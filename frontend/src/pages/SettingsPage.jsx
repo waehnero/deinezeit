@@ -1,0 +1,949 @@
+import { useState, useRef, useEffect } from 'react'
+import { useSettings } from '../contexts/SettingsContext'
+import { settingsApi } from '../services/api'
+import toast from 'react-hot-toast'
+import {
+  Settings2, Building2, Palette, HardDrive, Mail,
+  Save, Upload, Trash2, Download, Send, Loader2,
+  CheckCircle, Eye, EyeOff, RefreshCw, Cloud,
+  ImageIcon, Link2, Monitor
+} from 'lucide-react'
+
+// ── Farbthemen ────────────────────────────────────────────────────────────────
+const THEMES = [
+  { id: 'orange', label: 'Orange',  color: '#f97316' },
+  { id: 'blue',   label: 'Blau',    color: '#3b82f6' },
+  { id: 'green',  label: 'Grün',    color: '#22c55e' },
+  { id: 'purple', label: 'Lila',    color: '#a855f7' },
+  { id: 'teal',   label: 'Teal',    color: '#14b8a6' },
+  { id: 'red',    label: 'Rot',     color: '#f43f5e' },
+]
+
+// ── Tab-Komponente ────────────────────────────────────────────────────────────
+function Tab({ id, label, icon: Icon, active, onClick }) {
+  return (
+    <button
+      onClick={() => onClick(id)}
+      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition whitespace-nowrap
+        ${active
+          ? 'bg-primary-600 text-white shadow-sm'
+          : 'text-gray-600 hover:bg-gray-100'}`}
+    >
+      <Icon size={15} />
+      {label}
+    </button>
+  )
+}
+
+// ── Formularfeld ──────────────────────────────────────────────────────────────
+function Field({ label, children, hint }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {children}
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+    </div>
+  )
+}
+
+function Input({ value, onChange, type = 'text', placeholder, disabled }) {
+  return (
+    <input
+      type={type} value={value} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} disabled={disabled}
+      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50"
+    />
+  )
+}
+
+// ── Tab: Allgemein ────────────────────────────────────────────────────────────
+function TabAllgemein({ settings, onSaved }) {
+  const { updateSettings } = useSettings()
+  const [companyName,    setCompanyName]    = useState(settings.company_name || '')
+  const [appSubtitle,    setAppSubtitle]    = useState(settings.app_subtitle || '')
+  const [saving,         setSaving]         = useState(false)
+  const [logoUploading,  setLogoUploading]  = useState(false)
+  const [favUploading,   setFavUploading]   = useState(false)
+  const [contactGroups,  setContactGroups]  = useState([])
+  const [selectedContact, setSelectedContact] = useState({
+    id:   settings.company_contact_id   || '',
+    type: settings.company_contact_type || '',
+  })
+  const [contactSaving,  setContactSaving]  = useState(false)
+
+  const logoRef   = useRef(null)
+  const favRef    = useRef(null)
+
+  const logoUrl        = settings.logo_url        || null
+  const logoHeaderUrl  = settings.logo_header_url  || null
+  const logoFaviconUrl = settings.logo_favicon_url || null
+
+  // Kontaktoptionen laden
+  useEffect(() => {
+    settingsApi.getContactOptions()
+      .then(r => setContactGroups(r.data.groups || []))
+      .catch(() => {})
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await settingsApi.update({ company_name: companyName, app_subtitle: appSubtitle })
+      toast.success('Einstellungen gespeichert')
+      onSaved()
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setSaving(false) }
+  }
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const res = await settingsApi.uploadLogo(file)
+      updateSettings({
+        logo_url:        res.data.logo_url,
+        logo_header_url: res.data.logo_header_url,
+        logo_favicon_url: res.data.logo_favicon_url,
+      })
+      toast.success('Logo hochgeladen — 3 Varianten wurden automatisch generiert')
+      onSaved()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Upload fehlgeschlagen')
+    } finally {
+      setLogoUploading(false)
+      if (logoRef.current) logoRef.current.value = ''
+    }
+  }
+
+  const handleDeleteLogo = async () => {
+    try {
+      await settingsApi.deleteLogo()
+      updateSettings({ logo_url: '', logo_header_url: '', logo_favicon_url: '' })
+      toast.success('Logo gelöscht')
+      onSaved()
+    } catch { toast.error('Fehler beim Löschen') }
+  }
+
+  const handleFaviconAutoGenerate = async () => {
+    if (!logoUrl) return toast.error('Zuerst ein Logo hochladen')
+    // Backend hat Favicon bereits beim Logo-Upload generiert — einfach Settings neu laden
+    toast.success('Favicon wurde beim Logo-Upload automatisch generiert')
+  }
+
+  const handleFaviconUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFavUploading(true)
+    try {
+      const res = await settingsApi.uploadFavicon(file)
+      updateSettings({ logo_favicon_url: res.data.logo_favicon_url })
+      toast.success('Favicon hochgeladen')
+      onSaved()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Favicon-Upload fehlgeschlagen')
+    } finally {
+      setFavUploading(false)
+      if (favRef.current) favRef.current.value = ''
+    }
+  }
+
+  const handleContactSave = async () => {
+    setContactSaving(true)
+    try {
+      await settingsApi.update({
+        company_contact_id:   selectedContact.id,
+        company_contact_type: selectedContact.type,
+      })
+      toast.success('Firmen-Kontakt gespeichert')
+      onSaved()
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setContactSaving(false) }
+  }
+
+  // Alle Records aus allen Gruppen flach für Selektor
+  const allContacts = contactGroups.flatMap(g =>
+    g.records.map(r => ({ ...r, type_name: g.type_name, type_slug: g.type_slug }))
+  )
+  const selectedName = allContacts.find(c => c.id === selectedContact.id)?.display_name || ''
+
+  return (
+    <div className="space-y-8">
+
+      {/* Firmendaten */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Firmendaten</h3>
+        <div className="grid grid-cols-1 gap-4">
+          <Field label="Firmenname" hint="Wird in der Sidebar und auf der Login-Seite angezeigt">
+            <Input value={companyName} onChange={setCompanyName} placeholder="Meine Firma GmbH" />
+          </Field>
+          <Field label="Untertitel" hint="Kurze Beschreibung unter dem Firmennamen">
+            <Input value={appSubtitle} onChange={setAppSubtitle} placeholder="Zeiterfassung & Stammdaten" />
+          </Field>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={handleSave} disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            Speichern
+          </button>
+        </div>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Logo */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Firmenlogo</h3>
+          <div className="flex gap-2">
+            <button onClick={() => logoRef.current?.click()} disabled={logoUploading}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+              {logoUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {logoUrl ? 'Neues Logo hochladen' : 'Logo hochladen'}
+            </button>
+            {logoUrl && (
+              <button onClick={handleDeleteLogo}
+                className="flex items-center gap-2 px-4 py-2 border border-red-200 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition">
+                <Trash2 size={14} /> Entfernen
+              </button>
+            )}
+          </div>
+          <input ref={logoRef} type="file" accept=".png,.jpg,.jpeg,.svg,.webp" className="hidden" onChange={handleLogoUpload} />
+        </div>
+
+        <p className="text-xs text-gray-400">
+          PNG, JPG oder WebP hochladen — das System generiert automatisch alle drei Varianten.
+          Für beste Qualität empfiehlt sich ein transparentes PNG mit min. 800px Breite.
+        </p>
+
+        {/* 3 Varianten-Vorschau */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+          {/* Sidebar-Logo */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <Monitor size={12} /> Sidebar
+            </div>
+            <div className="h-16 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center p-2">
+              {logoUrl
+                ? <img src={logoUrl} alt="Sidebar" className="max-h-full max-w-full object-contain" />
+                : <Building2 size={20} className="text-gray-300" />
+              }
+            </div>
+            <p className="text-xs text-gray-400">Original · Sidebar & Login</p>
+          </div>
+
+          {/* Berichtskopf */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <ImageIcon size={12} /> Berichtskopf
+            </div>
+            <div className="h-16 border border-gray-200 rounded-xl bg-white flex items-center justify-center p-2">
+              {logoHeaderUrl
+                ? <img src={`${logoHeaderUrl}?v=${Date.now()}`} alt="Header" className="max-h-full max-w-full object-contain" />
+                : <div className="text-xs text-gray-300 text-center">600 × 120 px<br/>für Berichte</div>
+              }
+            </div>
+            <p className="text-xs text-gray-400">Querformat · Berichte & Dokumente</p>
+          </div>
+
+          {/* Favicon */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <Monitor size={12} /> Browser-Tab
+            </div>
+            <div className="h-16 border border-gray-200 rounded-xl bg-gray-100 flex items-center gap-3 px-4">
+              <div className="w-8 h-8 border border-gray-200 rounded bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {logoFaviconUrl
+                  ? <img src={`${logoFaviconUrl}?v=${Date.now()}`} alt="Favicon" className="w-full h-full object-contain" />
+                  : <Monitor size={14} className="text-gray-300" />
+                }
+              </div>
+              <div className="text-xs text-gray-500 min-w-0">
+                <div className="font-medium truncate">{companyName || 'DeineZeit'}</div>
+                <div className="text-gray-400">Browser-Tab</div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">32 × 32 px · Automatisch generiert</p>
+          </div>
+
+        </div>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Favicon */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Favicon (Browser-Tab)</h3>
+        <p className="text-xs text-gray-400">
+          Beim Logo-Upload wird der Favicon automatisch als 32×32 Variante generiert.
+          Du kannst auch ein eigenes Favicon hochladen — z.B. ein Icon ohne Text.
+        </p>
+
+        <div className="flex items-center gap-4">
+          {/* Vorschau */}
+          <div className="flex-shrink-0">
+            {logoFaviconUrl ? (
+              <div className="w-16 h-16 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
+                <img
+                  src={`${logoFaviconUrl}?v=${Date.now()}`}
+                  alt="Favicon"
+                  className="w-8 h-8 object-contain"
+                />
+              </div>
+            ) : (
+              <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-300">
+                <Monitor size={20} />
+              </div>
+            )}
+          </div>
+
+          {/* Buttons */}
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button onClick={handleFaviconAutoGenerate} disabled={!logoUrl}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition">
+                <RefreshCw size={14} />
+                Aus Logo generieren
+              </button>
+              <button onClick={() => favRef.current?.click()} disabled={favUploading}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                {favUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                Eigenes hochladen
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">PNG, JPG oder ICO · wird auf 32×32 px skaliert</p>
+          </div>
+        </div>
+
+        <input ref={favRef} type="file" accept=".png,.jpg,.jpeg,.ico" className="hidden" onChange={handleFaviconUpload} />
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Firmen-Kontakt */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Firmen-Kontakt (Briefkopf)</h3>
+        <p className="text-xs text-gray-400">
+          Verknüpfe einen Kontakt aus den Stammdaten als offizielle Firmenadresse —
+          diese Daten werden als Briefkopf auf Rechnungen und Dokumenten verwendet.
+        </p>
+
+        {contactGroups.length === 0 ? (
+          <div className="p-4 border border-dashed border-gray-200 rounded-xl text-sm text-gray-400 text-center">
+            Keine Stammdaten-Einträge vorhanden. Zuerst einen Kontakt in den Stammdaten anlegen.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <Field label="Kontakt auswählen">
+              <select
+                value={selectedContact.id}
+                onChange={e => {
+                  const id = e.target.value
+                  const found = allContacts.find(c => c.id === id)
+                  setSelectedContact({ id, type: found?.type_slug || '' })
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">— Kein Kontakt ausgewählt —</option>
+                {contactGroups.map(group => (
+                  <optgroup key={group.type_slug} label={group.type_name}>
+                    {group.records.map(r => (
+                      <option key={r.id} value={r.id}>{r.display_name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </Field>
+
+            {selectedContact.id && selectedName && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-primary-50 border border-primary-200 rounded-xl text-sm text-primary-700">
+                <Link2 size={14} />
+                <span>Verknüpft mit: <strong>{selectedName}</strong></span>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button onClick={handleContactSave} disabled={contactSaving}
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition">
+                {contactSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                Kontakt-Verknüpfung speichern
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+    </div>
+  )
+}
+
+// ── Tab: Design ───────────────────────────────────────────────────────────────
+function TabDesign({ settings, onSaved }) {
+  const [theme, setTheme] = useState(settings.color_theme || 'orange')
+  const [saving, setSaving] = useState(false)
+  const { updateSettings } = useSettings()
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await settingsApi.update({ color_theme: theme })
+      updateSettings({ color_theme: theme })
+      toast.success('Design gespeichert')
+      onSaved()
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">Farbthema</label>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {THEMES.map(t => (
+            <button key={t.id} onClick={() => setTheme(t.id)}
+              className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition
+                ${theme === t.id ? 'border-gray-800 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}
+            >
+              <div className="w-10 h-10 rounded-full shadow-inner" style={{ backgroundColor: t.color }} />
+              <span className="text-xs font-medium text-gray-700">{t.label}</span>
+              {theme === t.id && <CheckCircle size={14} className="text-gray-700" />}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-gray-400">
+          Das gewählte Farbthema wird sofort für alle Benutzer aktiv — ohne Neustart.
+        </p>
+      </div>
+
+      {/* Vorschau */}
+      <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50">
+        <p className="text-xs font-medium text-gray-500 mb-3">Vorschau</p>
+        <div className="flex flex-wrap gap-2">
+          <button className="px-4 py-2 rounded-lg text-sm font-medium text-white" style={{ backgroundColor: THEMES.find(t=>t.id===theme)?.color }}>
+            Primär-Button
+          </button>
+          <button className="px-4 py-2 rounded-lg text-sm font-medium border" style={{ color: THEMES.find(t=>t.id===theme)?.color, borderColor: THEMES.find(t=>t.id===theme)?.color }}>
+            Outline-Button
+          </button>
+          <span className="px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: THEMES.find(t=>t.id===theme)?.color + '20', color: THEMES.find(t=>t.id===theme)?.color }}>
+            Badge
+          </span>
+        </div>
+      </div>
+
+      <div className="pt-2 flex justify-end">
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition">
+          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+          Design übernehmen
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Cloud-Speicher Vorschläge ─────────────────────────────────────────────────
+const CLOUD_PRESETS = [
+  {
+    id: 'onedrive',
+    label: 'OneDrive',
+    hint: 'Automatisch mit Microsoft Cloud synchronisiert',
+    color: '#0078d4',
+    bg: '#eff6ff',
+    border: '#bfdbfe',
+    path: (user) => `C:\\Users\\${user}\\OneDrive\\Backups\\DeineZeit`,
+  },
+  {
+    id: 'googledrive',
+    label: 'Google Drive',
+    hint: 'Automatisch mit Google Drive synchronisiert',
+    color: '#1a73e8',
+    bg: '#f0fdf4',
+    border: '#bbf7d0',
+    path: (user) => `C:\\Users\\${user}\\Google Drive\\Backups\\DeineZeit`,
+  },
+  {
+    id: 'dropbox',
+    label: 'Dropbox',
+    hint: 'Automatisch mit Dropbox synchronisiert',
+    color: '#0061ff',
+    bg: '#f5f3ff',
+    border: '#ddd6fe',
+    path: (user) => `C:\\Users\\${user}\\Dropbox\\DeineZeit-Backup`,
+  },
+]
+
+// Versucht den Windows-Benutzernamen aus dem Backup-Pfad zu extrahieren
+function guessUsername(currentDir) {
+  if (!currentDir) return 'IhrName'
+  const m = currentDir.match(/^[A-Za-z]:\\[Uu]sers\\([^\\]+)/)
+  return m ? m[1] : 'IhrName'
+}
+
+// ── Tab: Backup ───────────────────────────────────────────────────────────────
+function TabBackup({ settings, onSaved }) {
+  const [backupDir,     setBackupDir]     = useState(settings.backup_dir            || '')
+  const [scheduleTime,  setScheduleTime]  = useState(settings.backup_schedule_time  || '02:00')
+  const [keepDays,      setKeepDays]      = useState(settings.backup_keep_days      || '30')
+  const [saving,        setSaving]        = useState(false)
+  const [downloading,   setDownloading]   = useState(false)
+
+  // Letzte 3 Backups aus backup_history (JSON-Array von ISO-Strings)
+  let history = []
+  try { history = JSON.parse(settings.backup_history || '[]') } catch {}
+
+  const username = guessUsername(backupDir || settings.backup_dir)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await settingsApi.update({
+        backup_dir:           backupDir,
+        backup_schedule_time: scheduleTime,
+        backup_keep_days:     keepDays,
+      })
+      toast.success('Backup-Einstellungen gespeichert')
+      onSaved()
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setSaving(false) }
+  }
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      const res   = await settingsApi.downloadBackup()
+      const url   = window.URL.createObjectURL(new Blob([res.data]))
+      const a     = document.createElement('a')
+      const cd    = res.headers['content-disposition'] || ''
+      const match = cd.match(/filename="?([^"]+)"?/)
+      a.href      = url
+      a.download  = match ? match[1] : `deinezeit_backup_${new Date().toISOString().slice(0,10)}.sql`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success('Backup heruntergeladen')
+      onSaved()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Backup fehlgeschlagen')
+    } finally { setDownloading(false) }
+  }
+
+  const fmtBackupDate = (iso) => {
+    try {
+      return new Date(iso).toLocaleString('de-AT', {
+        weekday: 'short', day: '2-digit', month: '2-digit',
+        year: 'numeric', hour: '2-digit', minute: '2-digit'
+      })
+    } catch { return iso }
+  }
+
+  return (
+    <div className="space-y-6">
+
+      {/* Cloud-Speicher Schnellauswahl */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+          <Cloud size={14} className="text-gray-400" />
+          Cloud-Speicher (Schnellauswahl)
+        </label>
+        <p className="text-xs text-gray-400 mb-3">
+          Backups werden im Cloud-Sync-Ordner gespeichert und automatisch hochgeladen.
+          Benutzernamen ggf. anpassen.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {CLOUD_PRESETS.map(preset => {
+            const suggestedPath = preset.path(username)
+            const isActive = backupDir === suggestedPath
+            return (
+              <button
+                key={preset.id}
+                onClick={() => setBackupDir(suggestedPath)}
+                className={`text-left p-3 rounded-xl border-2 transition ${
+                  isActive
+                    ? 'border-primary-400 bg-primary-50'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                <div className="font-medium text-sm text-gray-800 mb-0.5 flex items-center gap-1.5">
+                  {isActive && <CheckCircle size={13} className="text-primary-500 flex-shrink-0" />}
+                  {preset.label}
+                </div>
+                <div className="text-xs text-gray-400">{preset.hint}</div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Automatisches Backup – Einstellungen */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Backup-Ordner" hint="Lokaler oder Cloud-Sync-Pfad für die .sql-Dateien">
+          <Input value={backupDir} onChange={setBackupDir} placeholder="C:\Backups\DeineZeit" />
+        </Field>
+        <Field label="Tägliche Backup-Zeit" hint="Uhrzeit für den automatischen Windows-Task">
+          <Input value={scheduleTime} onChange={setScheduleTime} placeholder="02:00" />
+        </Field>
+        <Field label="Aufbewahrung">
+          <select value={keepDays} onChange={e => setKeepDays(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option value="7">7 Tage</option>
+            <option value="14">14 Tage</option>
+            <option value="30">30 Tage</option>
+            <option value="60">60 Tage</option>
+            <option value="90">90 Tage</option>
+            <option value="365">1 Jahr</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
+        <strong>Automatische Synchronisation:</strong> Änderungen werden innerhalb von 30 Sekunden
+        automatisch auf den Windows-Aufgabenplaner übertragen — kein manuelles Ausführen nötig.
+      </div>
+
+      <div className="flex justify-end">
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition">
+          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+          Einstellungen speichern
+        </button>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Manuelles Backup / Download */}
+      <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50 space-y-3">
+        <div>
+          <p className="text-sm font-medium text-gray-700">Backup jetzt erstellen</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Erstellt sofort einen vollständigen Datenbank-Dump und lädt ihn in deinen Download-Ordner.
+          </p>
+        </div>
+        <button onClick={handleDownload} disabled={downloading}
+          className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-400 text-white text-sm font-medium rounded-xl transition">
+          {downloading
+            ? <><Loader2 size={15} className="animate-spin" /> Erstelle Backup…</>
+            : <><Download size={15} /> Backup herunterladen</>
+          }
+        </button>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Letzte 3 Backups */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">Letzte Backups</label>
+        {history.length === 0 ? (
+          <p className="text-sm text-gray-400">Noch kein Backup aufgezeichnet.</p>
+        ) : (
+          <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+            {history.map((iso, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 bg-white">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${i === 0 ? 'bg-green-400' : 'bg-gray-300'}`} />
+                <span className="text-sm text-gray-700">{fmtBackupDate(iso)}</span>
+                {i === 0 && <span className="ml-auto text-xs text-green-600 font-medium">Letztes</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  )
+}
+
+// ── E-Mail-Anbieter Schnellauswahl ────────────────────────────────────────────
+const EMAIL_PROVIDERS = [
+  {
+    id: 'office365',
+    label: 'Office 365',
+    emoji: '🏢',
+    host: 'smtp.office365.com',
+    port: '587',
+    tls: true,
+    steps: [
+      { label: 'Schritt 1 – SMTP AUTH aktivieren', text: 'Im Microsoft 365 Admin Center (admin.microsoft.com) → Benutzer → Aktive Benutzer → Benutzer wählen → Tab „E-Mail" → „E-Mail-Apps verwalten" → Haken bei „Authentifiziertes SMTP" setzen → Speichern.' },
+      { label: 'Schritt 2 – Warten', text: 'Wichtig: Die Änderung kann 30–60 Minuten dauern bis sie wirkt. Danach erneut testen.' },
+      { label: 'MFA aktiv?', text: 'Falls Mehr-Faktor-Authentifizierung eingeschaltet ist: Unter myaccount.microsoft.com → Sicherheitsinfo ein App-Passwort erstellen und dieses statt des normalen Passworts verwenden.' },
+      { label: 'Immer noch Fehler 535?', text: 'Unter admin.microsoft.com → Einstellungen → Organisationseinstellungen → Dienste → Moderne Authentifizierung prüfen ob SMTP AUTH auf Tenant-Ebene deaktiviert ist. Falls ja: dort aktivieren oder einen IT-Administrator kontaktieren.' },
+    ],
+  },
+  {
+    id: 'gmail',
+    label: 'Gmail',
+    emoji: '📧',
+    host: 'smtp.gmail.com',
+    port: '587',
+    tls: true,
+    hint: {
+      type: 'info',
+      text: 'Bei aktivierter 2-Faktor-Authentifizierung muss ein App-Passwort verwendet werden: Google-Konto → Sicherheit → App-Passwörter. Das normale Google-Passwort funktioniert dann nicht.',
+    },
+  },
+  {
+    id: 'gmx',
+    label: 'GMX',
+    emoji: '📬',
+    host: 'smtp.gmx.net',
+    port: '587',
+    tls: true,
+    hint: {
+      type: 'info',
+      text: 'SMTP-Zugang in GMX aktivieren: Einstellungen → E-Mail → POP3/IMAP Abruf → SMTP-Zugang aktivieren.',
+    },
+  },
+  {
+    id: 'webde',
+    label: 'web.de',
+    emoji: '📮',
+    host: 'smtp.web.de',
+    port: '587',
+    tls: true,
+    hint: {
+      type: 'info',
+      text: 'SMTP-Zugang in web.de aktivieren: Einstellungen → E-Mail → Externe Programme.',
+    },
+  },
+  {
+    id: 'custom',
+    label: 'Eigener Server',
+    emoji: '🖥️',
+    host: null,
+    port: null,
+    tls: null,
+    hint: null,
+  },
+]
+
+// ── Tab: E-Mail ───────────────────────────────────────────────────────────────
+function TabEmail({ settings, onSaved }) {
+  const [host,      setHost]      = useState(settings.smtp_host      || '')
+  const [port,      setPort]      = useState(settings.smtp_port      || '587')
+  const [user,      setUser]      = useState(settings.smtp_user      || '')
+  const [password,  setPassword]  = useState('')
+  const [fromName,  setFromName]  = useState(settings.smtp_from_name  || '')
+  const [fromEmail, setFromEmail] = useState(settings.smtp_from_email || '')
+  const [tls,       setTls]       = useState(settings.smtp_tls !== 'false')
+  const [showPass,  setShowPass]  = useState(false)
+  const [saving,    setSaving]    = useState(false)
+  const [testEmail, setTestEmail] = useState('')
+  const [testing,   setTesting]   = useState(false)
+  const [activeProvider, setActiveProvider] = useState(null)
+
+  const selectProvider = (provider) => {
+    setActiveProvider(provider.id)
+    if (provider.host !== null) {
+      setHost(provider.host)
+      setPort(provider.port)
+      setTls(provider.tls)
+    }
+  }
+
+  const currentHint = EMAIL_PROVIDERS.find(p => p.id === activeProvider)?.hint
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const payload = { smtp_host: host, smtp_port: port, smtp_user: user, smtp_from_name: fromName, smtp_from_email: fromEmail, smtp_tls: tls ? 'true' : 'false' }
+      if (password) payload.smtp_password = password
+      await settingsApi.update(payload)
+      toast.success('E-Mail-Einstellungen gespeichert')
+      setPassword('')
+      onSaved()
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setSaving(false) }
+  }
+
+  const handleTest = async () => {
+    if (!testEmail) return toast.error('Bitte eine Empfänger-E-Mail eingeben')
+    setTesting(true)
+    try {
+      const res = await settingsApi.testEmail(testEmail)
+      toast.success(res.data.message || 'Test-Mail gesendet!')
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Versand fehlgeschlagen')
+    } finally { setTesting(false) }
+  }
+
+  return (
+    <div className="space-y-5">
+
+      {/* Anbieter-Schnellauswahl */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-2">Anbieter auswählen</p>
+        <div className="flex flex-wrap gap-2">
+          {EMAIL_PROVIDERS.map(provider => (
+            <button
+              key={provider.id}
+              type="button"
+              onClick={() => selectProvider(provider)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition ${
+                activeProvider === provider.id
+                  ? 'border-primary-500 bg-primary-50 text-primary-700'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <span>{provider.emoji}</span>
+              {provider.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Anbieter-Hinweis */}
+      {currentHint && (
+        <div className={`p-4 rounded-xl text-sm ${
+          currentHint.type === 'warning'
+            ? 'bg-amber-50 border border-amber-200 text-amber-800'
+            : 'bg-blue-50 border border-blue-200 text-blue-800'
+        }`}>
+          <div className="flex gap-2 mb-2 font-medium">
+            <span>{currentHint.type === 'warning' ? '⚠️' : 'ℹ️'}</span>
+            <span>{currentHint.type === 'warning' ? 'Wichtige Hinweise zur Einrichtung' : 'Hinweis'}</span>
+          </div>
+          {currentHint.steps ? (
+            <ol className="space-y-2 ml-1">
+              {currentHint.steps.map((step, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="font-bold flex-shrink-0">{i + 1}.</span>
+                  <span><span className="font-semibold">{step.label}:</span> {step.text}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="leading-relaxed ml-1">{currentHint.text}</p>
+          )}
+        </div>
+      )}
+
+      {/* Formular */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="SMTP-Server (Host)">
+          <Input value={host} onChange={setHost} placeholder="smtp.example.com" />
+        </Field>
+        <Field label="Port">
+          <Input value={port} onChange={setPort} placeholder="587" />
+        </Field>
+        <Field label="Benutzername">
+          <Input value={user} onChange={setUser} placeholder="user@example.com" />
+        </Field>
+        <Field label="Passwort" hint="Leer lassen um das gespeicherte Passwort zu behalten">
+          <div className="relative">
+            <input
+              type={showPass ? 'text' : 'password'} value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <button type="button" onClick={() => setShowPass(p => !p)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </Field>
+        <Field label="Absender-Name">
+          <Input value={fromName} onChange={setFromName} placeholder="DeineZeit" />
+        </Field>
+        <Field label="Absender-E-Mail">
+          <Input value={fromEmail} onChange={setFromEmail} placeholder="noreply@firma.at" type="email" />
+        </Field>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input type="checkbox" id="tls" checked={tls} onChange={e => setTls(e.target.checked)}
+          className="w-4 h-4 rounded accent-primary-600" />
+        <label htmlFor="tls" className="text-sm font-medium text-gray-700 cursor-pointer">
+          STARTTLS verwenden (empfohlen für Port 587)
+        </label>
+      </div>
+
+      <div className="flex justify-end pt-2">
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition">
+          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+          Speichern
+        </button>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Test-Mail */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Test-E-Mail senden</label>
+        <p className="text-xs text-gray-400 mb-3">
+          Sendet eine Test-Mail um die Konfiguration zu überprüfen. Zuerst speichern, dann testen.
+        </p>
+        <div className="flex gap-3">
+          <input
+            type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)}
+            placeholder="empfaenger@example.com"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <button onClick={handleTest} disabled={testing || !host}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition">
+            {testing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            Senden
+          </button>
+        </div>
+        {!host && <p className="text-xs text-orange-500 mt-2">Bitte zuerst SMTP-Server eingeben und speichern.</p>}
+      </div>
+    </div>
+  )
+}
+
+// ── Hauptseite ────────────────────────────────────────────────────────────────
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState('allgemein')
+  const { settings, loading, loadSettings } = useSettings()
+
+  const tabs = [
+    { id: 'allgemein', label: 'Allgemein',  icon: Building2  },
+    { id: 'design',    label: 'Design',     icon: Palette    },
+    { id: 'backup',    label: 'Backup',     icon: HardDrive  },
+    { id: 'email',     label: 'E-Mail',     icon: Mail       },
+  ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 size={28} className="animate-spin text-primary-400" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-8">
+        <div className="p-2 bg-primary-50 rounded-xl">
+          <Settings2 size={22} className="text-primary-600" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Programm konfigurieren</p>
+        </div>
+        <button onClick={loadSettings} className="ml-auto p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition" title="Neu laden">
+          <RefreshCw size={16} />
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {tabs.map(t => (
+          <Tab key={t.id} {...t} active={activeTab === t.id} onClick={setActiveTab} />
+        ))}
+      </div>
+
+      {/* Inhalt */}
+      <div className="card p-6">
+        {activeTab === 'allgemein' && <TabAllgemein settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'design'    && <TabDesign    settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'backup'    && <TabBackup    settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'email'     && <TabEmail     settings={settings} onSaved={loadSettings} />}
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Farbthemen (CSS-Variablen für Tailwind primary-*) ───────────────────── */
+:root {
+  /* Standard: Orange */
+  --p-50:  #fff7ed;
+  --p-100: #ffedd5;
+  --p-200: #fed7aa;
+  --p-300: #fdba74;
+  --p-400: #fb923c;
+  --p-500: #f97316;
+  --p-600: #ea580c;
+  --p-700: #c2410c;
+  --p-800: #9a3412;
+  --p-900: #7c2d12;
+}
+
+/* Thema: Blau */
+[data-theme="blue"] {
+  --p-50:  #eff6ff;
+  --p-100: #dbeafe;
+  --p-200: #bfdbfe;
+  --p-300: #93c5fd;
+  --p-400: #60a5fa;
+  --p-500: #3b82f6;
+  --p-600: #2563eb;
+  --p-700: #1d4ed8;
+  --p-800: #1e40af;
+  --p-900: #1e3a8a;
+}
+
+/* Thema: Grün */
+[data-theme="green"] {
+  --p-50:  #f0fdf4;
+  --p-100: #dcfce7;
+  --p-200: #bbf7d0;
+  --p-300: #86efac;
+  --p-400: #4ade80;
+  --p-500: #22c55e;
+  --p-600: #16a34a;
+  --p-700: #15803d;
+  --p-800: #166534;
+  --p-900: #14532d;
+}
+
+/* Thema: Lila */
+[data-theme="purple"] {
+  --p-50:  #faf5ff;
+  --p-100: #f3e8ff;
+  --p-200: #e9d5ff;
+  --p-300: #d8b4fe;
+  --p-400: #c084fc;
+  --p-500: #a855f7;
+  --p-600: #9333ea;
+  --p-700: #7e22ce;
+  --p-800: #6b21a8;
+  --p-900: #581c87;
+}
+
+/* Thema: Teal */
+[data-theme="teal"] {
+  --p-50:  #f0fdfa;
+  --p-100: #ccfbf1;
+  --p-200: #99f6e4;
+  --p-300: #5eead4;
+  --p-400: #2dd4bf;
+  --p-500: #14b8a6;
+  --p-600: #0d9488;
+  --p-700: #0f766e;
+  --p-800: #115e59;
+  --p-900: #134e4a;
+}
+
+/* Thema: Rot */
+[data-theme="red"] {
+  --p-50:  #fff1f2;
+  --p-100: #ffe4e6;
+  --p-200: #fecdd3;
+  --p-300: #fda4af;
+  --p-400: #fb7185;
+  --p-500: #f43f5e;
+  --p-600: #e11d48;
+  --p-700: #be123c;
+  --p-800: #9f1239;
+  --p-900: #881337;
+}
+
+@layer base {
+  body {
+    @apply text-neutral-900 antialiased bg-neutral-50;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600
+           text-white text-sm font-medium rounded-lg transition-all duration-150
+           shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-neutral-50
+           text-neutral-700 text-sm font-medium rounded-lg border border-neutral-200
+           transition-all duration-150 shadow-sm focus:outline-none
+           focus:ring-2 focus:ring-primary-400 focus:ring-offset-1;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100
+           text-red-700 text-sm font-medium rounded-lg border border-red-200
+           transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-400;
+  }
+
+  .card {
+    @apply bg-white rounded-xl border border-neutral-200;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
+  }
+
+  .input {
+    @apply w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-sm
+           text-neutral-900 placeholder-neutral-400 transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-neutral-700 mb-1;
+  }
+}
