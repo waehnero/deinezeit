@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db.base import get_db
 from app.models.attachment import Attachment
+from app.models.masterdata import EntityRecord, EntityType
 from app.models.user import User
 from app.api.deps import get_current_user
 from app.services import storage_service
@@ -94,6 +95,44 @@ def _to_response(a: Attachment) -> dict:
 
 # ── Alle Anhänge abrufen (optional gefiltert) ────────────────────────────────
 
+def _build_entity_label_map(db: Session, rows) -> dict:
+    """
+    Baut eine Map { (entity_type, entity_id) -> display_label } auf.
+    Für Stammdaten-Einträge wird EntityRecord.display_name genutzt.
+    """
+    label_map = {}
+    # Sammle alle einzigartigen (type, id) Kombinationen
+    pairs = set((r.entity_type, str(r.entity_id)) for r in rows)
+
+    for etype, eid in pairs:
+        try:
+            # Versuche Stammdaten-Eintrag zu finden (EntityRecord mit passendem EntityType.slug)
+            et = db.query(EntityType).filter(EntityType.slug == etype).first()
+            if et:
+                rec = db.query(EntityRecord).filter(
+                    EntityRecord.id == eid,
+                    EntityRecord.entity_type_id == et.id
+                ).first()
+                if rec and rec.display_name:
+                    label_map[(etype, eid)] = rec.display_name
+                elif rec and rec.data:
+                    # Fallback: ersten Nicht-Leer-Wert aus data nehmen
+                    first_val = next((str(v) for v in rec.data.values() if v), None)
+                    if first_val:
+                        label_map[(etype, eid)] = first_val
+        except Exception:
+            pass  # Bei Fehler einfach UUID anzeigen
+
+    return label_map
+
+
+def _to_response_with_label(attachment: Attachment, label_map: dict) -> dict:
+    r = _to_response(attachment)
+    key = (attachment.entity_type, str(attachment.entity_id))
+    r["entity_label"] = label_map.get(key)
+    return r
+
+
 @router.get("/all")
 async def list_all_attachments(
     entity_type: Optional[str] = Query(None),
@@ -108,7 +147,8 @@ async def list_all_attachments(
     if entity_id:
         q = q.filter(Attachment.entity_id == entity_id)
     rows = q.order_by(Attachment.created_at.desc()).all()
-    return {"attachments": [_to_response(r) for r in rows]}
+    label_map = _build_entity_label_map(db, rows)
+    return {"attachments": [_to_response_with_label(r, label_map) for r in rows]}
 
 
 # ── Anhänge abrufen ───────────────────────────────────────────────────────────

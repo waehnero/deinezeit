@@ -421,7 +421,12 @@ export default function DatacenterPage() {
         if (!typeMap[a.entity_type]) typeMap[a.entity_type] = { slug: a.entity_type, count: 0, entityMap: {} }
         typeMap[a.entity_type].count++
         if (!typeMap[a.entity_type].entityMap[a.entity_id]) {
-          typeMap[a.entity_type].entityMap[a.entity_id] = { id: a.entity_id, label: a.entity_id, count: 0 }
+          // entity_label vom Backend nutzen (sprechender Name statt UUID)
+          typeMap[a.entity_type].entityMap[a.entity_id] = {
+            id: a.entity_id,
+            label: a.entity_label || a.entity_id,
+            count: 0
+          }
         }
         typeMap[a.entity_type].entityMap[a.entity_id].count++
       })
@@ -518,11 +523,17 @@ export default function DatacenterPage() {
   const fileCount = attachments.filter(a => a.type === 'file').length
   const linkCount = attachments.filter(a => a.type === 'link').length
 
-  // Titel der aktuellen Auswahl
+  // Titel der aktuellen Auswahl — bei Unterordner den sprechenden Namen aus dem Ordnerbaum holen
+  const currentEntityLabel = selected?.entityId
+    ? folders.types?.find(t => t.slug === selected.type)
+        ?.entities?.find(e => e.id === selected.entityId)?.label
+      || selected.entityId
+    : null
+
   const currentTitle = selected === null
     ? 'Alle Dateien'
     : selected.entityId
-      ? `${entityLabel(selected.type)} / ${selected.entityId}`
+      ? `${entityLabel(selected.type)} / ${currentEntityLabel}`
       : entityLabel(selected.type)
 
   return (
