@@ -2,11 +2,13 @@ import { useState, useCallback, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragOverlay,
+  useDroppable,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -227,8 +229,12 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
   const [availableTypes, setAvailableTypes] = useState([])
   const [loading, setLoading]         = useState(false)
 
-  // Wenn sich activeTab ändert, Default setzen
-  useEffect(() => { setSelectedTab(activeTab || tabs[0] || null) }, [activeTab, tabs])
+  // Beim Öffnen des Panels immer den aktuell aktiven Tab übernehmen
+  useEffect(() => {
+    if (open) {
+      setSelectedTab(activeTab || tabs[0] || null)
+    }
+  }, [open, activeTab, tabs])
 
   useEffect(() => {
     if (fieldType === 'relation') {
@@ -380,6 +386,36 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
         </div>
       </form>
     </div>
+  )
+}
+
+// ── Tab als Drop-Zone ────────────────────────────────────────────────────────
+// Wird nur während eines Drag-Vorgangs als Ziel genutzt
+function DroppableTab({ tab, isActive, fieldCount, isDragging, onClick }) {
+  const { isOver, setNodeRef } = useDroppable({ id: `tab::${tab}` })
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      onClick={onClick}
+      className={`px-4 py-2 text-sm font-medium transition -mb-px border-b-2 rounded-t-lg ${
+        isActive
+          ? 'border-primary-500 text-primary-700 bg-primary-50'
+          : isOver && isDragging
+          ? 'border-amber-400 bg-amber-50 text-amber-800 scale-105'
+          : isDragging
+          ? 'border-dashed border-gray-300 text-gray-500 bg-gray-50'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+      }`}
+    >
+      {tab}
+      <span className={`ml-1.5 text-xs ${isOver && isDragging ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
+        ({fieldCount})
+      </span>
+      {isOver && isDragging && (
+        <span className="ml-1 text-xs text-amber-600">← hier ablegen</span>
+      )}
+    </button>
   )
 }
 
@@ -543,7 +579,25 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
 
   const handleDragEnd = ({ active, over }) => {
     setActiveId(null)
-    if (!over || active.id === over.id) return
+    if (!over) return
+
+    // ── Auf einen Tab-Button fallen gelassen → Feld in diesen Tab verschieben
+    if (String(over.id).startsWith('tab::')) {
+      const targetTab = String(over.id).replace('tab::', '')
+      setFields(prev => {
+        const updated = prev.map(f =>
+          f.id === active.id ? { ...f, tab: targetTab } : f
+        )
+        saveLayout(updated)
+        onFieldsChanged?.(updated)
+        return updated
+      })
+      setActiveTab(targetTab)   // direkt zum Ziel-Tab wechseln
+      return
+    }
+
+    // ── Normales Umsortieren innerhalb des aktiven Tabs
+    if (active.id === over.id) return
     setFields(prev => {
       const oldIdx = prev.findIndex(f => f.id === active.id)
       const newIdx = prev.findIndex(f => f.id === over.id)
@@ -653,25 +707,32 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
           {/* Tab-Verwaltung */}
           <TabManager slug={entityType.slug} tabs={tabs} onTabsChanged={handleTabsChanged} />
 
-          {/* Tab-Navigation im Builder */}
+          {/* 12-Spalten Grid — DndContext umschließt Tab-Navigation + Felder */}
+          {/* pointerWithin erkennt Drop auf Tab-Buttons; closestCenter als Fallback für Sortierung */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={(args) => pointerWithin(args).length > 0 ? pointerWithin(args) : closestCenter(args)}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+          {/* Tab-Navigation im Builder (Drop-Zonen während Drag) */}
           {tabs.length > 0 && (
             <div className="flex items-center gap-1 mb-4 border-b border-gray-200 pb-0">
               {tabs.map(tab => (
-                <button
+                <DroppableTab
                   key={tab}
+                  tab={tab}
+                  isActive={activeTab === tab}
+                  fieldCount={fields.filter(f => (f.tab || tabs[0]) === tab).length}
+                  isDragging={!!activeId}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition -mb-px border-b-2 ${
-                    activeTab === tab
-                      ? 'border-primary-500 text-primary-700 bg-primary-50'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {tab}
-                  <span className="ml-1.5 text-xs text-gray-400">
-                    ({fields.filter(f => (f.tab || tabs[0]) === tab).length})
-                  </span>
-                </button>
+                />
               ))}
+              {activeId && (
+                <span className="ml-3 text-xs text-amber-600 animate-pulse">
+                  ↑ Feld auf Register-Reiter fallen lassen zum Verschieben
+                </span>
+              )}
             </div>
           )}
 
@@ -680,14 +741,6 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
             <span className="inline-block w-3 h-3 border border-gray-300 rounded-sm"></span>
             Unsichtbares 12-Spalten-Raster · Felder einrasten automatisch
           </p>
-
-          {/* 12-Spalten Grid */}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
             <SortableContext items={visibleFields.map(f => f.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-12 gap-3 auto-rows-auto">
                 {visibleFields.map(field => (
