@@ -40,3 +40,9 @@ desktop.ini
 # Backup-Dateien
 *.sql
 backups/
+
+# Temporaere Dateien
+.watcher-pid
+
+# Hochgeladene Logos (werden zur Laufzeit generiert)
+backend/static/logo/
