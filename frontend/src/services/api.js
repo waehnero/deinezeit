@@ -121,4 +121,23 @@ export const settingsApi = {
   downloadBackup: () => api.get('/settings/backup/download', { responseType: 'blob' }),
 }
 
+export const datacenterApi = {
+  list:            (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),
+  upload:          (entityType, entityId, file, onProgress) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/datacenter/${entityType}/${entityId}/upload`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress,
+    })
+  },
+  addLink:         (data) => api.post('/datacenter/link', data),
+  download:        (id) => api.get(`/datacenter/${id}/download`, { responseType: 'blob' }),
+  preview:         (id) => api.get(`/datacenter/${id}/preview`, { responseType: 'blob' }),
+  createShareLink: (id, expiresHours) => api.post(`/datacenter/${id}/share-link`, { expires_hours: expiresHours }),
+  deleteShareLink: (id) => api.delete(`/datacenter/${id}/share-link`),
+  delete:          (id) => api.delete(`/datacenter/${id}`),
+  getProviders:    () => api.get('/datacenter/providers'),
+}
+
 export default api

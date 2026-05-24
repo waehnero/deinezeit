@@ -8,8 +8,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import os
 from app.core.config import settings
-from app.api import auth, users, masterdata, zeiterfassung, reports
+from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter
 from app.api import settings as settings_api
+from app.services import storage_service
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
@@ -49,6 +50,16 @@ app.include_router(masterdata.router, prefix="/api")
 app.include_router(zeiterfassung.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")
+app.include_router(datacenter.router, prefix="/api")
+
+
+# ── MinIO Bucket beim Start sicherstellen ─────────────────────────────────────
+@app.on_event("startup")
+async def startup_event():
+    try:
+        storage_service.ensure_bucket()
+    except Exception as e:
+        print(f"[WARN] MinIO Bucket konnte nicht erstellt werden: {e}")
 
 
 @app.get("/api/health")
