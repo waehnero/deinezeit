@@ -122,6 +122,14 @@ export const settingsApi = {
 }
 
 export const datacenterApi = {
+  // Alle Anhänge laden (optional gefiltert nach entityType und/oder entityId)
+  listAll:         (entityType, entityId) => {
+    const params = {}
+    if (entityType) params.entity_type = entityType
+    if (entityId)   params.entity_id   = entityId
+    return api.get('/datacenter/all', { params })
+  },
+  // Anhänge für einen konkreten Datensatz laden
   list:            (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),
   upload:          (entityType, entityId, file, onProgress) => {
     const form = new FormData()
@@ -134,6 +142,7 @@ export const datacenterApi = {
   addLink:         (data) => api.post('/datacenter/link', data),
   download:        (id) => api.get(`/datacenter/${id}/download`, { responseType: 'blob' }),
   preview:         (id) => api.get(`/datacenter/${id}/preview`, { responseType: 'blob' }),
+  download_blob:   (id) => api.get(`/datacenter/${id}/download`, { responseType: 'blob' }),
   createShareLink: (id, expiresHours) => api.post(`/datacenter/${id}/share-link`, { expires_hours: expiresHours }),
   deleteShareLink: (id) => api.delete(`/datacenter/${id}/share-link`),
   delete:          (id) => api.delete(`/datacenter/${id}`),

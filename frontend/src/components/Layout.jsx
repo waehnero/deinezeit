@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Database, Users, User, LogOut, Menu, X,
-  ChevronRight, Clock, Settings2
+  ChevronRight, Clock, Settings2, HardDrive
 } from 'lucide-react'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/zeiterfassung',icon: Clock,           label: 'Zeiterfassung' },
   { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },
+  { to: '/datacenter',   icon: HardDrive,       label: 'Datacenter' },
   { to: '/users',        icon: Users,           label: 'Benutzer' },
 ]
 

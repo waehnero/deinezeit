@@ -92,6 +92,25 @@ def _to_response(a: Attachment) -> dict:
     }
 
 
+# ── Alle Anhänge abrufen (optional gefiltert) ────────────────────────────────
+
+@router.get("/all")
+async def list_all_attachments(
+    entity_type: Optional[str] = Query(None),
+    entity_id:   Optional[str] = Query(None),
+    db:          Session = Depends(get_db),
+    _:           User = Depends(get_current_user),
+):
+    """Alle Anhänge abrufen – optional nach entity_type und/oder entity_id gefiltert."""
+    q = db.query(Attachment)
+    if entity_type:
+        q = q.filter(Attachment.entity_type == entity_type)
+    if entity_id:
+        q = q.filter(Attachment.entity_id == entity_id)
+    rows = q.order_by(Attachment.created_at.desc()).all()
+    return {"attachments": [_to_response(r) for r in rows]}
+
+
 # ── Anhänge abrufen ───────────────────────────────────────────────────────────
 
 @router.get("/{entity_type}/{entity_id}")

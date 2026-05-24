@@ -18,6 +18,7 @@ import UserManagementPage from './pages/UserManagementPage'
 import ZeiterfassungPage from './pages/ZeiterfassungPage'
 import ZeiterfassungFelder from './pages/ZeiterfassungFelder'
 import SettingsPage from './pages/SettingsPage'
+import DatacenterPage from './pages/DatacenterPage'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }) {
@@ -57,6 +58,7 @@ function App() {
                       <Route path="/profile"              element={<ProfilePage />} />
                       <Route path="/users"                element={<UserManagementPage />} />
                       <Route path="/zeiterfassung"        element={<ZeiterfassungPage />} />
+                      <Route path="/datacenter"           element={<DatacenterPage />} />
                       {/* Feldverwaltung & Einstellungen: nur Admin */}
                       <Route path="/zeiterfassung/felder" element={<AdminRoute><ZeiterfassungFelder /></AdminRoute>} />
                       <Route path="/settings"             element={<AdminRoute><SettingsPage /></AdminRoute>} />
