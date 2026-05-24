@@ -21,6 +21,9 @@ class EntityType(Base):
     description = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0)
+    # Geordnete Tab-Liste: ["Allgemein", "Bankdaten", "Kontakt"]
+    # Leere Liste = keine Tabs (klassisches Formular ohne Reiter)
+    tabs = Column(JSONB, nullable=True, default=list)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))
@@ -51,6 +54,10 @@ class FieldDefinition(Base):
     show_in_list = Column(Boolean, default=True)       # In der Tabellen-Übersicht anzeigen
     sort_order = Column(Integer, default=0)
     col_span = Column(Integer, default=12)             # Rasterbreite: 3=25%, 4=33%, 6=50%, 9=75%, 12=100%
+
+    # Tab-Zugehörigkeit: Name des Tabs (muss in EntityType.tabs enthalten sein)
+    # None = kein Tab / erster Tab
+    tab = Column(String(100), nullable=True)
 
     # Für Dropdown: Optionen als JSON-Array  ["Option A", "Option B"]
     options = Column(JSONB, nullable=True)

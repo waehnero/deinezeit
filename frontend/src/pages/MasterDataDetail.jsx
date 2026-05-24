@@ -64,6 +64,7 @@ function RecordModal({ entityType, record, onClose, onSaved }) {
             ) : (
               <DynamicForm
                 fields={entityType.fields}
+                tabs={entityType.tabs || []}
                 values={values}
                 onChange={setValues}
               />

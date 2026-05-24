@@ -180,15 +180,52 @@ async def update_fields_layout(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    """Reihenfolge UND Breite aller Felder in einem Aufruf speichern (Grid-Layout)."""
+    """Reihenfolge, Breite UND Tab-Zuweisung aller Felder in einem Aufruf speichern."""
     from app.models.masterdata import FieldDefinition as FD
     for item in layout:
-        db.query(FD).filter(FD.id == item["field_id"]).update({
+        update_data = {
             "sort_order": item["sort_order"],
-            "col_span": item.get("col_span", 12),
-        })
+            "col_span":   item.get("col_span", 12),
+        }
+        # Tab nur schreiben wenn explizit mitgegeben (auch None/null ist gültig)
+        if "tab" in item:
+            update_data["tab"] = item["tab"]
+        db.query(FD).filter(FD.id == item["field_id"]).update(update_data)
     db.commit()
     return {"message": "Layout gespeichert"}
+
+
+@router.put("/types/{slug}/tabs")
+async def update_tabs(
+    slug: str,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Tab-Liste des Stammdaten-Typs aktualisieren.
+    Body: { "tabs": ["Allgemein", "Bankdaten", "Kontakt"] }
+    """
+    et = masterdata_service.get_entity_type(db, slug)
+    if not et:
+        raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")
+
+    tabs = body.get("tabs", [])
+    if not isinstance(tabs, list):
+        raise HTTPException(status_code=400, detail="tabs muss eine Liste sein")
+
+    # Tabs bereinigen: leere Strings entfernen, Duplikate entfernen (Reihenfolge erhalten)
+    seen = set()
+    clean_tabs = []
+    for t in tabs:
+        t = str(t).strip()
+        if t and t not in seen:
+            seen.add(t)
+            clean_tabs.append(t)
+
+    et.tabs = clean_tabs
+    db.commit()
+    db.refresh(et)
+    return {"tabs": et.tabs}
 
 
 # ─── Datensätze ───────────────────────────────────────────────────────────────

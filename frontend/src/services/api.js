@@ -58,6 +58,7 @@ export const masterdataApi = {
   deleteField: (slug, fieldId) => api.delete(`/masterdata/types/${slug}/fields/${fieldId}`),
   updateFieldOrder: (slug, orders) => api.put(`/masterdata/types/${slug}/fields-order`, { orders }),
   updateFieldsLayout: (slug, layout) => api.put(`/masterdata/types/${slug}/fields-layout`, layout),
+  updateTabs: (slug, tabs) => api.put(`/masterdata/types/${slug}/tabs`, { tabs }),
 
   // Datensätze
   listRecords: (slug, params) => api.get(`/masterdata/types/${slug}/records`, { params }),

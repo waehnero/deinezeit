@@ -15,6 +15,7 @@ class FieldDefinitionBase(BaseModel):
     show_in_list: bool = True
     sort_order: int = 0
     col_span: int = 12   # 3=25%, 4=33%, 6=50%, 9=75%, 12=100%
+    tab: Optional[str] = None  # Tab-Name, z.B. "Allgemein", "Bankdaten"
     options: Optional[List[str]] = None
     placeholder: Optional[str] = None
     default_value: Optional[str] = None
@@ -33,6 +34,7 @@ class FieldDefinitionUpdate(BaseModel):
     show_in_list: Optional[bool] = None
     sort_order: Optional[int] = None
     col_span: Optional[int] = None
+    tab: Optional[str] = None
     options: Optional[List[str]] = None
     placeholder: Optional[str] = None
     default_value: Optional[str] = None
@@ -76,6 +78,7 @@ class EntityTypeResponse(EntityTypeBase):
     id: UUID
     is_active: bool
     record_count: int = 0
+    tabs: List[str] = []           # Geordnete Tab-Liste, z.B. ["Allgemein", "Bankdaten"]
     fields: List[FieldDefinitionResponse] = []
     created_at: datetime
 

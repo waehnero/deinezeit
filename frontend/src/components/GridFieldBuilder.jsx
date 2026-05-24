@@ -20,7 +20,8 @@ import { masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   GripVertical, Plus, Trash2, Pencil, Check, X,
-  ChevronDown, ChevronUp, Loader2, List
+  ChevronDown, ChevronUp, Loader2, List,
+  Layers, FolderPlus, ChevronRight
 } from 'lucide-react'
 import { FIELD_TYPES } from './FieldBuilder'
 
@@ -33,7 +34,6 @@ const COL_OPTIONS = [
   { span: 12, label: '100%', desc: 'Voll' },
 ]
 
-// col-span Tailwind-Klassen (müssen vollständig im Code stehen, nicht dynamisch)
 const COL_CLASSES = {
   3:  'col-span-3',
   4:  'col-span-4',
@@ -42,7 +42,7 @@ const COL_CLASSES = {
   12: 'col-span-12',
 }
 
-// ── Drag-Overlay (Vorschau während des Ziehens) ────────────────────────────────
+// ── Drag-Overlay ───────────────────────────────────────────────────────────────
 function DragPreview({ field }) {
   const TypeInfo = FIELD_TYPES.find(t => t.key === field.field_type) || FIELD_TYPES[0]
   return (
@@ -57,23 +57,19 @@ function DragPreview({ field }) {
 }
 
 // ── Einzelnes sortierbares Feld ───────────────────────────────────────────────
-function SortableField({ field, slug, onUpdated, onDeleted, onColSpanChange }) {
+function SortableField({ field, slug, tabs, activeTab, onUpdated, onDeleted, onColSpanChange, onTabChange }) {
   const {
     attributes, listeners, setNodeRef,
     transform, transition, isDragging,
   } = useSortable({ id: field.id })
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.3 : 1,
-  }
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }
 
-  const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(field.name)
-  const [isRequired, setIsRequired] = useState(field.is_required)
-  const [showInList, setShowInList] = useState(field.show_in_list)
-  const [loading, setLoading] = useState(false)
+  const [editing, setEditing]         = useState(false)
+  const [name, setName]               = useState(field.name)
+  const [isRequired, setIsRequired]   = useState(field.is_required)
+  const [showInList, setShowInList]   = useState(field.show_in_list)
+  const [loading, setLoading]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const TypeInfo = FIELD_TYPES.find(t => t.key === field.field_type) || FIELD_TYPES[0]
@@ -114,41 +110,25 @@ function SortableField({ field, slug, onUpdated, onDeleted, onColSpanChange }) {
   const colClass = COL_CLASSES[field.col_span] || 'col-span-12'
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`${colClass} group`}
-    >
+    <div ref={setNodeRef} style={style} className={`${colClass} group`}>
       <div className={`rounded-xl border transition h-full ${
-        isDragging
-          ? 'border-primary-300 bg-primary-50'
-          : editing
-          ? 'border-primary-400 bg-white shadow-sm'
-          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+        isDragging ? 'border-primary-300 bg-primary-50'
+        : editing   ? 'border-primary-400 bg-white shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
       }`}>
-
-        {/* Grip-Handle + Feldinhalt */}
         <div className="p-3">
           {editing ? (
-            /* Bearbeitungsmodus */
             <div className="space-y-2">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <input type="text" value={name} onChange={e => setName(e.target.value)} autoFocus
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
               <div className="flex gap-3 text-xs">
                 <label className="flex items-center gap-1.5 cursor-pointer text-gray-600">
-                  <input type="checkbox" checked={isRequired}
-                    onChange={e => setIsRequired(e.target.checked)}
+                  <input type="checkbox" checked={isRequired} onChange={e => setIsRequired(e.target.checked)}
                     className="w-3.5 h-3.5 accent-primary-600" />
                   Pflichtfeld
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer text-gray-600">
-                  <input type="checkbox" checked={showInList}
-                    onChange={e => setShowInList(e.target.checked)}
+                  <input type="checkbox" checked={showInList} onChange={e => setShowInList(e.target.checked)}
                     className="w-3.5 h-3.5 accent-primary-600" />
                   In Liste
                 </label>
@@ -156,8 +136,7 @@ function SortableField({ field, slug, onUpdated, onDeleted, onColSpanChange }) {
               <div className="flex gap-1.5">
                 <button onClick={handleSave} disabled={loading}
                   className="flex items-center gap-1 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 transition">
-                  {loading ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-                  OK
+                  {loading ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} OK
                 </button>
                 <button onClick={() => { setEditing(false); setName(field.name) }}
                   className="px-2 py-1 border border-gray-300 text-gray-500 text-xs rounded-lg hover:bg-gray-50 transition">
@@ -166,18 +145,12 @@ function SortableField({ field, slug, onUpdated, onDeleted, onColSpanChange }) {
               </div>
             </div>
           ) : (
-            /* Anzeigemodus */
             <div className="flex items-start gap-2">
-              {/* Drag-Handle */}
-              <button
-                {...attributes}
-                {...listeners}
+              <button {...attributes} {...listeners}
                 className="mt-0.5 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
-                aria-label="Feld verschieben"
-              >
+                aria-label="Feld verschieben">
                 <GripVertical size={15} />
               </button>
-
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <TypeIcon size={13} className="text-gray-400 flex-shrink-0" />
@@ -185,29 +158,19 @@ function SortableField({ field, slug, onUpdated, onDeleted, onColSpanChange }) {
                 </div>
                 <div className="flex flex-wrap gap-1 mt-1">
                   <span className="text-xs text-gray-400">{TypeInfo.label}</span>
-                  {field.is_required && (
-                    <span className="text-xs bg-red-50 text-red-500 px-1 rounded">Pflicht</span>
-                  )}
-                  {field.show_in_list && (
-                    <span className="text-xs bg-blue-50 text-blue-500 px-1 rounded">Liste</span>
-                  )}
+                  {field.is_required && <span className="text-xs bg-red-50 text-red-500 px-1 rounded">Pflicht</span>}
+                  {field.show_in_list && <span className="text-xs bg-blue-50 text-blue-500 px-1 rounded">Liste</span>}
                 </div>
               </div>
-
-              {/* Aktionen */}
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
                 <button onClick={() => setEditing(true)}
                   className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
                   <Pencil size={12} />
                 </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={loading}
+                <button onClick={handleDelete} disabled={loading}
                   className={`p-1 rounded-lg transition ${
                     confirmDelete ? 'bg-red-100 text-red-500' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                  }`}
-                  title={confirmDelete ? 'Nochmal klicken' : 'Löschen'}
-                >
+                  }`} title={confirmDelete ? 'Nochmal klicken' : 'Löschen'}>
                   {loading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                 </button>
               </div>
@@ -215,23 +178,34 @@ function SortableField({ field, slug, onUpdated, onDeleted, onColSpanChange }) {
           )}
         </div>
 
-        {/* Breitenauswahl (untere Leiste) */}
+        {/* Untere Leiste: Breite + Tab-Zuweisung */}
         {!editing && (
-          <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1 justify-center">
-            {COL_OPTIONS.map(opt => (
-              <button
-                key={opt.span}
-                onClick={() => onColSpanChange(field.id, opt.span)}
-                title={`${opt.desc} (${opt.label})`}
-                className={`text-xs px-1.5 py-0.5 rounded transition ${
-                  field.col_span === opt.span
-                    ? 'bg-primary-600 text-white font-medium'
-                    : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700'
-                }`}
+          <div className="border-t border-gray-100 px-2 py-1.5 flex items-center gap-2">
+            {/* Breitenauswahl */}
+            <div className="flex gap-1">
+              {COL_OPTIONS.map(opt => (
+                <button key={opt.span} onClick={() => onColSpanChange(field.id, opt.span)}
+                  title={`${opt.desc} (${opt.label})`}
+                  className={`text-xs px-1.5 py-0.5 rounded transition ${
+                    field.col_span === opt.span
+                      ? 'bg-primary-600 text-white font-medium'
+                      : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {/* Tab-Zuweisung (nur wenn Tabs definiert) */}
+            {tabs.length > 0 && (
+              <select
+                value={field.tab || tabs[0]}
+                onChange={e => onTabChange(field.id, e.target.value)}
+                className="ml-auto text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                title="Tab-Zuweisung"
               >
-                {opt.label}
-              </button>
-            ))}
+                {tabs.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            )}
           </div>
         )}
       </div>
@@ -240,19 +214,22 @@ function SortableField({ field, slug, onUpdated, onDeleted, onColSpanChange }) {
 }
 
 // ── Neues Feld hinzufügen ─────────────────────────────────────────────────────
-function AddFieldPanel({ slug, onAdded }) {
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [fieldType, setFieldType] = useState('text')
-  const [colSpan, setColSpan] = useState(12)
-  const [isRequired, setIsRequired] = useState(false)
-  const [options, setOptions] = useState('')
+function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
+  const [open, setOpen]               = useState(false)
+  const [name, setName]               = useState('')
+  const [fieldType, setFieldType]     = useState('text')
+  const [colSpan, setColSpan]         = useState(12)
+  const [isRequired, setIsRequired]   = useState(false)
+  const [options, setOptions]         = useState('')
   const [placeholder, setPlaceholder] = useState('')
   const [linkedTypeSlug, setLinkedTypeSlug] = useState('')
+  const [selectedTab, setSelectedTab] = useState(activeTab || (tabs[0] ?? null))
   const [availableTypes, setAvailableTypes] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]         = useState(false)
 
-  // EntityTypes für Relation-Picker laden
+  // Wenn sich activeTab ändert, Default setzen
+  useEffect(() => { setSelectedTab(activeTab || tabs[0] || null) }, [activeTab, tabs])
+
   useEffect(() => {
     if (fieldType === 'relation') {
       masterdataApi.listTypes()
@@ -277,17 +254,16 @@ function AddFieldPanel({ slug, onAdded }) {
         col_span: colSpan,
         is_required: isRequired,
         show_in_list: true,
+        tab: tabs.length > 0 ? (selectedTab || tabs[0]) : null,
         placeholder: placeholder || null,
-        options: fieldType === 'dropdown'
-          ? options.split(',').map(o => o.trim()).filter(Boolean)
-          : null,
+        options: fieldType === 'dropdown' ? options.split(',').map(o => o.trim()).filter(Boolean) : null,
         linked_type_slug: fieldType === 'relation' ? linkedTypeSlug : null,
       })
       toast.success(`Feld '${name}' hinzugefügt`)
       onAdded(res.data)
       setName(''); setFieldType('text'); setColSpan(12)
-      setIsRequired(false); setOptions(''); setPlaceholder('')
-      setLinkedTypeSlug(''); setOpen(false)
+      setIsRequired(false); setOptions(''); setPlaceholder(''); setLinkedTypeSlug('')
+      setOpen(false)
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Fehler beim Hinzufügen')
     } finally {
@@ -297,10 +273,8 @@ function AddFieldPanel({ slug, onAdded }) {
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="col-span-12 py-3 border-2 border-dashed border-gray-200 hover:border-primary-400 hover:bg-primary-50 rounded-xl text-sm text-gray-400 hover:text-primary-600 transition flex items-center justify-center gap-2"
-      >
+      <button onClick={() => setOpen(true)}
+        className="col-span-12 py-3 border-2 border-dashed border-gray-200 hover:border-primary-400 hover:bg-primary-50 rounded-xl text-sm text-gray-400 hover:text-primary-600 transition flex items-center justify-center gap-2">
         <Plus size={16} /> Neues Feld hinzufügen
       </button>
     )
@@ -315,8 +289,7 @@ function AddFieldPanel({ slug, onAdded }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Bezeichnung *</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              autoFocus required
+            <input type="text" value={name} onChange={e => setName(e.target.value)} autoFocus required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="z.B. Geburtsdatum, Umsatz …" />
           </div>
@@ -324,39 +297,31 @@ function AddFieldPanel({ slug, onAdded }) {
             <label className="block text-xs font-medium text-gray-600 mb-1">Feldtyp</label>
             <select value={fieldType} onChange={e => setFieldType(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
-              {FIELD_TYPES.map(({ key, label }) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
+              {FIELD_TYPES.map(({ key, label }) => <option key={key} value={key}>{label}</option>)}
             </select>
           </div>
         </div>
 
-        {/* Verknüpfungs-Zieltyp */}
         {fieldType === 'relation' && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Verknüpft mit *</label>
             {availableTypes.length === 0 ? (
               <p className="text-xs text-gray-400 py-2">Keine anderen Stammdaten-Typen vorhanden</p>
             ) : (
-              <select value={linkedTypeSlug} onChange={e => setLinkedTypeSlug(e.target.value)}
-                required
+              <select value={linkedTypeSlug} onChange={e => setLinkedTypeSlug(e.target.value)} required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
                 <option value="">— Typ auswählen —</option>
-                {availableTypes.map(t => (
-                  <option key={t.slug} value={t.slug}>{t.name}</option>
-                ))}
+                {availableTypes.map(t => <option key={t.slug} value={t.slug}>{t.name}</option>)}
               </select>
             )}
           </div>
         )}
 
-        {/* Breite */}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Breite im Formular</label>
           <div className="flex gap-1.5">
             {COL_OPTIONS.map(opt => (
-              <button key={opt.span} type="button"
-                onClick={() => setColSpan(opt.span)}
+              <button key={opt.span} type="button" onClick={() => setColSpan(opt.span)}
                 className={`flex-1 py-1.5 text-xs rounded-lg border transition ${
                   colSpan === opt.span
                     ? 'bg-primary-600 text-white border-primary-600 font-medium'
@@ -367,6 +332,16 @@ function AddFieldPanel({ slug, onAdded }) {
             ))}
           </div>
         </div>
+
+        {tabs.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tab-Zugehörigkeit</label>
+            <select value={selectedTab || tabs[0]} onChange={e => setSelectedTab(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              {tabs.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        )}
 
         {fieldType === 'dropdown' && (
           <div>
@@ -408,14 +383,139 @@ function AddFieldPanel({ slug, onAdded }) {
   )
 }
 
+// ── Tab-Verwaltung ────────────────────────────────────────────────────────────
+function TabManager({ slug, tabs, onTabsChanged }) {
+  const [newTabName, setNewTabName]   = useState('')
+  const [editingIdx, setEditingIdx]   = useState(null)
+  const [editingName, setEditingName] = useState('')
+  const [saving, setSaving]           = useState(false)
+
+  const saveTabs = async (updatedTabs) => {
+    setSaving(true)
+    try {
+      await masterdataApi.updateTabs(slug, updatedTabs)
+      onTabsChanged(updatedTabs)
+    } catch {
+      toast.error('Tabs konnten nicht gespeichert werden')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addTab = async () => {
+    const name = newTabName.trim()
+    if (!name || tabs.includes(name)) return
+    const updated = [...tabs, name]
+    setNewTabName('')
+    await saveTabs(updated)
+  }
+
+  const renameTab = async (idx) => {
+    const name = editingName.trim()
+    if (!name) { setEditingIdx(null); return }
+    const updated = tabs.map((t, i) => i === idx ? name : t)
+    setEditingIdx(null)
+    await saveTabs(updated)
+  }
+
+  const deleteTab = async (idx) => {
+    const updated = tabs.filter((_, i) => i !== idx)
+    await saveTabs(updated)
+  }
+
+  return (
+    <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+      <div className="flex items-center gap-2 mb-3">
+        <Layers size={15} className="text-amber-600" />
+        <span className="text-sm font-semibold text-amber-900">Register (Tabs)</span>
+        {saving && <Loader2 size={13} className="animate-spin text-amber-500" />}
+      </div>
+
+      {tabs.length === 0 ? (
+        <p className="text-xs text-amber-700 mb-3">
+          Noch keine Register angelegt. Erstelle Register um das Formular in übersichtliche Reiter aufzuteilen.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {tabs.map((tab, idx) => (
+            <div key={idx} className="flex items-center gap-1 bg-white border border-amber-300 rounded-lg px-2 py-1">
+              {editingIdx === idx ? (
+                <>
+                  <input
+                    autoFocus
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') renameTab(idx); if (e.key === 'Escape') setEditingIdx(null) }}
+                    className="text-xs border-0 outline-none bg-transparent w-24 text-gray-800"
+                  />
+                  <button onClick={() => renameTab(idx)} className="text-green-600 hover:text-green-700">
+                    <Check size={12} />
+                  </button>
+                  <button onClick={() => setEditingIdx(null)} className="text-gray-400 hover:text-gray-600">
+                    <X size={12} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-medium text-gray-800">{tab}</span>
+                  <button onClick={() => { setEditingIdx(idx); setEditingName(tab) }}
+                    className="text-gray-400 hover:text-amber-600 transition">
+                    <Pencil size={11} />
+                  </button>
+                  <button onClick={() => deleteTab(idx)}
+                    className="text-gray-400 hover:text-red-500 transition">
+                    <X size={11} />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Neuen Tab hinzufügen */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newTabName}
+          onChange={e => setNewTabName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTab() } }}
+          placeholder="Register-Name, z.B. Bankdaten"
+          className="flex-1 px-3 py-1.5 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+        />
+        <button
+          onClick={addTab}
+          disabled={!newTabName.trim() || tabs.includes(newTabName.trim())}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 text-white text-sm rounded-lg transition"
+        >
+          <FolderPlus size={14} />
+          Hinzufügen
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptkomponente ───────────────────────────────────────────────────────────
 export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
   const [fields, setFields] = useState(
     [...(entityType.fields || [])].sort((a, b) => a.sort_order - b.sort_order)
   )
+  const [tabs, setTabs]         = useState(entityType.tabs || [])
+  const [activeTab, setActiveTab] = useState(null)   // null = alle / erster Tab
   const [activeId, setActiveId] = useState(null)
   const [showBuilder, setShowBuilder] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]     = useState(false)
+
+  // Wenn Tabs vorhanden, erster Tab als Default
+  useEffect(() => {
+    if (tabs.length > 0 && activeTab === null) {
+      setActiveTab(tabs[0])
+    }
+    if (tabs.length === 0) {
+      setActiveTab(null)
+    }
+  }, [tabs])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -426,9 +526,10 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
     setSaving(true)
     try {
       const layout = updatedFields.map((f, idx) => ({
-        field_id: f.id,
+        field_id:   f.id,
         sort_order: idx * 10,
-        col_span: f.col_span,
+        col_span:   f.col_span,
+        tab:        f.tab ?? null,
       }))
       await masterdataApi.updateFieldsLayout(entityType.slug, layout)
     } catch {
@@ -443,7 +544,6 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
   const handleDragEnd = ({ active, over }) => {
     setActiveId(null)
     if (!over || active.id === over.id) return
-
     setFields(prev => {
       const oldIdx = prev.findIndex(f => f.id === active.id)
       const newIdx = prev.findIndex(f => f.id === over.id)
@@ -457,6 +557,15 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
   const handleColSpanChange = (fieldId, colSpan) => {
     setFields(prev => {
       const updated = prev.map(f => f.id === fieldId ? { ...f, col_span: colSpan } : f)
+      saveLayout(updated)
+      onFieldsChanged?.(updated)
+      return updated
+    })
+  }
+
+  const handleTabChange = (fieldId, tab) => {
+    setFields(prev => {
+      const updated = prev.map(f => f.id === fieldId ? { ...f, tab } : f)
       saveLayout(updated)
       onFieldsChanged?.(updated)
       return updated
@@ -483,6 +592,31 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
     })
   }
 
+  const handleTabsChanged = (newTabs) => {
+    setTabs(newTabs)
+    // Falls aktiver Tab gelöscht wurde → ersten Tab wählen
+    if (activeTab && !newTabs.includes(activeTab)) {
+      setActiveTab(newTabs[0] || null)
+    }
+    // Felder deren Tab nicht mehr existiert → erstem Tab zuweisen
+    if (newTabs.length > 0) {
+      setFields(prev => {
+        const updated = prev.map(f =>
+          f.tab && !newTabs.includes(f.tab) ? { ...f, tab: newTabs[0] } : f
+        )
+        saveLayout(updated)
+        return updated
+      })
+    }
+    // EntityType-Response für Parent aktualisieren
+    onFieldsChanged?.()
+  }
+
+  // Felder für aktuellen Tab filtern
+  const visibleFields = tabs.length > 0 && activeTab
+    ? fields.filter(f => (f.tab || tabs[0]) === activeTab)
+    : fields
+
   const activeField = fields.find(f => f.id === activeId)
 
   return (
@@ -502,7 +636,9 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
               {saving && <Loader2 size={13} className="animate-spin text-primary-400" />}
             </div>
             <p className="text-xs text-gray-500">
-              {fields.length} Felder · Ziehen zum Sortieren · Breite frei wählbar
+              {fields.length} Felder
+              {tabs.length > 0 && ` · ${tabs.length} Register`}
+              {' · Ziehen zum Sortieren · Breite frei wählbar'}
             </p>
           </div>
         </div>
@@ -514,6 +650,31 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
 
       {showBuilder && (
         <div className="border-t border-gray-100 p-4 sm:p-5">
+          {/* Tab-Verwaltung */}
+          <TabManager slug={entityType.slug} tabs={tabs} onTabsChanged={handleTabsChanged} />
+
+          {/* Tab-Navigation im Builder */}
+          {tabs.length > 0 && (
+            <div className="flex items-center gap-1 mb-4 border-b border-gray-200 pb-0">
+              {tabs.map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition -mb-px border-b-2 ${
+                    activeTab === tab
+                      ? 'border-primary-500 text-primary-700 bg-primary-50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {tab}
+                  <span className="ml-1.5 text-xs text-gray-400">
+                    ({fields.filter(f => (f.tab || tabs[0]) === tab).length})
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Raster-Hinweis */}
           <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 border border-gray-300 rounded-sm"></span>
@@ -527,22 +688,27 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext
-              items={fields.map(f => f.id)}
-              strategy={rectSortingStrategy}
-            >
+            <SortableContext items={visibleFields.map(f => f.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-12 gap-3 auto-rows-auto">
-                {fields.map(field => (
+                {visibleFields.map(field => (
                   <SortableField
                     key={field.id}
                     field={field}
                     slug={entityType.slug}
+                    tabs={tabs}
+                    activeTab={activeTab}
                     onUpdated={handleUpdated}
                     onDeleted={handleDeleted}
                     onColSpanChange={handleColSpanChange}
+                    onTabChange={handleTabChange}
                   />
                 ))}
-                <AddFieldPanel slug={entityType.slug} onAdded={handleAdded} />
+                <AddFieldPanel
+                  slug={entityType.slug}
+                  tabs={tabs}
+                  activeTab={activeTab}
+                  onAdded={handleAdded}
+                />
               </div>
             </SortableContext>
 
