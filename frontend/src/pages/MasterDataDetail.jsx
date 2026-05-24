@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import GridFieldBuilder from '../components/GridFieldBuilder'
 import DynamicForm from '../components/DynamicForm'
+import AttachmentPanel from '../components/AttachmentPanel'
 import {
   Plus, Search, ArrowLeft, Trash2, Pencil, X,
   Loader2, Database, ChevronLeft, ChevronRight,
@@ -81,6 +82,13 @@ function RecordModal({ entityType, record, onClose, onSaved }) {
             </button>
           </div>
         </form>
+
+        {/* Anhänge – nur bei bestehenden Datensätzen */}
+        {isEdit && (
+          <div className="px-5 pb-5 border-t border-gray-100">
+            <AttachmentPanel entityType={entityType.slug} entityId={record.id} />
+          </div>
+        )}
       </div>
     </div>
   )

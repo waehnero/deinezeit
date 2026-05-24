@@ -8,6 +8,7 @@ import {
   PauseCircle, RefreshCw, FileText
 } from 'lucide-react'
 import BerichtDialog from '../components/BerichtDialog'
+import AttachmentPanel from '../components/AttachmentPanel'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 function fmtMinutes(min) {
@@ -500,6 +501,13 @@ function EntryModal({ entry, onClose, onSaved }) {
             Speichern
           </button>
         </div>
+
+        {/* Anhänge – nur bei bestehenden Einträgen */}
+        {isEdit && (
+          <div className="px-5 pb-5 border-t border-gray-100">
+            <AttachmentPanel entityType="zeiterfassung" entityId={entry.id} />
+          </div>
+        )}
       </div>
     </div>
   )
