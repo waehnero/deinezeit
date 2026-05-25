@@ -122,6 +122,8 @@ async def add_field(
         is_required=body.is_required,
         is_unique=body.is_unique,
         show_in_list=body.show_in_list,
+        col_span=body.col_span,
+        tab=body.tab,
         options=body.options,
         placeholder=body.placeholder,
         default_value=body.default_value,

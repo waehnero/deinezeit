@@ -46,7 +46,11 @@ function NewTypeModal({ onClose, onCreated }) {
       toast.success(`'${name}' wurde angelegt`)
       onCreated(res.data)
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Fehler beim Anlegen')
+      const detail = err.response?.data?.detail
+      const message = Array.isArray(detail)
+        ? detail.map(e => e.msg || String(e)).join('; ')
+        : (typeof detail === 'string' ? detail : 'Fehler beim Anlegen')
+      toast.error(message)
     } finally {
       setLoading(false)
     }

@@ -61,8 +61,13 @@ class EntityTypeBase(BaseModel):
     sort_order: int = 0
 
 
-class EntityTypeCreate(EntityTypeBase):
-    pass
+class EntityTypeCreate(BaseModel):
+    """Eingabe-Schema: slug wird vom Backend automatisch aus dem Namen generiert."""
+    name: str
+    icon: Optional[str] = "Database"
+    color: Optional[str] = "#6b7280"
+    description: Optional[str] = None
+    sort_order: int = 0
 
 
 class EntityTypeUpdate(BaseModel):
