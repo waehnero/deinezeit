@@ -53,7 +53,8 @@ class MasterDataService:
 
         entity_type = EntityType(
             name=name, slug=slug, icon=icon, color=color,
-            description=description, sort_order=sort_order
+            description=description, sort_order=sort_order,
+            tabs=[],  # Leere Tab-Liste als Default
         )
         db.add(entity_type)
         db.commit()

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Any, Dict
 from uuid import UUID
 from datetime import datetime
@@ -81,6 +81,12 @@ class EntityTypeResponse(EntityTypeBase):
     tabs: List[str] = []           # Geordnete Tab-Liste, z.B. ["Allgemein", "Bankdaten"]
     fields: List[FieldDefinitionResponse] = []
     created_at: datetime
+
+    # None aus DB → leere Liste (Spalte neu, Altdaten haben NULL)
+    @field_validator('tabs', mode='before')
+    @classmethod
+    def tabs_none_to_list(cls, v):
+        return v if v is not None else []
 
     class Config:
         from_attributes = True
