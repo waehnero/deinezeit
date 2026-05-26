@@ -32,8 +32,12 @@ export const authApi = {
   setupTotp: () => api.post('/auth/totp/setup'),
   enableTotp: (secret, code) => api.post(`/auth/totp/enable?secret=${secret}`, { code }),
   disableTotp: (code) => api.post('/auth/totp/disable', { code }),
-  webauthnRegisterBegin: () => api.post('/auth/webauthn/register/begin'),
-  webauthnLoginBegin: (email) => api.post(`/auth/webauthn/login/begin?email=${email}`),
+  webauthnRegisterBegin:    () => api.post('/auth/webauthn/register/begin'),
+  webauthnRegisterComplete: (credential, deviceName) =>
+    api.post('/auth/webauthn/register/complete', { credential, device_name: deviceName }),
+  webauthnLoginBegin:       (email) => api.post(`/auth/webauthn/login/begin?email=${email}`),
+  webauthnLoginComplete:    (email, credential) =>
+    api.post('/auth/webauthn/login/complete', { email, credential }),
 }
 
 export const usersApi = {

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ShieldAlert, Mail, Phone } from 'lucide-react'
+import { version } from '../../package.json'
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
@@ -25,7 +26,7 @@ export default function ForgotPasswordPage() {
             angepasst an dein Unternehmen, nicht umgekehrt.
           </p>
         </div>
-        <p className="text-primary-200 text-sm">© 2026 DeineZeit · v0.3.0</p>
+        <p className="text-primary-200 text-sm">© 2026 DeineZeit · v{version}</p>
       </div>
 
       {/* Rechte Seite — Info */}

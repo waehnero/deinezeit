@@ -75,9 +75,126 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## Geplant für [0.4.0]
+---
 
-- Verknüpfungen zwischen Stammdaten-Typen (z.B. Projekt → Kunde zuordnen)
+## [0.4.0] – 2026-05-22 – Sicherheit & Design-Upgrade
+
+### Neu
+- **Farbschema zur Laufzeit änderbar**: Primärfarbe und Akzentfarbe über die Einstellungen wählbar — kein Neustart nötig
+- **Login-Seite neu gestaltet**: Modernes Design mit Markenbild
+- **Sidebar neu gestaltet**: Schlankere Navigation, bessere Lesbarkeit
+- **Dashboard neu gestaltet**: Übersichtlichere Kacheldarstellung
+- **Admin-Benutzerbearbeitung**: Admins können Benutzerdaten direkt bearbeiten
+- **Passwort vergessen Seite**: Eigene Seite mit Kontaktinformationen für Passwort-Reset
+- **Kontakte zusammengeführt**: Kunden und Lieferanten wurden zu einem gemeinsamen „Kontakte"-Typ zusammengeführt, Typ-Filter (Kunden / Lieferanten / Interessenten) in der Listenansicht
+- **Rate Limiting**: Login-Endpunkt ist gegen Brute-Force-Angriffe geschützt
+- **Sicherheits-Header**: HSTS, XSS-Schutz, Frame-Schutz, Content-Type-Sniffing-Schutz
+- **API-Docs gesperrt**: Swagger-UI nur noch im Debug-Modus erreichbar
+- **Upload-Limit**: Maximale Dateigröße für Uploads konfigurierbar
+
+### Technische Details
+- Migration 0004: Kontakte-Konsolidierung (Kunden + Lieferanten → Kontakte mit `typ`-Feld)
+- Neue npm-Pakete: `slowapi` (Rate Limiting)
+- Tailwind CSS auf CSS-Variablen umgestellt (`--color-primary-*`) für Laufzeit-Farbwechsel
+
+---
+
+## [0.5.0] – 2026-05-22 – Zeiterfassung
+
+### Neu
+- **Zeiterfassung**: Timer starten/stoppen mit Projekt- und Aufgabenzuordnung
+- **Manuelle Einträge**: Zeiten nachträglich eintragen und bearbeiten
+- **Eigene Felder für Zeiteinträge**: Admin kann beliebige Zusatzfelder definieren (z.B. Ort, Fahrtzeit, Notiz)
+- **Statistik**: Tages- und Wochenübersicht der erfassten Stunden
+- **Projektzeitbericht als PDF**: Gefilterte Auswertung nach Zeitraum, Mitarbeiter, Projekt als druckfertiges PDF
+- **Bericht-Optionen**: Zeitrunden auf 15/30 Minuten, Filterung nach Aufgabe, verschiedene Zeitraum-Voreinstellungen
+
+### Technische Details
+- Migration 0005: Tabellen `time_entries` und `zeiterfassung_fields`
+- Neue Backend-API: `/api/zeiterfassung/*`
+- Neue Komponenten: `ZeiterfassungPage`, `ZeiterfassungFelder`, `BerichtDialog`
+- WeasyPrint für PDF-Generierung serverseitig
+
+---
+
+## [0.6.0] – 2026-05-23 – Einstellungen, Backup & Branding
+
+### Neu
+- **Einstellungs-Seite**: Zentrales Admin-Panel mit vier Reitern
+  - *Allgemein*: Firmenname, Kontaktperson, Logo und Favicon hochladen
+  - *Design*: Primärfarbe und Akzentfarbe zur Laufzeit wechseln
+  - *Backup*: Datenbank-Backup herunterladen, Cloud-Speicher konfigurieren (OneDrive, Google Drive, Dropbox)
+  - *E-Mail*: SMTP-Konfiguration und Test-E-Mail
+- **Logo-Varianten**: Hochgeladenes Logo wird automatisch in hell/dunkel-Varianten generiert
+- **Favicon**: Eigenes Favicon hochladbar
+- **Automatisches Backup**: PowerShell-Skript für geplante Backups (Windows Task Scheduler)
+- **Backup-Watcher**: Überwacht Backup-Verzeichnis und kopiert bei Änderung in Cloud-Speicher
+- **Wiederherstellungs-Skript**: Backup mit einem Befehl wiederherstellen
+
+### Technische Details
+- Migration 0006: `settings`-Tabelle für alle App-Konfigurationen
+- Pillow für Logo-Verarbeitung (Varianten, Transparenz)
+- Neue Skripte: `backup.ps1`, `backup.bat`, `backup-einrichten.ps1`, `wiederherstellen.ps1`, `backup-watcher.ps1`
+
+---
+
+## [0.7.0] – 2026-05-23 – Datacenter (Datei-Verwaltung)
+
+### Neu
+- **Datacenter**: Zentrale Dateiverwaltung für alle Stammdaten-Datensätze
+- **Datei-Upload**: Beliebige Dateien direkt an Datensätze anhängen (Dokumente, Bilder, etc.)
+- **Weblinks speichern**: URLs als Verknüpfungen hinterlegen
+- **Download & Vorschau**: Dateien herunterladen oder direkt im Browser ansehen
+- **Shareable Links**: Zeitlich begrenzte Download-Links generieren und teilen
+- **Explorer-Ansicht**: Datacenter-Seite mit Ordnerstruktur (links) und Dateiliste (rechts)
+- **Ordner nach Datensatz benannt**: Statt UUIDs werden die echten Namen der verknüpften Datensätze als Ordnernamen angezeigt
+- **Datei-Anhänge im Bearbeitungs-Dialog**: Anhänge direkt beim Bearbeiten eines Datensatzes sehen und hochladen
+
+### Technische Details
+- Migration 0007/0008: `attachments`-Tabelle mit MinIO-Integration
+- MinIO (S3-kompatibler Objektspeicher) als separater Docker-Service
+- Presigned URLs für sichere Downloads und Vorschauen
+- Neue Backend-API: `/api/datacenter/*`
+
+---
+
+## [0.8.1] – 2026-05-25 – Passkey & Face ID Bugfix
+
+### Bugfixes
+- **Passkeys / Face ID / Windows Hello vollständig implementiert**: Anmeldung ohne Passwort funktioniert jetzt korrekt
+- Passkey hinzufügen (Profilseite) speichert Gerät korrekt in der Datenbank
+- Passkey-Login schließt den Vorgang ab und setzt den JWT-Token — vorher war kein Login möglich
+- Backend: Challenge-Speicher (In-Memory, TTL 5 Minuten) für Register- und Login-Flow ergänzt
+- Backend: `login/complete` Endpoint war komplett fehlend — jetzt vorhanden
+- Frontend: `webauthnRegisterComplete` und `webauthnLoginComplete` in api.js ergänzt
+
+---
+
+## [0.8.0] – 2026-05-25 – Register-System für Stammdaten & Bugfixes
+
+### Neu
+- **Register (Tabs) in Stammdaten-Formularen**: Admin kann beliebig viele benannte Register anlegen (z.B. „Allgemein", „Bankdaten", „Kontakt")
+- **Felder Register zuweisen**: Jedes Feld kann per Dropdown oder Drag & Drop einem Register zugewiesen werden
+- **Tab-Navigation im Formular**: Beim Bearbeiten eines Datensatzes werden die Register als Reiter angezeigt
+- **Drag & Drop auf Tab-Reiter**: Felder durch Fallen-Lassen auf einen Tab-Reiter verschieben
+- **Neues Feld landet im richtigen Register**: Beim Hinzufügen eines Felds wird der aktuell aktive Tab vorausgewählt
+- **Relation-Felder**: Verknüpfungen zwischen verschiedenen Stammdaten-Typen möglich (z.B. Ansprechpartner → Kontakt)
+
+### Bugfixes
+- Neuen Stammdaten-Typ anlegen funktioniert wieder (Schema-Validierungsfehler behoben)
+- Fehlerbehandlung bei API-Fehlern verhindert leere Seite (React-Crash durch Pydantic-v2-Fehlerformat)
+- Neue Felder übernehmen Tab-Zugehörigkeit und Feldbreite korrekt
+
+### Technische Details
+- Migration 0009: Neue Spalte `tab` in `field_definitions`, neue Spalte `tabs` (JSONB) in `entity_types`
+- Neue Endpoints: `PUT /masterdata/types/{slug}/tabs`, `PUT /masterdata/types/{slug}/fields-layout`
+- @dnd-kit `useDroppable` + `pointerWithin` für Tab-Drop-Zonen
+
+---
+
+## Geplant für [0.9.0]
+
 - Excel (.xlsx) Export
 - Erweiterte Filterung und Sortierung in Datensatz-Listen
 - Druckansicht / PDF-Export einzelner Datensätze
+- OnlyOffice Integration für Dokumentenbearbeitung direkt im Datacenter

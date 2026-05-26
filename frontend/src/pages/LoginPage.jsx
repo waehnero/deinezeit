@@ -3,8 +3,101 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { version } from '../../package.json'
 import toast from 'react-hot-toast'
-import { LogIn, Fingerprint, Eye, EyeOff } from 'lucide-react'
+import { LogIn, Fingerprint, Eye, EyeOff, Check, Wrench } from 'lucide-react'
+import { changelog } from '../data/changelog'
+
+// ── News-Panel (linke Seite der Anmeldeseite) ─────────────────────────────────
+function NewsPanel() {
+  const [activeTab, setActiveTab] = useState('features')
+
+  // Nur Einträge anzeigen, die im aktiven Tab Inhalt haben
+  const items = changelog.filter(entry =>
+    activeTab === 'features' ? entry.features.length > 0 : entry.updates.length > 0
+  )
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      {/* Logo */}
+      <div className="flex items-center gap-3 mb-6 flex-shrink-0">
+        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+          <span className="text-white font-bold text-lg">DZ</span>
+        </div>
+        <span className="text-white font-semibold text-xl">DeineZeit</span>
+      </div>
+
+      {/* Tab-Leiste */}
+      <div className="flex gap-1 mb-5 flex-shrink-0 bg-white/10 rounded-xl p-1">
+        <button
+          onClick={() => setActiveTab('features')}
+          className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition ${
+            activeTab === 'features'
+              ? 'bg-white text-primary-700 shadow-sm'
+              : 'text-white/80 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          Neue Features
+        </button>
+        <button
+          onClick={() => setActiveTab('updates')}
+          className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition ${
+            activeTab === 'updates'
+              ? 'bg-white text-primary-700 shadow-sm'
+              : 'text-white/80 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          Updates
+        </button>
+      </div>
+
+      {/* Zeitleiste — scrollbar, schrumpft auf verfügbaren Platz */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6"
+           style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.25) transparent' }}>
+        {items.length === 0 ? (
+          <p className="text-white/60 text-sm text-center pt-8">Keine Einträge</p>
+        ) : (
+          items.map((entry, idx) => {
+            const list = activeTab === 'features' ? entry.features : entry.updates
+            const Icon = activeTab === 'features' ? Check : Wrench
+            return (
+              <div key={entry.version} className="flex gap-3">
+                {/* Datum + Linie */}
+                <div className="flex flex-col items-center flex-shrink-0 w-10">
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex flex-col items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold leading-none text-xs">{entry.day}</span>
+                    <span className="text-white/70 leading-none text-[9px]">{entry.month}</span>
+                  </div>
+                  {idx < items.length - 1 && (
+                    <div className="w-px flex-1 bg-white/20 mt-2" />
+                  )}
+                </div>
+
+                {/* Inhalt */}
+                <div className="pb-2 flex-1 min-w-0">
+                  <p className="text-white font-semibold text-sm mb-2">
+                    v{entry.version}
+                  </p>
+                  <ul className="space-y-1.5">
+                    {list.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <Icon size={12} className="text-white/70 mt-0.5 flex-shrink-0" />
+                        <span className="text-white/80 text-xs leading-relaxed">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <p className="text-white/40 text-xs pt-4 flex-shrink-0">© 2026 DeineZeit · v{version}</p>
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const { t } = useTranslation()
@@ -51,42 +144,35 @@ export default function LoginPage() {
       toast.error('Bitte zuerst E-Mail eingeben')
       return
     }
+    setLoading(true)
     try {
       const { startAuthentication } = await import('@simplewebauthn/browser')
       const optionsRes = await authApi.webauthnLoginBegin(email)
       const assertion = await startAuthentication(optionsRes.data)
-      toast.success('Passkey-Login erfolgreich')
+      const res = await authApi.webauthnLoginComplete(email, assertion)
+      localStorage.setItem('access_token', res.data.access_token)
+      localStorage.setItem('refresh_token', res.data.refresh_token)
+      await reload()
+      navigate('/dashboard')
     } catch (err) {
-      toast.error('Passkey-Login fehlgeschlagen')
+      if (err.name !== 'NotAllowedError') {
+        const detail = err.response?.data?.detail
+        toast.error(typeof detail === 'string' ? detail : 'Passkey-Login fehlgeschlagen')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex">
-      {/* Linke Seite — Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary-500 flex-col justify-between p-12">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-              <span className="text-primary-600 font-bold text-lg">DZ</span>
-            </div>
-            <span className="text-white font-semibold text-xl">DeineZeit</span>
-          </div>
-        </div>
-        <div>
-          <h2 className="text-white text-3xl font-bold leading-snug mb-4">
-            Deine Stammdaten.<br />Deine Regeln.
-          </h2>
-          <p className="text-primary-100 text-base leading-relaxed">
-            Flexible Datenverwaltung für Kunden, Lieferanten und Projekte —
-            angepasst an dein Unternehmen, nicht umgekehrt.
-          </p>
-        </div>
-        <p className="text-primary-200 text-sm">© 2026 DeineZeit · v0.3.0</p>
+    <div className="h-screen overflow-hidden bg-neutral-50 flex">
+      {/* Linke Seite — News-Panel: feste Höhe = Fensterhöhe, kein Überlauf nach außen */}
+      <div className="hidden lg:flex lg:w-5/12 bg-primary-500 flex-col p-10 h-full">
+        <NewsPanel />
       </div>
 
-      {/* Rechte Seite — Login-Formular */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      {/* Rechte Seite — Login-Formular: eigener Scroll falls Fenster sehr klein */}
+      <div className="w-full lg:w-7/12 flex items-center justify-center p-8 overflow-y-auto">
         <div className="w-full max-w-sm">
           {/* Mobile Logo */}
           <div className="flex items-center gap-3 mb-10 lg:hidden">

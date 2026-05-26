@@ -1,7 +1,7 @@
 #!/bin/bash
 # ╔══════════════════════════════════════════════════════════════╗
 # ║           DeineZeit – Automatischer Installer               ║
-# ║                    Version 0.1.0                            ║
+# ║                    Version 0.8.1                            ║
 # ╚══════════════════════════════════════════════════════════════╝
 #
 # Verwendung (direkt von GitHub):
@@ -26,7 +26,7 @@ print_header() {
     echo ""
     echo -e "${BLUE}${BOLD}╔══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}${BOLD}║           DeineZeit – Automatischer Installer               ║${NC}"
-    echo -e "${BLUE}${BOLD}║                    Version 0.1.0                            ║${NC}"
+    echo -e "${BLUE}${BOLD}║                    Version 0.8.1                            ║${NC}"
     echo -e "${BLUE}${BOLD}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -51,14 +51,15 @@ print_error() {
 
 ask() {
     # ask "Frage" "Standardwert" → gibt Eingabe zurück
+    # Prompt auf stderr damit $() die Ausgabe nicht einfängt
     local prompt="$1"
     local default="${2:-}"
     local answer
 
     if [ -n "$default" ]; then
-        echo -ne "${BOLD}  $prompt ${NC}[${default}]: "
+        echo -ne "${BOLD}  $prompt ${NC}[${default}]: " >&2
     else
-        echo -ne "${BOLD}  $prompt: ${NC}"
+        echo -ne "${BOLD}  $prompt: ${NC}" >&2
     fi
 
     read -r answer
@@ -71,12 +72,12 @@ ask_password() {
     local password2
 
     while true; do
-        echo -ne "${BOLD}  $prompt: ${NC}"
+        echo -ne "${BOLD}  $prompt: ${NC}" >&2
         read -rs password
-        echo ""
-        echo -ne "${BOLD}  Passwort bestätigen: ${NC}"
+        echo "" >&2
+        echo -ne "${BOLD}  Passwort bestätigen: ${NC}" >&2
         read -rs password2
-        echo ""
+        echo "" >&2
 
         if [ "$password" = "$password2" ]; then
             if [ ${#password} -lt 8 ]; then
@@ -291,6 +292,7 @@ write_config() {
 
     SECRET_KEY=$(generate_secret)
     DB_PASSWORD=$(generate_secret | tr -dc 'a-zA-Z0-9' | head -c 32)
+    MINIO_PASSWORD=$(generate_secret | tr -dc 'a-zA-Z0-9' | head -c 32)
 
     cat > "$INSTALL_DIR/.env" <<EOF
 # DeineZeit Konfiguration
@@ -309,6 +311,10 @@ FRONTEND_URL=https://${DOMAIN}
 # WebAuthn (Face ID / Passkeys)
 WEBAUTHN_RP_ID=${DOMAIN}
 WEBAUTHN_RP_NAME=DeineZeit
+
+# MinIO (Datei-Speicher)
+MINIO_ROOT_USER=deinezeit
+MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
 
 # Domain
 DOMAIN=${DOMAIN}
