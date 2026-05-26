@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '0.9.2',
+    day: '27',
+    month: 'Mai',
+    year: '2026',
+    features: [
+      'Zeiterfassung: Ringe zeigen jetzt Verrechenbar (grün) und Nicht-verrechenbar (orange) getrennt an',
+    ],
+    updates: [],
+  },
+  {
     version: '0.9.1',
     day: '26',
     month: 'Mai',
@@ -13,7 +23,7 @@ export const changelog = [
       'Wartungsseite aktualisiert sich automatisch sobald das System wieder bereit ist',
     ],
     updates: [
-      'Update-Mechanismus grundlegend überarbeitet: läuft jetzt in einem unabhängigen Container und übersteht den eigenen Neustart',
+      'Update-Mechanismus grundlegend überarbeitet: läuft jetzt in einem unabhängigen Container, übersteht den eigenen Neustart zuverlässig',
       'Automatischer Rollback auf Vorgänger-Version wenn Build oder Health-Check fehlschlägt',
       'Update-Skript erkennt Domain automatisch — kein git-Konflikt mehr bei app.conf',
       'Health-Check nach Update: Backend muss in 2 Minuten antworten, sonst wird zurückgerollt',

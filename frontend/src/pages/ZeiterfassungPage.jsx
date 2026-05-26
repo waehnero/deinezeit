@@ -353,19 +353,44 @@ function StartTimerCard({ onStart }) {
 }
 
 // ── Ring-Diagramm ─────────────────────────────────────────────────────────────
-function RingChart({ label, minutes, targetMinutes }) {
-  const pct = targetMinutes > 0 ? Math.min(1, minutes / targetMinutes) : 0
+// Zeigt zwei Bögen: grün = verrechenbar, orange = nicht verrechenbar
+function RingChart({ label, minutes, billableMinutes, targetMinutes }) {
   const r = 36, cx = 44, cy = 44, circ = 2 * Math.PI * r
+
+  const nonBillable = Math.max(0, minutes - billableMinutes)
+  const billablePct    = targetMinutes > 0 ? Math.min(1, billableMinutes / targetMinutes) : 0
+  const nonBillablePct = targetMinutes > 0 ? Math.min(1 - billablePct, nonBillable / targetMinutes) : 0
+
+  const billableLen    = billablePct * circ
+  const nonBillableLen = nonBillablePct * circ
+  // Oranger Bogen beginnt dort wo der grüne aufhört
+  const orangeRotation = -90 + billablePct * 360
+
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</span>
       <div className="relative">
         <svg width={88} height={88}>
+          {/* Hintergrund-Ring (Ziel) */}
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={7} />
-          <circle cx={cx} cy={cy} r={r} fill="none"
-            stroke={pct >= 1 ? '#16a34a' : '#f97316'} strokeWidth={7}
-            strokeDasharray={`${pct * circ} ${(1 - pct) * circ}`}
-            strokeLinecap="round" transform={`rotate(-90 ${cx} ${cy})`} />
+
+          {/* Oranger Bogen — nicht verrechenbar (beginnt nach dem grünen) */}
+          {nonBillableLen > 0 && (
+            <circle cx={cx} cy={cy} r={r} fill="none"
+              stroke="#f97316" strokeWidth={7}
+              strokeDasharray={`${nonBillableLen} ${circ - nonBillableLen}`}
+              strokeLinecap="round"
+              transform={`rotate(${orangeRotation} ${cx} ${cy})`} />
+          )}
+
+          {/* Grüner Bogen — verrechenbar (beginnt oben) */}
+          {billableLen > 0 && (
+            <circle cx={cx} cy={cy} r={r} fill="none"
+              stroke="#16a34a" strokeWidth={7}
+              strokeDasharray={`${billableLen} ${circ - billableLen}`}
+              strokeLinecap="round"
+              transform={`rotate(-90 ${cx} ${cy})`} />
+          )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-base font-bold text-gray-800">{fmtMinutes(minutes)}</span>
@@ -755,9 +780,9 @@ export default function ZeiterfassungPage() {
       {/* Statistik-Ringe */}
       {stats && (
         <div className="flex justify-around bg-white rounded-2xl border border-gray-200 p-5 mb-6">
-          <RingChart label="Heute" minutes={stats.today_minutes} targetMinutes={stats.today_target_minutes} />
-          <RingChart label="Woche" minutes={stats.week_minutes} targetMinutes={stats.week_target_minutes} />
-          <RingChart label="Monat" minutes={stats.month_minutes} targetMinutes={stats.month_target_minutes} />
+          <RingChart label="Heute" minutes={stats.today_minutes} billableMinutes={stats.today_billable_minutes ?? stats.today_minutes} targetMinutes={stats.today_target_minutes} />
+          <RingChart label="Woche" minutes={stats.week_minutes} billableMinutes={stats.week_billable_minutes ?? stats.week_minutes} targetMinutes={stats.week_target_minutes} />
+          <RingChart label="Monat" minutes={stats.month_minutes} billableMinutes={stats.month_billable_minutes ?? stats.month_minutes} targetMinutes={stats.month_target_minutes} />
         </div>
       )}
 

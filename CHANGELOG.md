@@ -211,6 +211,18 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [0.9.2] – 2026-05-27 – Verrechenbarkeit in den Statistik-Ringen
+
+### Neu
+- **Zeiterfassung-Ringe**: Die drei Ringe (Heute / Woche / Monat) zeigen jetzt die Aufteilung zwischen verrechenbaren (grün) und nicht-verrechenbaren (orange) Stunden. Beide Bögen liegen nebeneinander auf dem Ring — der graue Hintergrund zeigt weiterhin das Ziel.
+
+### Technische Details
+- Backend `TimeStats`-Schema: neue Felder `today_billable_minutes`, `week_billable_minutes`, `month_billable_minutes`
+- `get_stats()` führt die Abfrage jetzt optional mit `billable=True`-Filter durch
+- `RingChart`-Komponente: zwei überlagerte SVG-Bögen statt einem; oranger Bogen beginnt am Endpunkt des grünen
+
+---
+
 ## [0.9.1] – 2026-05-26 – Update-Mechanismus überarbeitet & Wartungsseite
 
 ### Neu

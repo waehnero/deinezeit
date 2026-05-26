@@ -118,6 +118,9 @@ class TimeStats(BaseModel):
     today_minutes: int
     week_minutes: int
     month_minutes: int
+    today_billable_minutes: int  # Davon verrechenbar
+    week_billable_minutes: int
+    month_billable_minutes: int
     today_target_minutes: int    # Soll-Stunden (Standard: 8h)
     week_target_minutes: int     # Soll-Stunden (Standard: 40h)
     month_target_minutes: int    # Soll-Stunden (Standard: 160h)

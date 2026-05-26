@@ -309,23 +309,29 @@ async def get_stats(
     # Monat: 1. des Monats
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    def sum_minutes(from_dt: datetime, to_dt: datetime) -> int:
-        entries = db.query(TimeEntry).filter(
+    def sum_minutes(from_dt: datetime, to_dt: datetime, only_billable: bool = False) -> int:
+        q = db.query(TimeEntry).filter(
             TimeEntry.user_id == target_user_id,
             TimeEntry.started_at >= from_dt,
             TimeEntry.started_at < to_dt,
             TimeEntry.ended_at.isnot(None),
-        ).all()
+        )
+        if only_billable:
+            q = q.filter(TimeEntry.billable == True)
         total = 0
-        for e in entries:
+        for e in q.all():
             delta = (e.ended_at - e.started_at).total_seconds() / 60
             total += max(0, int(delta) - e.pause_minutes)
         return total
 
+    end = now + timedelta(hours=1)
     return TimeStats(
-        today_minutes=sum_minutes(today_start, now + timedelta(hours=1)),
-        week_minutes=sum_minutes(week_start, now + timedelta(hours=1)),
-        month_minutes=sum_minutes(month_start, now + timedelta(hours=1)),
+        today_minutes=sum_minutes(today_start, end),
+        week_minutes=sum_minutes(week_start, end),
+        month_minutes=sum_minutes(month_start, end),
+        today_billable_minutes=sum_minutes(today_start, end, only_billable=True),
+        week_billable_minutes=sum_minutes(week_start, end, only_billable=True),
+        month_billable_minutes=sum_minutes(month_start, end, only_billable=True),
         today_target_minutes=8 * 60,
         week_target_minutes=40 * 60,
         month_target_minutes=160 * 60,
