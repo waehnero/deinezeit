@@ -192,7 +192,26 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## Geplant für [0.9.0]
+## [0.9.0] – 2026-05-26 – Update-Verwaltung im Browser
+
+### Neu
+- **System-Tab in den Einstellungen**: Zeigt die aktuelle App-Version, den vollständigen Changelog und die Anzahl aktiver Benutzer — alles auf einen Blick
+- **Update starten per Klick**: Admin kann ein Server-Update direkt aus dem Browser anstoßen — kein SSH-Zugriff mehr nötig
+- **2-Minuten-Countdown**: Vor dem Update werden alle aktiven Benutzer benachrichtigt; ein oranges Banner oben im Bildschirm zeigt den Countdown
+- **Automatische Abmeldung**: Alle Benutzer werden beim Ablauf des Countdowns automatisch abgemeldet
+- **Erfolgsmeldung nach Update**: Nach dem Neustart erscheint auf der Anmeldeseite eine grüne Meldung, dass das Update erfolgreich war
+- **Update abbrechen**: Solange der Countdown läuft, kann der Admin das Update noch abbrechen
+
+### Technische Details
+- Neues Backend-Modul `system.py`: In-Memory-Statusverwaltung für Update-Prozess, aktive Sitzungs-Zählung via JWT-Middleware
+- `POST /system/update/start` startet asyncio-Background-Task mit 2-Minuten-Verzögerung; führt `git pull` + `docker compose up -d --build` auf dem Host aus
+- Backend-Container mountet `/var/run/docker.sock` und `/opt/deinezeit` für Host-Docker-Zugriff
+- Neuer `UpdateBanner`-Komponente mit 15-Sekunden-Polling und lokalem Sekunden-Countdown
+- `sessionStorage` überträgt Update-Meldung über den Neustart hinweg zur Login-Seite
+
+---
+
+## Geplant für [1.0.0]
 
 - Excel (.xlsx) Export
 - Erweiterte Filterung und Sortierung in Datensatz-Listen

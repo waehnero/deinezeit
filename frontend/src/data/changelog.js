@@ -4,6 +4,20 @@
  */
 export const changelog = [
   {
+    version: '0.9.0',
+    day: '26',
+    month: 'Mai',
+    year: '2026',
+    features: [
+      'Update-Verwaltung direkt im Browser — kein SSH-Zugriff mehr nötig',
+      'System-Tab in den Einstellungen: aktuelle Version, Changelog und Benutzer-Zähler',
+      'Update starten mit 2-Minuten-Countdown — alle aktiven Benutzer werden benachrichtigt',
+      'Countdown-Banner oben im Bildschirm mit automatischer Abmeldung',
+      'Erfolgsmeldung nach erfolgreichem Update auf der Anmeldeseite',
+    ],
+    updates: [],
+  },
+  {
     version: '0.8.1',
     day: '25',
     month: 'Mai',
