@@ -254,16 +254,13 @@ configure_firewall() {
 setup_application() {
     print_step "DeineZeit wird eingerichtet..."
 
-    # Verzeichnis anlegen
-    mkdir -p "$INSTALL_DIR"
-    mkdir -p "$INSTALL_DIR/backups"
-
     # Programmcode kopieren (bei lokalem Aufruf) oder herunterladen
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
         # Lokale Installation (Skript liegt im Projektordner)
         print_ok "Programmcode gefunden (lokale Installation)"
+        mkdir -p "$INSTALL_DIR"
         if [ "$SCRIPT_DIR" != "$INSTALL_DIR" ]; then
             cp -r "$SCRIPT_DIR/." "$INSTALL_DIR/"
         fi
@@ -278,10 +275,15 @@ setup_application() {
             print_ok "Repository bereits vorhanden – aktualisiere auf neuesten Stand..."
             git -C "$INSTALL_DIR" pull origin main
         else
+            # Verzeichnis darf beim Klonen noch nicht existieren
+            rm -rf "$INSTALL_DIR"
             git clone "$GITHUB_REPO" "$INSTALL_DIR"
             print_ok "Programmcode von GitHub geladen"
         fi
     fi
+
+    # Backup-Verzeichnis nach dem Klonen anlegen
+    mkdir -p "$INSTALL_DIR/backups"
 
     print_ok "Programmcode bereit in $INSTALL_DIR"
 }
