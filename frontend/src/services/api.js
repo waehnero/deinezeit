@@ -154,4 +154,13 @@ export const datacenterApi = {
   getProviders:    () => api.get('/datacenter/providers'),
 }
 
+export const systemApi = {
+  getVersion:      () => api.get('/system/version'),
+  getChangelog:    () => api.get('/system/changelog'),
+  getActiveUsers:  () => api.get('/system/active-users'),
+  getUpdateStatus: () => api.get('/system/update-status'),
+  startUpdate:     () => api.post('/system/update/start'),
+  cancelUpdate:    () => api.post('/system/update/cancel'),
+}
+
 export default api

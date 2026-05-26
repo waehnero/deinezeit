@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
+import UpdateBanner from './UpdateBanner'
 
 
 const NAV_ITEMS = [
@@ -121,6 +122,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="flex h-screen bg-neutral-50 overflow-hidden">
+      <UpdateBanner />
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-56 bg-white border-r border-neutral-200 flex-shrink-0">
         <SidebarContent />

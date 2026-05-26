@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
-import { settingsApi } from '../services/api'
+import { settingsApi, systemApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
   Save, Upload, Trash2, Download, Send, Loader2,
   CheckCircle, Eye, EyeOff, RefreshCw, Cloud,
-  ImageIcon, Link2, Monitor
+  ImageIcon, Link2, Monitor, Cpu, ArrowUpCircle,
+  Users, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp
 } from 'lucide-react'
 
 // ── Farbthemen ────────────────────────────────────────────────────────────────
@@ -894,16 +895,233 @@ function TabEmail({ settings, onSaved }) {
   )
 }
 
+// ── Tab: System & Updates ─────────────────────────────────────────────────────
+function TabSystem() {
+  const [versionInfo, setVersionInfo]     = useState(null)
+  const [changelog, setChangelog]         = useState('')
+  const [showChangelog, setShowChangelog] = useState(false)
+  const [activeUsers, setActiveUsers]     = useState(0)
+  const [loading, setLoading]             = useState(true)
+  const [checking, setChecking]           = useState(false)
+  const [starting, setStarting]           = useState(false)
+  const [cancelling, setCancelling]       = useState(false)
+  const [updateStatus, setUpdateStatus]   = useState(null)
+
+  useEffect(() => {
+    loadVersionInfo()
+    loadActiveUsers()
+  }, [])
+
+  const loadVersionInfo = async () => {
+    setLoading(true)
+    try {
+      const res = await systemApi.getVersion()
+      setVersionInfo(res.data)
+    } catch {
+      // ignorieren
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadActiveUsers = async () => {
+    try {
+      const res = await systemApi.getActiveUsers()
+      setActiveUsers(res.data.active_users || 0)
+    } catch { /* ignorieren */ }
+  }
+
+  const handleCheckUpdate = async () => {
+    setChecking(true)
+    try {
+      const res = await systemApi.getVersion()
+      setVersionInfo(res.data)
+      if (!res.data.update_available) {
+        toast.success('Sie verwenden bereits die neueste Version.')
+      }
+    } catch {
+      toast.error('Versionsprüfung fehlgeschlagen.')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const handleShowChangelog = async () => {
+    if (showChangelog) { setShowChangelog(false); return }
+    try {
+      const res = await systemApi.getChangelog()
+      setChangelog(res.data.content)
+      setShowChangelog(true)
+    } catch {
+      toast.error('Changelog konnte nicht geladen werden.')
+    }
+  }
+
+  const handleStartUpdate = async () => {
+    if (!window.confirm(
+      `Update starten?\n\nAlle angemeldeten Benutzer werden in 2 Minuten automatisch abgemeldet.\nDas System ist danach kurzzeitig nicht erreichbar.`
+    )) return
+
+    setStarting(true)
+    try {
+      await systemApi.startUpdate()
+      toast.success('Update eingeleitet — Benutzer werden benachrichtigt.')
+      const res = await systemApi.getUpdateStatus()
+      setUpdateStatus(res.data)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Update konnte nicht gestartet werden.')
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  const handleCancelUpdate = async () => {
+    setCancelling(true)
+    try {
+      await systemApi.cancelUpdate()
+      toast.success('Update wurde abgebrochen.')
+      setUpdateStatus(null)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Abbrechen nicht möglich.')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  const updatePending = updateStatus?.status === 'notifying'
+
+  return (
+    <div className="space-y-6">
+      {/* Versions-Info */}
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <Cpu size={16} className="text-primary-500" />
+          Versionsinformation
+        </h3>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-gray-400 text-sm">
+            <Loader2 size={15} className="animate-spin" /> Wird geladen…
+          </div>
+        ) : (
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Installierte Version</span>
+              <span className="font-mono font-semibold text-gray-800">v{versionInfo?.current}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Neueste Version</span>
+              <span className="font-mono font-semibold text-gray-800">v{versionInfo?.latest}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Status</span>
+              {versionInfo?.update_available ? (
+                <span className="flex items-center gap-1 text-amber-600 font-medium">
+                  <AlertTriangle size={13} />
+                  Update verfügbar
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-green-600 font-medium">
+                  <CheckCircle2 size={13} />
+                  Aktuell
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-3">
+          <button onClick={handleCheckUpdate} disabled={checking}
+            className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5">
+            {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            Auf Updates prüfen
+          </button>
+          <button onClick={handleShowChangelog}
+            className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5">
+            {showChangelog ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            Änderungsprotokoll
+          </button>
+        </div>
+
+        {showChangelog && changelog && (
+          <div className="mt-3 bg-gray-50 rounded-xl p-4 max-h-64 overflow-y-auto">
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
+              {changelog}
+            </pre>
+          </div>
+        )}
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Update starten */}
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <ArrowUpCircle size={16} className="text-primary-500" />
+          System-Update
+        </h3>
+
+        {/* Aktive Benutzer */}
+        <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+          <Users size={14} className="text-gray-400" />
+          {activeUsers === 0
+            ? 'Keine weiteren Benutzer angemeldet.'
+            : `${activeUsers} weitere Benutzer${activeUsers === 1 ? '' : ''} angemeldet — werden 2 Minuten vor dem Update benachrichtigt.`
+          }
+        </div>
+
+        {updatePending ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-medium text-amber-800 flex items-center gap-2">
+              <AlertTriangle size={15} />
+              Update läuft in Kürze — Countdown aktiv
+            </p>
+            <p className="text-xs text-amber-700">{updateStatus.message}</p>
+            <button onClick={handleCancelUpdate} disabled={cancelling}
+              className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-100">
+              {cancelling ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
+              Update abbrechen
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {versionInfo?.update_available ? (
+              <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-sm text-primary-800">
+                Version <strong>v{versionInfo.latest}</strong> ist verfügbar.
+                Alle Benutzer werden 2 Minuten vor dem Neustart benachrichtigt.
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600">
+                Sie können auch ein erneutes Update der aktuellen Version erzwingen
+                (z.B. um Konfigurationsänderungen einzuspielen).
+              </div>
+            )}
+            <button
+              onClick={handleStartUpdate}
+              disabled={starting}
+              className="btn-primary text-sm py-2 px-4 flex items-center gap-2"
+            >
+              {starting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpCircle size={14} />}
+              {versionInfo?.update_available ? `Update auf v${versionInfo.latest} starten` : 'System neu starten / Update erzwingen'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('allgemein')
   const { settings, loading, loadSettings } = useSettings()
 
   const tabs = [
-    { id: 'allgemein', label: 'Allgemein',  icon: Building2  },
-    { id: 'design',    label: 'Design',     icon: Palette    },
-    { id: 'backup',    label: 'Backup',     icon: HardDrive  },
-    { id: 'email',     label: 'E-Mail',     icon: Mail       },
+    { id: 'allgemein', label: 'Allgemein',  icon: Building2      },
+    { id: 'design',    label: 'Design',     icon: Palette        },
+    { id: 'backup',    label: 'Backup',     icon: HardDrive      },
+    { id: 'email',     label: 'E-Mail',     icon: Mail           },
+    { id: 'system',    label: 'System',     icon: Cpu            },
   ]
 
   if (loading) {
@@ -943,6 +1161,7 @@ export default function SettingsPage() {
         {activeTab === 'design'    && <TabDesign    settings={settings} onSaved={loadSettings} />}
         {activeTab === 'backup'    && <TabBackup    settings={settings} onSaved={loadSettings} />}
         {activeTab === 'email'     && <TabEmail     settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'system'    && <TabSystem />}
       </div>
     </div>
   )
