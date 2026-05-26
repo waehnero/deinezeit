@@ -19,6 +19,12 @@ from app.core.config import settings
 
 router = APIRouter(prefix="/system", tags=["system"])
 
+
+@router.get("/health")
+async def health():
+    """Einfacher Health-Check — wird von update.sh genutzt um zu prüfen ob das Backend läuft."""
+    return {"status": "ok"}
+
 # ── Aktive Sessions (in-memory) ───────────────────────────────────────────────
 # { user_id: last_active_datetime }
 _active_sessions: dict = {}
@@ -202,37 +208,45 @@ async def _run_update_after_delay(delay_seconds: int):
 
 
 def _execute_update():
-    """Update auf dem Host ausführen (docker socket + git)."""
+    """
+    Update starten: Einen unabhängigen docker:cli-Container spawnen, der update.sh ausführt.
+
+    Warum separater Container?
+    Der Backend-Container wird beim Update selbst neu gestartet. Würde das Update-Skript
+    direkt im Backend-Container laufen, würde der Prozess beim Neustart des Containers
+    abrupt beendet — docker compose bliebe in einem halbfertigen Zustand.
+    Der docker:cli-Container ist NICHT Teil des Compose-Projekts und läuft unabhängig
+    weiter, bis update.sh (inkl. Health-Check) abgeschlossen ist.
+    """
     install_dir = os.environ.get("INSTALL_DIR", "/opt/deinezeit")
 
     try:
-        # 1. Neuesten Code von GitHub holen
+        # Evtl. noch laufenden Updater aus einem früheren (fehlgeschlagenen) Versuch entfernen
         subprocess.run(
-            ["git", "-C", install_dir, "pull", "origin", "main"],
-            check=True, capture_output=True, timeout=60
+            ["docker", "rm", "-f", "deinezeit_updater"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
 
-        # 2. Docker-Images neu bauen und Container neu starten
-        #    Läuft als detached Prozess — der Backend-Container startet sich selbst neu
+        # Separaten Updater-Container starten
+        # --network host: damit curl http://localhost/api/health den nginx auf Port 80 erreicht
         subprocess.Popen(
             [
-                "docker", "compose",
-                "-f", f"{install_dir}/docker-compose.yml",
-                "up", "-d", "--build", "--remove-orphans"
+                "docker", "run", "--rm",
+                "--name", "deinezeit_updater",
+                "--network", "host",
+                "-v", "/var/run/docker.sock:/var/run/docker.sock",
+                "-v", f"{install_dir}:{install_dir}",
+                "-e", f"INSTALL_DIR={install_dir}",
+                "-w", install_dir,
+                "docker:cli",
+                "sh", "-c", "apk add --quiet --no-progress git curl && sh update.sh",
             ],
-            cwd=install_dir,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
 
-        _set_update_state(
-            status="done",
-            message="Update erfolgreich! Das System wird neu gestartet.",
-        )
+        # Status bleibt "updating" — nach dem Neustart der Container resettet sich der
+        # In-Memory-State ohnehin. Das Frontend zeigt die Wartungsseite bis nginx wieder antwortet.
 
-    except subprocess.TimeoutExpired:
-        _set_update_state(status="failed", message="Update fehlgeschlagen: Zeitüberschreitung beim git pull.")
-    except subprocess.CalledProcessError as e:
-        _set_update_state(status="failed", message=f"Update fehlgeschlagen: {e.stderr.decode()[:200]}")
     except Exception as e:
-        _set_update_state(status="failed", message=f"Update fehlgeschlagen: {str(e)}")
+        _set_update_state(status="failed", message=f"Update konnte nicht gestartet werden: {str(e)}")
