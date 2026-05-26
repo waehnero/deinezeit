@@ -93,8 +93,8 @@ ask_password() {
 }
 
 generate_secret() {
-    # Zufälligen 64-Zeichen Schlüssel generieren
-    cat /dev/urandom | tr -dc 'a-zA-Z0-9!@#$%^&*' | fold -w 64 | head -n 1
+    # Zufälligen Schlüssel generieren (openssl vermeidet SIGPIPE-Probleme mit pipefail)
+    openssl rand -base64 48 | tr -d '\n/+='
 }
 
 # ── Überprüfungen ─────────────────────────────────────────────────────────────
@@ -292,9 +292,9 @@ setup_application() {
 write_config() {
     print_step "Konfiguration wird erstellt..."
 
-    SECRET_KEY=$(generate_secret)
-    DB_PASSWORD=$(generate_secret | tr -dc 'a-zA-Z0-9' | head -c 32)
-    MINIO_PASSWORD=$(generate_secret | tr -dc 'a-zA-Z0-9' | head -c 32)
+    SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n/+=')
+    DB_PASSWORD=$(openssl rand -hex 16)
+    MINIO_PASSWORD=$(openssl rand -hex 16)
 
     cat > "$INSTALL_DIR/.env" <<EOF
 # DeineZeit Konfiguration
