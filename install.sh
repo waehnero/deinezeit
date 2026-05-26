@@ -355,8 +355,8 @@ setup_ssl() {
     docker compose up -d nginx certbot 2>/dev/null || true
     sleep 3
 
-    # Zertifikat beantragen
-    if docker compose run --rm certbot certonly \
+    # Zertifikat beantragen (--entrypoint überschreibt den renewal-Loop aus docker-compose.yml)
+    if docker compose run --rm --entrypoint certbot certbot certonly \
         --webroot \
         --webroot-path /var/www/certbot \
         --email "$ADMIN_EMAIL" \
