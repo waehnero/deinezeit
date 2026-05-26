@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '0.9.1',
+    day: '26',
+    month: 'Mai',
+    year: '2026',
+    features: [
+      'Wartungsseite während Updates — statt "502 Bad Gateway" erscheint eine DeineZeit-Seite mit Spinner',
+      'Wartungsseite aktualisiert sich automatisch sobald das System wieder bereit ist',
+    ],
+    updates: [
+      'Update-Mechanismus grundlegend überarbeitet: läuft jetzt in einem unabhängigen Container und übersteht den eigenen Neustart',
+      'Automatischer Rollback auf Vorgänger-Version wenn Build oder Health-Check fehlschlägt',
+      'Update-Skript erkennt Domain automatisch — kein git-Konflikt mehr bei app.conf',
+      'Health-Check nach Update: Backend muss in 2 Minuten antworten, sonst wird zurückgerollt',
+    ],
+  },
+  {
     version: '0.9.0',
     day: '26',
     month: 'Mai',

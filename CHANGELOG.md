@@ -211,6 +211,27 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [0.9.1] – 2026-05-26 – Update-Mechanismus überarbeitet & Wartungsseite
+
+### Neu
+- **Wartungsseite während Updates**: Statt des generischen „502 Bad Gateway"-Fehlers erscheint eine DeineZeit-Seite mit Spinner und dem Hinweis, dass ein Update läuft. Die Seite aktualisiert sich automatisch sobald das System wieder bereit ist.
+
+### Bugfixes & Verbesserungen
+- **Update-Prozess grundlegend überarbeitet**: Das Update läuft jetzt in einem unabhängigen `docker:cli`-Container außerhalb des Compose-Projekts — der Prozess übersteht den Neustart der eigenen Container und läuft sicher bis zum Ende durch
+- **Automatischer Rollback**: Schlägt Build oder Health-Check fehl, wird automatisch der vorherige Git-Commit wiederhergestellt und die Vorgänger-Version neu gestartet
+- **Domain-Konflikt behoben**: `update.sh` liest den echten Domain-Namen aus der laufenden nginx-Konfiguration, setzt die Datei für `git pull` zurück und baut sie danach mit der korrekten Domain neu auf — kein manueller Eingriff mehr nötig
+- **Health-Check nach Update**: Nach dem Neustart wird `/api/health` bis zu 2 Minuten gepollt; erst wenn das Backend antwortet gilt das Update als erfolgreich
+
+### Technische Details
+- `update.sh` übernimmt vollständigen Update-Ablauf: git pull → build → up -d → health-check → nginx reload
+- `_execute_update()` im Backend startet nur noch den `docker:cli`-Container per `docker run --rm --network host`
+- `nginx/maintenance.html`: statische Seite mit Auto-Refresh alle 10 Sekunden via `fetch('/api/health')`
+- `nginx/conf.d/app.conf`: `error_page 502 503 504 /maintenance.html` mit internem Location-Block
+- `docker-compose.yml`: `maintenance.html` als Read-only-Volume in nginx eingebunden
+- Neuer Endpoint `GET /api/system/health` für automatisierte Bereitschaftsprüfung
+
+---
+
 ## Geplant für [1.0.0]
 
 - Excel (.xlsx) Export
