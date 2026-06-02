@@ -46,7 +46,7 @@ rollback() {
         docker tag deinezeit-frontend:rollback deinezeit-frontend:latest >> "$LOG_FILE" 2>&1 || true
         log "Frontend-Image auf Backup-Version zurückgesetzt."
     fi
-    $COMPOSE up -d >> "$LOG_FILE" 2>&1 || true
+    $COMPOSE up -d --force-recreate >> "$LOG_FILE" 2>&1 || true
     sleep 3
     docker exec deinezeit_nginx nginx -s reload >> "$LOG_FILE" 2>&1 || true
     log "Rollback abgeschlossen – Vorgänger-Version läuft wieder."
