@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '0.9.5',
+    day: '03',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Dashboard: Bausteine per Drag & Drop frei anordnen',
+      'Dashboard: Breite der Bausteine anpassen (¼ / ½ / Vollbreite)',
+      'Dashboard: Layout wird pro Browser gespeichert und beim nächsten Besuch wiederhergestellt',
+      'Dashboard: Zeiterfassung-Widget mit Heute/Woche/Monat Übersicht direkt am Dashboard',
+    ],
+    updates: [],
+  },
+  {
     version: '0.9.4',
     day: '03',
     month: 'Juni',

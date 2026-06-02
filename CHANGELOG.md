@@ -5,6 +5,16 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [0.9.5] – 2026-06-03 – Dashboard konfigurierbar
+
+### Neu
+- Dashboard-Bausteine per Drag & Drop frei anordnen
+- Breite der Bausteine stufenweise anpassen (¼ / ½ / Vollbreite)
+- Layout wird im Browser gespeichert und beim nächsten Besuch wiederhergestellt
+- Neues Zeiterfassung-Widget auf dem Dashboard mit Heute/Woche/Monat-Übersicht
+
+---
+
 ## [0.9.4] – 2026-06-03 – Update-Prozess robuster
 
 ### Aktualisierungen
