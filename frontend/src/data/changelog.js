@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '0.9.3',
+    day: '02',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Stammdaten-Typen vereinheitlicht: Kunden und Lieferanten zusammengeführt zu "Kontakte" mit Typ-Feld (Kunde/Lieferant/Interessent)',
+      'Neuer Stammdaten-Typ "Artikel" für Produkte und Dienstleistungen',
+      'Bestehende Kunden- und Lieferanten-Datensätze automatisch nach Kontakte migriert',
+    ],
+  },
+  {
     version: '0.9.2',
     day: '27',
     month: 'Mai',

@@ -5,6 +5,16 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [0.9.3] – 2026-06-02 – Stammdaten vereinheitlicht
+
+### Aktualisierungen
+- Stammdaten-Typen vereinheitlicht: Kunden und Lieferanten zusammengeführt zu „Kontakte" mit Typ-Feld (Kunde / Lieferant / Interessent)
+- Neuer Stammdaten-Typ „Artikel" für Produkte und Dienstleistungen (Bezeichnung, Artikelnummer, Preis, Beschreibung)
+- Bestehende Kunden- und Lieferanten-Datensätze werden bei Migration automatisch nach Kontakte übernommen
+- Alembic-Migration 0010 stellt einheitlichen Stand bei Neu- und Bestandsinstallationen sicher
+
+---
+
 ## [0.1.0] – 2026-05-21 – Grundfundament
 
 ### Neu
