@@ -47,6 +47,8 @@ rollback() {
         log "Frontend-Image auf Backup-Version zurückgesetzt."
     fi
     $COMPOSE up -d >> "$LOG_FILE" 2>&1 || true
+    sleep 3
+    docker exec deinezeit_nginx nginx -s reload >> "$LOG_FILE" 2>&1 || true
     log "Rollback abgeschlossen – Vorgänger-Version läuft wieder."
     log ""
 }
@@ -126,6 +128,11 @@ if ! $COMPOSE up -d >> "$LOG_FILE" 2>&1; then
     exit 1
 fi
 log "Container gestartet."
+
+# nginx sofort neu laden damit neue Container-IPs aufgelöst werden
+sleep 2
+docker exec deinezeit_nginx nginx -s reload >> "$LOG_FILE" 2>&1 || true
+log "nginx neu geladen (Container-IPs aktualisiert)."
 
 # ── Health-Check (max. 2 Minuten) ─────────────────────────────────────────────
 log ""
