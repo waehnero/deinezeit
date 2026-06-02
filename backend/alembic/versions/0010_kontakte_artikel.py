@@ -83,7 +83,7 @@ def upgrade() -> None:
     conn.execute(sa.text("""
         INSERT INTO entity_records (id, entity_type_id, data, display_name, created_by, updated_by, created_at, updated_at)
         SELECT
-            er.id,
+            gen_random_uuid(),
             (SELECT id FROM entity_types WHERE slug = 'kontakte'),
             er.data || '{"typ": "Kunde"}'::jsonb,
             er.display_name,
@@ -94,11 +94,6 @@ def upgrade() -> None:
         FROM entity_records er
         JOIN entity_types et ON er.entity_type_id = et.id
         WHERE et.slug = 'kunden'
-          AND NOT EXISTS (
-              SELECT 1 FROM entity_records er2
-              WHERE er2.id = er.id
-                AND er2.entity_type_id = (SELECT id FROM entity_types WHERE slug = 'kontakte')
-          )
     """))
 
     # -------------------------------------------------------------------------
