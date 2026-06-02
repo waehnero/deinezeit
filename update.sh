@@ -37,6 +37,15 @@ rollback() {
     if [ -n "$DOMAIN" ]; then
         sed "s/deine-domain.at/$DOMAIN/g" "$APPCONF" > /tmp/appconf.tmp && mv /tmp/appconf.tmp "$APPCONF"
     fi
+    # Gesicherte Images wiederherstellen (damit wirklich der alte Code läuft)
+    if docker image inspect deinezeit-backend:rollback > /dev/null 2>&1; then
+        docker tag deinezeit-backend:rollback deinezeit-backend:latest >> "$LOG_FILE" 2>&1 || true
+        log "Backend-Image auf Backup-Version zurückgesetzt."
+    fi
+    if docker image inspect deinezeit-frontend:rollback > /dev/null 2>&1; then
+        docker tag deinezeit-frontend:rollback deinezeit-frontend:latest >> "$LOG_FILE" 2>&1 || true
+        log "Frontend-Image auf Backup-Version zurückgesetzt."
+    fi
     $COMPOSE up -d >> "$LOG_FILE" 2>&1 || true
     log "Rollback abgeschlossen – Vorgänger-Version läuft wieder."
     log ""
@@ -97,6 +106,10 @@ fi
 # ── 2. Docker Images bauen ────────────────────────────────────────────────────
 log ""
 log "[2/3] Docker Images werden gebaut..."
+# Aktuelle Images als Rollback-Sicherung taggen
+docker tag deinezeit-backend:latest deinezeit-backend:rollback >> "$LOG_FILE" 2>&1 || true
+docker tag deinezeit-frontend:latest deinezeit-frontend:rollback >> "$LOG_FILE" 2>&1 || true
+log "Aktuelle Images als Rollback-Backup gesichert."
 if ! $COMPOSE build >> "$LOG_FILE" 2>&1; then
     log "FEHLER: Build fehlgeschlagen."
     rollback

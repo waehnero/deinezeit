@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '0.9.4',
+    day: '03',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Update-Prozess: Alembic-Migrationen laufen jetzt automatisch beim Backend-Start — kein manuelles Eingreifen mehr nötig',
+      'Update-Prozess: Rollback stellt nun auch die Docker-Images der Vorgänger-Version wieder her, nicht nur den Code',
+    ],
+  },
+  {
     version: '0.9.3',
     day: '02',
     month: 'Juni',

@@ -5,6 +5,15 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [0.9.4] – 2026-06-03 – Update-Prozess robuster
+
+### Aktualisierungen
+- Backend führt Alembic-Migrationen jetzt automatisch beim Start aus — zukünftige Updates brauchen kein manuelles `alembic upgrade head` mehr
+- Migrations-Fehler beim Start verhindern nun das Hochkommen des Backends → Health-Check schlägt fehl → automatischer Rollback greift korrekt
+- Rollback im Update-Skript stellt jetzt auch die gesicherten Docker-Images wieder her, nicht nur den Git-Commit
+
+---
+
 ## [0.9.3] – 2026-06-02 – Stammdaten vereinheitlicht
 
 ### Aktualisierungen
