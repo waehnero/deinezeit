@@ -1135,6 +1135,8 @@ function TabRechnung() {
   const [customCss, setCustomCss] = useState('')
   const [showCustomEditor, setShowCustomEditor] = useState(false)
   const [previewTemplate, setPreviewTemplate] = useState(null) // null = kein Popup
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const [bankIban, setBankIban] = useState('')
   const [bankBic, setBankBic] = useState('')
@@ -1303,7 +1305,20 @@ function TabRechnung() {
                 )}
               </button>
               <button
-                onClick={() => setPreviewTemplate(n)}
+                onClick={async () => {
+                  setPreviewTemplate(n)
+                  setPreviewHtml('')
+                  setPreviewLoading(true)
+                  try {
+                    const token = localStorage.getItem('access_token')
+                    const res = await fetch(`/api/invoices/template-preview/${n}`, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    })
+                    const html = await res.text()
+                    setPreviewHtml(html)
+                  } catch { setPreviewHtml('<p style="padding:2rem;color:red">Fehler beim Laden</p>') }
+                  finally { setPreviewLoading(false) }
+                }}
                 className="w-full py-1.5 text-xs text-neutral-500 hover:text-primary-600 hover:bg-neutral-50 border-t border-neutral-100 flex items-center justify-center gap-1"
               >
                 <Eye size={12} /> Vorschau
@@ -1334,11 +1349,17 @@ function TabRechnung() {
                   </button>
                 </div>
               </div>
-              <div className="flex-1 overflow-hidden rounded-b-2xl">
+              <div className="flex-1 overflow-hidden rounded-b-2xl relative">
+                {previewLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                    <Loader2 size={28} className="animate-spin text-neutral-400" />
+                  </div>
+                )}
                 <iframe
-                  src={`/api/invoices/template-preview/${previewTemplate}`}
+                  srcdoc={previewHtml}
                   className="w-full h-full border-0"
                   title={`Vorschau Vorlage ${previewTemplate}`}
+                  sandbox="allow-same-origin"
                 />
               </div>
             </div>
