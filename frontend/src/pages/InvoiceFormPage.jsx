@@ -144,7 +144,8 @@ function ArticleSearch({ onSelect }) {
                 onSelect({
                   article_id: r.id,
                   description: r.display_name,
-                  unit_price: r.data?.preis || '0',
+                  unit_price: r.data?.preis != null ? String(r.data.preis) : '0',
+                  unit: r.data?.einheit || 'Stk',
                   detail: r.data?.beschreibung || '',
                 })
                 setSearch('')
@@ -584,25 +585,6 @@ export default function InvoiceFormPage() {
                 <p className="text-xs text-neutral-400 mt-1">Gemäß § 6 Abs. 1 Z 27 UStG keine USt.</p>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* PDF-Vorlage */}
-        <div className="bg-white border border-neutral-200 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-neutral-700 mb-3">PDF-Vorlage</h2>
-          <div className="flex gap-2 flex-wrap">
-            {[1, 2, 3, 4, 5].map(n => (
-              <button
-                key={n}
-                onClick={() => setTemplateId(n)}
-                className={`w-20 h-24 rounded-lg border-2 text-sm transition-all flex flex-col items-center justify-center gap-1 ${
-                  templateId === n ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'
-                }`}
-              >
-                <FileText size={20} />
-                <span>Vorlage {n}</span>
-              </button>
-            ))}
           </div>
         </div>
 

@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
-import { settingsApi, systemApi } from '../services/api'
+import { settingsApi, systemApi, invoiceApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
   Save, Upload, Trash2, Download, Send, Loader2,
   CheckCircle, Eye, EyeOff, RefreshCw, Cloud,
   ImageIcon, Link2, Monitor, Cpu, ArrowUpCircle,
-  Users, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp
+  Users, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp,
+  Receipt, FileText
 } from 'lucide-react'
 
 // ── Farbthemen ────────────────────────────────────────────────────────────────
@@ -1111,6 +1112,202 @@ function TabSystem() {
   )
 }
 
+// ── Tab: Rechnungen ───────────────────────────────────────────────────────────
+const TEMPLATE_NAMES = {
+  1: 'Klassisch',
+  2: 'Modern',
+  3: 'Kompakt',
+  4: 'Elegant',
+  5: 'Farbenfroh',
+}
+
+const TEMPLATE_DESCRIPTIONS = {
+  1: 'Zweispaltig, Logo rechts — seriöser Stil für alle Branchen',
+  2: 'Dunkler Header-Block, minimalistische Typografie',
+  3: 'Dichtes Layout, ideal für kurze Rechnungen',
+  4: 'Goldene Linie, Serif-Schrift, viel Weißraum',
+  5: 'Primärfarbe als Akzent, auffällig und modern',
+}
+
+function TabRechnung() {
+  const [invSettings, setInvSettings] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [customCss, setCustomCss] = useState('')
+  const [showCustomEditor, setShowCustomEditor] = useState(false)
+
+  useEffect(() => {
+    invoiceApi.getSettings().then(res => {
+      setInvSettings(res.data)
+      const bank = res.data.bank || {}
+      setBankIban(typeof bank === 'object' ? bank.iban || '' : '')
+      setBankBic(typeof bank === 'object' ? bank.bic || '' : '')
+      setBankName(typeof bank === 'object' ? bank.bank || '' : '')
+      setDefaultTemplate(res.data.default_template || 1)
+      setCustomCss(res.data.custom_template_css || '')
+      setDefaultTaxRate(res.data.default_tax_rate || 20)
+      setPaymentDays(res.data.default_payment_days || 30)
+      setKleinunternehmerText(
+        typeof res.data.kleinunternehmer_text === 'string'
+          ? res.data.kleinunternehmer_text.replace(/^"|"$/g, '')
+          : ''
+      )
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const [bankIban, setBankIban] = useState('')
+  const [bankBic, setBankBic] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [defaultTemplate, setDefaultTemplate] = useState(1)
+  const [defaultTaxRate, setDefaultTaxRate] = useState(20)
+  const [paymentDays, setPaymentDays] = useState(30)
+  const [kleinunternehmerText, setKleinunternehmerText] = useState('')
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await Promise.all([
+        invoiceApi.updateSetting('bank', { iban: bankIban, bic: bankBic, bank: bankName }),
+        invoiceApi.updateSetting('default_template', Number(defaultTemplate)),
+        invoiceApi.updateSetting('default_tax_rate', Number(defaultTaxRate)),
+        invoiceApi.updateSetting('default_payment_days', Number(paymentDays)),
+        invoiceApi.updateSetting('kleinunternehmer_text', kleinunternehmerText),
+        showCustomEditor && invoiceApi.updateSetting('custom_template_css', customCss),
+      ].filter(Boolean))
+      toast.success('Rechnungseinstellungen gespeichert')
+    } catch {
+      toast.error('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-neutral-400" /></div>
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Bankverbindung</h3>
+        <p className="text-xs text-neutral-400 mb-3">Wird automatisch auf jeder Rechnung gedruckt.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">IBAN</label>
+            <input value={bankIban} onChange={e => setBankIban(e.target.value)} placeholder="AT12 3456 7890 1234 5678"
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">BIC</label>
+            <input value={bankBic} onChange={e => setBankBic(e.target.value)} placeholder="BKAUATWW"
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Bankname</label>
+            <input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="Bank Austria"
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Standard-Einstellungen</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Standard-MwSt.-Satz (%)</label>
+            <select value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+              <option value={20}>20 %</option>
+              <option value={10}>10 %</option>
+              <option value={0}>0 %</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Standard-Zahlungsziel (Tage)</label>
+            <input type="number" value={paymentDays} onChange={e => setPaymentDays(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" min={0} max={365} />
+          </div>
+        </div>
+        <div className="mt-3">
+          <label className="block text-xs font-medium text-neutral-600 mb-1">Kleinunternehmer-Hinweistext</label>
+          <textarea value={kleinunternehmerText} onChange={e => setKleinunternehmerText(e.target.value)} rows={2}
+            placeholder="Gemäß § 6 Abs. 1 Z 27 UStG wird keine Umsatzsteuer berechnet."
+            className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" />
+        </div>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">PDF-Vorlage</h3>
+        <p className="text-xs text-neutral-400 mb-4">Die gewählte Vorlage wird für alle Dokumente (Rechnungen, Angebote, Gutschriften, Lieferscheine) als Standard verwendet.</p>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+          {[1, 2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              onClick={() => setDefaultTemplate(n)}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                Number(defaultTemplate) === n
+                  ? 'border-primary-500 bg-primary-50'
+                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
+              }`}
+            >
+              <FileText size={24} className={Number(defaultTemplate) === n ? 'text-primary-600' : 'text-neutral-400'} />
+              <span className={`text-xs font-semibold ${Number(defaultTemplate) === n ? 'text-primary-700' : 'text-neutral-700'}`}>
+                {TEMPLATE_NAMES[n]}
+              </span>
+              <span className="text-xs text-neutral-400 text-center leading-tight">{TEMPLATE_DESCRIPTIONS[n]}</span>
+              {Number(defaultTemplate) === n && (
+                <span className="text-xs bg-primary-600 text-white px-2 py-0.5 rounded-full">Standard</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="border border-neutral-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowCustomEditor(!showCustomEditor)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            <span className="flex items-center gap-2">
+              <FileText size={15} />
+              Eigene Vorlage (CSS-Editor)
+            </span>
+            {showCustomEditor ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+          {showCustomEditor && (
+            <div className="border-t border-neutral-100 p-4">
+              <p className="text-xs text-neutral-500 mb-2">
+                Überschreibe das Standard-CSS der Vorlagen. Wird zusätzlich zu der gewählten Vorlage angewendet.
+                Verwende Standard-CSS-Selektoren wie <code className="bg-neutral-100 px-1 rounded">.positions</code>,{' '}
+                <code className="bg-neutral-100 px-1 rounded">h1</code>,{' '}
+                <code className="bg-neutral-100 px-1 rounded">.bank-box</code> etc.
+              </p>
+              <textarea
+                value={customCss}
+                onChange={e => setCustomCss(e.target.value)}
+                rows={10}
+                placeholder={`/* Beispiel: eigene Schriftart und Farbe */\nbody { font-family: Georgia, serif; }\nh1 { color: #1a3a6b; }\ntable.positions th { background: #1a3a6b; }`}
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-xs font-mono resize-y"
+                spellCheck={false}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-2">
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-60">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          Speichern
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('allgemein')
@@ -1119,6 +1316,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'allgemein', label: 'Allgemein',  icon: Building2      },
     { id: 'design',    label: 'Design',     icon: Palette        },
+    { id: 'rechnung',  label: 'Rechnungen', icon: Receipt        },
     { id: 'backup',    label: 'Backup',     icon: HardDrive      },
     { id: 'email',     label: 'E-Mail',     icon: Mail           },
     { id: 'system',    label: 'System',     icon: Cpu            },
@@ -1159,6 +1357,7 @@ export default function SettingsPage() {
       <div className="card p-6">
         {activeTab === 'allgemein' && <TabAllgemein settings={settings} onSaved={loadSettings} />}
         {activeTab === 'design'    && <TabDesign    settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'rechnung'  && <TabRechnung />}
         {activeTab === 'backup'    && <TabBackup    settings={settings} onSaved={loadSettings} />}
         {activeTab === 'email'     && <TabEmail     settings={settings} onSaved={loadSettings} />}
         {activeTab === 'system'    && <TabSystem />}

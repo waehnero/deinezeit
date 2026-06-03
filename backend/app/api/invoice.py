@@ -145,7 +145,8 @@ async def create_invoice(
     db.flush()
 
     for i, pos_data in enumerate(body.positions):
-        pos = InvoicePosition(invoice_id=invoice.id, sort_order=i, **pos_data.model_dump())
+        pos = InvoicePosition(invoice_id=invoice.id, **pos_data.model_dump())
+        pos.sort_order = i
         db.add(pos)
 
     db.flush()
@@ -219,7 +220,8 @@ async def update_invoice(
     # Positionen ersetzen
     db.query(InvoicePosition).filter(InvoicePosition.invoice_id == invoice_id).delete()
     for i, pos_data in enumerate(body.positions):
-        pos = InvoicePosition(invoice_id=inv.id, sort_order=i, **pos_data.model_dump())
+        pos = InvoicePosition(invoice_id=inv.id, **pos_data.model_dump())
+        pos.sort_order = i
         db.add(pos)
 
     db.flush()
@@ -421,21 +423,21 @@ async def get_unbilled_time_entries(
         ~TimeEntry.id.in_(billed_ids),
     )
     if contact_id:
-        q = q.filter(TimeEntry.data["kontakt_id"].astext == str(contact_id))
+        q = q.filter(TimeEntry.contact_id == contact_id)
     if project_id:
-        q = q.filter(TimeEntry.data["projekt_id"].astext == str(project_id))
+        q = q.filter(TimeEntry.project_id == project_id)
 
     entries = q.order_by(TimeEntry.started_at.desc()).limit(200).all()
     result = []
     for e in entries:
-        duration_h = round((e.duration_seconds or 0) / 3600, 4) if e.duration_seconds else 0
+        duration_h = round((e.duration_minutes or 0) / 60, 4)
         result.append({
             "id": str(e.id),
             "started_at": e.started_at.isoformat() if e.started_at else None,
             "duration_hours": duration_h,
             "description": e.data.get("beschreibung", "") if e.data else "",
-            "project": e.data.get("projekt", "") if e.data else "",
-            "contact": e.data.get("kontakt", "") if e.data else "",
+            "project": e.project_name or (e.data.get("projekt", "") if e.data else ""),
+            "contact": e.contact_name or (e.data.get("kontakt", "") if e.data else ""),
         })
     return result
 

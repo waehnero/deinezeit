@@ -231,6 +231,11 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
                 sender_contact, recipient_contact, template_id: int) -> str:
     """Gibt vollständiges HTML-Dokument zurück."""
 
+    # Custom-CSS aus Einstellungen anhängen
+    custom_css = inv_settings.get("custom_template_css", "") or ""
+    if isinstance(custom_css, str) and custom_css.startswith('"'):
+        custom_css = custom_css.strip('"')
+
     logo_src   = _logo_b64(settings)
     logo_html  = f'<img class="logo" src="{logo_src}" alt="Logo">' if logo_src else \
                  f'<span style="font-size:14pt;font-weight:bold;">{settings.get("company_name","")}</span>'
@@ -324,6 +329,7 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
         outro=outro,
         watermark=watermark,
         settings=settings,
+        custom_css=custom_css,
     )
 
 
@@ -346,6 +352,7 @@ def _t1(**kw) -> str:
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
 {BASE_CSS}
+{kw["custom_css"]}
 .header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.8cm; }}
 .sender-block {{ font-size: 8pt; color: #555; text-align: right; }}
 .doc-title {{ margin: 0.5cm 0 0.3cm 0; }}
@@ -382,6 +389,7 @@ def _t2(**kw) -> str:
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
 {BASE_CSS}
+{kw["custom_css"]}
 .top-bar {{
   background: #1a1a2e; color: #fff; padding: 0.5cm 0.6cm;
   display: flex; justify-content: space-between; align-items: center;
@@ -422,6 +430,7 @@ def _t3(**kw) -> str:
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
 {BASE_CSS}
+{kw["custom_css"]}
 body {{ font-size: 8.5pt; }}
 .top {{ display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 0.3cm; margin-bottom: 0.4cm; }}
 .doc-label {{ font-size: 15pt; font-weight: 900; }}
@@ -456,6 +465,7 @@ def _t4(**kw) -> str:
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
 {BASE_CSS}
+{kw["custom_css"]}
 body {{ font-family: Georgia, 'Times New Roman', serif; font-size: 9.5pt; }}
 table.positions th, table.positions td {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 8.5pt; }}
 .header {{ border-bottom: 3px solid #c8a96e; padding-bottom: 0.4cm; margin-bottom: 0.6cm; display:flex; justify-content:space-between; align-items:flex-end; }}
@@ -494,6 +504,7 @@ def _t5(**kw) -> str:
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
 {BASE_CSS}
+{kw["custom_css"]}
 :root {{ --primary: {primary}; }}
 .header-band {{
   background: var(--primary); color: #fff;
@@ -542,7 +553,11 @@ table.totals .grand-total td {{ color: var(--primary); }}
 def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
                  sender_contact=None, recipient_contact=None) -> bytes:
     """Gibt PDF-Bytes zurück."""
-    template_id = getattr(invoice, "template_id", 1) or 1
+    # Vorlage: zuerst aus inv_settings (globale Einstellung), dann aus Rechnung, Fallback 1
+    default_tpl = inv_settings.get("default_template", 1)
+    try: default_tpl = int(default_tpl)
+    except Exception: default_tpl = 1
+    template_id = default_tpl or getattr(invoice, "template_id", 1) or 1
     html = _build_html(
         invoice=invoice,
         positions=positions,
@@ -560,7 +575,10 @@ def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
 def generate_html_preview(invoice, positions, settings: dict, inv_settings: dict,
                            sender_contact=None, recipient_contact=None) -> str:
     """Gibt HTML-String zurück (für Vorschau im Browser)."""
-    template_id = getattr(invoice, "template_id", 1) or 1
+    default_tpl = inv_settings.get("default_template", 1)
+    try: default_tpl = int(default_tpl)
+    except Exception: default_tpl = 1
+    template_id = default_tpl or getattr(invoice, "template_id", 1) or 1
     return _build_html(
         invoice=invoice,
         positions=positions,
