@@ -597,6 +597,81 @@ def _load_pdf_context(db: Session, invoice: Invoice):
     return settings, inv_settings, sender_contact, recipient_contact
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Muster-Vorschau für Template-Auswahl (kein echtes Dokument nötig)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/template-preview/{template_id}")
+async def template_preview(
+    template_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    from fastapi.responses import HTMLResponse
+    from app.services.invoice_pdf import generate_html_preview
+    from decimal import Decimal
+    from datetime import date as _date
+    import types
+
+    settings_d = {r.key: r.value for r in db.query(Setting).all()}
+    inv_settings_d = {r.key: r.value for r in db.query(InvoiceSettings).all()}
+    # Vorlage aus Parameter erzwingen
+    inv_settings_d["default_template"] = template_id
+
+    sender_contact = None
+    cid = settings_d.get("company_contact_id")
+    if cid:
+        try:
+            from uuid import UUID as _UUID
+            sender_contact = db.query(EntityRecord).filter(EntityRecord.id == _UUID(cid)).first()
+        except Exception:
+            pass
+
+    # Muster-Rechnung als einfaches Objekt
+    inv = types.SimpleNamespace(
+        doc_type="rechnung",
+        number="RE-2026-001",
+        date=_date.today(),
+        due_date=_date(2026, 7, 31),
+        delivery_date=None,
+        reference="Muster-001",
+        title="Musterrechnung — Vorschau",
+        intro_text="Wir erlauben uns, folgende Leistungen in Rechnung zu stellen:",
+        outro_text="Wir bitten um Überweisung des Betrages innerhalb von 30 Tagen. Vielen Dank!",
+        tax_mode="per_position",
+        subtotal=Decimal("1680.00"),
+        tax_total=Decimal("336.00"),
+        total=Decimal("2016.00"),
+        currency="EUR",
+        status="entwurf",
+        template_id=template_id,
+        contact_id=None,
+    )
+
+    # Muster-Positionen
+    class FakePos:
+        def __init__(self, desc, qty, price, tax, detail=None, unit="Stk"):
+            self.pos_type = "item"
+            self.description = desc
+            self.detail = detail
+            self.quantity = Decimal(str(qty))
+            self.unit = unit
+            self.unit_price = Decimal(str(price))
+            self.discount_pct = None
+            self.tax_rate = Decimal(str(tax))
+            self.line_total = (self.quantity * self.unit_price).quantize(Decimal("0.01"))
+
+    positions = [
+        FakePos("Webentwicklung — Frontend", 8, 120, 20, "React-Komponenten und UI-Implementierung", "h"),
+        FakePos("Webentwicklung — Backend", 6, 120, 20, "REST-API, Datenbank-Design", "h"),
+        FakePos("Projektmanagement & Meetings", 2, 90, 20, unit="h"),
+        FakePos("Server-Konfiguration (Pauschal)", 1, 480, 20),
+    ]
+
+    html = generate_html_preview(inv, positions, settings_d, inv_settings_d, sender_contact, None)
+    return HTMLResponse(content=html)
+
+
 @router.get("/{invoice_id}/pdf")
 async def download_invoice_pdf(
     invoice_id: UUID,
@@ -656,78 +731,4 @@ async def invoice_book_pdf(
         q = q.filter(Invoice.contact_id == contact_id)
     if doc_type:
         q = q.filter(Invoice.doc_type == doc_type)
-    invoices = q.order_by(Invoice.date.asc(), Invoice.number.asc()).all()
-
-    settings_rows = {r.key: r.value for r in db.query(Setting).all()}
-    company = settings_rows.get("company_name", "")
-
-    from decimal import Decimal
-    total_net   = sum(i.subtotal or Decimal("0") for i in invoices)
-    total_tax   = sum(i.tax_total or Decimal("0") for i in invoices)
-    total_gross = sum(i.total or Decimal("0") for i in invoices)
-
-    def fe(n): return f"{float(n):,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
-    def fd(d): return d.strftime("%d.%m.%Y") if d else "—"
-
-    rows_html = ""
-    for inv in invoices:
-        rows_html += f"""<tr>
-            <td>{inv.number}</td>
-            <td>{inv.doc_type.capitalize()}</td>
-            <td>{fd(inv.date)}</td>
-            <td>{fd(inv.due_date)}</td>
-            <td>{inv.title or ''}</td>
-            <td style="text-align:right">{fe(inv.subtotal)}</td>
-            <td style="text-align:right">{fe(inv.tax_total)}</td>
-            <td style="text-align:right;font-weight:600">{fe(inv.total)}</td>
-            <td>{inv.status}</td>
-        </tr>"""
-
-    period_str = ""
-    if date_from and date_to:
-        period_str = f"{fd(date_from)} – {fd(date_to)}"
-    elif date_from:
-        period_str = f"ab {fd(date_from)}"
-    elif date_to:
-        period_str = f"bis {fd(date_to)}"
-
-    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-@page {{ size: A4 landscape; margin: 1.5cm; @bottom-center {{ content: "Seite " counter(page) " von " counter(pages); font-size: 8pt; color: #999; }} }}
-body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #222; }}
-h1 {{ font-size: 14pt; font-weight: 700; margin-bottom: 0.2cm; }}
-p.meta {{ font-size: 8pt; color: #777; margin-bottom: 0.5cm; }}
-table {{ width: 100%; border-collapse: collapse; }}
-th {{ background: #1a1a2e; color: #fff; padding: 5px 6px; text-align: left; font-size: 7.5pt; text-transform: uppercase; }}
-td {{ padding: 4px 6px; border-bottom: 0.5px solid #eee; }}
-tr:nth-child(odd) {{ background: #fafafa; }}
-tfoot td {{ font-weight: 700; border-top: 2px solid #333; background: #f0f0f0; }}
-</style>
-</head><body>
-<h1>Rechnungsbuch — {company}</h1>
-<p class="meta">{period_str} &nbsp;·&nbsp; {len(invoices)} Dokumente</p>
-<table>
-<thead><tr>
-  <th>Nummer</th><th>Typ</th><th>Datum</th><th>Fällig</th><th>Titel</th>
-  <th style="text-align:right">Netto</th><th style="text-align:right">MwSt.</th>
-  <th style="text-align:right">Brutto</th><th>Status</th>
-</tr></thead>
-<tbody>{rows_html}</tbody>
-<tfoot><tr>
-  <td colspan="5">Gesamt ({len(invoices)} Dokumente)</td>
-  <td style="text-align:right">{fe(total_net)}</td>
-  <td style="text-align:right">{fe(total_tax)}</td>
-  <td style="text-align:right">{fe(total_gross)}</td>
-  <td></td>
-</tr></tfoot>
-</table>
-</body></html>"""
-
-    buf = _io.BytesIO()
-    WeasyprintHTML(string=html, base_url="/").write_pdf(buf)
-    filename = f"rechnungsbuch_{date_from or 'alle'}_{date_to or 'alle'}.pdf"
-    return StreamingResponse(
-        _io.BytesIO(buf.getvalue()),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    invoices = q.order

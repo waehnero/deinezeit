@@ -1130,30 +1130,11 @@ const TEMPLATE_DESCRIPTIONS = {
 }
 
 function TabRechnung() {
-  const [invSettings, setInvSettings] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [customCss, setCustomCss] = useState('')
   const [showCustomEditor, setShowCustomEditor] = useState(false)
-
-  useEffect(() => {
-    invoiceApi.getSettings().then(res => {
-      setInvSettings(res.data)
-      const bank = res.data.bank || {}
-      setBankIban(typeof bank === 'object' ? bank.iban || '' : '')
-      setBankBic(typeof bank === 'object' ? bank.bic || '' : '')
-      setBankName(typeof bank === 'object' ? bank.bank || '' : '')
-      setDefaultTemplate(res.data.default_template || 1)
-      setCustomCss(res.data.custom_template_css || '')
-      setDefaultTaxRate(res.data.default_tax_rate || 20)
-      setPaymentDays(res.data.default_payment_days || 30)
-      setKleinunternehmerText(
-        typeof res.data.kleinunternehmer_text === 'string'
-          ? res.data.kleinunternehmer_text.replace(/^"|"$/g, '')
-          : ''
-      )
-    }).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  const [previewTemplate, setPreviewTemplate] = useState(null) // null = kein Popup
 
   const [bankIban, setBankIban] = useState('')
   const [bankBic, setBankBic] = useState('')
@@ -1162,6 +1143,60 @@ function TabRechnung() {
   const [defaultTaxRate, setDefaultTaxRate] = useState(20)
   const [paymentDays, setPaymentDays] = useState(30)
   const [kleinunternehmerText, setKleinunternehmerText] = useState('')
+  const [contactHint, setContactHint] = useState('')  // Info ob Bankdaten aus Kontakt kamen
+
+  // Bankfelder aus Kontakt-Daten erkennen (sucht nach IBAN/BIC/Bank in allen Feldern)
+  function extractBankFromContact(data) {
+    if (!data) return {}
+    const result = {}
+    const keys = Object.keys(data)
+    for (const k of keys) {
+      const kl = k.toLowerCase()
+      const v = String(data[k] || '').trim()
+      if (!v) continue
+      if (!result.iban && (kl.includes('iban'))) result.iban = v
+      if (!result.bic  && (kl.includes('bic') || kl.includes('swift'))) result.bic = v
+      if (!result.bank && (kl.includes('bank') && !kl.includes('iban') && !kl.includes('bic'))) result.bank = v
+    }
+    return result
+  }
+
+  useEffect(() => {
+    Promise.all([
+      invoiceApi.getSettings(),
+      settingsApi.getCompanyContact(),
+    ]).then(([invRes, contactRes]) => {
+      const s = invRes.data
+      const bank = s.bank || {}
+      const savedIban = typeof bank === 'object' ? bank.iban || '' : ''
+      const savedBic  = typeof bank === 'object' ? bank.bic  || '' : ''
+      const savedBank = typeof bank === 'object' ? bank.bank || '' : ''
+
+      setBankIban(savedIban)
+      setBankBic(savedBic)
+      setBankName(savedBank)
+      setDefaultTemplate(s.default_template || 1)
+      setCustomCss(s.custom_template_css || '')
+      setDefaultTaxRate(s.default_tax_rate || 20)
+      setPaymentDays(s.default_payment_days || 30)
+      setKleinunternehmerText(
+        typeof s.kleinunternehmer_text === 'string'
+          ? s.kleinunternehmer_text.replace(/^"|"$/g, '') : ''
+      )
+
+      // Bankdaten aus Firmenkontakt vorausfüllen wenn Felder noch leer
+      const contact = contactRes.data?.contact
+      if (contact?.data) {
+        const fromContact = extractBankFromContact(contact.data)
+        if (!savedIban && fromContact.iban) { setBankIban(fromContact.iban); }
+        if (!savedBic  && fromContact.bic)  { setBankBic(fromContact.bic);   }
+        if (!savedBank && fromContact.bank) { setBankName(fromContact.bank);  }
+        if (fromContact.iban || fromContact.bic || fromContact.bank) {
+          setContactHint(`Bankdaten aus Kontakt „${contact.display_name}" übernommen`)
+        }
+      }
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [])
 
   async function handleSave() {
     setSaving(true)
@@ -1189,6 +1224,11 @@ function TabRechnung() {
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Bankverbindung</h3>
         <p className="text-xs text-neutral-400 mb-3">Wird automatisch auf jeder Rechnung gedruckt.</p>
+        {contactHint && (
+          <div className="mb-3 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <CheckCircle2 size={13} /> {contactHint}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">IBAN</label>
@@ -1244,26 +1284,66 @@ function TabRechnung() {
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
           {[1, 2, 3, 4, 5].map(n => (
-            <button
-              key={n}
-              onClick={() => setDefaultTemplate(n)}
-              className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                Number(defaultTemplate) === n
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
-              }`}
-            >
-              <FileText size={24} className={Number(defaultTemplate) === n ? 'text-primary-600' : 'text-neutral-400'} />
-              <span className={`text-xs font-semibold ${Number(defaultTemplate) === n ? 'text-primary-700' : 'text-neutral-700'}`}>
-                {TEMPLATE_NAMES[n]}
-              </span>
-              <span className="text-xs text-neutral-400 text-center leading-tight">{TEMPLATE_DESCRIPTIONS[n]}</span>
-              {Number(defaultTemplate) === n && (
-                <span className="text-xs bg-primary-600 text-white px-2 py-0.5 rounded-full">Standard</span>
-              )}
-            </button>
+            <div key={n} className={`flex flex-col rounded-xl border-2 transition-all overflow-hidden ${
+              Number(defaultTemplate) === n ? 'border-primary-500' : 'border-neutral-200'
+            }`}>
+              <button
+                onClick={() => setDefaultTemplate(n)}
+                className={`flex flex-col items-center gap-2 p-3 w-full transition-all ${
+                  Number(defaultTemplate) === n ? 'bg-primary-50' : 'bg-white hover:bg-neutral-50'
+                }`}
+              >
+                <FileText size={24} className={Number(defaultTemplate) === n ? 'text-primary-600' : 'text-neutral-400'} />
+                <span className={`text-xs font-semibold ${Number(defaultTemplate) === n ? 'text-primary-700' : 'text-neutral-700'}`}>
+                  {TEMPLATE_NAMES[n]}
+                </span>
+                <span className="text-xs text-neutral-400 text-center leading-tight">{TEMPLATE_DESCRIPTIONS[n]}</span>
+                {Number(defaultTemplate) === n && (
+                  <span className="text-xs bg-primary-600 text-white px-2 py-0.5 rounded-full">Standard</span>
+                )}
+              </button>
+              <button
+                onClick={() => setPreviewTemplate(n)}
+                className="w-full py-1.5 text-xs text-neutral-500 hover:text-primary-600 hover:bg-neutral-50 border-t border-neutral-100 flex items-center justify-center gap-1"
+              >
+                <Eye size={12} /> Vorschau
+              </button>
+            </div>
           ))}
         </div>
+
+        {/* Vorschau-Modal */}
+        {previewTemplate && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-4xl" style={{height: '90vh'}}>
+              <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200">
+                <div className="flex items-center gap-3">
+                  <FileText size={18} className="text-neutral-500" />
+                  <span className="font-semibold text-neutral-800">Vorschau: {TEMPLATE_NAMES[previewTemplate]}</span>
+                  <span className="text-xs text-neutral-400">{TEMPLATE_DESCRIPTIONS[previewTemplate]}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setDefaultTemplate(previewTemplate); setPreviewTemplate(null) }}
+                    className="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  >
+                    Als Standard verwenden
+                  </button>
+                  <button onClick={() => setPreviewTemplate(null)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
+                    <XCircle size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden rounded-b-2xl">
+                <iframe
+                  src={`/api/invoices/template-preview/${previewTemplate}`}
+                  className="w-full h-full border-0"
+                  title={`Vorschau Vorlage ${previewTemplate}`}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="border border-neutral-200 rounded-xl overflow-hidden">
           <button
