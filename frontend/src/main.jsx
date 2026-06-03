@@ -19,6 +19,9 @@ import ZeiterfassungPage from './pages/ZeiterfassungPage'
 import ZeiterfassungFelder from './pages/ZeiterfassungFelder'
 import SettingsPage from './pages/SettingsPage'
 import DatacenterPage from './pages/DatacenterPage'
+import InvoicePage from './pages/InvoicePage'
+import InvoiceFormPage from './pages/InvoiceFormPage'
+import InvoiceBookPage from './pages/InvoiceBookPage'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }) {
@@ -59,6 +62,12 @@ function App() {
                       <Route path="/users"                element={<UserManagementPage />} />
                       <Route path="/zeiterfassung"        element={<ZeiterfassungPage />} />
                       <Route path="/datacenter"           element={<DatacenterPage />} />
+                      {/* Rechnungsmodul */}
+                      <Route path="/invoices"            element={<InvoicePage />} />
+                      <Route path="/invoices/new"        element={<InvoiceFormPage />} />
+                      <Route path="/invoices/book"       element={<InvoiceBookPage />} />
+                      <Route path="/invoices/:id"        element={<InvoiceFormPage />} />
+                      <Route path="/invoices/:id/edit"   element={<InvoiceFormPage />} />
                       {/* Feldverwaltung & Einstellungen: nur Admin */}
                       <Route path="/zeiterfassung/felder" element={<AdminRoute><ZeiterfassungFelder /></AdminRoute>} />
                       <Route path="/settings"             element={<AdminRoute><SettingsPage /></AdminRoute>} />

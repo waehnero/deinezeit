@@ -163,4 +163,39 @@ export const systemApi = {
   cancelUpdate:    () => api.post('/system/update/cancel'),
 }
 
+export const invoiceApi = {
+  // Liste & Detail
+  list:           (params) => api.get('/invoices', { params }),
+  get:            (id) => api.get(`/invoices/${id}`),
+  create:         (data) => api.post('/invoices', data),
+  update:         (id, data) => api.put(`/invoices/${id}`, data),
+  delete:         (id) => api.delete(`/invoices/${id}`),
+
+  // Nächste Nummer vorschau
+  nextNumber:     (doc_type, year) => api.get('/invoices/next-number', { params: { doc_type, year } }),
+
+  // Aktionen
+  cancel:         (id, cancel_mode) => api.post(`/invoices/${id}/cancel`, { cancel_mode }),
+  markPaid:       (id, data) => api.post(`/invoices/${id}/mark-paid`, data),
+  convertToInvoice: (id) => api.post(`/invoices/${id}/convert-to-invoice`),
+
+  // Zeiteinträge
+  unbilledEntries: (params) => api.get('/invoices/time-entries/unbilled', { params }),
+
+  // Rechnungsbuch
+  book:           (params) => api.get('/invoices/book/list', { params }),
+  bookCsv:        (params) => api.get('/invoices/book/csv', { params, responseType: 'blob' }),
+
+  // Einstellungen
+  getSettings:    () => api.get('/invoices/settings/all'),
+  updateSetting:  (key, value) => api.put(`/invoices/settings/${key}`, { key, value }),
+
+  // Wiederkehrende Vorlagen
+  listTemplates:  () => api.get('/invoices/templates'),
+
+  // PDF
+  downloadPdf:    (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
+  bookPdf:        (params) => api.get('/invoices/book/pdf', { params, responseType: 'blob' }),
+}
+
 export default api

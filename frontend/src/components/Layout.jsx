@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Database, Users, User, LogOut, Menu, X,
-  ChevronRight, Clock, Settings2, HardDrive
+  ChevronRight, Clock, Settings2, HardDrive, Receipt
 } from 'lucide-react'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,6 +13,7 @@ import UpdateBanner from './UpdateBanner'
 const NAV_ITEMS = [
   { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/zeiterfassung',icon: Clock,           label: 'Zeiterfassung' },
+  { to: '/invoices',     icon: Receipt,         label: 'Rechnungen' },
   { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },
   { to: '/datacenter',   icon: HardDrive,       label: 'Datacenter' },
   { to: '/users',        icon: Users,           label: 'Benutzer' },
