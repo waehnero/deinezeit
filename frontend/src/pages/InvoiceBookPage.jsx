@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { invoiceApi } from '../services/api'
+import { invoiceApi, accountingApi } from '../services/api'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Download, RefreshCw, FileText, Mail, Filter } from 'lucide-react'
 
@@ -141,6 +141,22 @@ export default function InvoiceBookPage() {
                 className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50"
               >
                 <Download size={14} /> CSV
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const params = { ...parsePeriod(period) }
+                    if (docType) params.doc_type = docType
+                    const res = await accountingApi.exportBmd(params)
+                    const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+                    const a = document.createElement('a'); a.href = url; a.download = `bmd_export.csv`; a.click()
+                    URL.revokeObjectURL(url)
+                  } catch { toast.error('BMD-Export-Fehler') }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-primary-200 text-primary-700 rounded-lg hover:bg-primary-50"
+                title="BMD Buchungsjournal exportieren"
+              >
+                <Download size={14} /> BMD Export
               </button>
             </div>
           )}

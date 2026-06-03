@@ -198,4 +198,13 @@ export const invoiceApi = {
   bookPdf:        (params) => api.get('/invoices/book/pdf', { params, responseType: 'blob' }),
 }
 
+export const accountingApi = {
+  listAccounts:       (params) => api.get('/accounting/accounts', { params }),
+  createAccount:      (data)   => api.post('/accounting/accounts', data),
+  updateAccount:      (id, data) => api.put(`/accounting/accounts/${id}`, data),
+  deleteAccount:      (id)     => api.delete(`/accounting/accounts/${id}`),
+  setDefaultErloes:   (id)     => api.post(`/accounting/accounts/${id}/set-default-erloes`),
+  exportBmd:          (params) => api.get('/accounting/export/bmd', { params, responseType: 'blob' }),
+}
+
 export default api
