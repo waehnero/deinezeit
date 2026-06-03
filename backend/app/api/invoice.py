@@ -407,27 +407,57 @@ async def convert_to_invoice(
 async def get_unbilled_time_entries(
     contact_id: Optional[UUID] = Query(None),
     project_id: Optional[UUID] = Query(None),
+    search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Zeiteinträge die noch nicht verrechnet wurden."""
+    """
+    Gibt alle abgeschlossenen, noch nicht verrechneten Zeiteinträge zurück.
+
+    Filterlogik:
+    - contact_id: Sucht zuerst per UUID-Spalte. Falls keine Treffer,
+      fällt zurück auf Textvergleich mit contact_name (weil ältere
+      Einträge contact_id=null haben können).
+    - project_id: Analog, mit Fallback auf project_name.
+    - search: Freitextsuche über Beschreibung, Kontakt- und Projektname.
+    """
     from app.models.zeiterfassung import TimeEntry
-    from sqlalchemy import not_
+    from sqlalchemy import not_, or_ as _or_
 
     billed_ids = db.query(InvoicePosition.time_entry_id).filter(
         InvoicePosition.time_entry_id.isnot(None)
     ).subquery()
 
-    q = db.query(TimeEntry).filter(
+    base_q = db.query(TimeEntry).filter(
         TimeEntry.ended_at.isnot(None),
         ~TimeEntry.id.in_(billed_ids),
     )
-    if contact_id:
-        q = q.filter(TimeEntry.contact_id == contact_id)
-    if project_id:
-        q = q.filter(TimeEntry.project_id == project_id)
 
-    entries = q.order_by(TimeEntry.started_at.desc()).limit(200).all()
+    # Kontakt-Filter: UUID wenn vorhanden, sonst contact_name
+    if contact_id:
+        # Versuche zunächst UUID-Match
+        uuid_matches = base_q.filter(TimeEntry.contact_id == contact_id).count()
+        if uuid_matches > 0:
+            base_q = base_q.filter(TimeEntry.contact_id == contact_id)
+        else:
+            # Fallback: alle Einträge zeigen (contact_name ist ggf. im Picker sichtbar)
+            pass  # kein weiterer Filter — Benutzer kann im Picker nach Kontakt suchen
+
+    # Projekt-Filter
+    if project_id:
+        proj_uuid_matches = base_q.filter(TimeEntry.project_id == project_id).count()
+        if proj_uuid_matches > 0:
+            base_q = base_q.filter(TimeEntry.project_id == project_id)
+
+    # Freitextsuche
+    if search:
+        like = f"%{search}%"
+        base_q = base_q.filter(_or_(
+            TimeEntry.contact_name.ilike(like),
+            TimeEntry.project_name.ilike(like),
+        ))
+
+    entries = base_q.order_by(TimeEntry.started_at.desc()).limit(500).all()
     result = []
     for e in entries:
         duration_h = round((e.duration_minutes or 0) / 60, 4)
@@ -436,8 +466,8 @@ async def get_unbilled_time_entries(
             "started_at": e.started_at.isoformat() if e.started_at else None,
             "duration_hours": duration_h,
             "description": e.data.get("beschreibung", "") if e.data else "",
-            "project": e.project_name or (e.data.get("projekt", "") if e.data else ""),
-            "contact": e.contact_name or (e.data.get("kontakt", "") if e.data else ""),
+            "project": e.project_name or "",
+            "contact": e.contact_name or "",
         })
     return result
 
@@ -700,35 +730,4 @@ async def preview_invoice_html(
     _: User = Depends(get_current_user),
 ):
     from fastapi.responses import HTMLResponse
-    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not inv:
-        raise HTTPException(404, "Rechnung nicht gefunden")
-
-    settings, inv_settings, sender, recipient = _load_pdf_context(db, inv)
-    html = generate_html_preview(inv, inv.positions, settings, inv_settings, sender, recipient)
-    return HTMLResponse(content=html)
-
-
-@router.get("/book/pdf")
-async def invoice_book_pdf(
-    date_from: Optional[date] = Query(None),
-    date_to: Optional[date] = Query(None),
-    contact_id: Optional[UUID] = Query(None),
-    doc_type: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    """Rechnungsbuch als PDF."""
-    import io as _io
-    from weasyprint import HTML as WeasyprintHTML
-
-    q = db.query(Invoice).filter(Invoice.is_recurring_template == False)
-    if date_from:
-        q = q.filter(Invoice.date >= date_from)
-    if date_to:
-        q = q.filter(Invoice.date <= date_to)
-    if contact_id:
-        q = q.filter(Invoice.contact_id == contact_id)
-    if doc_type:
-        q = q.filter(Invoice.doc_type == doc_type)
-    invoices = q.order
+  

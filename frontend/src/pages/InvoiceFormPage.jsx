@@ -168,18 +168,33 @@ function TimeEntryPicker({ contactId, onAdd }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(new Set())
+  const [search, setSearch] = useState('')
 
-  async function load() {
+  async function load(searchVal = '') {
     setLoading(true)
     try {
-      const res = await invoiceApi.unbilledEntries(contactId ? { contact_id: contactId } : {})
+      const params = {}
+      if (contactId) params.contact_id = contactId
+      if (searchVal) params.search = searchVal
+      const res = await invoiceApi.unbilledEntries(params)
       setEntries(res.data)
     } catch { toast.error('Fehler beim Laden der Zeiteinträge') }
     finally { setLoading(false) }
   }
 
+  // Suchverzögerung
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => load(search), 350)
+    return () => clearTimeout(t)
+  }, [search, open]) // eslint-disable-line
+
   function toggle(id) {
     setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function selectAll() {
+    setSelected(new Set(entries.map(e => e.id)))
   }
 
   function addSelected() {
@@ -187,13 +202,18 @@ function TimeEntryPicker({ contactId, onAdd }) {
     onAdd(toAdd)
     setOpen(false)
     setSelected(new Set())
+    setSearch('')
   }
+
+  const totalHours = entries
+    .filter(e => selected.has(e.id))
+    .reduce((sum, e) => sum + Number(e.duration_hours), 0)
 
   return (
     <>
       <button
         type="button"
-        onClick={() => { setOpen(true); load() }}
+        onClick={() => { setOpen(true); setSearch(''); setSelected(new Set()); load('') }}
         className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
       >
         <Clock size={14} /> Zeiteinträge übernehmen
@@ -201,34 +221,81 @@ function TimeEntryPicker({ contactId, onAdd }) {
       {open && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <h2 className="text-base font-semibold mb-4">Nicht verrechnete Zeiteinträge</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Nicht verrechnete Zeiteinträge</h2>
+              {entries.length > 0 && (
+                <button onClick={selectAll} className="text-xs text-primary-600 hover:underline">
+                  Alle auswählen
+                </button>
+              )}
+            </div>
+
+            {/* Suchfeld */}
+            <div className="relative mb-3">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Nach Kontakt, Projekt oder Beschreibung suchen…"
+                className="w-full pl-8 pr-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300"
+              />
+            </div>
+
             {loading ? (
-              <div className="flex-1 flex items-center justify-center"><RefreshCw size={20} className="animate-spin text-neutral-400" /></div>
+              <div className="flex-1 flex items-center justify-center py-8">
+                <RefreshCw size={20} className="animate-spin text-neutral-400" />
+              </div>
             ) : entries.length === 0 ? (
-              <p className="text-sm text-neutral-500 flex-1">Keine offenen Zeiteinträge gefunden.</p>
+              <div className="flex-1 flex flex-col items-center justify-center py-8 text-neutral-400">
+                <Clock size={28} className="mb-2 opacity-30" />
+                <p className="text-sm">Keine offenen Zeiteinträge gefunden</p>
+                {search && <p className="text-xs mt-1">Suche ändern oder leer lassen für alle Einträge</p>}
+              </div>
             ) : (
-              <div className="flex-1 overflow-y-auto divide-y">
+              <div className="flex-1 overflow-y-auto divide-y border rounded-lg">
                 {entries.map(e => (
-                  <label key={e.id} className="flex items-center gap-3 py-2.5 hover:bg-neutral-50 cursor-pointer px-1">
-                    <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-neutral-800">{e.description || '(kein Titel)'}</p>
-                      <p className="text-xs text-neutral-400">{e.project} · {new Date(e.started_at).toLocaleDateString('de-AT')}</p>
+                  <label key={e.id} className="flex items-center gap-3 py-2.5 hover:bg-neutral-50 cursor-pointer px-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(e.id)}
+                      onChange={() => toggle(e.id)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-neutral-800 truncate">
+                        {e.description || '(kein Titel)'}
+                      </p>
+                      <p className="text-xs text-neutral-400 truncate">
+                        {[e.contact, e.project].filter(Boolean).join(' · ')}
+                        {e.started_at && ` · ${new Date(e.started_at).toLocaleDateString('de-AT')}`}
+                      </p>
                     </div>
-                    <span className="text-sm font-medium text-neutral-700">{Number(e.duration_hours).toFixed(2)} h</span>
+                    <span className="text-sm font-medium text-neutral-700 whitespace-nowrap">
+                      {Number(e.duration_hours).toFixed(2)} h
+                    </span>
                   </label>
                 ))}
               </div>
             )}
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-              <button onClick={() => setOpen(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-              <button
-                onClick={addSelected}
-                disabled={selected.size === 0}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-              >
-                {selected.size} Eintrag/Einträge übernehmen
-              </button>
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-xs text-neutral-500">
+                {selected.size > 0 && (
+                  <span>{selected.size} ausgewählt · <strong>{totalHours.toFixed(2)} h</strong> gesamt</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setOpen(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">
+                  Abbrechen
+                </button>
+                <button
+                  onClick={addSelected}
+                  disabled={selected.size === 0}
+                  className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {selected.size > 0 ? `${selected.size} übernehmen` : 'Übernehmen'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -423,7 +490,19 @@ export default function InvoiceFormPage() {
                 <Download size={14} /> PDF
               </button>
               <button
-                onClick={() => window.open(`/api/invoices/${id}/preview`, '_blank')}
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('access_token')
+                    const res = await fetch(`/api/invoices/${id}/preview`, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    })
+                    const html = await res.text()
+                    const blob = new Blob([html], { type: 'text/html' })
+                    const url = URL.createObjectURL(blob)
+                    window.open(url, '_blank')
+                    setTimeout(() => URL.revokeObjectURL(url), 10000)
+                  } catch { toast.error('Vorschau-Fehler') }
+                }}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50"
               >
                 <Eye size={14} /> Vorschau
