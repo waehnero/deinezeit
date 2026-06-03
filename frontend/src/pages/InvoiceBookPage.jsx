@@ -120,12 +120,29 @@ export default function InvoiceBookPage() {
         </div>
         <div className="flex items-center gap-2">
           {data && (
-            <button
-              onClick={downloadCsv}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50"
-            >
-              <Download size={14} /> CSV Export
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const params = { ...parsePeriod(period) }
+                    if (docType) params.doc_type = docType
+                    const res = await invoiceApi.bookPdf(params)
+                    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+                    const a = document.createElement('a'); a.href = url; a.download = `rechnungsbuch.pdf`; a.click()
+                    URL.revokeObjectURL(url)
+                  } catch { toast.error('PDF-Fehler') }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50"
+              >
+                <Download size={14} /> PDF
+              </button>
+              <button
+                onClick={downloadCsv}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50"
+              >
+                <Download size={14} /> CSV
+              </button>
+            </div>
           )}
         </div>
       </div>

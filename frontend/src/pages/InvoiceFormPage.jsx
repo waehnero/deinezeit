@@ -4,7 +4,7 @@ import { invoiceApi, masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search, ChevronDown,
-  RefreshCw, GripVertical, FileText, Clock
+  RefreshCw, GripVertical, FileText, Clock, Download, Eye
 } from 'lucide-react'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
@@ -405,14 +405,39 @@ export default function InvoiceFormPage() {
             )}
           </div>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60"
-        >
-          {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
-          Speichern
-        </button>
+        <div className="flex items-center gap-2">
+          {!isNew && (
+            <>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await invoiceApi.downloadPdf(id)
+                    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+                    const a = document.createElement('a'); a.href = url; a.download = `${id}.pdf`; a.click()
+                    URL.revokeObjectURL(url)
+                  } catch { toast.error('PDF-Fehler') }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50"
+              >
+                <Download size={14} /> PDF
+              </button>
+              <button
+                onClick={() => window.open(`/api/invoices/${id}/preview`, '_blank')}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50"
+              >
+                <Eye size={14} /> Vorschau
+              </button>
+            </>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60"
+          >
+            {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
+            Speichern
+          </button>
+        </div>
       </div>
 
       <div className="space-y-5">

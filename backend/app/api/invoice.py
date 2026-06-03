@@ -13,6 +13,9 @@ from app.api.deps import get_current_user, require_admin
 from app.models.user import User
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
                                  InvoiceNumberSequence, InvoiceSettings)
+from app.models.settings import Setting
+from app.models.masterdata import EntityRecord
+from app.services.invoice_pdf import generate_pdf, generate_html_preview
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -549,6 +552,7 @@ async def get_invoice_settings(
     return {r.key: r.value for r in rows}
 
 
+
 @router.put("/settings/{key}")
 async def update_invoice_setting(
     key: str,
@@ -564,3 +568,164 @@ async def update_invoice_setting(
         db.add(setting)
     db.commit()
     return {"key": key, "value": body.value}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PDF-Endpunkte
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _load_pdf_context(db: Session, invoice: Invoice):
+    """Lädt Settings, InvoiceSettings, Sender- und Empfängerkontakt."""
+    settings = {r.key: r.value for r in db.query(Setting).all()}
+    inv_settings = {r.key: r.value for r in db.query(InvoiceSettings).all()}
+
+    sender_contact = None
+    cid = settings.get("company_contact_id")
+    if cid:
+        try:
+            from uuid import UUID as _UUID
+            sender_contact = db.query(EntityRecord).filter(EntityRecord.id == _UUID(cid)).first()
+        except Exception:
+            pass
+
+    recipient_contact = None
+    if invoice.contact_id:
+        recipient_contact = db.query(EntityRecord).filter(EntityRecord.id == invoice.contact_id).first()
+
+    return settings, inv_settings, sender_contact, recipient_contact
+
+
+@router.get("/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Rechnung nicht gefunden")
+
+    settings, inv_settings, sender, recipient = _load_pdf_context(db, inv)
+    pdf_bytes = generate_pdf(inv, inv.positions, settings, inv_settings, sender, recipient)
+
+    filename = f"{inv.number.replace('/', '-')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{invoice_id}/preview")
+async def preview_invoice_html(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    from fastapi.responses import HTMLResponse
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Rechnung nicht gefunden")
+
+    settings, inv_settings, sender, recipient = _load_pdf_context(db, inv)
+    html = generate_html_preview(inv, inv.positions, settings, inv_settings, sender, recipient)
+    return HTMLResponse(content=html)
+
+
+@router.get("/book/pdf")
+async def invoice_book_pdf(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    contact_id: Optional[UUID] = Query(None),
+    doc_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Rechnungsbuch als PDF."""
+    import io as _io
+    from weasyprint import HTML as WeasyprintHTML
+
+    q = db.query(Invoice).filter(Invoice.is_recurring_template == False)
+    if date_from:
+        q = q.filter(Invoice.date >= date_from)
+    if date_to:
+        q = q.filter(Invoice.date <= date_to)
+    if contact_id:
+        q = q.filter(Invoice.contact_id == contact_id)
+    if doc_type:
+        q = q.filter(Invoice.doc_type == doc_type)
+    invoices = q.order_by(Invoice.date.asc(), Invoice.number.asc()).all()
+
+    settings_rows = {r.key: r.value for r in db.query(Setting).all()}
+    company = settings_rows.get("company_name", "")
+
+    from decimal import Decimal
+    total_net   = sum(i.subtotal or Decimal("0") for i in invoices)
+    total_tax   = sum(i.tax_total or Decimal("0") for i in invoices)
+    total_gross = sum(i.total or Decimal("0") for i in invoices)
+
+    def fe(n): return f"{float(n):,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+    def fd(d): return d.strftime("%d.%m.%Y") if d else "—"
+
+    rows_html = ""
+    for inv in invoices:
+        rows_html += f"""<tr>
+            <td>{inv.number}</td>
+            <td>{inv.doc_type.capitalize()}</td>
+            <td>{fd(inv.date)}</td>
+            <td>{fd(inv.due_date)}</td>
+            <td>{inv.title or ''}</td>
+            <td style="text-align:right">{fe(inv.subtotal)}</td>
+            <td style="text-align:right">{fe(inv.tax_total)}</td>
+            <td style="text-align:right;font-weight:600">{fe(inv.total)}</td>
+            <td>{inv.status}</td>
+        </tr>"""
+
+    period_str = ""
+    if date_from and date_to:
+        period_str = f"{fd(date_from)} – {fd(date_to)}"
+    elif date_from:
+        period_str = f"ab {fd(date_from)}"
+    elif date_to:
+        period_str = f"bis {fd(date_to)}"
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+@page {{ size: A4 landscape; margin: 1.5cm; @bottom-center {{ content: "Seite " counter(page) " von " counter(pages); font-size: 8pt; color: #999; }} }}
+body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #222; }}
+h1 {{ font-size: 14pt; font-weight: 700; margin-bottom: 0.2cm; }}
+p.meta {{ font-size: 8pt; color: #777; margin-bottom: 0.5cm; }}
+table {{ width: 100%; border-collapse: collapse; }}
+th {{ background: #1a1a2e; color: #fff; padding: 5px 6px; text-align: left; font-size: 7.5pt; text-transform: uppercase; }}
+td {{ padding: 4px 6px; border-bottom: 0.5px solid #eee; }}
+tr:nth-child(odd) {{ background: #fafafa; }}
+tfoot td {{ font-weight: 700; border-top: 2px solid #333; background: #f0f0f0; }}
+</style>
+</head><body>
+<h1>Rechnungsbuch — {company}</h1>
+<p class="meta">{period_str} &nbsp;·&nbsp; {len(invoices)} Dokumente</p>
+<table>
+<thead><tr>
+  <th>Nummer</th><th>Typ</th><th>Datum</th><th>Fällig</th><th>Titel</th>
+  <th style="text-align:right">Netto</th><th style="text-align:right">MwSt.</th>
+  <th style="text-align:right">Brutto</th><th>Status</th>
+</tr></thead>
+<tbody>{rows_html}</tbody>
+<tfoot><tr>
+  <td colspan="5">Gesamt ({len(invoices)} Dokumente)</td>
+  <td style="text-align:right">{fe(total_net)}</td>
+  <td style="text-align:right">{fe(total_tax)}</td>
+  <td style="text-align:right">{fe(total_gross)}</td>
+  <td></td>
+</tr></tfoot>
+</table>
+</body></html>"""
+
+    buf = _io.BytesIO()
+    WeasyprintHTML(string=html, base_url="/").write_pdf(buf)
+    filename = f"rechnungsbuch_{date_from or 'alle'}_{date_to or 'alle'}.pdf"
+    return StreamingResponse(
+        _io.BytesIO(buf.getvalue()),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
