@@ -147,7 +147,7 @@ export default function InvoicePage() {
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
             <Book size={15} /> Belegbuch
           </button>
-          <button onClick={() => navigate('/invoices/new')}
+          <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
             <Plus size={15} /> Neu erstellen
           </button>
@@ -188,7 +188,7 @@ export default function InvoicePage() {
           <div className="flex flex-col items-center justify-center py-16 text-neutral-400">
             <FileText size={40} className="mb-3 opacity-30" />
             <p className="text-sm">Keine Dokumente gefunden</p>
-            <button onClick={() => navigate('/invoices/new')} className="mt-3 text-sm text-primary-600 hover:underline">Erstes Dokument erstellen</button>
+            <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))} className="mt-3 text-sm text-primary-600 hover:underline">Erstes Dokument erstellen</button>
           </div>
         ) : (
           <table className="w-full text-sm">

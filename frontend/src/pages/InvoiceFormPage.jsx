@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { invoiceApi, masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
@@ -202,10 +202,11 @@ function TimeEntryPicker({ contactId, onAdd }) {
 // ── Hauptformular ──────────────────────────────────────────────────────────────
 export default function InvoiceFormPage() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const isNew = !id || id === 'new'
 
-  const [docType, setDocType] = useState('rechnung')
+  const [docType, setDocType] = useState(searchParams.get('type') || 'rechnung')
   const [contactId, setContactId] = useState(null)
   const [contactLabel, setContactLabel] = useState('')
   const [title, setTitle] = useState('')
@@ -469,7 +470,4 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
         </div>
       </div>
       <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
-        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-white text-neutral-500" />
-    </div>
-  )
-}
+        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-
