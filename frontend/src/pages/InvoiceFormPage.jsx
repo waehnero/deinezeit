@@ -46,7 +46,6 @@ const EMPTY_POSITION = {
   unit_price: '0', discount_pct: '', tax_rate: '20', article_id: null, time_entry_id: null,
 }
 
-// ── Kontakt-Suche ──────────────────────────────────────────────────────────────
 function ContactSearch({ value, label, onChange }) {
   const [search, setSearch] = useState(label || '')
   const [results, setResults] = useState([])
@@ -78,7 +77,6 @@ function ContactSearch({ value, label, onChange }) {
   )
 }
 
-// ── Artikel-Suche ──────────────────────────────────────────────────────────────
 function ArticleSearch({ onSelect }) {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState([])
@@ -113,7 +111,6 @@ function ArticleSearch({ onSelect }) {
   )
 }
 
-// ── Zeiteinträge-Picker ──────────────────────────────────────────────────────────
 function TimeEntryPicker({ contactId, onAdd }) {
   const [entries, setEntries] = useState([])
   const [open, setOpen] = useState(false)
@@ -199,7 +196,6 @@ function TimeEntryPicker({ contactId, onAdd }) {
   )
 }
 
-// ── Hauptformular ──────────────────────────────────────────────────────────────
 export default function InvoiceFormPage() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
@@ -431,7 +427,6 @@ export default function InvoiceFormPage() {
   )
 }
 
-// ── Positionszeile ─────────────────────────────────────────────────────────────
 function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
   const lineTotal = calcLine(pos)
   return (
@@ -470,4 +465,8 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
         </div>
       </div>
       <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
-        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-
+        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-white text-neutral-500" />
+    </div>
+  )
+}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
