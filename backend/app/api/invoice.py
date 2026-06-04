@@ -430,6 +430,47 @@ async def mark_paid(
     return inv
 
 
+@router.post("/{invoice_id}/set-status", response_model=InvoiceResponse)
+async def set_status(
+    invoice_id: UUID,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Setzt den Status eines Dokuments.
+    Erlaubte Übergänge:
+      entwurf   → offen | gesendet
+      offen     → gesendet | bezahlt
+      gesendet  → offen | bezahlt | angenommen | abgelehnt
+      angenommen→ (nur via convert-to-invoice weiter)
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Dokument nicht gefunden")
+    if inv.status == "storniert":
+        raise HTTPException(400, "Stornierte Dokumente können nicht geändert werden")
+
+    new_status = body.get("status")
+    allowed = {
+        "entwurf":   ["offen", "gesendet"],
+        "offen":     ["gesendet", "bezahlt"],
+        "gesendet":  ["offen", "bezahlt", "angenommen", "abgelehnt"],
+        "angenommen":["bezahlt"],
+        "abgelehnt": [],
+        "bezahlt":   [],
+        "ueberfaellig": ["bezahlt", "gesendet"],
+    }
+    if new_status not in allowed.get(inv.status, []):
+        raise HTTPException(400, f"Statuswechsel von '{inv.status}' nach '{new_status}' nicht erlaubt")
+
+    inv.status = new_status
+    inv.updated_by = current_user.email
+    db.commit()
+    db.refresh(inv)
+    return inv
+
+
 @router.post("/{invoice_id}/convert-to-invoice", response_model=InvoiceResponse)
 async def convert_to_invoice(
     invoice_id: UUID,
@@ -700,30 +741,4 @@ async def update_invoice_setting(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PDF-Endpunkte
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _load_pdf_context(db: Session, invoice: Invoice):
-    """Lädt Settings, InvoiceSettings, Sender- und Empfängerkontakt."""
-    settings = {r.key: r.value for r in db.query(Setting).all()}
-    inv_settings = {r.key: r.value for r in db.query(InvoiceSettings).all()}
-
-    sender_contact = None
-    cid = settings.get("company_contact_id")
-    if cid:
-        try:
-            from uuid import UUID as _UUID
-            sender_contact = db.query(EntityRecord).filter(EntityRecord.id == _UUID(cid)).first()
-        except Exception:
-            pass
-
-    recipient_contact = None
-    if invoice.contact_id:
-        recipient_contact = db.query(EntityRecord).filter(EntityRecord.id == invoice.contact_id).first()
-
-    return settings, inv_settings, sender_contact, recipient_contact
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Muster-Vorschau für Template-Auswahl (kein echtes Dokument nötig)
-# ──────────────────────
+# PDF-Endpunk

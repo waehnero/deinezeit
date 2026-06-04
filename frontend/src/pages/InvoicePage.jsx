@@ -113,6 +113,17 @@ export default function InvoicePage() {
     }
   }
 
+  async function handleSetStatus(invoice, status) {
+    const labels = { offen: 'Als offen markiert', gesendet: 'Als gesendet markiert', angenommen: 'Als angenommen markiert', abgelehnt: 'Als abgelehnt markiert' }
+    try {
+      await invoiceApi.setStatus(invoice.id, status)
+      toast.success(labels[status] || 'Status geändert')
+      load()
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Fehler')
+    }
+  }
+
   async function handleConvert(invoice) {
     try {
       const res = await invoiceApi.convertToInvoice(invoice.id)
@@ -266,6 +277,7 @@ export default function InvoicePage() {
                         <ActionMenu
                           invoice={inv}
                           onClose={() => setActionMenu(null)}
+                          onSetStatus={(s) => { setActionMenu(null); handleSetStatus(inv, s) }}
                           onCancel={() => { setActionMenu(null); setCancelDialog(inv) }}
                           onPaid={() => { setActionMenu(null); setPaidDialog(inv) }}
                           onConvert={() => { setActionMenu(null); handleConvert(inv) }}
@@ -304,34 +316,89 @@ export default function InvoicePage() {
 }
 
 // ── Aktionsmenü ────────────────────────────────────────────────────────────────
-function ActionMenu({ invoice, onClose, onCancel, onPaid, onConvert, onDelete, onEdit }) {
+function ActionMenu({ invoice, onClose, onSetStatus, onCancel, onPaid, onConvert, onDelete, onEdit }) {
   useEffect(() => {
     const h = () => onClose()
     document.addEventListener('click', h)
     return () => document.removeEventListener('click', h)
   }, [onClose])
 
+  const { status, doc_type } = invoice
+  const isRe = doc_type === 'rechnung'
+  const isAn = doc_type === 'angebot'
+  const isGs = doc_type === 'gutschrift'
+
   return (
-    <div className="absolute right-0 top-7 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 w-48" style={{zIndex: 9999}}>
+    <div className="absolute right-0 top-7 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 w-56" style={{zIndex: 9999}}>
+
+      {/* Öffnen */}
       <button onClick={onEdit} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
         <Eye size={14} /> Öffnen / Bearbeiten
       </button>
-      {invoice.doc_type === 'angebot' && invoice.status !== 'storniert' && (
-        <button onClick={onConvert} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-blue-600">
-          <RotateCcw size={14} /> → Rechnung umwandeln
+
+      <div className="border-t border-neutral-100 my-1" />
+
+      {/* ── Statusübergänge ── */}
+
+      {/* Entwurf → Offen (Rechnung, Gutschrift, Lieferschein) */}
+      {status === 'entwurf' && !isAn && (
+        <button onClick={() => onSetStatus('offen')} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-amber-600">
+          <Clock size={14} /> Als offen markieren
         </button>
       )}
-      {invoice.doc_type === 'rechnung' && invoice.status === 'offen' && (
+
+      {/* Entwurf → Gesendet */}
+      {status === 'entwurf' && (
+        <button onClick={() => onSetStatus('gesendet')} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-blue-600">
+          <Send size={14} /> Als gesendet markieren
+        </button>
+      )}
+
+      {/* Gesendet → Offen (Rechnung) */}
+      {status === 'gesendet' && isRe && (
+        <button onClick={() => onSetStatus('offen')} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-amber-600">
+          <Clock size={14} /> Als offen markieren
+        </button>
+      )}
+
+      {/* Offen/Gesendet/Überfällig → Bezahlt */}
+      {['offen', 'gesendet', 'ueberfaellig'].includes(status) && (isRe || isGs) && (
         <button onClick={onPaid} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-green-600">
           <CheckCircle2 size={14} /> Als bezahlt markieren
         </button>
       )}
-      {invoice.doc_type === 'rechnung' && invoice.status !== 'storniert' && (
-        <button onClick={onCancel} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-red-500">
-          <XCircle size={14} /> Stornieren
+
+      {/* Angebot: Gesendet → Angenommen / Abgelehnt */}
+      {isAn && status === 'gesendet' && (
+        <>
+          <button onClick={() => onSetStatus('angenommen')} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-green-600">
+            <CheckCircle2 size={14} /> Als angenommen markieren
+          </button>
+          <button onClick={() => onSetStatus('abgelehnt')} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-red-500">
+            <XCircle size={14} /> Als abgelehnt markieren
+          </button>
+        </>
+      )}
+
+      {/* Angebot → Rechnung umwandeln */}
+      {isAn && ['gesendet', 'angenommen'].includes(status) && (
+        <button onClick={onConvert} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-blue-600">
+          <RotateCcw size={14} /> → Rechnung umwandeln
         </button>
       )}
-      {['entwurf', 'storniert'].includes(invoice.status) && (
+
+      {/* Stornieren (Rechnung, nicht bereits storniert/bezahlt) */}
+      {isRe && !['storniert', 'bezahlt'].includes(status) && (
+        <>
+          <div className="border-t border-neutral-100 my-1" />
+          <button onClick={onCancel} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-red-500">
+            <XCircle size={14} /> Stornieren
+          </button>
+        </>
+      )}
+
+      {/* Löschen (nur Entwurf oder Storniert) */}
+      {['entwurf', 'storniert'].includes(status) && (
         <>
           <div className="border-t border-neutral-100 my-1" />
           <button onClick={onDelete} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 flex items-center gap-2 text-red-500">
@@ -350,51 +417,4 @@ function CancelDialog({ invoice, onClose, onConfirm }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
         <h2 className="text-base font-semibold mb-1">Rechnung stornieren</h2>
-        <p className="text-sm text-neutral-500 mb-4">{invoice.number} — {Number(invoice.total).toLocaleString('de-AT', { minimumFractionDigits: 2 })} €</p>
-        <div className="space-y-2 mb-6">
-          <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-neutral-50">
-            <input type="radio" name="mode" value="with_credit" checked={mode === 'with_credit'} onChange={() => setMode('with_credit')} className="mt-0.5" />
-            <div>
-              <p className="text-sm font-medium">Stornieren + Gutschrift erstellen</p>
-              <p className="text-xs text-neutral-500">Buchhalterisch korrekt — automatische Gegenbuchung</p>
-            </div>
-          </label>
-          <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-neutral-50">
-            <input type="radio" name="mode" value="status_only" checked={mode === 'status_only'} onChange={() => setMode('status_only')} className="mt-0.5" />
-            <div>
-              <p className="text-sm font-medium">Nur Status ändern</p>
-              <p className="text-xs text-neutral-500">Rechnung wird als storniert markiert, keine Gutschrift</p>
-            </div>
-          </label>
-        </div>
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-          <button onClick={() => onConfirm(mode)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Stornieren</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Bezahlt-Dialog ────────────────────────────────────────────────────────────
-function PaidDialog({ invoice, onClose, onConfirm }) {
-  const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10))
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
-        <h2 className="text-base font-semibold mb-4">Als bezahlt markieren</h2>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsdatum</label>
-        <input
-          type="date"
-          value={paidAt}
-          onChange={e => setPaidAt(e.target.value)}
-          className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm mb-4"
-        />
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-          <button onClick={() => onConfirm(paidAt)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Speichern</button>
-        </div>
-      </div>
-    </div>
-  )
-}
+        <p className="text-sm text-neutral-500 mb-4">{invoice.number} — {Number(invoice.total).toLocaleString('de-AT', { minimumFractionDi
