@@ -765,3 +765,62 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
     </div>
   )
 }
+            onChange={e => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Wird nicht auf dem Dokument gedruckt"
+            className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Positionszeile ────────────────────────────────────────────────────────────
+function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
+  const lineTotal = calcLine(pos)
+
+  return (
+    <div className="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
+      <div className="grid grid-cols-12 gap-2 items-start">
+        <div className="col-span-12 md:col-span-5">
+          <input value={pos.description} onChange={e => onChange('description', e.target.value)} placeholder="Beschreibung *"
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white" />
+        </div>
+        <div className="col-span-3 md:col-span-1">
+          <input type="number" value={pos.quantity} onChange={e => onChange('quantity', e.target.value)} placeholder="Menge"
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white text-right" />
+        </div>
+        <div className="col-span-3 md:col-span-1">
+          <input value={pos.unit || ''} onChange={e => onChange('unit', e.target.value)} placeholder="Einh."
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white" />
+        </div>
+        <div className="col-span-3 md:col-span-2">
+          <input type="number" step="0.01" value={pos.unit_price} onChange={e => onChange('unit_price', e.target.value)} placeholder="Preis"
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white text-right" />
+        </div>
+        {taxMode !== 'kleinunternehmer' && (
+          <div className="col-span-3 md:col-span-1">
+            <select value={pos.tax_rate} onChange={e => onChange('tax_rate', e.target.value)}
+              className="w-full border border-neutral-200 rounded px-1 py-1.5 text-sm bg-white">
+              <option value="20">20%</option>
+              <option value="10">10%</option>
+              <option value="0">0%</option>
+              <option value="">RC</option>
+            </select>
+          </div>
+        )}
+        <div className="col-span-2 md:col-span-1 flex items-center justify-end">
+          <span className="text-sm font-medium text-neutral-800">{fmtEuro(lineTotal)}</span>
+        </div>
+        <div className="col-span-1 flex items-center justify-center">
+          <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+      <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
+        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-white text-neutral-500" />
+    </div>
+  )
+}
