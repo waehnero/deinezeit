@@ -251,4 +251,39 @@ export default function InvoiceBookPage() {
                       <td className="px-4 py-2.5 font-mono font-medium text-neutral-800">{inv.number}</td>
                       <td className="px-4 py-2.5 text-neutral-600">{fmtDate(inv.date)}</td>
                       <td className="px-4 py-2.5 text-neutral-600">{fmtDate(inv.due_date)}</td>
-         
+                               <td className="px-4 py-2.5 text-neutral-700">{inv.title || '—'}</td>
+                      <td className="px-4 py-2.5 text-right text-neutral-700">{fmtEuro(inv.subtotal)}</td>
+                      <td className="px-4 py-2.5 text-right text-neutral-500">{fmtEuro(inv.tax_total)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-neutral-800">{fmtEuro(inv.total)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`text-xs font-medium ${STATUS_COLORS[inv.status] || 'text-neutral-600'}`}>
+                          {inv.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-neutral-200 bg-neutral-50 font-semibold">
+                    <td colSpan={4} className="px-4 py-3 text-neutral-700">Gesamt ({data.summary.count})</td>
+                    <td className="px-4 py-3 text-right text-neutral-800">{fmtEuro(data.summary.total_net)}</td>
+                    <td className="px-4 py-3 text-right text-neutral-600">{fmtEuro(data.summary.total_tax)}</td>
+                    <td className="px-4 py-3 text-right text-primary-700">{fmtEuro(data.summary.total_gross)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {!data && !loading && (
+        <div className="flex flex-col items-center justify-center py-20 text-neutral-400">
+          <Filter size={36} className="mb-3 opacity-30" />
+          <p className="text-sm">Zeitraum auswählen und auf „Anzeigen" klicken</p>
+        </div>
+      )}
+    </div>
+  )
+}
