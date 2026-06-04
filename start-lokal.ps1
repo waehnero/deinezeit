@@ -30,9 +30,21 @@ Set-Location $PSScriptRoot
 
 # Version aus package.json lesen und als Umgebungsvariable setzen
 # (überschreibt den Default in config.py zuverlässig, unabhängig vom Docker-Cache)
-$pkgJson = Get-Content "frontend\package.json" -Raw | ConvertFrom-Json
-$env:APP_VERSION = $pkgJson.version
-Write-Host "  Version: $env:APP_VERSION" -ForegroundColor Gray
+$pkgFile = Join-Path $PSScriptRoot "frontend\package.json"
+if (Test-Path $pkgFile) {
+    try {
+        $pkgJson = Get-Content $pkgFile -Raw | ConvertFrom-Json
+        if ($pkgJson.version) {
+            $env:APP_VERSION = $pkgJson.version
+            Write-Host "  Version: $env:APP_VERSION" -ForegroundColor Gray
+        }
+    } catch {
+        $env:APP_VERSION = "1.0.0"
+        Write-Host "  Version: 1.0.0 (Fallback)" -ForegroundColor Gray
+    }
+} else {
+    $env:APP_VERSION = "1.0.0"
+}
 
 # .env.local verwenden
 if (-not (Test-Path ".env.local")) {
