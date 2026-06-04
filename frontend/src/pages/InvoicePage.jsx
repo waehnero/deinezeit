@@ -202,7 +202,7 @@ export default function InvoicePage() {
       </div>
 
       {/* Tabelle */}
-      <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-neutral-200 rounded-xl overflow-visible">
         {loading && invoices.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-neutral-400">
             <RefreshCw size={20} className="animate-spin mr-2" /> Laden…
@@ -312,7 +312,7 @@ function ActionMenu({ invoice, onClose, onCancel, onPaid, onConvert, onDelete, o
   }, [onClose])
 
   return (
-    <div className="absolute right-0 top-7 z-50 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 w-48">
+    <div className="absolute right-0 top-7 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 w-48" style={{zIndex: 9999}}>
       <button onClick={onEdit} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
         <Eye size={14} /> Öffnen / Bearbeiten
       </button>
