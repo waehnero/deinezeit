@@ -31,10 +31,11 @@ router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 TYPE_PREFIX = {
-    "rechnung": "RE",
-    "angebot": "AN",
-    "gutschrift": "GS",
-    "lieferschein": "LS",
+    "rechnung":             "RE",
+    "angebot":              "AN",
+    "auftragsbestaetigung": "AB",
+    "gutschrift":           "GS",
+    "lieferschein":         "LS",
 }
 
 def _next_number(db: Session, doc_type: str, year: int) -> tuple[int, str]:
@@ -186,12 +187,13 @@ async def get_next_number(
     preview = fmt.format(year=y, seq=next_seq)
     return {"doc_type": doc_type, "year": y, "next_sequence": next_seq, "preview": preview}
 
-DOC_TYPES_LIST = ["rechnung", "angebot", "gutschrift", "lieferschein"]
+DOC_TYPES_LIST = ["rechnung", "angebot", "auftragsbestaetigung", "gutschrift", "lieferschein"]
 DOC_TYPE_DEFAULTS = {
-    "rechnung":     "RE-{year}-{seq:03d}",
-    "angebot":      "AN-{year}-{seq:03d}",
-    "gutschrift":   "GS-{year}-{seq:03d}",
-    "lieferschein": "LS-{year}-{seq:03d}",
+    "rechnung":             "RE-{year}-{seq:03d}",
+    "angebot":              "AN-{year}-{seq:03d}",
+    "auftragsbestaetigung": "AB-{year}-{seq:03d}",
+    "gutschrift":           "GS-{year}-{seq:03d}",
+    "lieferschein":         "LS-{year}-{seq:03d}",
 }
 
 
@@ -453,12 +455,12 @@ async def set_status(
 
     new_status = body.get("status")
     allowed = {
-        "entwurf":   ["offen", "gesendet"],
-        "offen":     ["gesendet", "bezahlt"],
-        "gesendet":  ["offen", "bezahlt", "angenommen", "abgelehnt"],
-        "angenommen":["bezahlt"],
-        "abgelehnt": [],
-        "bezahlt":   [],
+        "entwurf":      ["offen", "gesendet"],
+        "offen":        ["gesendet", "bezahlt"],
+        "gesendet":     ["offen", "bezahlt", "angenommen", "abgelehnt"],
+        "angenommen":   ["bezahlt"],
+        "abgelehnt":    [],
+        "bezahlt":      [],
         "ueberfaellig": ["bezahlt", "gesendet"],
     }
     if new_status not in allowed.get(inv.status, []):
@@ -471,18 +473,71 @@ async def set_status(
     return inv
 
 
+@router.post("/{invoice_id}/convert-to-ab", response_model=InvoiceResponse)
+async def convert_to_ab(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Angebot in Auftragsbestätigung umwandeln."""
+    offer = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not offer:
+        raise HTTPException(404, "Angebot nicht gefunden")
+    if offer.doc_type != "angebot":
+        raise HTTPException(400, "Nur Angebote können in eine AB umgewandelt werden")
+
+    year = datetime.now().date().year
+    sequence, number = _next_number(db, "auftragsbestaetigung", year)
+
+    # Standard-Texte für AB laden
+    intro_setting = db.query(InvoiceSettings).filter_by(key="default_intro_auftragsbestaetigung").first()
+    outro_setting = db.query(InvoiceSettings).filter_by(key="default_outro_auftragsbestaetigung").first()
+    intro = (intro_setting.value.strip('"') if intro_setting and isinstance(intro_setting.value, str) else "") or offer.intro_text or ""
+    outro = (outro_setting.value.strip('"') if outro_setting and isinstance(outro_setting.value, str) else "") or offer.outro_text or ""
+
+    ab = Invoice(
+        doc_type="auftragsbestaetigung",
+        number=number, year=year, sequence=sequence,
+        contact_id=offer.contact_id, project_id=offer.project_id,
+        related_invoice_id=offer.id,
+        title=offer.title, date=datetime.now().date(),
+        tax_mode=offer.tax_mode, currency=offer.currency,
+        template_id=offer.template_id,
+        intro_text=intro, outro_text=outro,
+        status="entwurf",
+        created_by=current_user.email, updated_by=current_user.email,
+    )
+    db.add(ab)
+    db.flush()
+    for orig_pos in offer.positions:
+        db.add(InvoicePosition(
+            invoice_id=ab.id, sort_order=orig_pos.sort_order,
+            pos_type=orig_pos.pos_type, description=orig_pos.description,
+            detail=orig_pos.detail, quantity=orig_pos.quantity, unit=orig_pos.unit,
+            unit_price=orig_pos.unit_price, discount_pct=orig_pos.discount_pct,
+            tax_rate=orig_pos.tax_rate,
+        ))
+    offer.status = "angenommen"
+    db.flush()
+    db.refresh(ab)
+    _calc_totals(ab)
+    db.commit()
+    db.refresh(ab)
+    return ab
+
+
 @router.post("/{invoice_id}/convert-to-invoice", response_model=InvoiceResponse)
 async def convert_to_invoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Angebot in Rechnung umwandeln."""
+    """Angebot oder Auftragsbestätigung in Rechnung umwandeln."""
     offer = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not offer:
-        raise HTTPException(404, "Angebot nicht gefunden")
-    if offer.doc_type != "angebot":
-        raise HTTPException(400, "Nur Angebote können umgewandelt werden")
+        raise HTTPException(404, "Dokument nicht gefunden")
+    if offer.doc_type not in ("angebot", "auftragsbestaetigung"):
+        raise HTTPException(400, "Nur Angebote oder Auftragsbestätigungen können umgewandelt werden")
 
     year = datetime.now().date().year
     sequence, number = _next_number(db, "rechnung", year)
@@ -534,6 +589,131 @@ async def convert_to_invoice(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# E-Mail-Versand
+# ─────────────────────────────────────────────────────────────────────────────
+
+DOC_TYPE_LABELS_DE = {
+    "rechnung":             "Rechnung",
+    "angebot":              "Angebot",
+    "auftragsbestaetigung": "Auftragsbestätigung",
+    "gutschrift":           "Gutschrift",
+    "lieferschein":         "Lieferschein",
+}
+
+
+def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict,
+                         sender_contact, recipient_contact, to_email: str, current_user_email: str):
+    """Generiert PDF und versendet per E-Mail."""
+    from app.services.invoice_pdf import generate_pdf
+    from app.services.email_service import send_email
+
+    doc_label = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
+    company_name = settings_d.get("company_name", "DeineZeit")
+
+    pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
+                              sender_contact, recipient_contact)
+
+    filename = f"{inv.number.replace('/', '-')}.pdf"
+    subject  = f"{doc_label} {inv.number} von {company_name}"
+    body     = (
+        f"Sehr geehrte Damen und Herren,\n\n"
+        f"anbei erhalten Sie {doc_label} {inv.number}.\n\n"
+        f"Mit freundlichen Grüßen\n{company_name}"
+    )
+
+    send_email(
+        settings=settings_d,
+        to_email=to_email,
+        subject=subject,
+        body_text=body,
+        attachments=[{"filename": filename, "data": pdf_bytes, "mime_type": "application/pdf"}],
+    )
+
+    # Status auf "gesendet" setzen
+    if inv.status == "entwurf":
+        inv.status = "gesendet"
+        inv.updated_by = current_user_email
+        db.add(inv)
+
+
+@router.post("/{invoice_id}/send-email")
+async def send_invoice_email(
+    invoice_id: UUID,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Versendet einen Beleg per E-Mail.
+    Body: { to_email: str (optional — wird sonst aus Kontakt gelesen) }
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
+
+    to_email = body.get("to_email", "")
+    if not to_email and recipient_contact:
+        to_email = (recipient_contact.data or {}).get("email", "")
+    if not to_email:
+        raise HTTPException(400, "Keine E-Mail-Adresse vorhanden. Bitte im Kontakt hinterlegen.")
+
+    try:
+        _send_invoice_email(inv, db, settings_d, inv_settings_d,
+                             sender_contact, recipient_contact, to_email, current_user.email)
+        db.commit()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"E-Mail konnte nicht gesendet werden: {str(e)}")
+
+    return {"ok": True, "to": to_email, "number": inv.number}
+
+
+@router.post("/bulk-send-email")
+async def bulk_send_email(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Versendet mehrere Belege per E-Mail.
+    Body: { invoice_ids: [str, ...] }
+    """
+    from uuid import UUID as _UUID
+    ids = [_UUID(i) for i in body.get("invoice_ids", [])]
+    if not ids:
+        raise HTTPException(400, "Keine Belege angegeben")
+
+    results = []
+    for inv_id in ids:
+        inv = db.query(Invoice).filter(Invoice.id == inv_id).first()
+        if not inv:
+            results.append({"id": str(inv_id), "ok": False, "error": "Nicht gefunden"})
+            continue
+
+        settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
+
+        to_email = (recipient_contact.data or {}).get("email", "") if recipient_contact else ""
+        if not to_email:
+            results.append({"id": str(inv_id), "number": inv.number, "ok": False,
+                             "error": "Keine E-Mail-Adresse im Kontakt"})
+            continue
+
+        try:
+            _send_invoice_email(inv, db, settings_d, inv_settings_d,
+                                 sender_contact, recipient_contact, to_email, current_user.email)
+            results.append({"id": str(inv_id), "number": inv.number, "ok": True, "to": to_email})
+        except Exception as e:
+            results.append({"id": str(inv_id), "number": inv.number, "ok": False, "error": str(e)})
+
+    db.commit()
+    sent = sum(1 for r in results if r["ok"])
+    return {"sent": sent, "total": len(ids), "results": results}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Zeiteinträge für Rechnung vorschlagen
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -558,187 +738,4 @@ async def get_unbilled_time_entries(
     from app.models.zeiterfassung import TimeEntry
     from sqlalchemy import not_, or_ as _or_
 
-    billed_ids = db.query(InvoicePosition.time_entry_id).filter(
-        InvoicePosition.time_entry_id.isnot(None)
-    ).subquery()
-
-    base_q = db.query(TimeEntry).filter(
-        TimeEntry.ended_at.isnot(None),
-        ~TimeEntry.id.in_(billed_ids),
-    )
-
-    # Kontakt-Filter: UUID wenn vorhanden, sonst contact_name
-    if contact_id:
-        # Versuche zunächst UUID-Match
-        uuid_matches = base_q.filter(TimeEntry.contact_id == contact_id).count()
-        if uuid_matches > 0:
-            base_q = base_q.filter(TimeEntry.contact_id == contact_id)
-        else:
-            # Fallback: alle Einträge zeigen (contact_name ist ggf. im Picker sichtbar)
-            pass  # kein weiterer Filter — Benutzer kann im Picker nach Kontakt suchen
-
-    # Projekt-Filter
-    if project_id:
-        proj_uuid_matches = base_q.filter(TimeEntry.project_id == project_id).count()
-        if proj_uuid_matches > 0:
-            base_q = base_q.filter(TimeEntry.project_id == project_id)
-
-    # Freitextsuche
-    if search:
-        like = f"%{search}%"
-        base_q = base_q.filter(_or_(
-            TimeEntry.contact_name.ilike(like),
-            TimeEntry.project_name.ilike(like),
-        ))
-
-    entries = base_q.order_by(TimeEntry.started_at.desc()).limit(500).all()
-    result = []
-    for e in entries:
-        duration_h = round((e.duration_minutes or 0) / 60, 4)
-        result.append({
-            "id": str(e.id),
-            "started_at": e.started_at.isoformat() if e.started_at else None,
-            "duration_hours": duration_h,
-            "description": e.data.get("beschreibung", "") if e.data else "",
-            "project": e.project_name or "",
-            "contact": e.contact_name or "",
-        })
-    return result
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Rechnungsbuch
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/book/list")
-async def invoice_book(
-    date_from: Optional[date] = Query(None),
-    date_to: Optional[date] = Query(None),
-    contact_id: Optional[UUID] = Query(None),
-    doc_type: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    q = db.query(Invoice).filter(Invoice.is_recurring_template == False)
-    if date_from:
-        q = q.filter(Invoice.date >= date_from)
-    if date_to:
-        q = q.filter(Invoice.date <= date_to)
-    if contact_id:
-        q = q.filter(Invoice.contact_id == contact_id)
-    if doc_type:
-        q = q.filter(Invoice.doc_type == doc_type)
-    if status:
-        q = q.filter(Invoice.status == status)
-    invoices = q.order_by(Invoice.date.asc(), Invoice.number.asc()).all()
-
-    from decimal import Decimal
-    total_net = sum(i.subtotal or Decimal("0") for i in invoices)
-    total_tax = sum(i.tax_total or Decimal("0") for i in invoices)
-    total_gross = sum(i.total or Decimal("0") for i in invoices)
-
-    return {
-        "invoices": [
-            {
-                "id": str(i.id),
-                "number": i.number,
-                "doc_type": i.doc_type,
-                "date": i.date.isoformat(),
-                "due_date": i.due_date.isoformat() if i.due_date else None,
-                "contact_id": str(i.contact_id) if i.contact_id else None,
-                "title": i.title,
-                "subtotal": float(i.subtotal),
-                "tax_total": float(i.tax_total),
-                "total": float(i.total),
-                "currency": i.currency,
-                "status": i.status,
-            }
-            for i in invoices
-        ],
-        "summary": {
-            "count": len(invoices),
-            "total_net": float(total_net),
-            "total_tax": float(total_tax),
-            "total_gross": float(total_gross),
-        },
-    }
-
-
-@router.get("/book/csv")
-async def invoice_book_csv(
-    date_from: Optional[date] = Query(None),
-    date_to: Optional[date] = Query(None),
-    contact_id: Optional[UUID] = Query(None),
-    doc_type: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    import csv, io
-    q = db.query(Invoice).filter(Invoice.is_recurring_template == False)
-    if date_from:
-        q = q.filter(Invoice.date >= date_from)
-    if date_to:
-        q = q.filter(Invoice.date <= date_to)
-    if contact_id:
-        q = q.filter(Invoice.contact_id == contact_id)
-    if doc_type:
-        q = q.filter(Invoice.doc_type == doc_type)
-    invoices = q.order_by(Invoice.date.asc()).all()
-
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow(["Nummer", "Typ", "Datum", "Fällig", "Titel", "Netto", "MwSt", "Brutto", "Währung", "Status"])
-    for i in invoices:
-        writer.writerow([
-            i.number, i.doc_type, i.date, i.due_date or "",
-            i.title or "", float(i.subtotal), float(i.tax_total), float(i.total),
-            i.currency, i.status,
-        ])
-
-    output.seek(0)
-    filename = f"rechnungsbuch_{date_from or 'alle'}_{date_to or 'alle'}.csv"
-    return StreamingResponse(
-        io.BytesIO(output.getvalue().encode("utf-8-sig")),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Belegnummern-Verwaltung
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Einstellungen
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/settings/all")
-async def get_invoice_settings(
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    rows = db.query(InvoiceSettings).all()
-    return {r.key: r.value for r in rows}
-
-
-
-@router.put("/settings/{key}")
-async def update_invoice_setting(
-    key: str,
-    body: InvoiceSettingsUpdate,
-    db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
-):
-    setting = db.query(InvoiceSettings).filter_by(key=key).first()
-    if setting:
-        setting.value = body.value
-    else:
-        setting = InvoiceSettings(key=key, value=body.value)
-        db.add(setting)
-    db.commit()
-    return {"key": key, "value": body.value}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PDF-Endpunk
+    billed_ids = db.query(InvoicePosition.time_entry_id).fi

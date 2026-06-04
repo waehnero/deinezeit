@@ -36,7 +36,9 @@ function fmtEuro(n) {
 }
 
 const DOC_TYPE_LABELS = {
-  rechnung: 'Rechnung', angebot: 'Angebot', gutschrift: 'Gutschrift', lieferschein: 'Lieferschein',
+  rechnung: 'Rechnung', angebot: 'Angebot',
+  auftragsbestaetigung: 'Auftragsbestätigung',
+  gutschrift: 'Gutschrift', lieferschein: 'Lieferschein',
 }
 
 const EMPTY_POSITION = {

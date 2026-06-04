@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Plus, Search, FileText, RefreshCw, Download, ChevronDown,
   CheckCircle2, Clock, AlertCircle, XCircle, Send, Eye,
-  MoreHorizontal, Book, RotateCcw, Repeat
+  MoreHorizontal, Book, RotateCcw, Repeat, Mail, CheckSquare
 } from 'lucide-react'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
@@ -19,11 +19,12 @@ function fmtEuro(n) {
 }
 
 const DOC_TYPES = [
-  { key: '',           label: 'Alle' },
-  { key: 'rechnung',   label: 'Rechnungen' },
-  { key: 'angebot',    label: 'Angebote' },
-  { key: 'gutschrift', label: 'Gutschriften' },
-  { key: 'lieferschein', label: 'Lieferscheine' },
+  { key: '',                     label: 'Alle' },
+  { key: 'rechnung',             label: 'Rechnungen' },
+  { key: 'angebot',              label: 'Angebote' },
+  { key: 'auftragsbestaetigung', label: 'Auftragsbestätigungen' },
+  { key: 'gutschrift',           label: 'Gutschriften' },
+  { key: 'lieferschein',         label: 'Lieferscheine' },
 ]
 
 const STATUS_BADGE = {
@@ -44,10 +45,11 @@ function StatusBadge({ status }) {
 
 function DocTypeBadge({ type }) {
   const map = {
-    rechnung:     'RE',
-    angebot:      'AN',
-    gutschrift:   'GS',
-    lieferschein: 'LS',
+    rechnung:             'RE',
+    angebot:              'AN',
+    auftragsbestaetigung: 'AB',
+    gutschrift:           'GS',
+    lieferschein:         'LS',
   }
   return (
     <span className="text-xs font-mono font-bold text-neutral-400">
@@ -66,6 +68,8 @@ export default function InvoicePage() {
   const [actionMenu, setActionMenu] = useState(null)   // invoice id
   const [cancelDialog, setCancelDialog] = useState(null)
   const [paidDialog, setPaidDialog] = useState(null)
+  const [sendDialog, setSendDialog] = useState(null)   // {invoices: [...], mode: 'single'|'bulk'}
+  const [selected, setSelected] = useState(new Set())  // ausgewählte IDs
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -124,14 +128,20 @@ export default function InvoicePage() {
     }
   }
 
-  async function handleConvert(invoice) {
+  async function handleConvertToAb(invoice) {
+    try {
+      const res = await invoiceApi.convertToAb(invoice.id)
+      toast.success(`Auftragsbestätigung ${res.data.number} erstellt`)
+      navigate(`/invoices/${res.data.id}`)
+    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
+  }
+
+  async function handleConvertToInvoice(invoice) {
     try {
       const res = await invoiceApi.convertToInvoice(invoice.id)
       toast.success(`Rechnung ${res.data.number} erstellt`)
       navigate(`/invoices/${res.data.id}`)
-    } catch (e) {
-      toast.error(e.response?.data?.detail || 'Fehler')
-    }
+    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
 
   async function handleDelete(invoice) {
@@ -143,6 +153,13 @@ export default function InvoicePage() {
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Fehler')
     }
+  }
+
+  function toggleSelect(id) {
+    setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  function toggleAll() {
+    setSelected(s => s.size === invoices.length ? new Set() : new Set(invoices.map(i => i.id)))
   }
 
   return (
@@ -160,6 +177,14 @@ export default function InvoicePage() {
           >
             <Book size={15} /> Belegbuch
           </button>
+          {selected.size > 0 && (
+            <button
+              onClick={() => setSendDialog({ invoices: invoices.filter(i => selected.has(i.id)), mode: 'bulk' })}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Mail size={15} /> {selected.size} Beleg{selected.size > 1 ? 'e' : ''} senden
+            </button>
+          )}
           <button
             onClick={() => navigate('/invoices/new')}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -233,6 +258,10 @@ export default function InvoicePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50">
+                <th className="px-3 py-3 w-10">
+                  <input type="checkbox" checked={selected.size === invoices.length && invoices.length > 0}
+                    onChange={toggleAll} className="w-4 h-4 rounded cursor-pointer" />
+                </th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500 w-8"></th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Nummer</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Datum</th>
@@ -278,9 +307,11 @@ export default function InvoicePage() {
                           invoice={inv}
                           onClose={() => setActionMenu(null)}
                           onSetStatus={(s) => { setActionMenu(null); handleSetStatus(inv, s) }}
+                          onConvertToAb={() => { setActionMenu(null); handleConvertToAb(inv) }}
+                          onConvertToInvoice={() => { setActionMenu(null); handleConvertToInvoice(inv) }}
+                          onSend={() => { setActionMenu(null); setSendDialog({ invoices: [inv], mode: 'single' }) }}
                           onCancel={() => { setActionMenu(null); setCancelDialog(inv) }}
                           onPaid={() => { setActionMenu(null); setPaidDialog(inv) }}
-                          onConvert={() => { setActionMenu(null); handleConvert(inv) }}
                           onDelete={() => { setActionMenu(null); handleDelete(inv) }}
                           onEdit={() => navigate(`/invoices/${inv.id}/edit`)}
                         />
@@ -293,6 +324,15 @@ export default function InvoicePage() {
           </table>
         )}
       </div>
+
+      {/* Senden-Dialog */}
+      {sendDialog && (
+        <SendDialog
+          invoices={sendDialog.invoices}
+          onClose={() => setSendDialog(null)}
+          onSent={() => { setSendDialog(null); setSelected(new Set()); load() }}
+        />
+      )}
 
       {/* Stornodialog */}
       {cancelDialog && (
@@ -316,7 +356,7 @@ export default function InvoicePage() {
 }
 
 // ── Aktionsmenü ────────────────────────────────────────────────────────────────
-function ActionMenu({ invoice, onClose, onSetStatus, onCancel, onPaid, onConvert, onDelete, onEdit }) {
+function ActionMenu({ invoice, onClose, onSetStatus, onConvertToAb, onConvertToInvoice, onSend, onCancel, onPaid, onDelete, onEdit }) {
   useEffect(() => {
     const h = () => onClose()
     document.addEventListener('click', h)
@@ -380,11 +420,28 @@ function ActionMenu({ invoice, onClose, onSetStatus, onCancel, onPaid, onConvert
         </>
       )}
 
-      {/* Angebot → Rechnung umwandeln */}
-      {isAn && ['gesendet', 'angenommen'].includes(status) && (
-        <button onClick={onConvert} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-blue-600">
+      {/* Angebot → AB umwandeln */}
+      {isAn && ['gesendet', 'angenommen', 'entwurf'].includes(status) && (
+        <button onClick={onConvertToAb} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-blue-600">
+          <RotateCcw size={14} /> → Auftragsbestätigung
+        </button>
+      )}
+
+      {/* Angebot oder AB → Rechnung umwandeln */}
+      {(isAn || doc_type === 'auftragsbestaetigung') && ['gesendet', 'angenommen', 'entwurf', 'offen'].includes(status) && (
+        <button onClick={onConvertToInvoice} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-primary-600">
           <RotateCcw size={14} /> → Rechnung umwandeln
         </button>
+      )}
+
+      {/* Per E-Mail senden */}
+      {status !== 'storniert' && (
+        <>
+          <div className="border-t border-neutral-100 my-1" />
+          <button onClick={onSend} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-blue-600">
+            <Mail size={14} /> Per E-Mail senden
+          </button>
+        </>
       )}
 
       {/* Stornieren (Rechnung, nicht bereits storniert/bezahlt) */}
@@ -418,3 +475,86 @@ function CancelDialog({ invoice, onClose, onConfirm }) {
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
         <h2 className="text-base font-semibold mb-1">Rechnung stornieren</h2>
         <p className="text-sm text-neutral-500 mb-4">{invoice.number} — {Number(invoice.total).toLocaleString('de-AT', { minimumFractionDi
+
+// ── Senden-Dialog ─────────────────────────────────────────────────────────────
+function SendDialog({ invoices, onClose, onSent }) {
+  const [sending, setSending] = useState(false)
+  const [results, setResults] = useState(null)
+
+  const isBulk = invoices.length > 1
+  const single = invoices[0]
+
+  async function handleSend() {
+    setSending(true)
+    try {
+      if (isBulk) {
+        const res = await invoiceApi.bulkSendEmail(invoices.map(i => i.id))
+        setResults(res.data.results)
+        const ok = res.data.results.filter(r => r.ok).length
+        toast.success(`${ok} von ${invoices.length} Belegen versendet`)
+      } else {
+        await invoiceApi.sendEmail(single.id, null)
+        toast.success(`${single.number} versendet`)
+        onSent()
+        return
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Fehler beim Versenden')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
+        <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
+          <Mail size={16} className="text-blue-600" />
+          {isBulk ? `${invoices.length} Belege per E-Mail senden` : `${single.number} per E-Mail senden`}
+        </h2>
+        <p className="text-xs text-neutral-500 mb-4">
+          Die PDF-Datei wird automatisch generiert und an die E-Mail-Adresse des Kontakts gesendet.
+          Der Status wird auf „Gesendet" gesetzt.
+        </p>
+
+        {!results ? (
+          <>
+            <div className="bg-neutral-50 rounded-lg p-3 mb-4 max-h-40 overflow-y-auto divide-y">
+              {invoices.map(inv => (
+                <div key={inv.id} className="py-2 flex items-center justify-between text-sm">
+                  <span className="font-medium text-neutral-700">{inv.number}</span>
+                  <span className="text-neutral-500 text-xs truncate max-w-[200px]">{inv.title || '—'}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
+              <button onClick={handleSend} disabled={sending}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
+                {sending ? <RefreshCw size={14} className="animate-spin" /> : <Mail size={14} />}
+                {sending ? 'Wird gesendet…' : 'Jetzt senden'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+              {results.map(r => (
+                <div key={r.id} className={`flex items-center gap-2 text-sm p-2 rounded ${r.ok ? 'bg-green-50' : 'bg-red-50'}`}>
+                  {r.ok
+                    ? <CheckCircle2 size={14} className="text-green-600 shrink-0" />
+                    : <XCircle size={14} className="text-red-500 shrink-0" />}
+                  <span className="font-medium">{r.number}</span>
+                  {r.ok ? <span className="text-neutral-500 text-xs">→ {r.to}</span> : <span className="text-red-500 text-xs">{r.error}</span>}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <button onClick={onSent} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">Schließen</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}

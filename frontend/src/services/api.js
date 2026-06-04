@@ -175,8 +175,11 @@ export const invoiceApi = {
   nextNumber:     (doc_type, year) => api.get('/invoices/next-number', { params: { doc_type, year } }),
 
   // Aktionen
-  setStatus:      (id, status) => api.post(`/invoices/${id}/set-status`, { status }),
-  cancel:         (id, cancel_mode) => api.post(`/invoices/${id}/cancel`, { cancel_mode }),
+  setStatus:        (id, status) => api.post(`/invoices/${id}/set-status`, { status }),
+  convertToAb:      (id) => api.post(`/invoices/${id}/convert-to-ab`),
+  cancel:           (id, cancel_mode) => api.post(`/invoices/${id}/cancel`, { cancel_mode }),
+  sendEmail:        (id, to_email) => api.post(`/invoices/${id}/send-email`, { to_email }),
+  bulkSendEmail:    (invoice_ids) => api.post('/invoices/bulk-send-email', { invoice_ids }),
   markPaid:       (id, data) => api.post(`/invoices/${id}/mark-paid`, data),
   convertToInvoice: (id) => api.post(`/invoices/${id}/convert-to-invoice`),
 
@@ -209,4 +212,7 @@ export const accountingApi = {
   updateAccount:      (id, data) => api.put(`/accounting/accounts/${id}`, data),
   deleteAccount:      (id)     => api.delete(`/accounting/accounts/${id}`),
   setDefaultErloes:   (id)     => api.post(`/accounting/accounts/${id}/set-default-erloes`),
-  exportBmd:          (params) => api.g
+  exportBmd:          (params) => api.get('/accounting/export/bmd', { params, responseType: 'blob' }),
+}
+
+export default api
