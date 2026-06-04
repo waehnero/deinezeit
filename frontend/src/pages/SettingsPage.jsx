@@ -1173,29 +1173,19 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
       const savedIban = typeof bank === 'object' ? bank.iban || '' : ''
       const savedBic  = typeof bank === 'object' ? bank.bic  || '' : ''
       const savedBank = typeof bank === 'object' ? bank.bank || '' : ''
-
-      setBankIban(savedIban)
-      setBankBic(savedBic)
-      setBankName(savedBank)
+      setBankIban(savedIban); setBankBic(savedBic); setBankName(savedBank)
       setDefaultTemplate(s.default_template || 1)
       setCustomCss(s.custom_template_css || '')
       setDefaultTaxRate(s.default_tax_rate || 20)
       setPaymentDays(s.default_payment_days || 30)
-      setKleinunternehmerText(
-        typeof s.kleinunternehmer_text === 'string'
-          ? s.kleinunternehmer_text.replace(/^"|"$/g, '') : ''
-      )
-
-      // Bankdaten aus Firmenkontakt vorausfüllen wenn Felder noch leer
+      setKleinunternehmerText(typeof s.kleinunternehmer_text === 'string' ? s.kleinunternehmer_text.replace(/^"|"$/g, '') : '')
       const contact = contactRes.data?.contact
       if (contact?.data) {
-        const fromContact = extractBankFromContact(contact.data)
-        if (!savedIban && fromContact.iban) { setBankIban(fromContact.iban); }
-        if (!savedBic  && fromContact.bic)  { setBankBic(fromContact.bic);   }
-        if (!savedBank && fromContact.bank) { setBankName(fromContact.bank);  }
-        if (fromContact.iban || fromContact.bic || fromContact.bank) {
-          setContactHint(`Bankdaten aus Kontakt „${contact.display_name}" übernommen`)
-        }
+        const fc = extractBankFromContact(contact.data)
+        if (!savedIban && fc.iban) setBankIban(fc.iban)
+        if (!savedBic  && fc.bic)  setBankBic(fc.bic)
+        if (!savedBank && fc.bank) setBankName(fc.bank)
+        if (fc.iban || fc.bic || fc.bank) setContactHint(`Bankdaten aus Kontakt "${contact.display_name}" übernommen`)
       }
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
@@ -1211,12 +1201,9 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         invoiceApi.updateSetting('kleinunternehmer_text', kleinunternehmerText),
         showCustomEditor && invoiceApi.updateSetting('custom_template_css', customCss),
       ].filter(Boolean))
-      toast.success('Rechnungseinstellungen gespeichert')
-    } catch {
-      toast.error('Fehler beim Speichern')
-    } finally {
-      setSaving(false)
-    }
+      toast.success('Belegeinstellungen gespeichert')
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setSaving(false) }
   }
 
   if (loading) return <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-neutral-400" /></div>
@@ -1225,243 +1212,112 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
     <div className="space-y-6">
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Bankverbindung</h3>
-        <p className="text-xs text-neutral-400 mb-3">Wird automatisch auf jeder Rechnung gedruckt.</p>
         {contactHint && (
           <div className="mb-3 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
             <CheckCircle2 size={13} /> {contactHint}
           </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">IBAN</label>
-            <input value={bankIban} onChange={e => setBankIban(e.target.value)} placeholder="AT12 3456 7890 1234 5678"
-              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">BIC</label>
-            <input value={bankBic} onChange={e => setBankBic(e.target.value)} placeholder="BKAUATWW"
-              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">Bankname</label>
-            <input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="Bank Austria"
-              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
-          </div>
+          <div><label className="block text-xs font-medium text-neutral-600 mb-1">IBAN</label>
+            <input value={bankIban} onChange={e => setBankIban(e.target.value)} placeholder="AT12 3456 7890 1234 5678" className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" /></div>
+          <div><label className="block text-xs font-medium text-neutral-600 mb-1">BIC</label>
+            <input value={bankBic} onChange={e => setBankBic(e.target.value)} placeholder="BKAUATWW" className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" /></div>
+          <div><label className="block text-xs font-medium text-neutral-600 mb-1">Bankname</label>
+            <input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="Bank Austria" className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" /></div>
         </div>
       </div>
-
       <hr className="border-gray-100" />
-
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Standard-Einstellungen</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">Standard-MwSt.-Satz (%)</label>
-            <select value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)}
-              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
-              <option value={20}>20 %</option>
-              <option value={10}>10 %</option>
-              <option value={0}>0 %</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">Standard-Zahlungsziel (Tage)</label>
-            <input type="number" value={paymentDays} onChange={e => setPaymentDays(e.target.value)}
-              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" min={0} max={365} />
-          </div>
+          <div><label className="block text-xs font-medium text-neutral-600 mb-1">Standard-MwSt.-Satz (%)</label>
+            <select value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+              <option value={20}>20 %</option><option value={10}>10 %</option><option value={0}>0 %</option>
+            </select></div>
+          <div><label className="block text-xs font-medium text-neutral-600 mb-1">Standard-Zahlungsziel (Tage)</label>
+            <input type="number" value={paymentDays} onChange={e => setPaymentDays(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" min={0} max={365} /></div>
         </div>
-        <div className="mt-3">
-          <label className="block text-xs font-medium text-neutral-600 mb-1">Kleinunternehmer-Hinweistext</label>
-          <textarea value={kleinunternehmerText} onChange={e => setKleinunternehmerText(e.target.value)} rows={2}
-            placeholder="Gemäß § 6 Abs. 1 Z 27 UStG wird keine Umsatzsteuer berechnet."
-            className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" />
-        </div>
+        <div className="mt-3"><label className="block text-xs font-medium text-neutral-600 mb-1">Kleinunternehmer-Hinweistext</label>
+          <textarea value={kleinunternehmerText} onChange={e => setKleinunternehmerText(e.target.value)} rows={2} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" /></div>
       </div>
-
       <hr className="border-gray-100" />
-
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">PDF-Vorlage</h3>
-        <p className="text-xs text-neutral-400 mb-4">Die gewählte Vorlage wird für alle Dokumente (Rechnungen, Angebote, Gutschriften, Lieferscheine) als Standard verwendet.</p>
-
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
           {[1, 2, 3, 4, 5].map(n => (
-            <div key={n} className={`flex flex-col rounded-xl border-2 transition-all overflow-hidden ${
-              Number(defaultTemplate) === n ? 'border-primary-500' : 'border-neutral-200'
-            }`}>
-              <button
-                onClick={() => setDefaultTemplate(n)}
-                className={`flex flex-col items-center gap-2 p-3 w-full transition-all ${
-                  Number(defaultTemplate) === n ? 'bg-primary-50' : 'bg-white hover:bg-neutral-50'
-                }`}
-              >
+            <div key={n} className={`flex flex-col rounded-xl border-2 transition-all overflow-hidden ${Number(defaultTemplate) === n ? 'border-primary-500' : 'border-neutral-200'}`}>
+              <button onClick={() => setDefaultTemplate(n)} className={`flex flex-col items-center gap-2 p-3 w-full ${Number(defaultTemplate) === n ? 'bg-primary-50' : 'bg-white hover:bg-neutral-50'}`}>
                 <FileText size={24} className={Number(defaultTemplate) === n ? 'text-primary-600' : 'text-neutral-400'} />
-                <span className={`text-xs font-semibold ${Number(defaultTemplate) === n ? 'text-primary-700' : 'text-neutral-700'}`}>
-                  {TEMPLATE_NAMES[n]}
-                </span>
+                <span className={`text-xs font-semibold ${Number(defaultTemplate) === n ? 'text-primary-700' : 'text-neutral-700'}`}>{TEMPLATE_NAMES[n]}</span>
                 <span className="text-xs text-neutral-400 text-center leading-tight">{TEMPLATE_DESCRIPTIONS[n]}</span>
-                {Number(defaultTemplate) === n && (
-                  <span className="text-xs bg-primary-600 text-white px-2 py-0.5 rounded-full">Standard</span>
-                )}
+                {Number(defaultTemplate) === n && <span className="text-xs bg-primary-600 text-white px-2 py-0.5 rounded-full">Standard</span>}
               </button>
-              <button
-                onClick={async () => {
-                  setPreviewTemplate(n)
-                  setPreviewHtml('')
-                  setPreviewLoading(true)
-                  try {
-                    const token = localStorage.getItem('access_token')
-                    const res = await fetch(`/api/invoices/template-preview/${n}`, {
-                      headers: { Authorization: `Bearer ${token}` }
-                    })
-                    const html = await res.text()
-                    setPreviewHtml(html)
-                  } catch { setPreviewHtml('<p style="padding:2rem;color:red">Fehler beim Laden</p>') }
-                  finally { setPreviewLoading(false) }
-                }}
-                className="w-full py-1.5 text-xs text-neutral-500 hover:text-primary-600 hover:bg-neutral-50 border-t border-neutral-100 flex items-center justify-center gap-1"
-              >
+              <button onClick={async () => {
+                setPreviewTemplate(n); setPreviewHtml(''); setPreviewLoading(true)
+                try {
+                  const token = localStorage.getItem('access_token')
+                  const res = await fetch(`/api/invoices/template-preview/${n}`, { headers: { Authorization: `Bearer ${token}` } })
+                  setPreviewHtml(await res.text())
+                } catch { setPreviewHtml('<p style="padding:2rem;color:red">Fehler</p>') }
+                finally { setPreviewLoading(false) }
+              }} className="w-full py-1.5 text-xs text-neutral-500 hover:text-primary-600 hover:bg-neutral-50 border-t border-neutral-100 flex items-center justify-center gap-1">
                 <Eye size={12} /> Vorschau
               </button>
             </div>
           ))}
         </div>
-
-        {/* Vorschau-Modal */}
         {previewTemplate && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-4xl" style={{height: '90vh'}}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200">
-                <div className="flex items-center gap-3">
-                  <FileText size={18} className="text-neutral-500" />
-                  <span className="font-semibold text-neutral-800">Vorschau: {TEMPLATE_NAMES[previewTemplate]}</span>
-                  <span className="text-xs text-neutral-400">{TEMPLATE_DESCRIPTIONS[previewTemplate]}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => { setDefaultTemplate(previewTemplate); setPreviewTemplate(null) }}
-                    className="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                  >
-                    Als Standard verwenden
-                  </button>
-                  <button onClick={() => setPreviewTemplate(null)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
-                    <XCircle size={18} />
-                  </button>
+                <span className="font-semibold text-neutral-800">Vorschau: {TEMPLATE_NAMES[previewTemplate]}</span>
+                <div className="flex gap-2">
+                  <button onClick={() => { setDefaultTemplate(previewTemplate); setPreviewTemplate(null) }} className="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700">Als Standard verwenden</button>
+                  <button onClick={() => setPreviewTemplate(null)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500"><XCircle size={18} /></button>
                 </div>
               </div>
               <div className="flex-1 overflow-hidden rounded-b-2xl relative">
-                {previewLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
-                    <Loader2 size={28} className="animate-spin text-neutral-400" />
-                  </div>
-                )}
-                <iframe
-                  srcdoc={previewHtml}
-                  className="w-full h-full border-0"
-                  title={`Vorschau Vorlage ${previewTemplate}`}
-                  sandbox="allow-same-origin"
-                />
+                {previewLoading && <div className="absolute inset-0 flex items-center justify-center bg-white z-10"><Loader2 size={28} className="animate-spin text-neutral-400" /></div>}
+                <iframe srcdoc={previewHtml} className="w-full h-full border-0" sandbox="allow-same-origin" />
               </div>
             </div>
           </div>
         )}
-
         <div className="border border-neutral-200 rounded-xl overflow-hidden">
-          <button
-            onClick={() => setShowCustomEditor(!showCustomEditor)}
-            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-          >
-            <span className="flex items-center gap-2">
-              <FileText size={15} />
-              Eigene Vorlage (CSS-Editor)
-            </span>
+          <button onClick={() => setShowCustomEditor(!showCustomEditor)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+            <span className="flex items-center gap-2"><FileText size={15} /> Eigene Vorlage (CSS-Editor)</span>
             {showCustomEditor ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
           {showCustomEditor && (
             <div className="border-t border-neutral-100 p-4">
-              <p className="text-xs text-neutral-500 mb-2">
-                Überschreibe das Standard-CSS der Vorlagen. Wird zusätzlich zu der gewählten Vorlage angewendet.
-                Verwende Standard-CSS-Selektoren wie <code className="bg-neutral-100 px-1 rounded">.positions</code>,{' '}
-                <code className="bg-neutral-100 px-1 rounded">h1</code>,{' '}
-                <code className="bg-neutral-100 px-1 rounded">.bank-box</code> etc.
-              </p>
-              <textarea
-                value={customCss}
-                onChange={e => setCustomCss(e.target.value)}
-                rows={10}
-                placeholder={`/* Beispiel: eigene Schriftart und Farbe */\nbody { font-family: Georgia, serif; }\nh1 { color: #1a3a6b; }\ntable.positions th { background: #1a3a6b; }`}
-                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-xs font-mono resize-y"
-                spellCheck={false}
-              />
+              <p className="text-xs text-neutral-500 mb-2">Überschreibe das Standard-CSS. Selektoren: <code className="bg-neutral-100 px-1 rounded">.positions</code>, <code className="bg-neutral-100 px-1 rounded">h1</code>, <code className="bg-neutral-100 px-1 rounded">.bank-box</code> etc.</p>
+              <textarea value={customCss} onChange={e => setCustomCss(e.target.value)} rows={10} placeholder="/* body { font-family: Georgia, serif; } */" className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-xs font-mono resize-y" spellCheck={false} />
             </div>
           )}
         </div>
       </div>
-
       <div className="flex justify-end pt-2">
-        <button onClick={handleSave} disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-60">
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          Speichern
+        <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-60">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Speichern
         </button>
       </div>
     </div>
   )
 }
 
-// ── Tab: Parameter (fasst Belege + Belegnummern + Buchhaltung zusammen) ──────
-const DOC_TYPE_LABELS_PARAM = {
-  rechnung:     { label: 'Rechnung',     prefix: 'RE', example: 'RE-2026-001' },
-  angebot:      { label: 'Angebot',      prefix: 'AN', example: 'AN-2026-001' },
-  gutschrift:   { label: 'Gutschrift',   prefix: 'GS', example: 'GS-2026-001' },
-  lieferschein: { label: 'Lieferschein', prefix: 'LS', example: 'LS-2026-001' },
-}
-
-function SectionHeader({ title, open, onToggle, children }) {
-  return (
-    <div className="border border-neutral-200 rounded-xl overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-neutral-50 text-left"
-      >
-        <span className="font-semibold text-neutral-800 text-sm">{title}</span>
-        {open ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
-      </button>
-      {open && <div className="border-t border-neutral-100 px-5 py-5">{children}</div>}
-    </div>
-  )
-}
-
-function TabParameter() {
-  const [openSection, setOpenSection] = useState('belege')
-
-  function toggle(s) { setOpenSection(v => v === s ? null : s) }
-
-  return (
-    <div className="space-y-3">
-      {/* Gruppe 1: Belegeinstellungen */}
-      <SectionHeader title="Belegeinstellungen" open={openSection === 'belege'} onToggle={() => toggle('belege')}>
-        <TabRechnung embedded />
-      </SectionHeader>
-
-      {/* Gruppe 2: Belegnummern */}
-      <SectionHeader title="Belegnummern" open={openSection === 'nummern'} onToggle={() => toggle('nummern')}>
-        <BelegnummernSection />
-      </SectionHeader>
-
-      {/* Gruppe 3: Kontenplan */}
-      <SectionHeader title="Kontenplan (EKR)" open={openSection === 'konten'} onToggle={() => toggle('konten')}>
-        <TabBuchhaltung embedded />
-      </SectionHeader>
-    </div>
-  )
+// ── Belegnummern-Sektion ──────────────────────────────────────────────────────
+const DOC_TYPE_META = {
+  rechnung:     { label: 'Rechnung',     prefix: 'RE' },
+  angebot:      { label: 'Angebot',      prefix: 'AN' },
+  gutschrift:   { label: 'Gutschrift',   prefix: 'GS' },
+  lieferschein: { label: 'Lieferschein', prefix: 'LS' },
 }
 
 function BelegnummernSection() {
   const [sequences, setSequences] = useState([])
   const [loading, setLoading] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())
-  const [edits, setEdits] = useState({})   // { docType: { format, last_sequence } }
+  const [edits, setEdits] = useState({})
   const [saving, setSaving] = useState({})
 
   async function load() {
@@ -1470,123 +1326,81 @@ function BelegnummernSection() {
       const res = await invoiceApi.getNumberSequences(year)
       setSequences(res.data)
       const e = {}
-      res.data.forEach(s => {
-        e[s.doc_type] = { format: s.format, last_sequence: String(s.last_sequence) }
-      })
+      res.data.forEach(s => { e[s.doc_type] = { format: s.format, last_sequence: String(s.last_sequence) } })
       setEdits(e)
-    } catch { toast.error('Fehler beim Laden') }
+    } catch { toast.error('Fehler beim Laden der Belegnummern') }
     finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [year]) // eslint-disable-line
 
   function preview(docType) {
-    const e = edits[docType]
-    if (!e) return '—'
+    const e = edits[docType]; if (!e) return '—'
     try {
       const seq = parseInt(e.last_sequence || 0) + 1
-      return e.format.replace('{year}', year).replace('{seq:03d}', String(seq).padStart(3, '0'))
-        .replace('{seq:04d}', String(seq).padStart(4, '0'))
-        .replace('{seq}', String(seq))
+      return e.format.replace('{year}', year).replace('{seq:03d}', String(seq).padStart(3,'0')).replace('{seq:04d}', String(seq).padStart(4,'0')).replace('{seq}', String(seq))
     } catch { return '—' }
   }
 
   async function handleSave(docType) {
-    setSaving(s => ({ ...s, [docType]: true }))
+    setSaving(s => ({...s, [docType]: true}))
     try {
-      const e = edits[docType]
-      await invoiceApi.updateNumberSequence(docType, {
-        year,
-        format: e.format,
-        last_sequence: parseInt(e.last_sequence),
-      })
-      toast.success(`${DOC_TYPE_LABELS_PARAM[docType]?.label} gespeichert`)
+      await invoiceApi.updateNumberSequence(docType, { year, format: edits[docType].format, last_sequence: parseInt(edits[docType].last_sequence) })
+      toast.success(`${DOC_TYPE_META[docType]?.label} gespeichert`)
       load()
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Fehler')
-    } finally {
-      setSaving(s => ({ ...s, [docType]: false }))
-    }
+    } catch (err) { toast.error(err.response?.data?.detail || 'Fehler') }
+    finally { setSaving(s => ({...s, [docType]: false})) }
   }
 
   if (loading) return <div className="flex justify-center py-4"><Loader2 size={20} className="animate-spin text-neutral-400" /></div>
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
-        <p className="text-xs text-neutral-500 flex-1">
-          Definiere das Format und den aktuellen Zählerstand pro Belegart und Jahr.
-          Platzhalter: <code className="bg-neutral-100 px-1 rounded text-xs">{'{year}'}</code> = Jahr,
-          <code className="bg-neutral-100 px-1 rounded text-xs ml-1">{'{seq:03d}'}</code> = 3-stellige laufende Nummer.
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-neutral-500">
+          Platzhalter: <code className="bg-neutral-100 px-1 rounded">{'{year}'}</code> = Jahr,{' '}
+          <code className="bg-neutral-100 px-1 rounded">{'{seq:03d}'}</code> = 3-stellige Nummer
         </p>
         <div className="flex items-center gap-2">
           <label className="text-xs text-neutral-500">Jahr:</label>
-          <select value={year} onChange={e => setYear(Number(e.target.value))}
-            className="border border-neutral-200 rounded px-2 py-1 text-sm">
-            {[0,1,2,3].map(i => {
-              const y = new Date().getFullYear() - i + 1
-              return <option key={y} value={y}>{y}</option>
-            })}
+          <select value={year} onChange={e => setYear(Number(e.target.value))} className="border border-neutral-200 rounded px-2 py-1 text-sm">
+            {[0,1,2,3].map(i => { const y = new Date().getFullYear() - i + 1; return <option key={y} value={y}>{y}</option> })}
           </select>
         </div>
       </div>
-
       <div className="space-y-3">
         {sequences.map(seq => {
-          const meta = DOC_TYPE_LABELS_PARAM[seq.doc_type] || {}
+          const meta = DOC_TYPE_META[seq.doc_type] || {}
           const e = edits[seq.doc_type] || {}
-          const isSaving = saving[seq.doc_type]
           return (
             <div key={seq.doc_type} className="border border-neutral-200 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded">
-                    {meta.prefix}
-                  </span>
+                  <span className="text-xs font-mono font-bold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded">{meta.prefix}</span>
                   <span className="text-sm font-medium text-neutral-800">{meta.label}</span>
                 </div>
-                <span className="text-xs text-neutral-400">
-                  Nächste: <strong className="text-neutral-700 font-mono">{preview(seq.doc_type)}</strong>
-                </span>
+                <span className="text-xs text-neutral-400">Nächste: <strong className="text-neutral-700 font-mono">{preview(seq.doc_type)}</strong></span>
               </div>
               <div className="grid grid-cols-12 gap-3 items-end">
                 <div className="col-span-6">
                   <label className="block text-xs font-medium text-neutral-500 mb-1">Nummernformat</label>
-                  <input
-                    value={e.format || ''}
-                    onChange={ev => setEdits(d => ({ ...d, [seq.doc_type]: { ...d[seq.doc_type], format: ev.target.value } }))}
-                    placeholder={`z.B. ${meta.prefix}-{year}-{seq:03d}`}
-                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm font-mono"
-                  />
+                  <input value={e.format || ''} onChange={ev => setEdits(d => ({...d, [seq.doc_type]: {...d[seq.doc_type], format: ev.target.value}}))}
+                    placeholder={`${meta.prefix}-{year}-{seq:03d}`} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
                 <div className="col-span-3">
-                  <label className="block text-xs font-medium text-neutral-500 mb-1">
-                    Letzter Zähler {year}
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={e.last_sequence ?? seq.last_sequence}
-                    onChange={ev => setEdits(d => ({ ...d, [seq.doc_type]: { ...d[seq.doc_type], last_sequence: ev.target.value } }))}
-                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm text-right"
-                  />
+                  <label className="block text-xs font-medium text-neutral-500 mb-1">Letzter Zähler {year}</label>
+                  <input type="number" min={0} value={e.last_sequence ?? seq.last_sequence}
+                    onChange={ev => setEdits(d => ({...d, [seq.doc_type]: {...d[seq.doc_type], last_sequence: ev.target.value}}))}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm text-right" />
                 </div>
                 <div className="col-span-3">
-                  <button
-                    onClick={() => handleSave(seq.doc_type)}
-                    disabled={isSaving}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60"
-                  >
-                    {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    Speichern
+                  <button onClick={() => handleSave(seq.doc_type)} disabled={saving[seq.doc_type]}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
+                    {saving[seq.doc_type] ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Speichern
                   </button>
                 </div>
               </div>
-              {seq.last_sequence > 0 && (
-                <p className="text-xs text-neutral-400 mt-2">
-                  Aktuell: {seq.last_sequence} Belege in {year} · Nächste freie Nr.: {seq.next_sequence}
-                </p>
-              )}
+              {seq.last_sequence > 0 && <p className="text-xs text-neutral-400 mt-2">{seq.last_sequence} Belege in {year} · Nächste freie Nr.: {seq.next_sequence}</p>}
             </div>
           )
         })}
@@ -1595,225 +1409,149 @@ function BelegnummernSection() {
   )
 }
 
-// ── Tab: Buchhaltung ──────────────────────────────────────────────────────────
-const TYP_LABELS = {
-  aktiv: 'Aktiv', passiv: 'Passiv', ertrag: 'Ertrag', aufwand: 'Aufwand', neutral: 'Neutral',
-}
-const TYP_COLORS = {
-  aktiv:   'bg-blue-50 text-blue-700',
-  passiv:  'bg-purple-50 text-purple-700',
-  ertrag:  'bg-green-50 text-green-700',
-  aufwand: 'bg-red-50 text-red-700',
-  neutral: 'bg-neutral-100 text-neutral-600',
-}
+// ── Tab: Kontenplan ───────────────────────────────────────────────────────────
+const TYP_LABELS = { aktiv:'Aktiv', passiv:'Passiv', ertrag:'Ertrag', aufwand:'Aufwand', neutral:'Neutral' }
+const TYP_COLORS = { aktiv:'bg-blue-50 text-blue-700', passiv:'bg-purple-50 text-purple-700', ertrag:'bg-green-50 text-green-700', aufwand:'bg-red-50 text-red-700', neutral:'bg-neutral-100 text-neutral-600' }
 
 function TabBuchhaltung({ embedded = false }) { // eslint-disable-line
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editRow, setEditRow] = useState(null)   // id der bearbeiteten Zeile
+  const [editRow, setEditRow] = useState(null)
   const [editData, setEditData] = useState({})
   const [showNew, setShowNew] = useState(false)
-  const [newData, setNewData] = useState({ nr: '', name: '', typ: 'ertrag', ust_code: '', beschreibung: '' })
+  const [newData, setNewData] = useState({ nr:'', name:'', typ:'ertrag', ust_code:'', beschreibung:'' })
   const [typFilter, setTypFilter] = useState('')
   const [search, setSearch] = useState('')
 
   async function load() {
     setLoading(true)
-    try {
-      const res = await accountingApi.listAccounts({ active_only: false })
-      setAccounts(res.data)
-    } catch { toast.error('Fehler beim Laden') }
+    try { const res = await accountingApi.listAccounts({ active_only: false }); setAccounts(res.data) }
+    catch { toast.error('Fehler beim Laden') }
     finally { setLoading(false) }
   }
-
   useEffect(() => { load() }, [])
 
   const filtered = accounts.filter(a => {
     if (typFilter && a.typ !== typFilter) return false
-    if (search) {
-      const s = search.toLowerCase()
-      return a.nr.includes(s) || a.name.toLowerCase().includes(s)
-    }
+    if (search) { const s = search.toLowerCase(); return a.nr.includes(s) || a.name.toLowerCase().includes(s) }
     return true
   })
 
   async function handleSave(id) {
-    try {
-      await accountingApi.updateAccount(id, editData)
-      toast.success('Gespeichert')
-      setEditRow(null)
-      load()
-    } catch { toast.error('Fehler') }
+    try { await accountingApi.updateAccount(id, editData); toast.success('Gespeichert'); setEditRow(null); load() }
+    catch { toast.error('Fehler') }
   }
-
   async function handleCreate() {
-    try {
-      await accountingApi.createAccount(newData)
-      toast.success(`Konto ${newData.nr} angelegt`)
-      setShowNew(false)
-      setNewData({ nr: '', name: '', typ: 'ertrag', ust_code: '', beschreibung: '' })
-      load()
-    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
+    try { await accountingApi.createAccount(newData); toast.success(`Konto ${newData.nr} angelegt`); setShowNew(false); setNewData({ nr:'', name:'', typ:'ertrag', ust_code:'', beschreibung:'' }); load() }
+    catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
-
   async function handleDelete(id, nr) {
     if (!window.confirm(`Konto ${nr} wirklich löschen?`)) return
-    try {
-      await accountingApi.deleteAccount(id)
-      toast.success('Gelöscht')
-      load()
-    } catch { toast.error('Fehler') }
+    try { await accountingApi.deleteAccount(id); toast.success('Gelöscht'); load() }
+    catch { toast.error('Fehler') }
   }
-
   async function handleSetDefault(id) {
-    try {
-      await accountingApi.setDefaultErloes(id)
-      toast.success('Als Standard-Erlöskonto gesetzt')
-      load()
-    } catch { toast.error('Fehler') }
+    try { await accountingApi.setDefaultErloes(id); toast.success('Standard-Erlöskonto gesetzt'); load() }
+    catch { toast.error('Fehler') }
   }
 
   if (loading) return <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-neutral-400" /></div>
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Kontenplan (EKR)</h3>
-        <p className="text-xs text-neutral-400 mb-4">
-          Vorbefüllt mit dem österreichischen Einheitskontenrahmen. Konten können angepasst, ergänzt oder deaktiviert werden.
-          Das <Star size={11} className="inline mb-0.5" />-Konto ist das Standard-Erlöskonto für neue Rechnungspositionen.
-        </p>
-
-        {/* Filter */}
-        <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <div className="relative flex-1 max-w-xs">
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Kontonr. oder Name…"
-              className="w-full pl-3 pr-3 py-1.5 text-sm border border-neutral-200 rounded-lg" />
-          </div>
-          <select value={typFilter} onChange={e => setTypFilter(e.target.value)}
-            className="text-sm border border-neutral-200 rounded-lg px-3 py-1.5">
-            <option value="">Alle Typen</option>
+    <div>
+      <p className="text-xs text-neutral-400 mb-4">
+        Vorbefüllt mit dem österreichischen EKR. <Star size={11} className="inline mb-0.5" />-Konto = Standard-Erlöskonto für neue Positionen.
+      </p>
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nr. oder Name…" className="flex-1 max-w-xs border border-neutral-200 rounded-lg px-3 py-1.5 text-sm" />
+        <select value={typFilter} onChange={e => setTypFilter(e.target.value)} className="text-sm border border-neutral-200 rounded-lg px-3 py-1.5">
+          <option value="">Alle Typen</option>
+          {Object.entries(TYP_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={14} /> Konto hinzufügen</button>
+      </div>
+      {showNew && (
+        <div className="border border-primary-200 bg-primary-50 rounded-xl p-4 mb-3 grid grid-cols-12 gap-2 items-center">
+          <input value={newData.nr} onChange={e => setNewData({...newData, nr: e.target.value})} placeholder="Nr." className="col-span-2 border border-neutral-200 rounded px-2 py-1.5 text-sm" />
+          <input value={newData.name} onChange={e => setNewData({...newData, name: e.target.value})} placeholder="Bezeichnung" className="col-span-4 border border-neutral-200 rounded px-2 py-1.5 text-sm" />
+          <select value={newData.typ} onChange={e => setNewData({...newData, typ: e.target.value})} className="col-span-2 border border-neutral-200 rounded px-2 py-1.5 text-sm">
             {Object.entries(TYP_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <button onClick={() => setShowNew(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-            <Plus size={14} /> Konto hinzufügen
-          </button>
-        </div>
-
-        {/* Neues Konto */}
-        {showNew && (
-          <div className="border border-primary-200 bg-primary-50 rounded-xl p-4 mb-3 grid grid-cols-12 gap-2 items-center">
-            <input value={newData.nr} onChange={e => setNewData({...newData, nr: e.target.value})}
-              placeholder="Nr." className="col-span-2 border border-neutral-200 rounded px-2 py-1.5 text-sm" />
-            <input value={newData.name} onChange={e => setNewData({...newData, name: e.target.value})}
-              placeholder="Kontobezeichnung" className="col-span-4 border border-neutral-200 rounded px-2 py-1.5 text-sm" />
-            <select value={newData.typ} onChange={e => setNewData({...newData, typ: e.target.value})}
-              className="col-span-2 border border-neutral-200 rounded px-2 py-1.5 text-sm">
-              {Object.entries(TYP_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <input value={newData.ust_code} onChange={e => setNewData({...newData, ust_code: e.target.value})}
-              placeholder="USt-Code" className="col-span-2 border border-neutral-200 rounded px-2 py-1.5 text-sm" />
-            <div className="col-span-2 flex gap-1">
-              <button onClick={handleCreate} className="flex-1 px-2 py-1.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">
-                Anlegen
-              </button>
-              <button onClick={() => setShowNew(false)} className="px-2 py-1.5 text-xs border rounded hover:bg-neutral-50">
-                ✕
-              </button>
-            </div>
+          <input value={newData.ust_code} onChange={e => setNewData({...newData, ust_code: e.target.value})} placeholder="USt-Code" className="col-span-2 border border-neutral-200 rounded px-2 py-1.5 text-sm" />
+          <div className="col-span-2 flex gap-1">
+            <button onClick={handleCreate} className="flex-1 px-2 py-1.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">Anlegen</button>
+            <button onClick={() => setShowNew(false)} className="px-2 py-1.5 text-xs border rounded hover:bg-neutral-50">✕</button>
           </div>
-        )}
-
-        {/* Tabelle */}
-        <div className="border border-neutral-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-neutral-50 border-b border-neutral-100">
-                <th className="text-left px-3 py-2.5 font-medium text-neutral-500 w-20">Nr.</th>
-                <th className="text-left px-3 py-2.5 font-medium text-neutral-500">Bezeichnung</th>
-                <th className="text-left px-3 py-2.5 font-medium text-neutral-500 w-24">Typ</th>
-                <th className="text-left px-3 py-2.5 font-medium text-neutral-500 w-20">USt-Code</th>
-                <th className="px-3 py-2.5 w-28"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-50">
-              {filtered.map(a => (
-                <tr key={a.id} className={`hover:bg-neutral-50 ${!a.is_active ? 'opacity-40' : ''}`}>
-                  {editRow === a.id ? (
-                    <>
-                      <td className="px-2 py-1.5">
-                        <input value={editData.nr} onChange={e => setEditData({...editData, nr: e.target.value})}
-                          className="w-full border border-neutral-200 rounded px-2 py-1 text-sm font-mono" />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})}
-                          className="w-full border border-neutral-200 rounded px-2 py-1 text-sm" />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <select value={editData.typ} onChange={e => setEditData({...editData, typ: e.target.value})}
-                          className="w-full border border-neutral-200 rounded px-1 py-1 text-xs">
-                          {Object.entries(TYP_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input value={editData.ust_code || ''} onChange={e => setEditData({...editData, ust_code: e.target.value})}
-                          className="w-full border border-neutral-200 rounded px-2 py-1 text-xs" />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <div className="flex gap-1">
-                          <button onClick={() => handleSave(a.id)} className="px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">
-                            <Save size={12} />
-                          </button>
-                          <button onClick={() => setEditRow(null)} className="px-2 py-1 text-xs border rounded hover:bg-neutral-50">
-                            ✕
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-3 py-2.5 font-mono font-medium text-neutral-800">
-                        {a.nr}
-                        {a.is_default_erloes && <Star size={11} className="inline ml-1 text-amber-500 mb-0.5" fill="currentColor" />}
-                      </td>
-                      <td className="px-3 py-2.5 text-neutral-700">{a.name}</td>
-                      <td className="px-3 py-2.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYP_COLORS[a.typ] || 'bg-neutral-100 text-neutral-600'}`}>
-                          {TYP_LABELS[a.typ] || a.typ}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-neutral-500 font-mono">{a.ust_code || '—'}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex gap-1 justify-end">
-                          {!a.is_default_erloes && a.typ === 'ertrag' && (
-                            <button onClick={() => handleSetDefault(a.id)} title="Als Standard-Erlöskonto"
-                              className="p-1 text-neutral-400 hover:text-amber-500">
-                              <Star size={13} />
-                            </button>
-                          )}
-                          <button onClick={() => { setEditRow(a.id); setEditData({nr: a.nr, name: a.name, typ: a.typ, ust_code: a.ust_code || '', beschreibung: a.beschreibung || '', is_active: a.is_active, is_default_erloes: a.is_default_erloes}) }}
-                            className="p-1 text-neutral-400 hover:text-neutral-700">
-                            <Eye size={13} />
-                          </button>
-                          <button onClick={() => handleDelete(a.id, a.nr)}
-                            className="p-1 text-neutral-400 hover:text-red-500">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <div className="text-center py-8 text-sm text-neutral-400">Keine Konten gefunden</div>
-          )}
         </div>
-        <p className="text-xs text-neutral-400 mt-2">{filtered.length} von {accounts.length} Konten</p>
+      )}
+      <div className="border border-neutral-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-neutral-50 border-b border-neutral-100">
+            <th className="text-left px-3 py-2.5 font-medium text-neutral-500 w-20">Nr.</th>
+            <th className="text-left px-3 py-2.5 font-medium text-neutral-500">Bezeichnung</th>
+            <th className="text-left px-3 py-2.5 font-medium text-neutral-500 w-24">Typ</th>
+            <th className="text-left px-3 py-2.5 font-medium text-neutral-500 w-20">USt-Code</th>
+            <th className="px-3 py-2.5 w-28"></th>
+          </tr></thead>
+          <tbody className="divide-y divide-neutral-50">
+            {filtered.map(a => (
+              <tr key={a.id} className={`hover:bg-neutral-50 ${!a.is_active ? 'opacity-40' : ''}`}>
+                {editRow === a.id ? (
+                  <>
+                    <td className="px-2 py-1.5"><input value={editData.nr} onChange={e => setEditData({...editData, nr: e.target.value})} className="w-full border border-neutral-200 rounded px-2 py-1 text-sm font-mono" /></td>
+                    <td className="px-2 py-1.5"><input value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})} className="w-full border border-neutral-200 rounded px-2 py-1 text-sm" /></td>
+                    <td className="px-2 py-1.5"><select value={editData.typ} onChange={e => setEditData({...editData, typ: e.target.value})} className="w-full border border-neutral-200 rounded px-1 py-1 text-xs">{Object.entries(TYP_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></td>
+                    <td className="px-2 py-1.5"><input value={editData.ust_code || ''} onChange={e => setEditData({...editData, ust_code: e.target.value})} className="w-full border border-neutral-200 rounded px-2 py-1 text-xs" /></td>
+                    <td className="px-2 py-1.5"><div className="flex gap-1">
+                      <button onClick={() => handleSave(a.id)} className="px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"><Save size={12} /></button>
+                      <button onClick={() => setEditRow(null)} className="px-2 py-1 text-xs border rounded hover:bg-neutral-50">✕</button>
+                    </div></td>
+                  </>
+                ) : (
+                  <>
+                    <td className="px-3 py-2.5 font-mono font-medium text-neutral-800">{a.nr}{a.is_default_erloes && <Star size={11} className="inline ml-1 text-amber-500 mb-0.5" fill="currentColor" />}</td>
+                    <td className="px-3 py-2.5 text-neutral-700">{a.name}</td>
+                    <td className="px-3 py-2.5"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYP_COLORS[a.typ] || 'bg-neutral-100 text-neutral-600'}`}>{TYP_LABELS[a.typ] || a.typ}</span></td>
+                    <td className="px-3 py-2.5 text-xs text-neutral-500 font-mono">{a.ust_code || '—'}</td>
+                    <td className="px-3 py-2.5"><div className="flex gap-1 justify-end">
+                      {!a.is_default_erloes && a.typ === 'ertrag' && <button onClick={() => handleSetDefault(a.id)} title="Standard-Erlöskonto" className="p-1 text-neutral-400 hover:text-amber-500"><Star size={13} /></button>}
+                      <button onClick={() => { setEditRow(a.id); setEditData({nr:a.nr, name:a.name, typ:a.typ, ust_code:a.ust_code||'', beschreibung:a.beschreibung||'', is_active:a.is_active, is_default_erloes:a.is_default_erloes}) }} className="p-1 text-neutral-400 hover:text-neutral-700"><Eye size={13} /></button>
+                      <button onClick={() => handleDelete(a.id, a.nr)} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+                    </div></td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && <div className="text-center py-8 text-sm text-neutral-400">Keine Konten gefunden</div>}
       </div>
+      <p className="text-xs text-neutral-400 mt-2">{filtered.length} von {accounts.length} Konten</p>
+    </div>
+  )
+}
+
+// ── Tab: Parameter (horizontale Unter-Tabs) ───────────────────────────────────
+function TabParameter() {
+  const [sub, setSub] = useState('belege')
+  const subTabs = [
+    { id: 'belege',   label: 'Belegeinstellungen' },
+    { id: 'nummern',  label: 'Belegnummern'       },
+    { id: 'konten',   label: 'Kontenplan (EKR)'   },
+  ]
+  return (
+    <div>
+      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit">
+        {subTabs.map(t => (
+          <button key={t.id} onClick={() => setSub(t.id)}
+            className={`px-4 py-1.5 text-sm rounded-md transition-all ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {sub === 'belege'  && <TabRechnung embedded />}
+      {sub === 'nummern' && <BelegnummernSection />}
+      {sub === 'konten'  && <TabBuchhaltung embedded />}
     </div>
   )
 }
@@ -1832,45 +1570,32 @@ export default function SettingsPage() {
     { id: 'system',     label: 'System',     icon: Cpu       },
   ]
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={28} className="animate-spin text-primary-400" />
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 size={28} className="animate-spin text-primary-400" />
+    </div>
+  )
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-8">
-        <div className="p-2 bg-primary-50 rounded-xl">
-          <Settings2 size={22} className="text-primary-600" />
-        </div>
+        <div className="p-2 bg-primary-50 rounded-xl"><Settings2 size={22} className="text-primary-600" /></div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
           <p className="text-sm text-gray-400 mt-0.5">Programm konfigurieren</p>
         </div>
-        <button onClick={loadSettings} className="ml-auto p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition" title="Neu laden">
-          <RefreshCw size={16} />
-        </button>
+        <button onClick={loadSettings} className="ml-auto p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition" title="Neu laden"><RefreshCw size={16} /></button>
       </div>
-
-      {/* Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
-        {tabs.map(t => (
-          <Tab key={t.id} {...t} active={activeTab === t.id} onClick={setActiveTab} />
-        ))}
+        {tabs.map(t => <Tab key={t.id} {...t} active={activeTab === t.id} onClick={setActiveTab} />)}
       </div>
-
-      {/* Inhalt */}
       <div className="card p-6">
-        {activeTab === 'allgemein' && <TabAllgemein settings={settings} onSaved={loadSettings} />}
-        {activeTab === 'design'    && <TabDesign    settings={settings} onSaved={loadSettings} />}
-        {activeTab === 'parameter'    && <TabParameter />}
-        {activeTab === 'backup'    && <TabBackup    settings={settings} onSaved={loadSettings} />}
-        {activeTab === 'email'     && <TabEmail     settings={settings} onSaved={loadSettings} />}
-        {activeTab === 'system'    && <TabSystem />}
+        {activeTab === 'allgemein'  && <TabAllgemein  settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'design'     && <TabDesign     settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'parameter'  && <TabParameter />}
+        {activeTab === 'backup'     && <TabBackup     settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'email'      && <TabEmail      settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'system'     && <TabSystem />}
       </div>
     </div>
   )

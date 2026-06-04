@@ -28,6 +28,12 @@ Write-Host " OK" -ForegroundColor Green
 # In den Projektordner wechseln
 Set-Location $PSScriptRoot
 
+# Version aus package.json lesen und als Umgebungsvariable setzen
+# (überschreibt den Default in config.py zuverlässig, unabhängig vom Docker-Cache)
+$pkgJson = Get-Content "frontend\package.json" -Raw | ConvertFrom-Json
+$env:APP_VERSION = $pkgJson.version
+Write-Host "  Version: $env:APP_VERSION" -ForegroundColor Gray
+
 # .env.local verwenden
 if (-not (Test-Path ".env.local")) {
     Write-Host "  FEHLER: .env.local nicht gefunden!" -ForegroundColor Red

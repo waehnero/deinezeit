@@ -186,6 +186,99 @@ async def get_next_number(
     preview = fmt.format(year=y, seq=next_seq)
     return {"doc_type": doc_type, "year": y, "next_sequence": next_seq, "preview": preview}
 
+DOC_TYPES_LIST = ["rechnung", "angebot", "gutschrift", "lieferschein"]
+DOC_TYPE_DEFAULTS = {
+    "rechnung":     "RE-{year}-{seq:03d}",
+    "angebot":      "AN-{year}-{seq:03d}",
+    "gutschrift":   "GS-{year}-{seq:03d}",
+    "lieferschein": "LS-{year}-{seq:03d}",
+}
+
+
+@router.get("/number-sequences")
+async def get_number_sequences(
+    year: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Gibt Nummernkreise (Format + aktueller Zähler) für alle Dokumenttypen zurück."""
+    y = year or datetime.now().year
+    result = []
+    for doc_type in DOC_TYPES_LIST:
+        seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
+        fmt_setting = db.query(InvoiceSettings).filter_by(key=f"number_format_{doc_type}").first()
+        fmt = (fmt_setting.value.strip('"') if fmt_setting and fmt_setting.value else None) \
+              or DOC_TYPE_DEFAULTS[doc_type]
+        last = seq.last_sequence if seq else 0
+        # Vorschau nächste Nummer
+        preview = fmt.format(year=y, seq=last + 1)
+        result.append({
+            "doc_type": doc_type,
+            "year": y,
+            "format": fmt,
+            "last_sequence": last,
+            "next_sequence": last + 1,
+            "next_preview": preview,
+        })
+    return result
+
+
+@router.put("/number-sequences/{doc_type}")
+async def update_number_sequence(
+    doc_type: str,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """
+    Aktualisiert Format und/oder Zählerstand für einen Dokumenttyp.
+    Body: { year, format, last_sequence }
+    """
+    if doc_type not in DOC_TYPES_LIST:
+        raise HTTPException(400, f"Ungültiger Dokumenttyp: {doc_type}")
+
+    y = body.get("year", datetime.now().year)
+
+    # Format speichern
+    if "format" in body:
+        fmt_key = f"number_format_{doc_type}"
+        setting = db.query(InvoiceSettings).filter_by(key=fmt_key).first()
+        if setting:
+            setting.value = body["format"]
+        else:
+            setting = InvoiceSettings(key=fmt_key, value=body["format"])
+            db.add(setting)
+
+    # Zählerstand setzen
+    if "last_sequence" in body:
+        new_seq = int(body["last_sequence"])
+        if new_seq < 0:
+            raise HTTPException(400, "Zählerstand darf nicht negativ sein")
+        seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
+        if seq:
+            seq.last_sequence = new_seq
+        else:
+            seq = InvoiceNumberSequence(doc_type=doc_type, year=y, last_sequence=new_seq)
+            db.add(seq)
+
+    db.commit()
+
+    # Aktuellen Stand zurückgeben
+    seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
+    fmt_setting = db.query(InvoiceSettings).filter_by(key=f"number_format_{doc_type}").first()
+    fmt = (fmt_setting.value.strip('"') if fmt_setting and fmt_setting.value else None) \
+          or DOC_TYPE_DEFAULTS[doc_type]
+    last = seq.last_sequence if seq else 0
+    return {
+        "doc_type": doc_type,
+        "year": y,
+        "format": fmt,
+        "last_sequence": last,
+        "next_sequence": last + 1,
+        "next_preview": fmt.format(year=y, seq=last + 1),
+    }
+
+
 
 @router.get("/{invoice_id}", response_model=InvoiceResponse)
 async def get_invoice(
@@ -574,99 +667,6 @@ async def invoice_book_csv(
 # ─────────────────────────────────────────────────────────────────────────────
 # Belegnummern-Verwaltung
 # ─────────────────────────────────────────────────────────────────────────────
-
-DOC_TYPES_LIST = ["rechnung", "angebot", "gutschrift", "lieferschein"]
-DOC_TYPE_DEFAULTS = {
-    "rechnung":     "RE-{year}-{seq:03d}",
-    "angebot":      "AN-{year}-{seq:03d}",
-    "gutschrift":   "GS-{year}-{seq:03d}",
-    "lieferschein": "LS-{year}-{seq:03d}",
-}
-
-
-@router.get("/number-sequences")
-async def get_number_sequences(
-    year: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    """Gibt Nummernkreise (Format + aktueller Zähler) für alle Dokumenttypen zurück."""
-    y = year or datetime.now().year
-    result = []
-    for doc_type in DOC_TYPES_LIST:
-        seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
-        fmt_setting = db.query(InvoiceSettings).filter_by(key=f"number_format_{doc_type}").first()
-        fmt = (fmt_setting.value.strip('"') if fmt_setting and fmt_setting.value else None) \
-              or DOC_TYPE_DEFAULTS[doc_type]
-        last = seq.last_sequence if seq else 0
-        # Vorschau nächste Nummer
-        preview = fmt.format(year=y, seq=last + 1)
-        result.append({
-            "doc_type": doc_type,
-            "year": y,
-            "format": fmt,
-            "last_sequence": last,
-            "next_sequence": last + 1,
-            "next_preview": preview,
-        })
-    return result
-
-
-@router.put("/number-sequences/{doc_type}")
-async def update_number_sequence(
-    doc_type: str,
-    body: dict,
-    db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
-):
-    """
-    Aktualisiert Format und/oder Zählerstand für einen Dokumenttyp.
-    Body: { year, format, last_sequence }
-    """
-    if doc_type not in DOC_TYPES_LIST:
-        raise HTTPException(400, f"Ungültiger Dokumenttyp: {doc_type}")
-
-    y = body.get("year", datetime.now().year)
-
-    # Format speichern
-    if "format" in body:
-        fmt_key = f"number_format_{doc_type}"
-        setting = db.query(InvoiceSettings).filter_by(key=fmt_key).first()
-        if setting:
-            setting.value = body["format"]
-        else:
-            setting = InvoiceSettings(key=fmt_key, value=body["format"])
-            db.add(setting)
-
-    # Zählerstand setzen
-    if "last_sequence" in body:
-        new_seq = int(body["last_sequence"])
-        if new_seq < 0:
-            raise HTTPException(400, "Zählerstand darf nicht negativ sein")
-        seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
-        if seq:
-            seq.last_sequence = new_seq
-        else:
-            seq = InvoiceNumberSequence(doc_type=doc_type, year=y, last_sequence=new_seq)
-            db.add(seq)
-
-    db.commit()
-
-    # Aktuellen Stand zurückgeben
-    seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
-    fmt_setting = db.query(InvoiceSettings).filter_by(key=f"number_format_{doc_type}").first()
-    fmt = (fmt_setting.value.strip('"') if fmt_setting and fmt_setting.value else None) \
-          or DOC_TYPE_DEFAULTS[doc_type]
-    last = seq.last_sequence if seq else 0
-    return {
-        "doc_type": doc_type,
-        "year": y,
-        "format": fmt,
-        "last_sequence": last,
-        "next_sequence": last + 1,
-        "next_preview": fmt.format(year=y, seq=last + 1),
-    }
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Einstellungen

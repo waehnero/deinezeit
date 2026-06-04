@@ -105,6 +105,15 @@ if [ -n "$DOMAIN" ]; then
     log "nginx/conf.d/app.conf: Domain '$DOMAIN' eingesetzt"
 fi
 
+# ── Version aus package.json lesen und exportieren ────────────────────────────
+# Wird als Umgebungsvariable an docker compose übergeben und überschreibt
+# den Default in config.py — unabhängig vom Docker-Layer-Cache.
+if [ -f "$INSTALL_DIR/frontend/package.json" ]; then
+    APP_VERSION=$(grep '"version"' "$INSTALL_DIR/frontend/package.json" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+    export APP_VERSION
+    log "Version: $APP_VERSION"
+fi
+
 # ── 2. Docker Images bauen ────────────────────────────────────────────────────
 log ""
 log "[2/3] Docker Images werden gebaut..."
