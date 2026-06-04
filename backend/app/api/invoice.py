@@ -572,6 +572,103 @@ async def invoice_book_csv(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Belegnummern-Verwaltung
+# ─────────────────────────────────────────────────────────────────────────────
+
+DOC_TYPES_LIST = ["rechnung", "angebot", "gutschrift", "lieferschein"]
+DOC_TYPE_DEFAULTS = {
+    "rechnung":     "RE-{year}-{seq:03d}",
+    "angebot":      "AN-{year}-{seq:03d}",
+    "gutschrift":   "GS-{year}-{seq:03d}",
+    "lieferschein": "LS-{year}-{seq:03d}",
+}
+
+
+@router.get("/number-sequences")
+async def get_number_sequences(
+    year: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Gibt Nummernkreise (Format + aktueller Zähler) für alle Dokumenttypen zurück."""
+    y = year or datetime.now().year
+    result = []
+    for doc_type in DOC_TYPES_LIST:
+        seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
+        fmt_setting = db.query(InvoiceSettings).filter_by(key=f"number_format_{doc_type}").first()
+        fmt = (fmt_setting.value.strip('"') if fmt_setting and fmt_setting.value else None) \
+              or DOC_TYPE_DEFAULTS[doc_type]
+        last = seq.last_sequence if seq else 0
+        # Vorschau nächste Nummer
+        preview = fmt.format(year=y, seq=last + 1)
+        result.append({
+            "doc_type": doc_type,
+            "year": y,
+            "format": fmt,
+            "last_sequence": last,
+            "next_sequence": last + 1,
+            "next_preview": preview,
+        })
+    return result
+
+
+@router.put("/number-sequences/{doc_type}")
+async def update_number_sequence(
+    doc_type: str,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """
+    Aktualisiert Format und/oder Zählerstand für einen Dokumenttyp.
+    Body: { year, format, last_sequence }
+    """
+    if doc_type not in DOC_TYPES_LIST:
+        raise HTTPException(400, f"Ungültiger Dokumenttyp: {doc_type}")
+
+    y = body.get("year", datetime.now().year)
+
+    # Format speichern
+    if "format" in body:
+        fmt_key = f"number_format_{doc_type}"
+        setting = db.query(InvoiceSettings).filter_by(key=fmt_key).first()
+        if setting:
+            setting.value = body["format"]
+        else:
+            setting = InvoiceSettings(key=fmt_key, value=body["format"])
+            db.add(setting)
+
+    # Zählerstand setzen
+    if "last_sequence" in body:
+        new_seq = int(body["last_sequence"])
+        if new_seq < 0:
+            raise HTTPException(400, "Zählerstand darf nicht negativ sein")
+        seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
+        if seq:
+            seq.last_sequence = new_seq
+        else:
+            seq = InvoiceNumberSequence(doc_type=doc_type, year=y, last_sequence=new_seq)
+            db.add(seq)
+
+    db.commit()
+
+    # Aktuellen Stand zurückgeben
+    seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
+    fmt_setting = db.query(InvoiceSettings).filter_by(key=f"number_format_{doc_type}").first()
+    fmt = (fmt_setting.value.strip('"') if fmt_setting and fmt_setting.value else None) \
+          or DOC_TYPE_DEFAULTS[doc_type]
+    last = seq.last_sequence if seq else 0
+    return {
+        "doc_type": doc_type,
+        "year": y,
+        "format": fmt,
+        "last_sequence": last,
+        "next_sequence": last + 1,
+        "next_preview": fmt.format(year=y, seq=last + 1),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Einstellungen
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -629,105 +726,4 @@ def _load_pdf_context(db: Session, invoice: Invoice):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Muster-Vorschau für Template-Auswahl (kein echtes Dokument nötig)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/template-preview/{template_id}")
-async def template_preview(
-    template_id: int,
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    from fastapi.responses import HTMLResponse
-    from app.services.invoice_pdf import generate_html_preview
-    from decimal import Decimal
-    from datetime import date as _date
-    import types
-
-    settings_d = {r.key: r.value for r in db.query(Setting).all()}
-    inv_settings_d = {r.key: r.value for r in db.query(InvoiceSettings).all()}
-    # Vorlage aus Parameter erzwingen
-    inv_settings_d["default_template"] = template_id
-
-    sender_contact = None
-    cid = settings_d.get("company_contact_id")
-    if cid:
-        try:
-            from uuid import UUID as _UUID
-            sender_contact = db.query(EntityRecord).filter(EntityRecord.id == _UUID(cid)).first()
-        except Exception:
-            pass
-
-    # Muster-Rechnung als einfaches Objekt
-    inv = types.SimpleNamespace(
-        doc_type="rechnung",
-        number="RE-2026-001",
-        date=_date.today(),
-        due_date=_date(2026, 7, 31),
-        delivery_date=None,
-        reference="Muster-001",
-        title="Musterrechnung — Vorschau",
-        intro_text="Wir erlauben uns, folgende Leistungen in Rechnung zu stellen:",
-        outro_text="Wir bitten um Überweisung des Betrages innerhalb von 30 Tagen. Vielen Dank!",
-        tax_mode="per_position",
-        subtotal=Decimal("1680.00"),
-        tax_total=Decimal("336.00"),
-        total=Decimal("2016.00"),
-        currency="EUR",
-        status="entwurf",
-        template_id=template_id,
-        contact_id=None,
-    )
-
-    # Muster-Positionen
-    class FakePos:
-        def __init__(self, desc, qty, price, tax, detail=None, unit="Stk"):
-            self.pos_type = "item"
-            self.description = desc
-            self.detail = detail
-            self.quantity = Decimal(str(qty))
-            self.unit = unit
-            self.unit_price = Decimal(str(price))
-            self.discount_pct = None
-            self.tax_rate = Decimal(str(tax))
-            self.line_total = (self.quantity * self.unit_price).quantize(Decimal("0.01"))
-
-    positions = [
-        FakePos("Webentwicklung — Frontend", 8, 120, 20, "React-Komponenten und UI-Implementierung", "h"),
-        FakePos("Webentwicklung — Backend", 6, 120, 20, "REST-API, Datenbank-Design", "h"),
-        FakePos("Projektmanagement & Meetings", 2, 90, 20, unit="h"),
-        FakePos("Server-Konfiguration (Pauschal)", 1, 480, 20),
-    ]
-
-    html = generate_html_preview(inv, positions, settings_d, inv_settings_d, sender_contact, None)
-    return HTMLResponse(content=html)
-
-
-@router.get("/{invoice_id}/pdf")
-async def download_invoice_pdf(
-    invoice_id: UUID,
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not inv:
-        raise HTTPException(404, "Rechnung nicht gefunden")
-
-    settings, inv_settings, sender, recipient = _load_pdf_context(db, inv)
-    pdf_bytes = generate_pdf(inv, inv.positions, settings, inv_settings, sender, recipient)
-
-    filename = f"{inv.number.replace('/', '-')}.pdf"
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
-@router.get("/{invoice_id}/preview")
-async def preview_invoice_html(
-    invoice_id: UUID,
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    from fastapi.responses import HTMLResponse
-  
+# ──────────────────────

@@ -1129,7 +1129,7 @@ const TEMPLATE_DESCRIPTIONS = {
   5: 'Primärfarbe als Akzent, auffällig und modern',
 }
 
-function TabRechnung() {
+function TabRechnung({ embedded = false }) { // eslint-disable-line
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [customCss, setCustomCss] = useState('')
@@ -1409,6 +1409,192 @@ function TabRechnung() {
   )
 }
 
+// ── Tab: Parameter (fasst Belege + Belegnummern + Buchhaltung zusammen) ──────
+const DOC_TYPE_LABELS_PARAM = {
+  rechnung:     { label: 'Rechnung',     prefix: 'RE', example: 'RE-2026-001' },
+  angebot:      { label: 'Angebot',      prefix: 'AN', example: 'AN-2026-001' },
+  gutschrift:   { label: 'Gutschrift',   prefix: 'GS', example: 'GS-2026-001' },
+  lieferschein: { label: 'Lieferschein', prefix: 'LS', example: 'LS-2026-001' },
+}
+
+function SectionHeader({ title, open, onToggle, children }) {
+  return (
+    <div className="border border-neutral-200 rounded-xl overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-neutral-50 text-left"
+      >
+        <span className="font-semibold text-neutral-800 text-sm">{title}</span>
+        {open ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
+      </button>
+      {open && <div className="border-t border-neutral-100 px-5 py-5">{children}</div>}
+    </div>
+  )
+}
+
+function TabParameter() {
+  const [openSection, setOpenSection] = useState('belege')
+
+  function toggle(s) { setOpenSection(v => v === s ? null : s) }
+
+  return (
+    <div className="space-y-3">
+      {/* Gruppe 1: Belegeinstellungen */}
+      <SectionHeader title="Belegeinstellungen" open={openSection === 'belege'} onToggle={() => toggle('belege')}>
+        <TabRechnung embedded />
+      </SectionHeader>
+
+      {/* Gruppe 2: Belegnummern */}
+      <SectionHeader title="Belegnummern" open={openSection === 'nummern'} onToggle={() => toggle('nummern')}>
+        <BelegnummernSection />
+      </SectionHeader>
+
+      {/* Gruppe 3: Kontenplan */}
+      <SectionHeader title="Kontenplan (EKR)" open={openSection === 'konten'} onToggle={() => toggle('konten')}>
+        <TabBuchhaltung embedded />
+      </SectionHeader>
+    </div>
+  )
+}
+
+function BelegnummernSection() {
+  const [sequences, setSequences] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [year, setYear] = useState(new Date().getFullYear())
+  const [edits, setEdits] = useState({})   // { docType: { format, last_sequence } }
+  const [saving, setSaving] = useState({})
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await invoiceApi.getNumberSequences(year)
+      setSequences(res.data)
+      const e = {}
+      res.data.forEach(s => {
+        e[s.doc_type] = { format: s.format, last_sequence: String(s.last_sequence) }
+      })
+      setEdits(e)
+    } catch { toast.error('Fehler beim Laden') }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => { load() }, [year]) // eslint-disable-line
+
+  function preview(docType) {
+    const e = edits[docType]
+    if (!e) return '—'
+    try {
+      const seq = parseInt(e.last_sequence || 0) + 1
+      return e.format.replace('{year}', year).replace('{seq:03d}', String(seq).padStart(3, '0'))
+        .replace('{seq:04d}', String(seq).padStart(4, '0'))
+        .replace('{seq}', String(seq))
+    } catch { return '—' }
+  }
+
+  async function handleSave(docType) {
+    setSaving(s => ({ ...s, [docType]: true }))
+    try {
+      const e = edits[docType]
+      await invoiceApi.updateNumberSequence(docType, {
+        year,
+        format: e.format,
+        last_sequence: parseInt(e.last_sequence),
+      })
+      toast.success(`${DOC_TYPE_LABELS_PARAM[docType]?.label} gespeichert`)
+      load()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Fehler')
+    } finally {
+      setSaving(s => ({ ...s, [docType]: false }))
+    }
+  }
+
+  if (loading) return <div className="flex justify-center py-4"><Loader2 size={20} className="animate-spin text-neutral-400" /></div>
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <p className="text-xs text-neutral-500 flex-1">
+          Definiere das Format und den aktuellen Zählerstand pro Belegart und Jahr.
+          Platzhalter: <code className="bg-neutral-100 px-1 rounded text-xs">{'{year}'}</code> = Jahr,
+          <code className="bg-neutral-100 px-1 rounded text-xs ml-1">{'{seq:03d}'}</code> = 3-stellige laufende Nummer.
+        </p>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-neutral-500">Jahr:</label>
+          <select value={year} onChange={e => setYear(Number(e.target.value))}
+            className="border border-neutral-200 rounded px-2 py-1 text-sm">
+            {[0,1,2,3].map(i => {
+              const y = new Date().getFullYear() - i + 1
+              return <option key={y} value={y}>{y}</option>
+            })}
+          </select>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {sequences.map(seq => {
+          const meta = DOC_TYPE_LABELS_PARAM[seq.doc_type] || {}
+          const e = edits[seq.doc_type] || {}
+          const isSaving = saving[seq.doc_type]
+          return (
+            <div key={seq.doc_type} className="border border-neutral-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded">
+                    {meta.prefix}
+                  </span>
+                  <span className="text-sm font-medium text-neutral-800">{meta.label}</span>
+                </div>
+                <span className="text-xs text-neutral-400">
+                  Nächste: <strong className="text-neutral-700 font-mono">{preview(seq.doc_type)}</strong>
+                </span>
+              </div>
+              <div className="grid grid-cols-12 gap-3 items-end">
+                <div className="col-span-6">
+                  <label className="block text-xs font-medium text-neutral-500 mb-1">Nummernformat</label>
+                  <input
+                    value={e.format || ''}
+                    onChange={ev => setEdits(d => ({ ...d, [seq.doc_type]: { ...d[seq.doc_type], format: ev.target.value } }))}
+                    placeholder={`z.B. ${meta.prefix}-{year}-{seq:03d}`}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm font-mono"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <label className="block text-xs font-medium text-neutral-500 mb-1">
+                    Letzter Zähler {year}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={e.last_sequence ?? seq.last_sequence}
+                    onChange={ev => setEdits(d => ({ ...d, [seq.doc_type]: { ...d[seq.doc_type], last_sequence: ev.target.value } }))}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm text-right"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <button
+                    onClick={() => handleSave(seq.doc_type)}
+                    disabled={isSaving}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60"
+                  >
+                    {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    Speichern
+                  </button>
+                </div>
+              </div>
+              {seq.last_sequence > 0 && (
+                <p className="text-xs text-neutral-400 mt-2">
+                  Aktuell: {seq.last_sequence} Belege in {year} · Nächste freie Nr.: {seq.next_sequence}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Tab: Buchhaltung ──────────────────────────────────────────────────────────
 const TYP_LABELS = {
   aktiv: 'Aktiv', passiv: 'Passiv', ertrag: 'Ertrag', aufwand: 'Aufwand', neutral: 'Neutral',
@@ -1421,7 +1607,7 @@ const TYP_COLORS = {
   neutral: 'bg-neutral-100 text-neutral-600',
 }
 
-function TabBuchhaltung() {
+function TabBuchhaltung({ embedded = false }) { // eslint-disable-line
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [editRow, setEditRow] = useState(null)   // id der bearbeiteten Zeile
@@ -1638,13 +1824,12 @@ export default function SettingsPage() {
   const { settings, loading, loadSettings } = useSettings()
 
   const tabs = [
-    { id: 'allgemein',    label: 'Allgemein',    icon: Building2  },
-    { id: 'design',       label: 'Design',       icon: Palette    },
-    { id: 'rechnung',     label: 'Rechnungen',   icon: Receipt    },
-    { id: 'buchhaltung',  label: 'Buchhaltung',  icon: BookOpen   },
-    { id: 'backup',       label: 'Backup',       icon: HardDrive  },
-    { id: 'email',        label: 'E-Mail',       icon: Mail       },
-    { id: 'system',       label: 'System',       icon: Cpu        },
+    { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
+    { id: 'design',     label: 'Design',     icon: Palette   },
+    { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
+    { id: 'backup',     label: 'Backup',     icon: HardDrive },
+    { id: 'email',      label: 'E-Mail',     icon: Mail      },
+    { id: 'system',     label: 'System',     icon: Cpu       },
   ]
 
   if (loading) {
@@ -1682,8 +1867,7 @@ export default function SettingsPage() {
       <div className="card p-6">
         {activeTab === 'allgemein' && <TabAllgemein settings={settings} onSaved={loadSettings} />}
         {activeTab === 'design'    && <TabDesign    settings={settings} onSaved={loadSettings} />}
-        {activeTab === 'rechnung'     && <TabRechnung />}
-        {activeTab === 'buchhaltung'  && <TabBuchhaltung />}
+        {activeTab === 'parameter'    && <TabParameter />}
         {activeTab === 'backup'    && <TabBackup    settings={settings} onSaved={loadSettings} />}
         {activeTab === 'email'     && <TabEmail     settings={settings} onSaved={loadSettings} />}
         {activeTab === 'system'    && <TabSystem />}

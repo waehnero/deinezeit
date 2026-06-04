@@ -13,7 +13,7 @@ import UpdateBanner from './UpdateBanner'
 const NAV_ITEMS = [
   { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/zeiterfassung',icon: Clock,           label: 'Zeiterfassung' },
-  { to: '/invoices',     icon: Receipt,         label: 'Rechnungen' },
+  { to: '/invoices',     icon: Receipt,         label: 'Belege' },
   { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },
   { to: '/datacenter',   icon: HardDrive,       label: 'Datacenter' },
   { to: '/users',        icon: Users,           label: 'Benutzer' },

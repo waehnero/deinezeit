@@ -194,8 +194,12 @@ export const invoiceApi = {
   listTemplates:  () => api.get('/invoices/templates'),
 
   // PDF
-  downloadPdf:    (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
-  bookPdf:        (params) => api.get('/invoices/book/pdf', { params, responseType: 'blob' }),
+  downloadPdf:        (id) => api.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
+  bookPdf:            (params) => api.get('/invoices/book/pdf', { params, responseType: 'blob' }),
+
+  // Belegnummern
+  getNumberSequences: (year) => api.get('/invoices/number-sequences', { params: year ? { year } : {} }),
+  updateNumberSequence: (docType, data) => api.put(`/invoices/number-sequences/${docType}`, data),
 }
 
 export const accountingApi = {
