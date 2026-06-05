@@ -260,25 +260,35 @@ function QuickAccessWidget({ editMode, navigate }) {
 // ── Standard-Konfiguration ────────────────────────────────────────────────────
 function buildDefaultConfig(types) {
   return [
-    { id: 'widget_zeit',      type: 'zeiterfassung',    size: 2 },
-    { id: 'widget_rechnungen', type: 'rechnungen',      size: 2 },
-    { id: 'widget_quick',     type: 'quick_access',     size: 2 },
+    ...FIXED_WIDGETS,
     ...types.map(t => ({ id: `widget_et_${t.slug}`, type: 'entity_type', slug: t.slug, size: 1 })),
   ]
 }
 
+const FIXED_WIDGETS = [
+  { id: 'widget_zeit',       type: 'zeiterfassung', size: 2 },
+  { id: 'widget_rechnungen', type: 'rechnungen',    size: 2 },
+  { id: 'widget_quick',      type: 'quick_access',  size: 2 },
+]
+
 function mergeConfig(saved, types) {
+  // Neue feste Widgets hinzufügen falls noch nicht vorhanden
+  const savedIds = saved.map(w => w.id)
+  const newFixed = FIXED_WIDGETS.filter(w => !savedIds.includes(w.id))
+
   // Neue Entity-Typen die noch nicht in der Config sind hinzufügen
   const existingSlugs = saved
     .filter(w => w.type === 'entity_type')
     .map(w => w.slug)
-  const newWidgets = types
+  const newEntityWidgets = types
     .filter(t => !existingSlugs.includes(t.slug))
     .map(t => ({ id: `widget_et_${t.slug}`, type: 'entity_type', slug: t.slug, size: 1 }))
+
   // Gelöschte Entity-Typen entfernen
   const validSlugs = types.map(t => t.slug)
   const filtered = saved.filter(w => w.type !== 'entity_type' || validSlugs.includes(w.slug))
-  return [...filtered, ...newWidgets]
+
+  return [...filtered, ...newFixed, ...newEntityWidgets]
 }
 
 // ── Hauptseite ────────────────────────────────────────────────────────────────
