@@ -55,21 +55,19 @@ def bump_version(version: str, bump: str) -> str:
 def get_commits_since_last_bump() -> list:
     """
     Alle Commits seit dem letzten 'chore: Version'-Commit.
-    Verwendet --format=%H%n%s mit Null-Byte-Trenner um mehrzeilige Bodies zu vermeiden.
+    SHA-1 Hashes sind immer exakt 40 Zeichen — daher sicheres Splitting bei Position 40.
     """
-    # Nur Hash und Subject (keine Body) — stabil auch bei mehrzeiligen Commit-Messages
-    log = run(["git", "log", "--format=%H\x00%s", "HEAD"], check=True)
+    log = run(["git", "log", "--format=%H %s", "HEAD"], check=True)
     commits = []
     for line in log.splitlines():
         line = line.strip()
-        if not line:
+        if len(line) < 42:  # 40 (Hash) + 1 (Leerzeichen) + 1 (min. Subject)
             continue
-        if "\x00" not in line:
-            continue
-        hash_, subject = line.split("\x00", 1)
+        hash_ = line[:40]
+        subject = line[41:].strip()
         if subject.startswith("chore: Version"):
             break  # Ab hier ist alles bereits versioniert
-        commits.append({"hash": hash_.strip(), "subject": subject.strip()})
+        commits.append({"hash": hash_, "subject": subject})
     return commits
 
 
