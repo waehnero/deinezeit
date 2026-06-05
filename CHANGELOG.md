@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.1] – 2026-06-05 – Rechnungs-Widget Darstellung optimiert
+
+### Aktualisierungen
+- Rechnungs-Widget wird nun auch bei bestehender Dashboard-Konfiguration korrekt angezeigt.
+
+---
+
 ## [1.3.0] – 2026-06-05 – Dashboard und Einstellungen überarbeitet
 
 ### Neu
