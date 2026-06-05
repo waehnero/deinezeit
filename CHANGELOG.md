@@ -5,6 +5,24 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.0] – 2026-06-05 – Dashboard und Einstellungen überarbeitet
+
+### Neu
+- Rechnungs-Widget im Dashboard hinzugefügt
+- Automatischer Versions-Bump via GitHub Actions
+- E-Mail als Unter-Tab unter System verschoben
+- Backup als Unter-Tab unter System integriert
+- Design als Unter-Tab unter Allgemein eingebaut
+
+### Aktualisierungen
+- auto_version.py robustheit bei fehlenden Dateien verbessert
+- Version aus CHANGELOG.md ausgelesen
+- Arbeitsverzeichnis auf Repo-Root gesetzt
+- Git-Log-Parsing stabilisiert
+- Git-Config vor Script initialisiert
+
+---
+
 ## [1.2.1] – 2026-06-05 – Dashboard: Rechnungs-Widget
 
 ### Neu
