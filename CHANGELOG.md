@@ -5,6 +5,18 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.10] – 2026-06-05 – Lokale Instanzerkennung und Stabilitätsverbesserungen
+
+### Neu
+- Lokale Instanzerkennung implementiert
+
+### Aktualisierungen
+- Update-Tab zeigt git pull Anleitung statt Button
+- Changelog-Konflikte gelöst
+- Changelog mit fehlenden Versionen 1.2.1–1.3.8 synchronisiert
+
+---
+
 ## [1.3.9] – 2026-06-05 – Lokale Instanz erkennung
 
 ### Aktualisierungen

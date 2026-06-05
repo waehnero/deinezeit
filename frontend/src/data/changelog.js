@@ -4,6 +4,20 @@
  */
 export const changelog = [
   {
+    version: '1.3.10',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Lokale Instanzerkennung implementiert',
+    ],
+    updates: [
+      'Update-Tab zeigt git pull Anleitung statt Button',
+      'Changelog-Konflikte gelöst',
+      'Changelog mit fehlenden Versionen 1.2.1–1.3.8 synchronisiert',
+    ],
+  },
+  {
     version: '1.3.9',
     day: '05',
     month: 'Juni',
