@@ -1585,6 +1585,7 @@ function TabSystemWrapper({ settings, onSaved }) {
   const subTabs = [
     { id: 'system', label: 'System' },
     { id: 'backup', label: 'Backup' },
+    { id: 'email',  label: 'E-Mail' },
   ]
   return (
     <div>
@@ -1598,6 +1599,7 @@ function TabSystemWrapper({ settings, onSaved }) {
       </div>
       {sub === 'system' && <TabSystem />}
       {sub === 'backup' && <TabBackup settings={settings} onSaved={onSaved} />}
+      {sub === 'email'  && <TabEmail  settings={settings} onSaved={onSaved} />}
     </div>
   )
 }
@@ -1610,7 +1612,6 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
     { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
-    { id: 'email',      label: 'E-Mail',     icon: Mail      },
     { id: 'system',     label: 'System',     icon: Cpu       },
   ]
 
@@ -1636,7 +1637,6 @@ export default function SettingsPage() {
       <div className="card p-6">
         {activeTab === 'allgemein'  && <TabAllgemeinWrapper settings={settings} onSaved={loadSettings} />}
         {activeTab === 'parameter'  && <TabParameter />}
-        {activeTab === 'email'      && <TabEmail      settings={settings} onSaved={loadSettings} />}
         {activeTab === 'system'     && <TabSystemWrapper settings={settings} onSaved={loadSettings} />}
       </div>
     </div>
