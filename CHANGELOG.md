@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.5] – 2026-06-05 – Datenbankmigrationen hinzugefügt
+
+### Aktualisierungen
+- Alembic-Migrationen zur Versionskontrolle hinzugefügt
+
+---
+
 ## [1.3.4] – 2026-06-05 – Backend-Infrastruktur erweitert
 
 ### Aktualisierungen
