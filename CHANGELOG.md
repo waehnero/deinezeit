@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.2] – 2026-06-05 – Versions-Anzeige korrigiert
+
+### Aktualisierungen
+- Versions-Anzeige liest nun aus CHANGELOG.md statt aus package.json oder config.py
+
+---
+
 ## [1.3.1] – 2026-06-05 – Rechnungs-Widget Darstellung optimiert
 
 ### Aktualisierungen
