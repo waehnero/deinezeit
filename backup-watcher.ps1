@@ -50,11 +50,31 @@ function Update-ScheduledTask($backupDir, $scheduleTime) {
         -Force 2>&1 | Out-Null
 }
 
+# ── Admin-Check ───────────────────────────────────────────────────────────────
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    # Neu starten als Administrator
+    $psi = New-Object System.Diagnostics.ProcessStartInfo "PowerShell.exe"
+    $psi.Arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
+    $psi.Verb = "runas"
+    $psi.UseShellExecute = $true
+    [System.Diagnostics.Process]::Start($psi) | Out-Null
+    exit
+}
+
 # ── Startwerte aus lokaler Konfiguration lesen ────────────────────────────────
 $localCfg = Get-LocalConfig
 $lastDir  = $localCfg["BACKUP_DIR"]
 $lastTime = $localCfg["BACKUP_SCHEDULE_TIME"]
 if (-not $lastTime) { $lastTime = "02:00" }
+
+# ── Einmalig beim Start einrichten (Ordner + Task) ────────────────────────────
+if ($lastDir -ne "") {
+    if (-not (Test-Path $lastDir)) {
+        New-Item -ItemType Directory -Path $lastDir -Force | Out-Null
+    }
+    Update-ScheduledTask $lastDir $lastTime
+}
 
 # ── Hauptschleife: alle 30 Sekunden pruefen ───────────────────────────────────
 while ($true) {

@@ -115,13 +115,10 @@ Start-Process "http://localhost"
 # aktualisiert backup.cfg + Windows-Aufgabenplaner automatisch)
 $watcherScript = Join-Path $PSScriptRoot "backup-watcher.ps1"
 if (Test-Path $watcherScript) {
-    $watcherProc = Start-Process PowerShell `
+    Start-Process PowerShell `
         -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$watcherScript`"" `
-        -WindowStyle Hidden -PassThru -ErrorAction SilentlyContinue
-    if ($watcherProc) {
-        $watcherProc.Id | Set-Content -Path (Join-Path $PSScriptRoot ".watcher-pid") -Encoding UTF8
-        Write-Host "  Backup-Watcher gestartet (laeuft im Hintergrund)" -ForegroundColor Gray
-    }
+        -WindowStyle Hidden -Verb RunAs -ErrorAction SilentlyContinue
+    Write-Host "  Backup-Watcher gestartet (laeuft im Hintergrund als Administrator)" -ForegroundColor Gray
 }
 
 Write-Host "  Zum Beenden: stopp-lokal.bat doppelklicken"
