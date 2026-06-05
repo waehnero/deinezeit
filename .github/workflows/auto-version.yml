@@ -1,0 +1,44 @@
+name: Auto-Version
+
+# Wird bei jedem Push auf main ausgelöst —
+# außer wenn der Commit selbst ein Versions-Bump ist (verhindert Endlosschleife)
+on:
+  push:
+    branches: [main]
+
+jobs:
+  bump-version:
+    name: Version automatisch erhöhen
+    runs-on: ubuntu-latest
+
+    # Nicht ausführen wenn der letzte Commit bereits ein Versions-Bump ist
+    if: "!startsWith(github.event.head_commit.message, 'chore: Version')"
+
+    permissions:
+      contents: write   # Damit der Workflow zurück in main pushen darf
+
+    steps:
+      - name: Checkout (vollständige History)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Abhängigkeiten installieren
+        run: pip install requests
+
+      - name: Version-Bump ausführen
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/auto_version.py
+
+      - name: Änderungen committen und pushen
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git push
