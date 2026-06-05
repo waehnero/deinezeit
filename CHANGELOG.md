@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.7] – 2026-06-05 – Backend-Infrastruktur aktualisiert
+
+### Aktualisierungen
+- Backend-App-Verzeichnis in Versionskontrolle integriert
+
+---
+
 ## [1.3.6] – 2026-06-05 – Konfigurationsstabilität verbessert
 
 ### Aktualisierungen
