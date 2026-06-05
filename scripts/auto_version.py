@@ -179,6 +179,9 @@ def update_package_json(version: str):
 
 def update_config_py(version: str):
     path = "backend/app/core/config.py"
+    if not os.path.exists(path):
+        print(f"  ⚠ {path} nicht im Repo — übersprungen")
+        return
     with open(path, encoding="utf-8") as f:
         content = f.read()
     content = re.sub(
@@ -192,6 +195,9 @@ def update_config_py(version: str):
 
 
 def update_docker_compose(path: str, version: str):
+    if not os.path.exists(path):
+        print(f"  ⚠ {path} nicht im Repo — übersprungen")
+        return
     with open(path, encoding="utf-8") as f:
         content = f.read()
     content = re.sub(
