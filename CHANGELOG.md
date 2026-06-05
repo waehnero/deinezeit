@@ -5,6 +5,14 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.9] – 2026-06-05 – Lokale Instanz erkennung
+
+### Aktualisierungen
+- Lokale Entwicklungsinstanz wird automatisch erkannt — Update-Button zeigt stattdessen Anleitung für git pull
+- Backend blockiert Update-Start in lokalem Modus mit klarer Fehlermeldung
+
+---
+
 ## [1.3.8] – 2026-06-05 – Frontend-Integration
 
 ### Aktualisierungen

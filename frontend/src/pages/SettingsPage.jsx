@@ -990,6 +990,7 @@ function TabSystem() {
   }
 
   const updatePending = updateStatus?.status === 'notifying'
+  const isLocalMode = versionInfo?.local_mode === true
 
   return (
     <div className="space-y-6">
@@ -1016,7 +1017,12 @@ function TabSystem() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-500">Status</span>
-              {versionInfo?.update_available ? (
+              {isLocalMode ? (
+                <span className="flex items-center gap-1 text-blue-600 font-medium">
+                  <Monitor size={13} />
+                  Lokale Instanz
+                </span>
+              ) : versionInfo?.update_available ? (
                 <span className="flex items-center gap-1 text-amber-600 font-medium">
                   <AlertTriangle size={13} />
                   Update verfügbar
@@ -1062,50 +1068,68 @@ function TabSystem() {
           System-Update
         </h3>
 
-        {/* Aktive Benutzer */}
-        <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-          <Users size={14} className="text-gray-400" />
-          {activeUsers === 0
-            ? 'Keine weiteren Benutzer angemeldet.'
-            : `${activeUsers} weitere Benutzer${activeUsers === 1 ? '' : ''} angemeldet — werden 2 Minuten vor dem Update benachrichtigt.`
-          }
-        </div>
-
-        {updatePending ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-medium text-amber-800 flex items-center gap-2">
-              <AlertTriangle size={15} />
-              Update läuft in Kürze — Countdown aktiv
+        {isLocalMode ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+            <p className="text-sm font-medium text-blue-800 flex items-center gap-2">
+              <Monitor size={15} />
+              Lokale Entwicklungsinstanz
             </p>
-            <p className="text-xs text-amber-700">{updateStatus.message}</p>
-            <button onClick={handleCancelUpdate} disabled={cancelling}
-              className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-100">
-              {cancelling ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
-              Update abbrechen
-            </button>
+            <p className="text-sm text-blue-700">
+              Automatische Updates sind in der lokalen Instanz nicht verfügbar.
+              Um auf eine neue Version zu aktualisieren, bitte im Projektverzeichnis ausführen:
+            </p>
+            <code className="block mt-2 bg-blue-100 text-blue-900 text-xs px-3 py-2 rounded-lg font-mono">
+              git pull &amp;&amp; docker compose -f docker-compose.local.yml up -d --build
+            </code>
           </div>
         ) : (
-          <div className="space-y-3">
-            {versionInfo?.update_available ? (
-              <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-sm text-primary-800">
-                Version <strong>v{versionInfo.latest}</strong> ist verfügbar.
-                Alle Benutzer werden 2 Minuten vor dem Neustart benachrichtigt.
+          <>
+            {/* Aktive Benutzer */}
+            <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+              <Users size={14} className="text-gray-400" />
+              {activeUsers === 0
+                ? 'Keine weiteren Benutzer angemeldet.'
+                : `${activeUsers} weitere Benutzer${activeUsers === 1 ? '' : ''} angemeldet — werden 2 Minuten vor dem Update benachrichtigt.`
+              }
+            </div>
+
+            {updatePending ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-medium text-amber-800 flex items-center gap-2">
+                  <AlertTriangle size={15} />
+                  Update läuft in Kürze — Countdown aktiv
+                </p>
+                <p className="text-xs text-amber-700">{updateStatus.message}</p>
+                <button onClick={handleCancelUpdate} disabled={cancelling}
+                  className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-100">
+                  {cancelling ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
+                  Update abbrechen
+                </button>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600">
-                Sie können auch ein erneutes Update der aktuellen Version erzwingen
-                (z.B. um Konfigurationsänderungen einzuspielen).
+              <div className="space-y-3">
+                {versionInfo?.update_available ? (
+                  <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-sm text-primary-800">
+                    Version <strong>v{versionInfo.latest}</strong> ist verfügbar.
+                    Alle Benutzer werden 2 Minuten vor dem Neustart benachrichtigt.
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600">
+                    Sie können auch ein erneutes Update der aktuellen Version erzwingen
+                    (z.B. um Konfigurationsänderungen einzuspielen).
+                  </div>
+                )}
+                <button
+                  onClick={handleStartUpdate}
+                  disabled={starting}
+                  className="btn-primary text-sm py-2 px-4 flex items-center gap-2"
+                >
+                  {starting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpCircle size={14} />}
+                  {versionInfo?.update_available ? `Update auf v${versionInfo.latest} starten` : 'System neu starten / Update erzwingen'}
+                </button>
               </div>
             )}
-            <button
-              onClick={handleStartUpdate}
-              disabled={starting}
-              className="btn-primary text-sm py-2 px-4 flex items-center gap-2"
-            >
-              {starting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpCircle size={14} />}
-              {versionInfo?.update_available ? `Update auf v${versionInfo.latest} starten` : 'System neu starten / Update erzwingen'}
-            </button>
-          </div>
+          </>
         )}
       </div>
     </div>

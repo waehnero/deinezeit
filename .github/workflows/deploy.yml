@@ -1,0 +1,97 @@
+# ============================================================
+# DeineZeit – Automatisches Deployment (CD)
+# Läuft bei jedem Push auf den main-Branch
+#
+# Voraussetzungen (einmalig in GitHub einstellen):
+#   Settings → Secrets and variables → Actions → New repository secret
+#
+#   SSH_HOST          IP oder Domain deines Servers
+#   SSH_USER          Linux-Benutzer (z.B. root oder deinezeit)
+#   SSH_PRIVATE_KEY   Privater SSH-Schlüssel (Inhalt von ~/.ssh/id_rsa)
+#   DEPLOY_PATH       Pfad auf dem Server, z.B. /opt/deinezeit
+# ============================================================
+
+name: Deploy → Produktion
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: "Auf Server deployen"
+    runs-on: ubuntu-latest
+
+    # Nur deployen wenn alle CI-Checks bestanden haben
+    needs: []   # Parallel zu CI – oder: needs: [sicherheit-backend, docker-build]
+
+    environment:
+      name: production
+      url: https://${{ vars.DOMAIN || 'deine-domain.at' }}
+
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: "SSH-Schlüssel einrichten"
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: "Bekannten Host eintragen (Fingerprint)"
+        run: |
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: "Code auf Server übertragen"
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='.env' \
+            --exclude='backend/static' \
+            --exclude='postgres_data' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      - name: "Docker-Images bauen & Dienste neu starten"
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "▶ Neue Images bauen..."
+            docker compose build --no-cache
+
+            echo "▶ Datenbank-Migrationen..."
+            docker compose run --rm backend alembic upgrade head
+
+            echo "▶ Dienste neu starten (Zero-Downtime)..."
+            docker compose up -d --remove-orphans
+
+            echo "▶ Alte Images aufräumen..."
+            docker image prune -f
+
+            echo "✓ Deployment abgeschlossen!"
+          ENDSSH
+
+      - name: "Healthcheck"
+        run: |
+          echo "Warte 15 Sekunden auf Start..."
+          sleep 15
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://${{ secrets.SSH_HOST }}/api/health || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "✓ App läuft (HTTP $STATUS)"
+          else
+            echo "⚠ Healthcheck: HTTP $STATUS – bitte Logs prüfen"
+            echo "  ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+            echo "  cd ${{ secrets.DEPLOY_PATH }} && docker compose logs --tail=50"
+          fi
+
+      - name: "Deployment-Zusammenfassung"
+        if: always()
+        run: |
+          echo "## Deployment-Ergebnis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Zeitpunkt:** $(date '+%d.%m.%Y %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Gestartet von:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

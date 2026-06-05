@@ -1,0 +1,19 @@
+# Standardmäßig alle Textdateien mit LF-Zeilenenden speichern
+* text=auto
+
+# Shell-Skripte immer mit LF (Linux-Zeilenenden)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows-Skripte mit CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+# Binärdateien nicht konvertieren
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

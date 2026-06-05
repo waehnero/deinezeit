@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.3.9',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Lokale Entwicklungsinstanz wird automatisch erkannt — Update-Button zeigt stattdessen Anleitung für git pull',
+      'Backend blockiert Update-Start in lokalem Modus mit klarer Fehlermeldung',
+    ],
+  },
+  {
     version: '1.3.8',
     day: '05',
     month: 'Juni',

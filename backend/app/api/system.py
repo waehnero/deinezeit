@@ -84,6 +84,11 @@ def _version_from_changelog_text(text: str) -> str:
     return ""
 
 
+def _is_local_mode() -> bool:
+    """True wenn DEPLOY_MODE=local gesetzt ist (docker-compose.local.yml)."""
+    return os.environ.get("DEPLOY_MODE", "").lower() == "local"
+
+
 def _read_local_version() -> str:
     """Installierte Version aus lokaler CHANGELOG.md lesen."""
     # Suche CHANGELOG.md relativ zum Backend-Verzeichnis (zwei Ebenen hoch)
@@ -131,6 +136,7 @@ async def get_version_info():
         "current": current,
         "latest": latest,
         "update_available": update_available,
+        "local_mode": _is_local_mode(),
     }
 
 
@@ -186,6 +192,13 @@ async def start_update(
     admin: User = Depends(require_admin)
 ):
     """Update-Prozess starten: Benutzer benachrichtigen, nach 2 Minuten ausführen."""
+    if _is_local_mode():
+        raise HTTPException(
+            status_code=400,
+            detail="Updates sind in der lokalen Entwicklungsinstanz nicht verfügbar. "
+                   "Bitte 'git pull' im Projektverzeichnis ausführen und die Container neu starten.",
+        )
+
     with _update_lock:
         if _update_state["status"] not in ("idle", "done", "failed"):
             raise HTTPException(status_code=409, detail="Ein Update-Prozess läuft bereits")
