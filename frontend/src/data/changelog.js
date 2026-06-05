@@ -4,6 +4,111 @@
  */
 export const changelog = [
   {
+    version: '1.3.8',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Gesamtes Frontend in Versionskontrolle integriert — ermöglicht automatische Updates über GitHub Actions',
+    ],
+  },
+  {
+    version: '1.3.7',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Backend-App-Verzeichnis in Versionskontrolle integriert',
+    ],
+  },
+  {
+    version: '1.3.6',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Stabilitätsverbesserung bei der Datenbank-Konfiguration',
+    ],
+  },
+  {
+    version: '1.3.5',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Alembic-Migrationen zur Versionskontrolle hinzugefügt',
+    ],
+  },
+  {
+    version: '1.3.4',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Backend-Infrastruktur (Dockerfile, Abhängigkeiten) in Versionskontrolle integriert',
+    ],
+  },
+  {
+    version: '1.3.3',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Docker-Compose Konfiguration in Versionskontrolle integriert — ermöglicht vollautomatische Server-Updates',
+    ],
+  },
+  {
+    version: '1.3.2',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Versionsanzeige liest nun direkt aus CHANGELOG.md — installierte und neueste Version immer korrekt',
+    ],
+  },
+  {
+    version: '1.3.1',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Rechnungs-Widget wird nun auch bei bestehender Dashboard-Konfiguration korrekt angezeigt',
+    ],
+  },
+  {
+    version: '1.3.0',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Rechnungs-Widget im Dashboard: zeigt offene, überfällige und bezahlte Rechnungen auf einen Blick',
+      'Automatischer Versions-Bump via GitHub Actions — Versionen werden bei jedem Push selbstständig erhöht',
+      'E-Mail-Einstellungen als Unter-Tab unter System zusammengefasst',
+      'Backup als Unter-Tab unter System integriert',
+      'Design-Einstellungen als Unter-Tab unter Allgemein eingebaut',
+    ],
+    updates: [],
+  },
+  {
+    version: '1.2.1',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Dashboard-Widget „Rechnungen": zeigt offene, überfällige und diesen Monat bezahlte Rechnungen mit Anzahl und Brutto-Summe',
+      'Widget ist standardmäßig im Dashboard enthalten, verschiebbar und in der Größe anpassbar',
+    ],
+    updates: [],
+  },
+  {
     version: '1.2.0',
     day: '05',
     month: 'Juni',
