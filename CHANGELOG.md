@@ -5,6 +5,32 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.2.0] – 2026-06-05 – Auftragsbestätigung & Rechnungsmodul-Erweiterungen
+
+### Neu
+- Auftragsbestätigung (AB) als neuer Dokumenttyp mit eigenem Nummernkreis (AB-2026-001, …)
+- E-Mail-Versand direkt aus dem Rechnungsmodul — einzeln oder als Bulk-Versand für mehrere Belege
+- Statusworkflow mit kontextabhängigem Aktionsmenü: Entwurf → Offen → Bezahlt, Angenommen / Abgelehnt, Storniert
+- Angebote können nach Annahme direkt in eine Auftragsbestätigung oder Rechnung umgewandelt werden
+
+### Aktualisierungen
+- Parameter-Tab in den Einstellungen: Präfixe und Nummernformate pro Dokumenttyp frei konfigurierbar
+- Dokumenttyp-Bezeichnungen können umbenannt werden
+
+---
+
+## [1.1.0] – 2026-06-04 – Buchhaltungsmodul
+
+### Neu
+- Kontenplan nach EKR (Einheitskontenrahmen) vorbefüllt und durchsuchbar
+- BMD-Export für die steuerliche Übergabe an den Steuerberater
+- Debitor- und Kreditornummern direkt bei Kontakten hinterlegbar
+- Erlöskonto pro Artikel festlegbar — wird automatisch auf Rechnungspositionen übernommen
+- Konto pro Rechnungsposition individuell überschreibbar
+- Kontakte: neuer Finanz-Tab mit IBAN, BIC und Bankname (Migration 0012/0013)
+
+---
+
 ## [1.0.0] – 2026-06-03 – Rechnungsmodul
 
 ### Neu

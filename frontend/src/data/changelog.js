@@ -4,6 +4,37 @@
  */
 export const changelog = [
   {
+    version: '1.2.0',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Auftragsbestätigung (AB) als neuer Dokumenttyp mit eigenem Nummernkreis (AB-2026-001, …)',
+      'E-Mail-Versand direkt aus dem Rechnungsmodul — einzeln oder als Bulk-Versand',
+      'Statusworkflow mit kontextabhängigem Aktionsmenü: Entwurf → Offen → Bezahlt, Angenommen/Abgelehnt, Storniert',
+      'Angebote nach Annahme direkt in Auftragsbestätigung oder Rechnung umwandeln',
+    ],
+    updates: [
+      'Parameter-Tab in den Einstellungen: Präfixe und Nummernformate pro Dokumenttyp konfigurierbar',
+      'Dokumenttyp-Bezeichnungen können umbenannt werden',
+    ],
+  },
+  {
+    version: '1.1.0',
+    day: '04',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Buchhaltungsmodul: Kontenplan nach EKR (Einheitskontenrahmen) vorbefüllt und durchsuchbar',
+      'BMD-Export für die steuerliche Übergabe an den Steuerberater',
+      'Debitor- und Kreditornummern direkt bei Kontakten hinterlegbar',
+      'Erlöskonto pro Artikel festlegbar — wird automatisch auf Rechnungspositionen übernommen',
+      'Konto pro Rechnungsposition individuell überschreibbar',
+      'Kontakte: neuer Finanz-Tab mit IBAN, BIC und Bankname',
+    ],
+    updates: [],
+  },
+  {
     version: '1.0.0',
     day: '03',
     month: 'Juni',
