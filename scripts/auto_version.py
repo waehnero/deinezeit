@@ -25,10 +25,16 @@ import subprocess
 import sys
 from datetime import datetime
 
+
 # ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
-def run(cmd: list[str]) -> str:
-    result = subprocess.run(cmd, capture_output=True, text=True)
+def run(cmd: list, check: bool = False) -> str:
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    if check and result.returncode != 0:
+        print(f"  FEHLER bei: {' '.join(cmd)}")
+        print(f"  stdout: {result.stdout}")
+        print(f"  stderr: {result.stderr}")
+        sys.exit(1)
     return result.stdout.strip()
 
 
@@ -46,25 +52,28 @@ def bump_version(version: str, bump: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
-def get_commits_since_last_bump() -> list[dict]:
-    """Alle Commits seit dem letzten 'chore: Version'-Commit."""
-    log = run(["git", "log", "--format=%H\t%s\t%b", "HEAD"])
+def get_commits_since_last_bump() -> list:
+    """
+    Alle Commits seit dem letzten 'chore: Version'-Commit.
+    Verwendet --format=%H%n%s mit Null-Byte-Trenner um mehrzeilige Bodies zu vermeiden.
+    """
+    # Nur Hash und Subject (keine Body) — stabil auch bei mehrzeiligen Commit-Messages
+    log = run(["git", "log", "--format=%H\x00%s", "HEAD"], check=True)
     commits = []
-    for line in log.split("\n"):
-        if not line.strip():
+    for line in log.splitlines():
+        line = line.strip()
+        if not line:
             continue
-        parts = line.split("\t", 2)
-        hash_ = parts[0]
-        subject = parts[1] if len(parts) > 1 else ""
-        body = parts[2] if len(parts) > 2 else ""
-
+        if "\x00" not in line:
+            continue
+        hash_, subject = line.split("\x00", 1)
         if subject.startswith("chore: Version"):
             break  # Ab hier ist alles bereits versioniert
-        commits.append({"hash": hash_, "subject": subject, "body": body})
+        commits.append({"hash": hash_.strip(), "subject": subject.strip()})
     return commits
 
 
-def determine_bump_type(commits: list[dict]) -> str:
+def determine_bump_type(commits: list) -> str:
     subjects = [c["subject"] for c in commits]
     if any("BREAKING" in s for s in subjects):
         return "major"
@@ -73,81 +82,80 @@ def determine_bump_type(commits: list[dict]) -> str:
     return "patch"
 
 
-def categorize_commits(commits: list[dict]) -> tuple[list[str], list[str]]:
+def categorize_commits(commits: list) -> tuple:
     """Gibt (features, updates) zurück — direkt aus Commit-Messages."""
     features, updates = [], []
     for c in commits:
         s = c["subject"]
         if s.startswith("feat:"):
             features.append(s[5:].strip())
-        elif s.startswith("fix:") or s.startswith("refactor:") or s.startswith("perf:"):
+        elif s.startswith(("fix:", "refactor:", "perf:")):
             updates.append(re.sub(r"^[a-z]+:\s*", "", s).strip())
     return features, updates
 
 
-def improve_with_claude(
-    commits: list[dict], new_version: str
-) -> tuple[str, list[str], list[str]]:
+def improve_with_claude(commits: list, new_version: str) -> tuple:
     """
     Nutzt die Claude API um aus Commit-Messages saubere Changelog-Einträge
     und einen passenden Versions-Titel zu generieren.
-    Gibt (titel, features, updates) zurück.
+    Gibt (titel, features, updates) zurück oder (None, None, None) bei Fehler.
     """
-    import requests
-
-    api_key = os.environ["ANTHROPIC_API_KEY"]
-    commit_text = "\n".join(
-        f"- {c['subject']}" + (f"\n  {c['body']}" if c["body"].strip() else "")
-        for c in commits
-    )
-
-    prompt = f"""Du bist ein technischer Redakteur für ein deutschsprachiges Software-Produkt namens "DeineZeit" (eine Business-App für Zeiterfassung, Stammdaten, Rechnungen und Buchhaltung).
-
-Hier sind die Git-Commit-Messages seit dem letzten Release (Version {new_version}):
-
-{commit_text}
-
-Erstelle daraus:
-1. Einen kurzen deutschen Versions-Titel (2–5 Wörter, beschreibt das Hauptthema)
-2. Eine Liste neuer Features (aus "feat:"-Commits) — jedes als prägnanter deutscher Satz
-3. Eine Liste von Verbesserungen/Bugfixes (aus "fix:", "refactor:", "perf:"-Commits) — jedes als prägnanter deutscher Satz
-
-Antworte ausschließlich als gültiges JSON in diesem Format:
-{{
-  "titel": "...",
-  "features": ["...", "..."],
-  "updates": ["...", "..."]
-}}
-
-Regeln:
-- Keine Markdown-Formatierung
-- Nur JSON, kein Text davor oder danach
-- Technische Details weglassen, Nutzen hervorheben
-- Leere Arrays wenn keine Einträge vorhanden
-"""
-
-    response = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        json={
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 1024,
-            "messages": [{"role": "user", "content": prompt}],
-        },
-        timeout=30,
-    )
-
-    if response.status_code != 200:
-        print(f"  Claude API Fehler ({response.status_code}) — verwende Commit-Messages direkt")
+    try:
+        import requests
+    except ImportError:
         return None, None, None
 
-    raw = response.json()["content"][0]["text"].strip()
-    data = json.loads(raw)
-    return data.get("titel", ""), data.get("features", []), data.get("updates", [])
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None, None, None
+
+    commit_text = "\n".join(f"- {c['subject']}" for c in commits)
+
+    prompt = (
+        'Du bist ein technischer Redakteur für ein deutschsprachiges Software-Produkt namens "DeineZeit" '
+        "(eine Business-App für Zeiterfassung, Stammdaten, Rechnungen und Buchhaltung).\n\n"
+        f"Hier sind die Git-Commit-Messages seit dem letzten Release (neue Version wird {new_version}):\n\n"
+        f"{commit_text}\n\n"
+        "Erstelle daraus:\n"
+        "1. Einen kurzen deutschen Versions-Titel (2-5 Woerter, beschreibt das Hauptthema)\n"
+        '2. Eine Liste neuer Features (aus "feat:"-Commits) - jedes als praegnanter deutscher Satz\n'
+        '3. Eine Liste von Verbesserungen/Bugfixes (aus "fix:", "refactor:", "perf:"-Commits) - jedes als praegnanter deutscher Satz\n\n'
+        "Antworte ausschliesslich als gueltiges JSON:\n"
+        '{"titel": "...", "features": ["...", "..."], "updates": ["...", "..."]}\n\n'
+        "Nur JSON, kein Text davor oder danach. Leere Arrays wenn keine Eintraege vorhanden."
+    )
+
+    try:
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1024,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=30,
+        )
+
+        if response.status_code != 200:
+            print(f"  Claude API Fehler ({response.status_code}) — Fallback auf Commit-Messages")
+            return None, None, None
+
+        raw = response.json()["content"][0]["text"].strip()
+        # JSON-Block aus der Antwort extrahieren (falls doch etwas drumherum ist)
+        json_match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not json_match:
+            return None, None, None
+        data = json.loads(json_match.group())
+        return data.get("titel", ""), data.get("features", []), data.get("updates", [])
+
+    except Exception as e:
+        print(f"  Claude API Ausnahme: {e} — Fallback auf Commit-Messages")
+        return None, None, None
 
 
 # ─── Dateien aktualisieren ────────────────────────────────────────────────────
@@ -157,7 +165,7 @@ def update_package_json(version: str):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     data["version"] = version
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
     print(f"  ✓ {path}")
@@ -172,7 +180,7 @@ def update_config_py(version: str):
         rf"\g<1>{version}\g<2>",
         content,
     )
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)
     print(f"  ✓ {path}")
 
@@ -185,47 +193,56 @@ def update_docker_compose(path: str, version: str):
         rf"\g<1>{version}\g<2>",
         content,
     )
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)
     print(f"  ✓ {path}")
 
 
-def update_changelog_js(version: str, features: list[str], updates: list[str]):
+def update_changelog_js(version: str, features: list, updates: list):
     path = "frontend/src/data/changelog.js"
     with open(path, encoding="utf-8") as f:
         content = f.read()
 
     today = datetime.now()
-    months = ["Januar","Februar","März","April","Mai","Juni",
-              "Juli","August","September","Oktober","November","Dezember"]
+    months = ["Januar", "Februar", "Maerz", "April", "Mai", "Juni",
+              "Juli", "August", "September", "Oktober", "November", "Dezember"]
+    # Echte Umlaute für den Output
+    month_display = ["Januar", "Februar", "März", "April", "Mai", "Juni",
+                     "Juli", "August", "September", "Oktober", "November", "Dezember"]
 
-    def js_list(items):
+    def escape_js(s: str) -> str:
+        return s.replace("\\", "\\\\").replace("'", "\\'")
+
+    def js_array(items: list) -> str:
         if not items:
-            return ""
-        return "\n" + "\n".join(f"      '{i.replace(chr(39), chr(92)+chr(39))}',\n" for i in items)
+            return "[]"
+        lines = "\n" + "".join(f"      '{escape_js(i)}',\n" for i in items) + "    "
+        return f"[{lines}]"
 
-    new_entry = f"""  {{
-    version: '{version}',
-    day: '{today.day:02d}',
-    month: '{months[today.month - 1]}',
-    year: '{today.year}',
-    features: [{js_list(features)}    ],
-    updates: [{js_list(updates)}    ],
-  }},
-"""
+    new_entry = (
+        "  {\n"
+        f"    version: '{version}',\n"
+        f"    day: '{today.day:02d}',\n"
+        f"    month: '{month_display[today.month - 1]}',\n"
+        f"    year: '{today.year}',\n"
+        f"    features: {js_array(features)},\n"
+        f"    updates: {js_array(updates)},\n"
+        "  },\n"
+    )
 
+    # Flexibel: findet "export const changelog = [" unabhängig von Zeilenenden
     content = re.sub(
-        r"(export const changelog = \[\n)",
-        r"\g<1>" + new_entry,
+        r"(export const changelog\s*=\s*\[)\s*\n",
+        lambda m: m.group(0) + new_entry,
         content,
         count=1,
     )
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)
     print(f"  ✓ {path}")
 
 
-def update_changelog_md(version: str, titel: str, features: list[str], updates: list[str]):
+def update_changelog_md(version: str, titel: str, features: list, updates: list):
     path = "CHANGELOG.md"
     with open(path, encoding="utf-8") as f:
         content = f.read()
@@ -244,10 +261,15 @@ def update_changelog_md(version: str, titel: str, features: list[str], updates: 
 
     # Nach dem ersten "---" einfügen
     insert_marker = "---\n"
-    idx = content.index(insert_marker) + len(insert_marker)
+    idx = content.find(insert_marker)
+    if idx == -1:
+        # Fallback: einfach nach der ersten Zeile einfügen
+        idx = content.find("\n") + 1
+    else:
+        idx += len(insert_marker)
     content = content[:idx] + new_entry + content[idx:]
 
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)
     print(f"  ✓ {path}")
 
@@ -261,9 +283,20 @@ def git_commit(version: str, titel: str):
         "frontend/src/data/changelog.js",
         "CHANGELOG.md",
     ]
-    run(["git", "add"] + files)
-    run(["git", "commit", "-m", f"chore: Version {version} — {titel}"])
-    print(f"  ✓ git commit: chore: Version {version} — {titel}")
+    run(["git", "add"] + files, check=True)
+    result = subprocess.run(
+        ["git", "commit", "-m", f"chore: Version {version} — {titel}"],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        # Kein Fehler wenn nichts zu committen (already up to date)
+        if "nothing to commit" in result.stdout or "nothing to commit" in result.stderr:
+            print("  ℹ Keine Änderungen zu committen.")
+        else:
+            print(f"  FEHLER beim Commit: {result.stderr}")
+            sys.exit(1)
+    else:
+        print(f"  ✓ git commit: chore: Version {version} — {titel}")
 
 
 # ─── Hauptprogramm ────────────────────────────────────────────────────────────
@@ -288,28 +321,22 @@ def main():
     bump = determine_bump_type(commits)
     current = get_current_version()
     new_version = bump_version(current, bump)
-    print(f"  Bump-Typ: {bump}  ({current} → {new_version})\n")
+    print(f"  Bump-Typ: {bump}  ({current} -> {new_version})\n")
 
     # 3. Changelog-Inhalt generieren
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    titel, features, updates = None, None, None
-
-    if api_key:
-        print("  Claude API verfügbar — generiere Beschreibungen …")
-        titel, features, updates = improve_with_claude(commits, new_version)
+    titel, features, updates = improve_with_claude(commits, new_version)
 
     if not titel:  # Fallback: direkt aus Commit-Messages
-        print("  Verwende Commit-Messages direkt …")
+        print("  Generiere Changelog aus Commit-Messages …")
         features, updates = categorize_commits(commits)
-        # Titel = erste feat-Message oder erste Commit-Message (gekürzt)
-        feat_commits = [c["subject"][5:].strip() for c in commits if c["subject"].startswith("feat:")]
-        titel = feat_commits[0] if feat_commits else re.sub(r"^[a-z]+:\s*", "", commits[0]["subject"]).strip()
+        feat_subjects = [c["subject"][5:].strip() for c in commits if c["subject"].startswith("feat:")]
+        titel = feat_subjects[0] if feat_subjects else re.sub(r"^[a-z]+:\s*", "", commits[0]["subject"]).strip()
+    else:
+        print("  Claude API: Beschreibungen generiert")
 
-    print(f"  Titel: {titel}")
-    if features:
-        print(f"  Features ({len(features)}): {', '.join(features[:2])}{'…' if len(features) > 2 else ''}")
-    if updates:
-        print(f"  Updates ({len(updates)}): {', '.join(updates[:2])}{'…' if len(updates) > 2 else ''}")
+    print(f"  Titel:    {titel}")
+    print(f"  Features: {len(features)}")
+    print(f"  Updates:  {len(updates)}")
     print()
 
     # 4. Alle Dateien aktualisieren
@@ -318,14 +345,14 @@ def main():
     update_config_py(new_version)
     update_docker_compose("docker-compose.yml", new_version)
     update_docker_compose("docker-compose.local.yml", new_version)
-    update_changelog_js(new_version, features, updates)
-    update_changelog_md(new_version, titel, features, updates)
+    update_changelog_js(new_version, features or [], updates or [])
+    update_changelog_md(new_version, titel, features or [], updates or [])
 
     # 5. Git-Commit erstellen
     print("\n  Git-Commit erstellen:")
     git_commit(new_version, titel)
 
-    print(f"\n  ✓ Version {new_version} erfolgreich erstellt.\n")
+    print(f"\n  Version {new_version} erfolgreich erstellt.\n")
 
 
 if __name__ == "__main__":
