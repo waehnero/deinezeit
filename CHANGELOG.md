@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.4] – 2026-06-05 – Backend-Infrastruktur erweitert
+
+### Aktualisierungen
+- Backend-Grunddateien für Docker-Containerisierung hinzugefügt
+
+---
+
 ## [1.3.3] – 2026-06-05 – Docker-Compose Integration
 
 ### Aktualisierungen
