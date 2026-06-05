@@ -1579,6 +1579,29 @@ function TabParameter() {
   )
 }
 
+// ── Tab: System + Backup (horizontale Unter-Tabs) ────────────────────────────
+function TabSystemWrapper({ settings, onSaved }) {
+  const [sub, setSub] = useState('system')
+  const subTabs = [
+    { id: 'system', label: 'System' },
+    { id: 'backup', label: 'Backup' },
+  ]
+  return (
+    <div>
+      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit">
+        {subTabs.map(t => (
+          <button key={t.id} onClick={() => setSub(t.id)}
+            className={`px-4 py-1.5 text-sm rounded-md transition-all ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {sub === 'system' && <TabSystem />}
+      {sub === 'backup' && <TabBackup settings={settings} onSaved={onSaved} />}
+    </div>
+  )
+}
+
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('allgemein')
@@ -1587,7 +1610,6 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
     { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
-    { id: 'backup',     label: 'Backup',     icon: HardDrive },
     { id: 'email',      label: 'E-Mail',     icon: Mail      },
     { id: 'system',     label: 'System',     icon: Cpu       },
   ]
@@ -1614,9 +1636,8 @@ export default function SettingsPage() {
       <div className="card p-6">
         {activeTab === 'allgemein'  && <TabAllgemeinWrapper settings={settings} onSaved={loadSettings} />}
         {activeTab === 'parameter'  && <TabParameter />}
-        {activeTab === 'backup'     && <TabBackup     settings={settings} onSaved={loadSettings} />}
         {activeTab === 'email'      && <TabEmail      settings={settings} onSaved={loadSettings} />}
-        {activeTab === 'system'     && <TabSystem />}
+        {activeTab === 'system'     && <TabSystemWrapper settings={settings} onSaved={loadSettings} />}
       </div>
     </div>
   )
