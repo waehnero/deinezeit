@@ -5,6 +5,24 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.0.0] – 2026-06-03 – Rechnungsmodul
+
+### Neu
+- Rechnungen, Angebote, Gutschriften und Lieferscheine erstellen
+- Automatische Nummerierung pro Dokumenttyp (RE-2026-001, AN-2026-001, …)
+- Stornierung mit automatischer Gutschrift oder nur Statusänderung
+- Angebote können direkt in Rechnungen umgewandelt werden
+- Zeiteinträge aus der Zeiterfassung direkt auf Rechnung übernehmen
+- Positionen aus Artikel-Stammdaten oder als Freitext
+- MwSt.: pro Position wählbar, ein Satz, oder Kleinunternehmerregelung
+- PDF-Export mit 5 wählbaren Vorlagen (Klassisch, Modern, Kompakt, Elegant, Farbenfroh)
+- Rechnungsbuch filterbar nach Monat/Quartal/Jahr und/oder Kunde — als PDF oder CSV
+- Zahlungsstatus: offen, bezahlt, überfällig, storniert
+- Wiederkehrende Rechnungsvorlagen (wöchentlich, monatlich, quartalsweise, jährlich)
+- Bankverbindung aus den App-Einstellungen automatisch auf jedem Dokument
+
+---
+
 ## [0.9.5] – 2026-06-03 – Dashboard konfigurierbar
 
 ### Neu
@@ -273,9 +291,3 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## Geplant für [1.0.0]
-
-- Excel (.xlsx) Export
-- Erweiterte Filterung und Sortierung in Datensatz-Listen
-- Druckansicht / PDF-Export einzelner Datensätze
-- OnlyOffice Integration für Dokumentenbearbeitung direkt im Datacenter
