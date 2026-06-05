@@ -1531,6 +1531,29 @@ function TabBuchhaltung({ embedded = false }) { // eslint-disable-line
   )
 }
 
+// ── Tab: Allgemein + Design (horizontale Unter-Tabs) ─────────────────────────
+function TabAllgemeinWrapper({ settings, onSaved }) {
+  const [sub, setSub] = useState('firma')
+  const subTabs = [
+    { id: 'firma',  label: 'Firmendaten' },
+    { id: 'design', label: 'Design'      },
+  ]
+  return (
+    <div>
+      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit">
+        {subTabs.map(t => (
+          <button key={t.id} onClick={() => setSub(t.id)}
+            className={`px-4 py-1.5 text-sm rounded-md transition-all ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {sub === 'firma'  && <TabAllgemein settings={settings} onSaved={onSaved} />}
+      {sub === 'design' && <TabDesign    settings={settings} onSaved={onSaved} />}
+    </div>
+  )
+}
+
 // ── Tab: Parameter (horizontale Unter-Tabs) ───────────────────────────────────
 function TabParameter() {
   const [sub, setSub] = useState('belege')
@@ -1563,7 +1586,6 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
-    { id: 'design',     label: 'Design',     icon: Palette   },
     { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
     { id: 'backup',     label: 'Backup',     icon: HardDrive },
     { id: 'email',      label: 'E-Mail',     icon: Mail      },
@@ -1590,8 +1612,7 @@ export default function SettingsPage() {
         {tabs.map(t => <Tab key={t.id} {...t} active={activeTab === t.id} onClick={setActiveTab} />)}
       </div>
       <div className="card p-6">
-        {activeTab === 'allgemein'  && <TabAllgemein  settings={settings} onSaved={loadSettings} />}
-        {activeTab === 'design'     && <TabDesign     settings={settings} onSaved={loadSettings} />}
+        {activeTab === 'allgemein'  && <TabAllgemeinWrapper settings={settings} onSaved={loadSettings} />}
         {activeTab === 'parameter'  && <TabParameter />}
         {activeTab === 'backup'     && <TabBackup     settings={settings} onSaved={loadSettings} />}
         {activeTab === 'email'      && <TabEmail      settings={settings} onSaved={loadSettings} />}
