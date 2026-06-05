@@ -300,6 +300,11 @@ def git_commit(version: str, titel: str):
 # ─── Hauptprogramm ────────────────────────────────────────────────────────────
 
 def main():
+    # Immer vom Repo-Root aus arbeiten (scripts/ ist eine Ebene tiefer)
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(repo_root)
+    print(f"  Arbeitsverzeichnis: {repo_root}")
+
     print("\n══════════════════════════════════════════")
     print("  DeineZeit  —  Auto-Version")
     print("══════════════════════════════════════════\n")
