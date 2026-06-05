@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.8] – 2026-06-05 – Frontend-Integration
+
+### Aktualisierungen
+- Gesamtes Frontend in Versionskontrolle integriert
+
+---
+
 ## [1.3.7] – 2026-06-05 – Backend-Infrastruktur aktualisiert
 
 ### Aktualisierungen
