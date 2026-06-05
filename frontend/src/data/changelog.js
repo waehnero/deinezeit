@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.3.8',
+    day: '05',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Gesamtes Frontend in Versionskontrolle integriert',
+    ],
+  },
+  {
     version: '1.2.0',
     day: '05',
     month: 'Juni',
