@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.6] – 2026-06-05 – Konfigurationsstabilität verbessert
+
+### Aktualisierungen
+- ConfigParser-Interpolation in alembic.ini entfernt
+
+---
+
 ## [1.3.5] – 2026-06-05 – Datenbankmigrationen hinzugefügt
 
 ### Aktualisierungen
