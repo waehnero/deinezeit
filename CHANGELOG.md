@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.3] – 2026-06-05 – Docker-Compose Integration
+
+### Aktualisierungen
+- Docker-Compose Dateien zum Repository hinzugefügt
+
+---
+
 ## [1.3.2] – 2026-06-05 – Versions-Anzeige korrigiert
 
 ### Aktualisierungen
