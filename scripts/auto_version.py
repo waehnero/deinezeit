@@ -39,8 +39,13 @@ def run(cmd: list, check: bool = False) -> str:
 
 
 def get_current_version() -> str:
-    with open("frontend/package.json", encoding="utf-8") as f:
-        return json.load(f)["version"]
+    """Liest die aktuelle Version aus CHANGELOG.md (immer im Repo vorhanden)."""
+    with open("CHANGELOG.md", encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r'^## \[(\d+\.\d+\.\d+)\]', line)
+            if m:
+                return m.group(1)
+    return "0.0.0"
 
 
 def bump_version(version: str, bump: str) -> str:
@@ -160,6 +165,9 @@ def improve_with_claude(commits: list, new_version: str) -> tuple:
 
 def update_package_json(version: str):
     path = "frontend/package.json"
+    if not os.path.exists(path):
+        print(f"  ⚠ {path} nicht im Repo — übersprungen")
+        return
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     data["version"] = version
@@ -198,6 +206,9 @@ def update_docker_compose(path: str, version: str):
 
 def update_changelog_js(version: str, features: list, updates: list):
     path = "frontend/src/data/changelog.js"
+    if not os.path.exists(path):
+        print(f"  ⚠ {path} nicht im Repo — übersprungen")
+        return
     with open(path, encoding="utf-8") as f:
         content = f.read()
 
@@ -273,7 +284,7 @@ def update_changelog_md(version: str, titel: str, features: list, updates: list)
 
 
 def git_commit(version: str, titel: str):
-    files = [
+    candidates = [
         "frontend/package.json",
         "backend/app/core/config.py",
         "docker-compose.yml",
@@ -281,6 +292,7 @@ def git_commit(version: str, titel: str):
         "frontend/src/data/changelog.js",
         "CHANGELOG.md",
     ]
+    files = [f for f in candidates if os.path.exists(f)]
     run(["git", "add"] + files, check=True)
     result = subprocess.run(
         ["git", "commit", "-m", f"chore: Version {version} — {titel}"],
