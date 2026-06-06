@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.6.6',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'E-Mail-Dialog mit Kontaktinfo, Empfänger-Mail und CC-Feld hinzugefügt',
+    ],
+    updates: [],
+  },
+  {
     version: '1.6.5',
     day: '06',
     month: 'Juni',

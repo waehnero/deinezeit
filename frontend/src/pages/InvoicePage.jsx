@@ -235,7 +235,7 @@ export default function InvoicePage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <StatusBadge status={inv.status} />
-                      {sentStatus[inv.id] === 'ok' && (
+                      {(inv.status === 'gesendet' || sentStatus[inv.id] === 'ok') && sentStatus[inv.id] !== 'error' && (
                         <MailCheck size={15} className="text-green-500 shrink-0" title="Erfolgreich versendet" />
                       )}
                       {sentStatus[inv.id] === 'error' && (
