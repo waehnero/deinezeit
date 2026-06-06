@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.4.4] – 2026-06-06 – E-Mail-Fehlerbehandlung verbessert
+
+### Aktualisierungen
+- Fehlermeldungen beim E-Mail-Versand werden nun dauerhaft im Dialog angezeigt.
+
+---
+
 ## [1.4.3] – 2026-06-06 – E-Mail-Versand repariert
 
 ### Aktualisierungen

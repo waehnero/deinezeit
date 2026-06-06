@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.4.4',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Fehlermeldungen beim E-Mail-Versand werden nun dauerhaft im Dialog angezeigt.',
+    ],
+  },
+  {
     version: '1.4.3',
     day: '06',
     month: 'Juni',
