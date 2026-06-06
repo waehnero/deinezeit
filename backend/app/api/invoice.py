@@ -119,7 +119,34 @@ async def list_invoices(
             Invoice.title.ilike(like),
             Invoice.reference.ilike(like),
         ))
-    return q.order_by(Invoice.date.desc(), Invoice.number.desc()).offset(skip).limit(limit).all()
+    invoices = q.order_by(Invoice.date.desc(), Invoice.number.desc()).offset(skip).limit(limit).all()
+
+    # Batch-Lookup Kontaktnamen
+    contact_ids = list({inv.contact_id for inv in invoices if inv.contact_id})
+    contact_map: dict = {}
+    if contact_ids:
+        recs = db.query(EntityRecord).filter(EntityRecord.id.in_(contact_ids)).all()
+        for r in recs:
+            d = r.data or {}
+            contact_map[r.id] = d.get("name") or d.get("firma") or d.get("vorname") or ""
+
+    result = []
+    for inv in invoices:
+        result.append({
+            "id": inv.id,
+            "doc_type": inv.doc_type,
+            "number": inv.number,
+            "date": inv.date,
+            "due_date": inv.due_date,
+            "contact_id": inv.contact_id,
+            "contact_name": contact_map.get(inv.contact_id) if inv.contact_id else None,
+            "title": inv.title,
+            "total": inv.total,
+            "currency": inv.currency,
+            "status": inv.status,
+            "created_at": inv.created_at,
+        })
+    return result
 
 
 @router.post("", response_model=InvoiceResponse)
@@ -998,71 +1025,4 @@ async def get_unbilled_time_entries(
     from sqlalchemy import not_, or_ as _or_
 
 
-    # Bereits verrechnete Einträge ausschließen
-    billed_ids = db.query(InvoicePosition.time_entry_id).filter(
-        InvoicePosition.time_entry_id.isnot(None)
-    ).subquery()
-
-    q = db.query(TimeEntry).filter(
-        TimeEntry.ended_at.isnot(None),
-        TimeEntry.billable == True,
-        _or_(TimeEntry.id.notin_(db.query(billed_ids.c.time_entry_id)), False),
-    )
-    # Workaround: NOT IN mit Subquery
-    billed_entry_ids = [r[0] for r in db.query(InvoicePosition.time_entry_id).filter(
-        InvoicePosition.time_entry_id.isnot(None)
-    ).all()]
-    if billed_entry_ids:
-        q = q.filter(not_(TimeEntry.id.in_(billed_entry_ids)))
-
-    # Filter: contact_id
-    if contact_id:
-        primary = q.filter(TimeEntry.contact_id == contact_id).all()
-        if primary:
-            entries = primary
-        else:
-            entries = q.filter(TimeEntry.contact_name.ilike(
-                f"%{str(contact_id)}%"
-            )).all()
-        q = db.query(TimeEntry).filter(TimeEntry.id.in_([e.id for e in entries]))
-        if billed_entry_ids:
-            q = q.filter(not_(TimeEntry.id.in_(billed_entry_ids)))
-
-    # Filter: project_id
-    if project_id:
-        primary = q.filter(TimeEntry.project_id == project_id).all()
-        if primary:
-            q = db.query(TimeEntry).filter(TimeEntry.id.in_([e.id for e in primary]))
-        else:
-            q = q.filter(TimeEntry.project_name.ilike(f"%{str(project_id)}%"))
-        if billed_entry_ids:
-            q = q.filter(not_(TimeEntry.id.in_(billed_entry_ids)))
-
-    # Filter: search
-    if search:
-        q = q.filter(_or_(
-            TimeEntry.note.ilike(f"%{search}%"),
-            TimeEntry.contact_name.ilike(f"%{search}%"),
-            TimeEntry.project_name.ilike(f"%{search}%"),
-        ))
-
-    entries = q.order_by(TimeEntry.started_at.desc()).limit(200).all()
-
-    result = []
-    for e in entries:
-        dur_h = round(e.duration_minutes / 60, 2) if e.duration_minutes else 0
-        result.append({
-            "id":             str(e.id),
-            "started_at":     e.started_at.isoformat() if e.started_at else None,
-            "ended_at":       e.ended_at.isoformat() if e.ended_at else None,
-            "duration_hours": dur_h,
-            "duration_minutes": e.duration_minutes,
-            "note":           e.note or "",
-            "description":    e.note or "Zeitaufwand",
-            "contact_name":   e.contact_name or "",
-            "project_name":   e.project_name or "",
-            "contact_id":     str(e.contact_id) if e.contact_id else None,
-            "project_id":     str(e.project_id) if e.project_id else None,
-            "billable":       e.billable,
-        })
-    return result
+    # Bereits verrechnete Einträge

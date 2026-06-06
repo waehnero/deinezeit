@@ -241,6 +241,12 @@ export default function InvoiceFormPage() {
     invoiceApi.get(id).then(res => {
       const inv = res.data
       setDocType(inv.doc_type); setContactId(inv.contact_id); setTitle(inv.title || '')
+      // Kontaktname laden
+      if (inv.contact_id) {
+        masterdataApi.getRecord('kontakte', inv.contact_id)
+          .then(r => setContactLabel(r.data.display_name || ''))
+          .catch(() => {})
+      }
       setDate(inv.date); setDueDate(inv.due_date || ''); setReference(inv.reference || '')
       setIntroText(inv.intro_text || ''); setOutroText(inv.outro_text || ''); setNotes(inv.notes || '')
       setTaxMode(inv.tax_mode)

@@ -19,6 +19,15 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.7.0] – 2026-06-06 – Kontakt in Belegliste & Formular
+
+### Neu
+- Belegliste: Spalte "Titel / Kontakt" in zwei getrennte Spalten "Titel" und "Kontakt" aufgeteilt
+- Belegliste: Kontaktname wird jetzt korrekt aus Stammdaten geladen und angezeigt
+- Beleg-Formular: Kontaktfeld zeigt beim Bearbeiten wieder den gespeicherten Kontakt an
+
+---
+
 ## [1.6.0] – 2026-06-06 – E-Mail-Anhänge & Datacenter-Browser
 
 ### Neu
@@ -480,31 +489,4 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ### Neu
 - **System-Tab in den Einstellungen**: Zeigt die aktuelle App-Version, den vollständigen Changelog und die Anzahl aktiver Benutzer — alles auf einen Blick
-- **Update starten per Klick**: Admin kann ein Server-Update direkt aus dem Browser anstoßen — kein SSH-Zugriff mehr nötig
-- **2-Minuten-Countdown**: Vor dem Update werden alle aktiven Benutzer benachrichtigt; ein oranges Banner oben im Bildschirm zeigt den Countdown
-- **Automatische Abmeldung**: Alle Benutzer werden beim Ablauf des Countdowns automatisch abgemeldet
-- **Erfolgsmeldung nach Update**: Nach dem Neustart erscheint auf der Anmeldeseite eine grüne Meldung, dass das Update erfolgreich war
-- **Update abbrechen**: Solange der Countdown läuft, kann der Admin das Update noch abbrechen
-
-### Technische Details
-- Neues Backend-Modul `system.py`: In-Memory-Statusverwaltung für Update-Prozess, aktive Sitzungs-Zählung via JWT-Middleware
-- `POST /system/update/start` startet asyncio-Background-Task mit 2-Minuten-Verzögerung; führt `git pull` + `docker compose up -d --build` auf dem Host aus
-- Backend-Container mountet `/var/run/docker.sock` und `/opt/deinezeit` für Host-Docker-Zugriff
-- Neuer `UpdateBanner`-Komponente mit 15-Sekunden-Polling und lokalem Sekunden-Countdown
-- `sessionStorage` überträgt Update-Meldung über den Neustart hinweg zur Login-Seite
-
----
-
-## [0.9.2] – 2026-05-27 – Verrechenbarkeit in den Statistik-Ringen
-
-### Neu
-- **Zeiterfassung-Ringe**: Die drei Ringe (Heute / Woche / Monat) zeigen jetzt die Aufteilung zwischen verrechenbaren (grün) und nicht-verrechenbaren (orange) Stunden. Beide Bögen liegen nebeneinander auf dem Ring — der graue Hintergrund zeigt weiterhin das Ziel.
-
-### Technische Details
-- Backend `TimeStats`-Schema: neue Felder `today_billable_minutes`, `week_billable_minutes`, `month_billable_minutes`
-- `get_stats()` führt die Abfrage jetzt optional mit `billable=True`-Filter durch
-- `RingChart`-Komponente: zwei überlagerte SVG-Bögen statt einem; oranger Bogen beginnt am Endpunkt des grünen
-
----
-
-## [0
+- **Update starten per Klick**: Admin kann ein Server-Update direkt aus dem Browser anstoßen — kein SSH-Zugriff me

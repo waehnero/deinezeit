@@ -204,7 +204,8 @@ export default function InvoicePage() {
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Nummer</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Datum</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Fällig</th>
-                <th className="text-left px-4 py-3 font-medium text-neutral-500">Titel / Kontakt</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-500">Titel</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-500">Kontakt</th>
                 <th className="text-right px-4 py-3 font-medium text-neutral-500">Betrag</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Status</th>
                 <th className="px-4 py-3 w-10"></th>
@@ -229,6 +230,7 @@ export default function InvoicePage() {
                     ) : '—'}
                   </td>
                   <td className="px-4 py-3 text-neutral-700">{inv.title || '—'}</td>
+                  <td className="px-4 py-3 text-neutral-500 text-sm">{inv.contact_name || '—'}</td>
                   <td className="px-4 py-3 text-right font-medium text-neutral-800">{fmtEuro(inv.total)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

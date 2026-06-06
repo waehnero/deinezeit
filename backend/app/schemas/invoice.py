@@ -139,6 +139,7 @@ class InvoiceListItem(BaseModel):
     date: date
     due_date: Optional[date] = None
     contact_id: Optional[UUID] = None
+    contact_name: Optional[str] = None
     title: Optional[str] = None
     total: Decimal
     currency: str
