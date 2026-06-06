@@ -76,7 +76,8 @@ def _generate_logo_variants(original_bytes: bytes, ext: str) -> tuple[bytes, byt
 @router.get("", response_model=SettingsResponse)
 async def get_settings(db: Session = Depends(get_db)):
     data = _load(db)
-    safe = {k: v for k, v in data.items() if k != 'smtp_password'}
+    # Secrets niemals zurückgeben
+    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret')}
     return SettingsResponse(**{k: safe.get(k, '') for k in SettingsResponse.model_fields})
 
 
@@ -329,46 +330,24 @@ async def test_email(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    import smtplib
-    from email.mime.text import MIMEText
+    from app.services.email_service import send_email
 
-    data = _load(db)
-    host       = data.get("smtp_host", "")
-    port       = int(data.get("smtp_port", "587"))
-    user       = data.get("smtp_user", "")
-    password   = data.get("smtp_password", "")
-    from_name  = data.get("smtp_from_name", "DeineZeit")
-    from_email = data.get("smtp_from_email", user)
-    use_tls    = data.get("smtp_tls", "true").lower() == "true"
-
-    if not host:
-        raise HTTPException(400, "SMTP-Host nicht konfiguriert")
+    data     = _load(db)
+    provider = data.get("email_provider", "smtp")
 
     try:
-        msg = MIMEText(
-            "Das ist eine Test-E-Mail von DeineZeit.\n\n"
-            "SMTP-Konfiguration funktioniert korrekt.",
-            "plain", "utf-8"
+        send_email(
+            settings  = data,
+            to_email  = body.to_email,
+            subject   = "DeineZeit – Test-E-Mail",
+            body_text = (
+                "Das ist eine Test-E-Mail von DeineZeit.\n\n"
+                f"Versandmethode: {'Microsoft Graph API' if provider == 'graph' else 'SMTP'}\n"
+                "Konfiguration funktioniert korrekt."
+            ),
         )
-        msg["Subject"] = "DeineZeit – Test-E-Mail"
-        msg["From"]    = f"{from_name} <{from_email}>"
-        msg["To"]      = body.to_email
-
-        if use_tls:
-            server = smtplib.SMTP(host, port, timeout=15)
-            server.ehlo()        # EHLO vor STARTTLS — für Office 365 erforderlich
-            server.starttls()
-            server.ehlo()        # EHLO nach STARTTLS erneuern
-        else:
-            server = smtplib.SMTP_SSL(host, port, timeout=15)
-            server.ehlo()
-
-        if user and password:
-            server.login(user, password)
-
-        server.sendmail(from_email, [body.to_email], msg.as_string())
-        server.quit()
-        return {"ok": True, "message": f"Test-Mail an {body.to_email} gesendet"}
+        method = "Microsoft Graph API" if provider == "graph" else "SMTP"
+        return {"ok": True, "message": f"Test-Mail via {method} an {body.to_email} gesendet"}
 
     except Exception as e:
         raise HTTPException(400, f"E-Mail konnte nicht gesendet werden: {str(e)}")

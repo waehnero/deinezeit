@@ -111,15 +111,6 @@ Write-Host ""
 Start-Sleep -Seconds 2
 Start-Process "http://localhost"
 
-# Backup-Watcher im Hintergrund starten (prueft alle 30 Sek. auf Aenderungen und
-# aktualisiert backup.cfg + Windows-Aufgabenplaner automatisch)
-$watcherScript = Join-Path $PSScriptRoot "backup-watcher.ps1"
-if (Test-Path $watcherScript) {
-    Start-Process PowerShell `
-        -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$watcherScript`"" `
-        -WindowStyle Hidden -Verb RunAs -ErrorAction SilentlyContinue
-    Write-Host "  Backup-Watcher gestartet (laeuft im Hintergrund als Administrator)" -ForegroundColor Gray
-}
 
 Write-Host "  Zum Beenden: stopp-lokal.bat doppelklicken"
 Write-Host "  (Dieses Fenster kann minimiert werden)"
