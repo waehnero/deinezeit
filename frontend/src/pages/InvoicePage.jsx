@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { invoiceApi } from '../services/api'
+import { invoiceApi, datacenterApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
   MoreHorizontal, Book, RotateCcw, Mail, MailCheck, MailX,
-  Paperclip, X, HardDrive, Upload
+  Paperclip, X as XIcon, HardDrive, Upload
 } from 'lucide-react'
-import { datacenterApi } from '../services/api'
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -426,78 +425,63 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
   )
 }
 
-// ── Datacenter-Browser (Anhang auswählen) ────────────────────────────────────
-function DatacenterPicker({ onAdd, onClose }) {
-  const [files, setFiles] = useState([])
+function DatacenterPicker({ onSelect, onClose }) {
+  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState(new Set())
+  const [selected, setSelected] = useState([])
 
   useEffect(() => {
-    datacenterApi.listAll()
-      .then(r => setFiles((r.data.attachments || []).filter(f => f.type === 'file')))
-      .catch(() => toast.error('Datacenter konnte nicht geladen werden'))
-      .finally(() => setLoading(false))
+    datacenterApi.listAll().then(r => {
+      setItems(r.data || [])
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
-  const filtered = files.filter(f =>
-    (f.display_name || f.filename || '').toLowerCase().includes(search.toLowerCase())
+  const filtered = items.filter(it =>
+    (it.filename || it.name || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  function fmtSize(b) {
-    if (!b) return ''
-    if (b < 1024) return `${b} B`
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
-    return `${(b / 1024 / 1024).toFixed(1)} MB`
+  function toggle(id) {
+    setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+  }
+
+  function handleConfirm() {
+    const chosen = items.filter(it => selected.includes(it.id))
+    onSelect(chosen)
+    onClose()
   }
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-md">
+      <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-md flex flex-col" style={{maxHeight:'80vh'}}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-neutral-900 flex items-center gap-2">
-            <HardDrive size={15} className="text-primary-600" /> Aus Datacenter auswählen
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <HardDrive size={15} className="text-blue-500" /> Datacenter
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-neutral-100"><X size={16} /></button>
+          <button onClick={onClose}><XIcon size={16} /></button>
         </div>
         <input
-          value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Dateiname suchen…"
-          className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm mb-3"
+          className="border rounded-lg px-3 py-1.5 text-sm mb-3 outline-none focus:ring-2 focus:ring-blue-300"
+          placeholder="Suchen…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
         />
-        <div className="max-h-64 overflow-y-auto divide-y border border-neutral-100 rounded-lg">
-          {loading && <div className="py-8 text-center text-neutral-400 text-sm">Lädt…</div>}
-          {!loading && filtered.length === 0 && <div className="py-8 text-center text-neutral-400 text-sm">Keine Dateien gefunden</div>}
-          {filtered.map(f => (
-            <label key={f.id} className="flex items-center gap-3 px-3 py-2 hover:bg-neutral-50 cursor-pointer">
-              <input type="checkbox"
-                checked={selected.has(f.id)}
-                onChange={() => setSelected(prev => {
-                  const n = new Set(prev)
-                  n.has(f.id) ? n.delete(f.id) : n.add(f.id)
-                  return n
-                })}
-                className="w-4 h-4 rounded"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-neutral-800 truncate">{f.display_name || f.filename}</p>
-                <p className="text-xs text-neutral-400">{f.mimetype || ''} {fmtSize(f.filesize)}</p>
-              </div>
+        <div className="flex-1 overflow-y-auto divide-y border rounded-lg mb-3">
+          {loading && <div className="p-4 text-center text-sm text-neutral-400">Lädt…</div>}
+          {!loading && filtered.length === 0 && <div className="p-4 text-center text-sm text-neutral-400">Keine Dateien gefunden</div>}
+          {filtered.map(it => (
+            <label key={it.id} className="flex items-center gap-2 px-3 py-2 hover:bg-neutral-50 cursor-pointer text-sm">
+              <input type="checkbox" checked={selected.includes(it.id)} onChange={() => toggle(it.id)} className="rounded" />
+              <span className="truncate">{it.filename || it.name || it.id}</span>
+              {it.file_size && <span className="ml-auto text-xs text-neutral-400 shrink-0">{(it.file_size/1024).toFixed(0)} KB</span>}
             </label>
           ))}
         </div>
-        <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onClose} className="px-3 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-          <button
-            disabled={selected.size === 0}
-            onClick={() => {
-              const chosen = filtered.filter(f => selected.has(f.id))
-              onAdd(chosen.map(f => ({ type: 'datacenter', id: f.id, name: f.display_name || f.filename || 'Anhang' })))
-              onClose()
-            }}
-            className="px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-          >
-            {selected.size > 0 ? `${selected.size} hinzufügen` : 'Auswählen'}
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
+          <button onClick={handleConfirm} disabled={selected.length === 0}
+            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {selected.length > 0 ? `${selected.length} hinzufügen` : 'Auswählen'}
           </button>
         </div>
       </div>
@@ -505,52 +489,51 @@ function DatacenterPicker({ onAdd, onClose }) {
   )
 }
 
-// ── SendDialog ────────────────────────────────────────────────────────────────
 function SendDialog({ invoices, onClose, onSent }) {
   const [sending, setSending] = useState(false)
   const [results, setResults] = useState(null)
   const [error, setError] = useState(null)
-  const [attachments, setAttachments] = useState([])   // {type, id|file, name, mime_type?}
+  const [attachments, setAttachments] = useState([])
   const [showDcPicker, setShowDcPicker] = useState(false)
   const isBulk = invoices.length > 1
   const single = invoices[0]
 
-  function removeAttachment(idx) {
-    setAttachments(a => a.filter((_, i) => i !== idx))
-  }
-
-  async function fileToB64(file) {
-    return new Promise((res, rej) => {
-      const r = new FileReader()
-      r.onload = () => res(r.result.split(',')[1])
-      r.onerror = rej
-      r.readAsDataURL(file)
+  function buildExtraAttachments() {
+    return attachments.map(a => {
+      if (a.source === 'datacenter') return { type: 'datacenter', id: a.id, filename: a.filename }
+      return { type: 'local', filename: a.filename, content_base64: a.content_base64 }
     })
   }
 
-  async function buildExtraAttachments() {
-    const out = []
-    for (const att of attachments) {
-      if (att.type === 'datacenter') {
-        out.push({ type: 'datacenter', id: att.id })
-      } else if (att.type === 'local') {
-        const data_b64 = await fileToB64(att.file)
-        out.push({ type: 'local', filename: att.name, mime_type: att.mime_type, data_b64 })
+  function handleLocalFile(e) {
+    const files = Array.from(e.target.files)
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = ev => {
+        const b64 = ev.target.result.split(',')[1]
+        setAttachments(s => [...s, { source: 'local', filename: file.name, content_base64: b64, _key: Math.random() }])
       }
-    }
-    return out
+      reader.readAsDataURL(file)
+    })
+    e.target.value = ''
+  }
+
+  function removeAttachment(key) {
+    setAttachments(s => s.filter(a => a._key !== key))
   }
 
   async function handleSend() {
     setSending(true)
     setError(null)
+    const extra = buildExtraAttachments()
     try {
-      const extra = await buildExtraAttachments()
       if (isBulk) {
         const res = await invoiceApi.bulkSendEmail(invoices.map(i => i.id))
         setResults(res.data.results)
         const ok = res.data.results.filter(r => r.ok).length
         toast.success(`${ok} von ${invoices.length} Belegen versendet`)
+        const statusMap = {}
+        res.data.results.forEach(r => { statusMap[r.id] = r.ok ? 'ok' : 'error' })
       } else {
         await invoiceApi.sendEmail(single.id, null, extra)
         toast.success(`${single.number} versendet`)
@@ -561,12 +544,27 @@ function SendDialog({ invoices, onClose, onSent }) {
       const msg = e.response?.data?.detail || 'Fehler beim Versenden'
       setError(msg)
       onSent(invoices.map(i => i.id), 'error', false)
-    }
-    finally { setSending(false) }
+    } finally { setSending(false) }
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      {showDcPicker && (
+        <DatacenterPicker
+          onClose={() => setShowDcPicker(false)}
+          onSelect={chosen => {
+            const newItems = chosen.map(it => ({
+              source: 'datacenter', id: it.id,
+              filename: it.filename || it.name || it.id,
+              _key: Math.random()
+            }))
+            setAttachments(s => {
+              const existingIds = s.filter(a => a.source === 'datacenter').map(a => a.id)
+              return [...s, ...newItems.filter(n => !existingIds.includes(n.id))]
+            })
+          }}
+        />
+      )}
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Mail size={16} className="text-blue-600" />
@@ -576,16 +574,44 @@ function SendDialog({ invoices, onClose, onSent }) {
           PDF wird generiert und an die E-Mail-Adresse des Kontakts gesendet. Status wird auf „Gesendet" gesetzt.
         </p>
 
+        {/* Anhänge */}
+        {attachments.length > 0 && (
+          <div className="mb-3 space-y-1">
+            {attachments.map(a => (
+              <div key={a._key} className="flex items-center gap-2 text-xs bg-neutral-50 border rounded-lg px-2 py-1">
+                <Paperclip size={11} className="text-neutral-400 shrink-0" />
+                <span className="truncate flex-1">{a.filename}</span>
+                <span className="text-neutral-400 shrink-0">{a.source === 'datacenter' ? 'DC' : 'Lokal'}</span>
+                <button onClick={() => removeAttachment(a._key)} className="text-neutral-400 hover:text-red-500">
+                  <XIcon size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Anhang hinzufügen Button */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setShowDcPicker(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg hover:bg-neutral-50 text-neutral-600"
+          >
+            <HardDrive size={13} /> Datacenter
+          </button>
+          <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg hover:bg-neutral-50 text-neutral-600 cursor-pointer">
+            <Upload size={13} /> Lokale Datei
+            <input type="file" className="hidden" multiple onChange={handleLocalFile} />
+          </label>
+        </div>
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 whitespace-pre-wrap">
             <strong>Fehler:</strong> {error}
           </div>
         )}
-
         {!results ? (
           <>
-            {/* Belegliste */}
-            <div className="bg-neutral-50 rounded-lg p-3 mb-3 max-h-32 overflow-y-auto divide-y">
+            <div className="bg-neutral-50 rounded-lg p-3 mb-4 max-h-40 overflow-y-auto divide-y">
               {invoices.map(inv => (
                 <div key={inv.id} className="py-2 flex items-center justify-between text-sm">
                   <span className="font-medium text-neutral-700">{inv.number}</span>
@@ -593,62 +619,13 @@ function SendDialog({ invoices, onClose, onSent }) {
                 </div>
               ))}
             </div>
-
-            {/* Anhänge */}
-            {attachments.length > 0 && (
-              <div className="mb-3 space-y-1">
-                {attachments.map((att, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-1.5 text-sm">
-                    <Paperclip size={13} className="text-neutral-400 shrink-0" />
-                    <span className="flex-1 truncate text-neutral-700">{att.name}</span>
-                    <span className="text-xs text-neutral-400 shrink-0">
-                      {att.type === 'datacenter' ? 'Datacenter' : 'Lokal'}
-                    </span>
-                    <button onClick={() => removeAttachment(i)} className="p-0.5 rounded hover:bg-neutral-200 text-neutral-400 hover:text-neutral-600">
-                      <X size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Aktionsleiste */}
-            <div className="flex items-center justify-between gap-2 mt-1">
-              {/* Anhang hinzufügen */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowDcPicker(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50 text-neutral-600"
-                >
-                  <Paperclip size={14} />
-                  Anhang hinzufügen
-                </button>
-                {/* Versteckter File-Input für lokalen Upload */}
-                <label className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50 text-neutral-600 cursor-pointer" title="Lokale Datei hochladen">
-                  <Upload size={14} />
-                  <span className="sr-only">Lokale Datei</span>
-                  <input type="file" multiple className="hidden"
-                    onChange={e => {
-                      const newAtts = Array.from(e.target.files).map(f => ({
-                        type: 'local', file: f, name: f.name, mime_type: f.type || 'application/octet-stream'
-                      }))
-                      setAttachments(a => [...a, ...newAtts])
-                      e.target.value = ''
-                    }}
-                  />
-                  Lokale Datei
-                </label>
-              </div>
-
-              {/* Senden / Abbrechen */}
-              <div className="flex items-center gap-2">
-                <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-                <button onClick={handleSend} disabled={sending}
-                  className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
-                  {sending ? <RefreshCw size={14} className="animate-spin" /> : <Mail size={14} />}
-                  {sending ? 'Wird gesendet…' : 'Jetzt senden'}
-                </button>
-              </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
+              <button onClick={handleSend} disabled={sending}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
+                {sending ? <RefreshCw size={14} className="animate-spin" /> : <Mail size={14} />}
+                {sending ? 'Wird gesendet…' : 'Jetzt senden'}
+              </button>
             </div>
           </>
         ) : (
@@ -674,224 +651,6 @@ function SendDialog({ invoices, onClose, onSent }) {
           </>
         )}
       </div>
-
-      {showDcPicker && (
-        <DatacenterPicker
-          onAdd={items => setAttachments(a => [...a, ...items])}
-          onClose={() => setShowDcPicker(false)}
-        />
-      )}
-    </div>
-  )
-}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-neutral-800 truncate">{f.display_name || f.filename}</p>
-                <p className="text-xs text-neutral-400">{f.mimetype || ''} {fmtSize(f.filesize)}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-        <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onClose} className="px-3 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-          <button
-            disabled={selected.size === 0}
-            onClick={() => {
-              const chosen = filtered.filter(f => selected.has(f.id))
-              onAdd(chosen.map(f => ({ type: 'datacenter', id: f.id, name: f.display_name || f.filename || 'Anhang' })))
-              onClose()
-            }}
-            className="px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-          >
-            {selected.size > 0 ? `${selected.size} hinzufügen` : 'Auswählen'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── SendDialog ────────────────────────────────────────────────────────────────
-function SendDialog({ invoices, onClose, onSent }) {
-  const [sending, setSending] = useState(false)
-  const [results, setResults] = useState(null)
-  const [error, setError] = useState(null)
-  const [attachments, setAttachments] = useState([])
-  const [showDcPicker, setShowDcPicker] = useState(false)
-  const isBulk = invoices.length > 1
-  const single = invoices[0]
-
-  function removeAttachment(idx) {
-    setAttachments(a => a.filter((_, i) => i !== idx))
-  }
-
-  async function fileToB64(file) {
-    return new Promise((res, rej) => {
-      const r = new FileReader()
-      r.onload = () => res(r.result.split(',')[1])
-      r.onerror = rej
-      r.readAsDataURL(file)
-    })
-  }
-
-  async function buildExtraAttachments() {
-    const out = []
-    for (const att of attachments) {
-      if (att.type === 'datacenter') {
-        out.push({ type: 'datacenter', id: att.id })
-      } else if (att.type === 'local') {
-        const data_b64 = await fileToB64(att.file)
-        out.push({ type: 'local', filename: att.name, mime_type: att.mime_type, data_b64 })
-      }
-    }
-    return out
-  }
-
-  async function handleSend() {
-    setSending(true)
-    setError(null)
-    try {
-      const extra = await buildExtraAttachments()
-      if (isBulk) {
-        const res = await invoiceApi.bulkSendEmail(invoices.map(i => i.id))
-        setResults(res.data.results)
-        const ok = res.data.results.filter(r => r.ok).length
-        toast.success(`${ok} von ${invoices.length} Belegen versendet`)
-      } else {
-        await invoiceApi.sendEmail(single.id, null, extra)
-        toast.success(`${single.number} versendet`)
-        onSent([single.id], 'ok', true)
-        return
-      }
-    } catch (e) {
-      const msg = e.response?.data?.detail || 'Fehler beim Versenden'
-      setError(msg)
-      onSent(invoices.map(i => i.id), 'error', false)
-    }
-    finally { setSending(false) }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
-        <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
-          <Mail size={16} className="text-blue-600" />
-          {isBulk ? `${invoices.length} Belege per E-Mail senden` : `${single.number} per E-Mail senden`}
-        </h2>
-        <p className="text-xs text-neutral-500 mb-4">
-          PDF wird generiert und an die E-Mail-Adresse des Kontakts gesendet. Status wird auf Gesendet gesetzt.
-        </p>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 whitespace-pre-wrap">
-            <strong>Fehler:</strong> {error}
-          </div>
-        )}
-
-        {!results ? (
-          <>
-            <div className="bg-neutral-50 rounded-lg p-3 mb-3 max-h-32 overflow-y-auto divide-y">
-              {invoices.map(inv => (
-                <div key={inv.id} className="py-2 flex items-center justify-between text-sm">
-                  <span className="font-medium text-neutral-700">{inv.number}</span>
-                  <span className="text-neutral-500 text-xs truncate max-w-[200px]">{inv.title || '—'}</span>
-                </div>
-              ))}
-            </div>
-
-            {attachments.length > 0 && (
-              <div className="mb-3 space-y-1">
-                {attachments.map((att, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-1.5 text-sm">
-                    <Paperclip size={13} className="text-neutral-400 shrink-0" />
-                    <span className="flex-1 truncate text-neutral-700">{att.name}</span>
-                    <span className="text-xs text-neutral-400 shrink-0">
-                      {att.type === 'datacenter' ? 'Datacenter' : 'Lokal'}
-                    </span>
-                    <button onClick={() => removeAttachment(i)} className="p-0.5 rounded hover:bg-neutral-200 text-neutral-400 hover:text-neutral-600">
-                      <X size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-2 mt-1">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowDcPicker(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50 text-neutral-600"
-                >
-                  <Paperclip size={14} /> Anhang hinzufügen
-                </button>
-                <label className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50 text-neutral-600 cursor-pointer">
-                  <Upload size={14} /> Lokale Datei
-                  <input type="file" multiple className="hidden"
-                    onChange={e => {
-                      const newAtts = Array.from(e.target.files).map(f => ({
-                        type: 'local', file: f, name: f.name, mime_type: f.type || 'application/octet-stream'
-                      }))
-                      setAttachments(a => [...a, ...newAtts])
-                      e.target.value = ''
-                    }}
-                  />
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-                <button onClick={handleSend} disabled={sending}
-                  className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
-                  {sending ? <RefreshCw size={14} className="animate-spin" /> : <Mail size={14} />}
-                  {sending ? 'Wird gesendet…' : 'Jetzt senden'}
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
-              {results.map(r => (
-                <div key={r.id} className={`flex items-center gap-2 text-sm p-2 rounded ${r.ok ? 'bg-green-50' : 'bg-red-50'}`}>
-                  {r.ok ? <CheckCircle2 size={14} className="text-green-600 shrink-0" /> : <XCircle size={14} className="text-red-500 shrink-0" />}
-                  <span className="font-medium">{r.number}</span>
-                  {r.ok ? <span className="text-neutral-500 text-xs">{r.to}</span> : <span className="text-red-500 text-xs">{r.error}</span>}
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end">
-              <button onClick={() => {
-                const okIds = results.filter(r => r.ok).map(r => r.id)
-                const errIds = results.filter(r => !r.ok).map(r => r.id)
-                if (okIds.length) onSent(okIds, 'ok', false)
-                if (errIds.length) onSent(errIds, 'error', false)
-                onSent([], 'ok', true)
-              }} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">Schließen</button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {showDcPicker && (
-        <DatacenterPicker
-          onAdd={items => setAttachments(a => [...a, ...items])}
-          onClose={() => setShowDcPicker(false)}
-        />
-      )}
-    </div>
-  )
-}
-                onSent([], 'ok', true)
-              }} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">Schließen</button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {showDcPicker && (
-        <DatacenterPicker
-          onAdd={items => setAttachments(a => [...a, ...items])}
-          onClose={() => setShowDcPicker(false)}
-        />
-      )}
     </div>
   )
 }
