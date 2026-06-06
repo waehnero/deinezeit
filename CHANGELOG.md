@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.6] – 2026-06-06 – E-Mail-Kommunikation erweitert
+
+### Neu
+- E-Mail-Dialog mit Kontaktinfo, Empfänger-Mail und CC-Feld hinzugefügt
+
+---
+
 ## [1.6.5] – 2026-06-06 – Kontaktname in Belegliste korrigiert
 
 ### Aktualisierungen
