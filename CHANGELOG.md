@@ -5,6 +5,15 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.4.1] – 2026-06-06 – nginx Healthcheck-Fix
+
+### Behoben
+- nginx wartet beim Start auf Backend-Healthcheck (`/api/health`) bevor es Anfragen weiterleitet
+- nginx löst Container-IPs dynamisch alle 10 Sekunden neu auf (Docker DNS-Resolver `127.0.0.11`) — kein manueller Neustart nach Backend-Recreate nötig
+- docker-compose.yml: fehlende Named Volumes (`certbot_conf`) und Networks-Sektion ergänzt
+
+---
+
 ## [1.4.0] – 2026-06-06 – E-Mail-Integration und Stabilität
 
 ### Neu
@@ -445,16 +454,4 @@ Format: [Version] – Datum – Was hat sich geändert
 ### Bugfixes & Verbesserungen
 - **Update-Prozess grundlegend überarbeitet**: Das Update läuft jetzt in einem unabhängigen `docker:cli`-Container außerhalb des Compose-Projekts — der Prozess übersteht den Neustart der eigenen Container und läuft sicher bis zum Ende durch
 - **Automatischer Rollback**: Schlägt Build oder Health-Check fehl, wird automatisch der vorherige Git-Commit wiederhergestellt und die Vorgänger-Version neu gestartet
-- **Domain-Konflikt behoben**: `update.sh` liest den echten Domain-Namen aus der laufenden nginx-Konfiguration, setzt die Datei für `git pull` zurück und baut sie danach mit der korrekten Domain neu auf — kein manueller Eingriff mehr nötig
-- **Health-Check nach Update**: Nach dem Neustart wird `/api/health` bis zu 2 Minuten gepollt; erst wenn das Backend antwortet gilt das Update als erfolgreich
-
-### Technische Details
-- `update.sh` übernimmt vollständigen Update-Ablauf: git pull → build → up -d → health-check → nginx reload
-- `_execute_update()` im Backend startet nur noch den `docker:cli`-Container per `docker run --rm --network host`
-- `nginx/maintenance.html`: statische Seite mit Auto-Refresh alle 10 Sekunden via `fetch('/api/health')`
-- `nginx/conf.d/app.conf`: `error_page 502 503 504 /maintenance.html` mit internem Location-Block
-- `docker-compose.yml`: `maintenance.html` als Read-only-Volume in nginx eingebunden
-- Neuer Endpoint `GET /api/system/health` für automatisierte Bereitschaftsprüfung
-
----
-
+- **Domain-Konflikt behoben**: `update.sh` liest den echten Domain-Namen aus der laufenden nginx-Konfiguration, s

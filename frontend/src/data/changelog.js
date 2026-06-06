@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.4.1',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    updates: [
+      'nginx-Healthcheck auf Backend: nginx startet erst wenn Backend bereit ist',
+      'nginx löst Container-IPs dynamisch alle 10 Sekunden neu auf — kein manueller Neustart nach Backend-Recreate nötig',
+      'docker-compose.yml: fehlende Volumes (certbot_conf) und Networks ergänzt',
+    ],
+  },
+  {
     version: '1.4.0',
     day: '06',
     month: 'Juni',
