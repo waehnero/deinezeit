@@ -409,11 +409,13 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
 function SendDialog({ invoices, onClose, onSent }) {
   const [sending, setSending] = useState(false)
   const [results, setResults] = useState(null)
+  const [error, setError] = useState(null)
   const isBulk = invoices.length > 1
   const single = invoices[0]
 
   async function handleSend() {
     setSending(true)
+    setError(null)
     try {
       if (isBulk) {
         const res = await invoiceApi.bulkSendEmail(invoices.map(i => i.id))
@@ -426,7 +428,10 @@ function SendDialog({ invoices, onClose, onSent }) {
         onSent()
         return
       }
-    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler beim Versenden') }
+    } catch (e) {
+      const msg = e.response?.data?.detail || 'Fehler beim Versenden'
+      setError(msg)
+    }
     finally { setSending(false) }
   }
 
@@ -440,6 +445,11 @@ function SendDialog({ invoices, onClose, onSent }) {
         <p className="text-xs text-neutral-500 mb-4">
           PDF wird generiert und an die E-Mail-Adresse des Kontakts gesendet. Status wird auf „Gesendet" gesetzt.
         </p>
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 whitespace-pre-wrap">
+            <strong>Fehler:</strong> {error}
+          </div>
+        )}
         {!results ? (
           <>
             <div className="bg-neutral-50 rounded-lg p-3 mb-4 max-h-40 overflow-y-auto divide-y">
