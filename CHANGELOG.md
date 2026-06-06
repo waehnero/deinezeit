@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.5.0] – 2026-06-06 – Mail-Icons (grün/orange) nach Versand + Status immer auf gesendet setzen
+
+### Neu
+- Mail-Icons (grün/orange) nach Versand + Status immer auf gesendet setzen
+
+---
+
 ## [1.4.5] – 2026-06-06 – E-Mail-Versand und Abrechnung
 
 ### Aktualisierungen

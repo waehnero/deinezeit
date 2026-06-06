@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.5.0',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Mail-Icons (grün/orange) nach Versand + Status immer auf gesendet setzen',
+    ],
+    updates: [],
+  },
+  {
     version: '1.4.5',
     day: '06',
     month: 'Juni',
