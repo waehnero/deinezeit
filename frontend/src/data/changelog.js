@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.6.7',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Mail-Icon in Rechnungsstatus bleibt nach Seitenwechsel erhalten',
+      'API und Abhängigkeiten wiederhergestellt, CC-Feld hinzugefügt',
+    ],
+  },
+  {
     version: '1.6.6',
     day: '06',
     month: 'Juni',

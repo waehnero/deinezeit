@@ -5,6 +5,14 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.7] – 2026-06-06 – Stabilität und Mail-Verwaltung
+
+### Aktualisierungen
+- Mail-Icon in Rechnungsstatus bleibt nach Seitenwechsel erhalten
+- API und Abhängigkeiten wiederhergestellt, CC-Feld hinzugefügt
+
+---
+
 ## [1.6.6] – 2026-06-06 – E-Mail-Kommunikation erweitert
 
 ### Neu
