@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '1.4.0',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Office 365 E-Mail-Integration via Microsoft Graph API',
+    ],
+    updates: [
+      'Weißer Bildschirm im Changelog-Panel der Anmeldeseite behoben',
+      'Update-Watchdog und HTTPS Health-Check optimiert',
+      'Belegbuch-Endpoints implementiert (Listenansicht, CSV- und PDF-Export)',
+      'Backup-Watcher mit Administratorrechten ausgeführt',
+      'Quellcode-Verwaltung für zuverlässige Docker-basierte Updates verbessert',
+    ],
+  },
+  {
     version: '1.3.13',
     day: '06',
     month: 'Juni',

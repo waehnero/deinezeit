@@ -5,6 +5,20 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.4.0] – 2026-06-06 – E-Mail-Integration und Stabilität
+
+### Neu
+- Office 365 E-Mail-Integration via Microsoft Graph API
+
+### Aktualisierungen
+- Weißer Bildschirm im Changelog-Panel der Anmeldeseite behoben
+- Update-Watchdog und HTTPS Health-Check optimiert
+- Belegbuch-Endpoints implementiert (Listenansicht, CSV- und PDF-Export)
+- Backup-Watcher mit Administratorrechten ausgeführt
+- Quellcode-Verwaltung für zuverlässige Docker-basierte Updates verbessert
+
+---
+
 ## [1.3.13] – 2026-06-06 – Update-Mechanismus Test
 
 ### Neu
