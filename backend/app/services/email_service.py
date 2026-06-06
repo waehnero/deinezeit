@@ -43,6 +43,7 @@ def _send_smtp(
     body_text: str,
     body_html: Optional[str] = None,
     attachments: Optional[list] = None,
+    cc_email: Optional[str] = None,
 ) -> None:
     """Versendet E-Mail via SMTP (STARTTLS oder SSL)."""
     cfg = _smtp_config(settings)
@@ -53,6 +54,8 @@ def _send_smtp(
     msg["Subject"] = subject
     msg["From"]    = f"{cfg['from_name']} <{cfg['from_email']}>" if cfg["from_name"] else cfg["from_email"]
     msg["To"]      = to_email
+    if cc_email:
+        msg["Cc"] = cc_email
 
     alt = MIMEMultipart("alternative") if attachments else msg
     alt.attach(MIMEText(body_text, "plain", "utf-8"))
@@ -80,7 +83,8 @@ def _send_smtp(
     if cfg["user"] and cfg["password"]:
         server.login(cfg["user"], cfg["password"])
 
-    server.sendmail(cfg["from_email"], [to_email], msg.as_string())
+    recipients = [to_email] + ([cc_email] if cc_email else [])
+    server.sendmail(cfg["from_email"], recipients, msg.as_string())
     server.quit()
 
 
@@ -124,6 +128,7 @@ def _send_graph(
     body_text: str,
     body_html: Optional[str] = None,
     attachments: Optional[list] = None,
+    cc_email: Optional[str] = None,
 ) -> None:
     """Versendet E-Mail via Microsoft Graph API (sendMail)."""
     tenant_id     = settings.get("ms_tenant_id", "").strip()
@@ -159,6 +164,7 @@ def _send_graph(
         "toRecipients": [
             {"emailAddress": {"address": to_email}}
         ],
+        **({"ccRecipients": [{"emailAddress": {"address": cc_email}}]} if cc_email else {}),
     }
 
     # Anhänge (base64-kodiert)
@@ -204,6 +210,7 @@ def send_email(
     body_text: str,
     body_html: Optional[str] = None,
     attachments: Optional[list] = None,
+    cc_email: Optional[str] = None,
 ) -> None:
     """
     Versendet eine E-Mail — automatische Auswahl zwischen Graph API und SMTP.
@@ -218,6 +225,6 @@ def send_email(
     """
     provider = settings.get("email_provider", "smtp")
     if provider == "graph":
-        _send_graph(settings, to_email, subject, body_text, body_html, attachments)
+        _send_graph(settings, to_email, subject, body_text, body_html, attachments, cc_email)
     else:
-        _send_smtp(settings, to_email, subject, body_text, body_html, attachments)
+        _send_smtp(settings, to_email, subject, body_text, body_html, attachments, cc_email)

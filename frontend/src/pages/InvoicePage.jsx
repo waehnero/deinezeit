@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { invoiceApi, datacenterApi } from '../services/api'
+import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Plus, Search, FileText, RefreshCw, Download,
@@ -497,8 +497,18 @@ function SendDialog({ invoices, onClose, onSent }) {
   const [error, setError] = useState(null)
   const [attachments, setAttachments] = useState([])
   const [showDcPicker, setShowDcPicker] = useState(false)
+  const [ccEmail, setCcEmail] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
   const isBulk = invoices.length > 1
   const single = invoices[0]
+
+  // Kontakt-E-Mail laden (nur Einzelversand)
+  useEffect(() => {
+    if (isBulk || !single?.contact_id) return
+    masterdataApi.getRecord('kontakte', single.contact_id)
+      .then(r => setContactEmail(r.data?.data?.email || ''))
+      .catch(() => {})
+  }, [single?.contact_id, isBulk])
 
   function buildExtraAttachments() {
     return attachments.map(a => {
@@ -537,7 +547,7 @@ function SendDialog({ invoices, onClose, onSent }) {
         const statusMap = {}
         res.data.results.forEach(r => { statusMap[r.id] = r.ok ? 'ok' : 'error' })
       } else {
-        await invoiceApi.sendEmail(single.id, null, extra)
+        await invoiceApi.sendEmail(single.id, null, extra, ccEmail)
         toast.success(`${single.number} versendet`)
         onSent([single.id], 'ok', true)
         return
@@ -572,6 +582,31 @@ function SendDialog({ invoices, onClose, onSent }) {
           <Mail size={16} className="text-blue-600" />
           {isBulk ? `${invoices.length} Belege per E-Mail senden` : `${single.number} per E-Mail senden`}
         </h2>
+
+        {/* Empfänger-Info (nur Einzelversand) */}
+        {!isBulk && (
+          <div className="mb-4 bg-neutral-50 border rounded-lg px-4 py-3 text-sm space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-400 w-16 shrink-0 text-xs">Kontakt</span>
+              <span className="font-medium text-neutral-800">{single.contact_name || '—'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-400 w-16 shrink-0 text-xs">An</span>
+              <span className="text-neutral-700">{contactEmail || <span className="italic text-neutral-400">Keine E-Mail hinterlegt</span>}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-400 w-16 shrink-0 text-xs">CC</span>
+              <input
+                type="email"
+                value={ccEmail}
+                onChange={e => setCcEmail(e.target.value)}
+                placeholder="CC-Adresse (optional)"
+                className="flex-1 border border-neutral-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-neutral-500 mb-4">
           PDF wird generiert und an die E-Mail-Adresse des Kontakts gesendet. Status wird auf „Gesendet" gesetzt.
         </p>

@@ -854,7 +854,7 @@ def _load_pdf_context(db: Session, invoice: Invoice):
 
 def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict,
                          sender_contact, recipient_contact, to_email: str, current_user_email: str,
-                         extra_attachments: list = None):
+                         extra_attachments: list = None, cc_email: str = None):
     """Generiert PDF und versendet per E-Mail.
     extra_attachments: Liste von Dicts mit:
       - type='datacenter': {type, id}  → wird aus Storage geladen
@@ -909,6 +909,7 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
         subject=subject,
         body_text=body,
         attachments=attachments,
+        cc_email=cc_email or None,
     )
 
     # Status auf "gesendet" setzen (außer bereits bezahlt/storniert/angenommen/abgelehnt)
@@ -936,6 +937,7 @@ async def send_invoice_email(
     settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
 
     to_email = body.get("to_email", "")
+    cc_email = body.get("cc_email", "") or None
     if not to_email and recipient_contact:
         to_email = (recipient_contact.data or {}).get("email", "")
     if not to_email:
@@ -946,7 +948,7 @@ async def send_invoice_email(
     try:
         _send_invoice_email(inv, db, settings_d, inv_settings_d,
                              sender_contact, recipient_contact, to_email, current_user.email,
-                             extra_attachments=extra_attachments)
+                             extra_attachments=extra_attachments, cc_email=cc_email)
         db.commit()
     except ValueError as e:
         raise HTTPException(400, str(e))

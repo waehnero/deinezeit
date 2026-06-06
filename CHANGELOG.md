@@ -41,6 +41,15 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.8.0] – 2026-06-07 – E-Mail-Dialog: Kontaktinfo & CC-Empfänger
+
+### Neu
+- E-Mail-Versand-Dialog zeigt Kontaktname und Empfänger-E-Mail an
+- CC-Adresse kann optional eingetragen werden
+- Backend: CC-Unterstützung für SMTP und Microsoft Graph API
+
+---
+
 ## [1.7.0] – 2026-06-06 – Kontakt in Belegliste & Formular
 
 ### Neu
@@ -493,22 +502,4 @@ Format: [Version] – Datum – Was hat sich geändert
 - **Tab-Navigation im Formular**: Beim Bearbeiten eines Datensatzes werden die Register als Reiter angezeigt
 - **Drag & Drop auf Tab-Reiter**: Felder durch Fallen-Lassen auf einen Tab-Reiter verschieben
 - **Neues Feld landet im richtigen Register**: Beim Hinzufügen eines Felds wird der aktuell aktive Tab vorausgewählt
-- **Relation-Felder**: Verknüpfungen zwischen verschiedenen Stammdaten-Typen möglich (z.B. Ansprechpartner → Kontakt)
-
-### Bugfixes
-- Neuen Stammdaten-Typ anlegen funktioniert wieder (Schema-Validierungsfehler behoben)
-- Fehlerbehandlung bei API-Fehlern verhindert leere Seite (React-Crash durch Pydantic-v2-Fehlerformat)
-- Neue Felder übernehmen Tab-Zugehörigkeit und Feldbreite korrekt
-
-### Technische Details
-- Migration 0009: Neue Spalte `tab` in `field_definitions`, neue Spalte `tabs` (JSONB) in `entity_types`
-- Neue Endpoints: `PUT /masterdata/types/{slug}/tabs`, `PUT /masterdata/types/{slug}/fields-layout`
-- @dnd-kit `useDroppable` + `pointerWithin` für Tab-Drop-Zonen
-
----
-
-## [0.9.0] – 2026-05-26 – Update-Verwaltung im Browser
-
-### Neu
-- **System-Tab in den Einstellungen**: Zeigt die aktuelle App-Version, den vollständigen Changelog und die Anzahl aktiver Benutzer — alles auf einen Blick
-- **Update starten per Klick**: Admin kann ein Server-Update direkt aus dem Browser anstoßen — kein SSH-Zugriff me
+- **Relation-Felder**: Verknüpfungen zwischen verschiedenen Stammdate
