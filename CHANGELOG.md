@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.4.3] – 2026-06-06 – E-Mail-Versand repariert
+
+### Aktualisierungen
+- E-Mail-Versand und Rechnungsgenerierung wiederhergestellt
+
+---
+
 ## [1.4.2] – 2026-06-06 – Nginx-Stabilität und Docker-Verbesserungen
 
 ### Aktualisierungen

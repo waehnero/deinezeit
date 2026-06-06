@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.4.3',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'E-Mail-Versand und Rechnungsgenerierung wiederhergestellt',
+    ],
+  },
+  {
     version: '1.4.2',
     day: '06',
     month: 'Juni',
