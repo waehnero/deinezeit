@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
-  MoreHorizontal, Book, RotateCcw, Mail
+  MoreHorizontal, Book, RotateCcw, Mail, MailCheck, MailX
 } from 'lucide-react'
 
 function fmtDate(d) {
@@ -59,6 +59,7 @@ export default function InvoicePage() {
   const [paidDialog, setPaidDialog] = useState(null)
   const [sendDialog, setSendDialog] = useState(null)
   const [selected, setSelected] = useState(new Set())
+  const [sentStatus, setSentStatus] = useState({}) // id → 'ok' | 'error'
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -228,7 +229,17 @@ export default function InvoicePage() {
                   </td>
                   <td className="px-4 py-3 text-neutral-700">{inv.title || '—'}</td>
                   <td className="px-4 py-3 text-right font-medium text-neutral-800">{fmtEuro(inv.total)}</td>
-                  <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={inv.status} />
+                      {sentStatus[inv.id] === 'ok' && (
+                        <MailCheck size={15} className="text-green-500 shrink-0" title="Erfolgreich versendet" />
+                      )}
+                      {sentStatus[inv.id] === 'error' && (
+                        <MailX size={15} className="text-orange-500 shrink-0" title="Versand fehlgeschlagen" />
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div className="relative">
                       <button onClick={() => setActionMenu(actionMenu === inv.id ? null : inv.id)}
@@ -258,7 +269,14 @@ export default function InvoicePage() {
 
       {sendDialog && (
         <SendDialog invoices={sendDialog.invoices} onClose={() => setSendDialog(null)}
-          onSent={() => { setSendDialog(null); setSelected(new Set()); load() }} />
+          onSent={(ids, status, close = true) => {
+            setSentStatus(prev => {
+              const next = { ...prev }
+              ids.forEach(id => { next[id] = status })
+              return next
+            })
+            if (close) { setSendDialog(null); setSelected(new Set()); load() }
+          }} />
       )}
       {cancelDialog && (
         <CancelDialog invoice={cancelDialog} onClose={() => setCancelDialog(null)}
@@ -422,15 +440,20 @@ function SendDialog({ invoices, onClose, onSent }) {
         setResults(res.data.results)
         const ok = res.data.results.filter(r => r.ok).length
         toast.success(`${ok} von ${invoices.length} Belegen versendet`)
+        // Icons: ok → grün, fehler → orange
+        const statusMap = {}
+        res.data.results.forEach(r => { statusMap[r.id] = r.ok ? 'ok' : 'error' })
+        // bulk: kein sofortiges onSent — User sieht Ergebnisliste
       } else {
         await invoiceApi.sendEmail(single.id, null)
         toast.success(`${single.number} versendet`)
-        onSent()
+        onSent([single.id], 'ok', true)
         return
       }
     } catch (e) {
       const msg = e.response?.data?.detail || 'Fehler beim Versenden'
       setError(msg)
+      onSent(invoices.map(i => i.id), 'error', false)
     }
     finally { setSending(false) }
   }
@@ -481,7 +504,13 @@ function SendDialog({ invoices, onClose, onSent }) {
               ))}
             </div>
             <div className="flex justify-end">
-              <button onClick={onSent} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">Schließen</button>
+              <button onClick={() => {
+                        const okIds = results.filter(r => r.ok).map(r => r.id)
+                const errIds = results.filter(r => !r.ok).map(r => r.id)
+                if (okIds.length) onSent(okIds, 'ok', false)
+                if (errIds.length) onSent(errIds, 'error', false)
+                onSent([], 'ok', true) // Dialog schließen + reload
+              }} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">Schließen</button>
             </div>
           </>
         )}

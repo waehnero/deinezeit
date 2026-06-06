@@ -854,8 +854,8 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
         attachments=[{"filename": filename, "data": pdf_bytes, "mime_type": "application/pdf"}],
     )
 
-    # Status auf "gesendet" setzen
-    if inv.status == "entwurf":
+    # Status auf "gesendet" setzen (außer bereits bezahlt/storniert/angenommen/abgelehnt)
+    if inv.status not in ("bezahlt", "storniert", "angenommen", "abgelehnt"):
         inv.status = "gesendet"
         inv.updated_by = current_user_email
         db.add(inv)
