@@ -827,10 +827,18 @@ def _load_pdf_context(db: Session, invoice: Invoice):
 
 
 def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict,
-                         sender_contact, recipient_contact, to_email: str, current_user_email: str):
-    """Generiert PDF und versendet per E-Mail."""
+                         sender_contact, recipient_contact, to_email: str, current_user_email: str,
+                         extra_attachments: list = None):
+    """Generiert PDF und versendet per E-Mail.
+    extra_attachments: Liste von Dicts mit:
+      - type='datacenter': {type, id}  → wird aus Storage geladen
+      - type='local':      {type, filename, mime_type, data_b64}  → base64-kodiert
+    """
+    import base64
     from app.services.invoice_pdf import generate_pdf
     from app.services.email_service import send_email
+    from app.models.attachment import Attachment
+    from app.services import storage_service
 
     doc_label = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
     company_name = settings_d.get("company_name", "DeineZeit")
@@ -846,12 +854,35 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
         f"Mit freundlichen Grüßen\n{company_name}"
     )
 
+    attachments = [{"filename": filename, "data": pdf_bytes, "mime_type": "application/pdf"}]
+
+    for att in (extra_attachments or []):
+        try:
+            if att.get("type") == "datacenter":
+                dc = db.query(Attachment).filter(Attachment.id == att["id"]).first()
+                if dc and dc.storage_key:
+                    data, mime = storage_service.download_file(dc.storage_key)
+                    attachments.append({
+                        "filename":  dc.filename or dc.display_name or "anhang",
+                        "data":      data,
+                        "mime_type": mime or dc.mimetype or "application/octet-stream",
+                    })
+            elif att.get("type") == "local":
+                data = base64.b64decode(att.get("data_b64", ""))
+                attachments.append({
+                    "filename":  att.get("filename", "anhang"),
+                    "data":      data,
+                    "mime_type": att.get("mime_type", "application/octet-stream"),
+                })
+        except Exception:
+            pass  # Einzelner fehlerhafter Anhang soll Versand nicht blockieren
+
     send_email(
         settings=settings_d,
         to_email=to_email,
         subject=subject,
         body_text=body,
-        attachments=[{"filename": filename, "data": pdf_bytes, "mime_type": "application/pdf"}],
+        attachments=attachments,
     )
 
     # Status auf "gesendet" setzen (außer bereits bezahlt/storniert/angenommen/abgelehnt)
@@ -884,9 +915,12 @@ async def send_invoice_email(
     if not to_email:
         raise HTTPException(400, "Keine E-Mail-Adresse vorhanden. Bitte im Kontakt hinterlegen.")
 
+    extra_attachments = body.get("extra_attachments", [])
+
     try:
         _send_invoice_email(inv, db, settings_d, inv_settings_d,
-                             sender_contact, recipient_contact, to_email, current_user.email)
+                             sender_contact, recipient_contact, to_email, current_user.email,
+                             extra_attachments=extra_attachments)
         db.commit()
     except ValueError as e:
         raise HTTPException(400, str(e))
