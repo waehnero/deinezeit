@@ -127,8 +127,7 @@ async def list_invoices(
     if contact_ids:
         recs = db.query(EntityRecord).filter(EntityRecord.id.in_(contact_ids)).all()
         for r in recs:
-            d = r.data or {}
-            contact_map[r.id] = d.get("name") or d.get("firma") or d.get("vorname") or ""
+            contact_map[r.id] = r.display_name or ""
 
     result = []
     for inv in invoices:
