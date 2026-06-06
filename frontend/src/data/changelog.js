@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.6.1',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'InvoicePage: Anhänge-Feature korrekt integriert ohne Duplikate',
+    ],
+  },
+  {
     version: '1.6.0',
     day: '06',
     month: 'Juni',

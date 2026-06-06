@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.1] – 2026-06-06 – Anhänge-Feature korrigiert
+
+### Aktualisierungen
+- InvoicePage: Anhänge-Feature korrekt integriert ohne Duplikate
+
+---
+
 ## [1.6.0] – 2026-06-06 – E-Mail-Anhänge & Datacenter-Browser
 
 ### Neu
