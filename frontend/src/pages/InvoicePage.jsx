@@ -433,7 +433,7 @@ function DatacenterPicker({ onSelect, onClose }) {
 
   useEffect(() => {
     datacenterApi.listAll().then(r => {
-      setItems(r.data || [])
+      setItems(r.data?.attachments || [])
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
