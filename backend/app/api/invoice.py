@@ -804,6 +804,28 @@ DOC_TYPE_LABELS_DE = {
 }
 
 
+
+def _load_pdf_context(db: Session, invoice: Invoice):
+    """Lädt Settings, InvoiceSettings, Sender- und Empfängerkontakt."""
+    settings = {r.key: r.value for r in db.query(Setting).all()}
+    inv_settings = {r.key: r.value for r in db.query(InvoiceSettings).all()}
+
+    sender_contact = None
+    cid = settings.get("company_contact_id")
+    if cid:
+        try:
+            from uuid import UUID as _UUID
+            sender_contact = db.query(EntityRecord).filter(EntityRecord.id == _UUID(cid)).first()
+        except Exception:
+            pass
+
+    recipient_contact = None
+    if invoice.contact_id:
+        recipient_contact = db.query(EntityRecord).filter(EntityRecord.id == invoice.contact_id).first()
+
+    return settings, inv_settings, sender_contact, recipient_contact
+
+
 def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict,
                          sender_contact, recipient_contact, to_email: str, current_user_email: str):
     """Generiert PDF und versendet per E-Mail."""
@@ -941,4 +963,72 @@ async def get_unbilled_time_entries(
     from app.models.zeiterfassung import TimeEntry
     from sqlalchemy import not_, or_ as _or_
 
-    billed_ids = db.query(InvoicePosition.time_entry_id).fi
+
+    # Bereits verrechnete Einträge ausschließen
+    billed_ids = db.query(InvoicePosition.time_entry_id).filter(
+        InvoicePosition.time_entry_id.isnot(None)
+    ).subquery()
+
+    q = db.query(TimeEntry).filter(
+        TimeEntry.ended_at.isnot(None),
+        TimeEntry.billable == True,
+        _or_(TimeEntry.id.notin_(db.query(billed_ids.c.time_entry_id)), False),
+    )
+    # Workaround: NOT IN mit Subquery
+    billed_entry_ids = [r[0] for r in db.query(InvoicePosition.time_entry_id).filter(
+        InvoicePosition.time_entry_id.isnot(None)
+    ).all()]
+    if billed_entry_ids:
+        q = q.filter(not_(TimeEntry.id.in_(billed_entry_ids)))
+
+    # Filter: contact_id
+    if contact_id:
+        primary = q.filter(TimeEntry.contact_id == contact_id).all()
+        if primary:
+            entries = primary
+        else:
+            entries = q.filter(TimeEntry.contact_name.ilike(
+                f"%{str(contact_id)}%"
+            )).all()
+        q = db.query(TimeEntry).filter(TimeEntry.id.in_([e.id for e in entries]))
+        if billed_entry_ids:
+            q = q.filter(not_(TimeEntry.id.in_(billed_entry_ids)))
+
+    # Filter: project_id
+    if project_id:
+        primary = q.filter(TimeEntry.project_id == project_id).all()
+        if primary:
+            q = db.query(TimeEntry).filter(TimeEntry.id.in_([e.id for e in primary]))
+        else:
+            q = q.filter(TimeEntry.project_name.ilike(f"%{str(project_id)}%"))
+        if billed_entry_ids:
+            q = q.filter(not_(TimeEntry.id.in_(billed_entry_ids)))
+
+    # Filter: search
+    if search:
+        q = q.filter(_or_(
+            TimeEntry.note.ilike(f"%{search}%"),
+            TimeEntry.contact_name.ilike(f"%{search}%"),
+            TimeEntry.project_name.ilike(f"%{search}%"),
+        ))
+
+    entries = q.order_by(TimeEntry.started_at.desc()).limit(200).all()
+
+    result = []
+    for e in entries:
+        dur_h = round(e.duration_minutes / 60, 2) if e.duration_minutes else 0
+        result.append({
+            "id":             str(e.id),
+            "started_at":     e.started_at.isoformat() if e.started_at else None,
+            "ended_at":       e.ended_at.isoformat() if e.ended_at else None,
+            "duration_hours": dur_h,
+            "duration_minutes": e.duration_minutes,
+            "note":           e.note or "",
+            "description":    e.note or "Zeitaufwand",
+            "contact_name":   e.contact_name or "",
+            "project_name":   e.project_name or "",
+            "contact_id":     str(e.contact_id) if e.contact_id else None,
+            "project_id":     str(e.project_id) if e.project_id else None,
+            "billable":       e.billable,
+        })
+    return result
