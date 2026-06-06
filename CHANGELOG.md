@@ -5,6 +5,14 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.3] – 2026-06-06 – Kontaktanzeige in Belegen
+
+### Aktualisierungen
+- Kontakt wird nun in der Belegliste angezeigt
+- Kontaktfeld im Formular repariert
+
+---
+
 ## [1.6.2] – 2026-06-06 – DatacenterPicker API-Kompatibilität
 
 ### Aktualisierungen

@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.6.3',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Kontakt wird nun in der Belegliste angezeigt',
+      'Kontaktfeld im Formular repariert',
+    ],
+  },
+  {
     version: '1.6.2',
     day: '06',
     month: 'Juni',
