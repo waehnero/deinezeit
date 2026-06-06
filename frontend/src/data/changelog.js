@@ -4,6 +4,15 @@
  */
 export const changelog = [
   {
+    version: '1.3.13',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    updates: [
+      'Update-Mechanismus End-to-End erfolgreich getestet',
+    ],
+  },
+    {
     version: '1.3.12',
     day: '06',
     month: 'Juni',

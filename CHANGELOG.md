@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.13] – 2026-06-06 – Update-Mechanismus Test
+
+### Neu
+- Update-Mechanismus End-to-End erfolgreich getestet
+
+---
+
 ## [1.3.12] – 2026-06-06 – Weißer Bildschirm nach Update behoben
 
 ### Behoben
