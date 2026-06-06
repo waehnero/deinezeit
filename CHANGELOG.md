@@ -5,6 +5,14 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.4.2] – 2026-06-06 – Nginx-Stabilität und Docker-Verbesserungen
+
+### Aktualisierungen
+- Healthcheck und dynamische DNS-Auflösung für Nginx optimiert
+- Docker-Compose-Konfiguration vervollständigt
+
+---
+
 ## [1.4.1] – 2026-06-06 – nginx Healthcheck-Fix
 
 ### Behoben

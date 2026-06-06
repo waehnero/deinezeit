@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.4.2',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Healthcheck und dynamische DNS-Auflösung für Nginx optimiert',
+      'Docker-Compose-Konfiguration vervollständigt',
+    ],
+  },
+  {
     version: '1.4.1',
     day: '06',
     month: 'Juni',
