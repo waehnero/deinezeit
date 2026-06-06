@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.5] – 2026-06-06 – Kontaktname in Belegliste korrigiert
+
+### Aktualisierungen
+- Kontaktnamen werden in der Belegliste nun korrekt angezeigt
+
+---
+
 ## [1.6.4] – 2026-06-06 – Kontaktsuche Bugfix
 
 ### Aktualisierungen

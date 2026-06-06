@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.6.5',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Kontaktnamen werden in der Belegliste nun korrekt angezeigt',
+    ],
+  },
+  {
     version: '1.6.4',
     day: '06',
     month: 'Juni',
