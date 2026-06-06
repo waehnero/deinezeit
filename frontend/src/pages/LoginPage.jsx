@@ -14,7 +14,9 @@ function NewsPanel() {
 
   // Nur Einträge anzeigen, die im aktiven Tab Inhalt haben
   const items = changelog.filter(entry =>
-    activeTab === 'features' ? entry.features.length > 0 : entry.updates.length > 0
+    activeTab === 'features'
+      ? (entry.features?.length ?? 0) > 0
+      : (entry.updates?.length ?? 0) > 0
   )
 
   return (
@@ -58,7 +60,7 @@ function NewsPanel() {
           <p className="text-white/60 text-sm text-center pt-8">Keine Einträge</p>
         ) : (
           items.map((entry, idx) => {
-            const list = activeTab === 'features' ? entry.features : entry.updates
+            const list = activeTab === 'features' ? (entry.features ?? []) : (entry.updates ?? [])
             const Icon = activeTab === 'features' ? Check : Wrench
             return (
               <div key={entry.version} className="flex gap-3">

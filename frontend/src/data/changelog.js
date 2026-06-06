@@ -4,12 +4,23 @@
  */
 export const changelog = [
   {
+    version: '1.3.12',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    title: 'Weißer Bildschirm nach Update behoben',
+    updates: [
+      'Absturz auf der Anmeldeseite bei Changelog-Einträgen ohne features/updates-Schlüssel behoben',
+      'Changelog-Eintrag 1.3.11 korrekt im Updates-Tab sichtbar',
+    ],
+  },
+  {
     version: '1.3.11',
     day: '06',
     month: 'Juni',
     year: '2026',
     title: 'Update-Prozess Stabilitätsverbesserungen',
-    changes: [
+    updates: [
       'Update-Status bleibt nicht mehr auf "Aktualisierung läuft" stecken (Watchdog nach 5 Min)',
       'Health-Check im Update-Script auf HTTPS umgestellt',
       'nginx-Konfiguration und update.sh jetzt in git versioniert',

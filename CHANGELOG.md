@@ -5,6 +5,14 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.3.12] – 2026-06-06 – Weißer Bildschirm nach Update behoben
+
+### Behoben
+- Absturz auf der Anmeldeseite wenn ein Changelog-Eintrag weder "features" noch "updates" enthält (optional chaining)
+- changelog.js v1.3.11: "changes" in "updates" umbenannt damit Eintrag im Updates-Tab erscheint
+
+---
+
 ## [1.3.11] – 2026-06-06 – Update-Prozess Stabilitätsverbesserungen
 
 ### Behoben
