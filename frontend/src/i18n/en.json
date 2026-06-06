@@ -1,0 +1,62 @@
+{
+  "app": {
+    "name": "DeineZeit",
+    "tagline": "Your Business Platform"
+  },
+  "auth": {
+    "login": "Sign In",
+    "logout": "Sign Out",
+    "email": "Email Address",
+    "password": "Password",
+    "totpCode": "2FA Code (6 digits)",
+    "loginButton": "Sign In",
+    "loginWithPasskey": "Sign in with Face ID / Fingerprint",
+    "forgotPassword": "Forgot password?",
+    "welcomeBack": "Welcome back",
+    "loginSubtitle": "Sign in with your credentials",
+    "invalidCredentials": "Invalid email or password",
+    "totpRequired": "Please enter your 2FA code",
+    "totpInvalid": "Invalid 2FA code"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "masterData": "Master Data",
+    "customers": "Customers",
+    "suppliers": "Suppliers",
+    "projects": "Projects",
+    "settings": "Settings",
+    "users": "User Management",
+    "profile": "My Profile"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Successfully saved",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "noData": "No entries found"
+  },
+  "profile": {
+    "title": "My Profile",
+    "language": "Language",
+    "twoFactor": "Two-Factor Authentication",
+    "twoFactorEnabled": "2FA is enabled",
+    "twoFactorDisabled": "2FA is disabled",
+    "enableTotp": "Enable 2FA",
+    "disableTotp": "Disable 2FA",
+    "passkeys": "Face ID / Passkeys",
+    "addPasskey": "Add new passkey",
+    "noPasskeys": "No passkeys registered yet"
+  },
+  "languages": {
+    "de": "Deutsch",
+    "en": "English"
+  }
+}

@@ -743,4 +743,202 @@ async def convert_to_invoice(
         raise HTTPException(400, "Nur Angebote oder Auftragsbestätigungen können umgewandelt werden")
 
     year = datetime.now().date().year
-    sequence, nu
+    sequence, number = _next_number(db, "rechnung", year)
+
+    invoice = Invoice(
+        doc_type="rechnung",
+        number=number,
+        year=year,
+        sequence=sequence,
+        contact_id=offer.contact_id,
+        project_id=offer.project_id,
+        related_invoice_id=offer.id,
+        title=offer.title,
+        date=datetime.now().date(),
+        tax_mode=offer.tax_mode,
+        currency=offer.currency,
+        template_id=offer.template_id,
+        intro_text=offer.intro_text,
+        outro_text=offer.outro_text,
+        status="entwurf",
+        created_by=current_user.email,
+        updated_by=current_user.email,
+    )
+    db.add(invoice)
+    db.flush()
+
+    for orig_pos in offer.positions:
+        pos = InvoicePosition(
+            invoice_id=invoice.id,
+            sort_order=orig_pos.sort_order,
+            pos_type=orig_pos.pos_type,
+            description=orig_pos.description,
+            detail=orig_pos.detail,
+            quantity=orig_pos.quantity,
+            unit=orig_pos.unit,
+            unit_price=orig_pos.unit_price,
+            discount_pct=orig_pos.discount_pct,
+            tax_rate=orig_pos.tax_rate,
+        )
+        db.add(pos)
+
+    offer.status = "angenommen"
+    db.flush()
+    db.refresh(invoice)
+    _calc_totals(invoice)
+    db.commit()
+    db.refresh(invoice)
+    return invoice
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# E-Mail-Versand
+# ─────────────────────────────────────────────────────────────────────────────
+
+DOC_TYPE_LABELS_DE = {
+    "rechnung":             "Rechnung",
+    "angebot":              "Angebot",
+    "auftragsbestaetigung": "Auftragsbestätigung",
+    "gutschrift":           "Gutschrift",
+    "lieferschein":         "Lieferschein",
+}
+
+
+def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict,
+                         sender_contact, recipient_contact, to_email: str, current_user_email: str):
+    """Generiert PDF und versendet per E-Mail."""
+    from app.services.invoice_pdf import generate_pdf
+    from app.services.email_service import send_email
+
+    doc_label = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
+    company_name = settings_d.get("company_name", "DeineZeit")
+
+    pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
+                              sender_contact, recipient_contact)
+
+    filename = f"{inv.number.replace('/', '-')}.pdf"
+    subject  = f"{doc_label} {inv.number} von {company_name}"
+    body     = (
+        f"Sehr geehrte Damen und Herren,\n\n"
+        f"anbei erhalten Sie {doc_label} {inv.number}.\n\n"
+        f"Mit freundlichen Grüßen\n{company_name}"
+    )
+
+    send_email(
+        settings=settings_d,
+        to_email=to_email,
+        subject=subject,
+        body_text=body,
+        attachments=[{"filename": filename, "data": pdf_bytes, "mime_type": "application/pdf"}],
+    )
+
+    # Status auf "gesendet" setzen
+    if inv.status == "entwurf":
+        inv.status = "gesendet"
+        inv.updated_by = current_user_email
+        db.add(inv)
+
+
+@router.post("/{invoice_id}/send-email")
+async def send_invoice_email(
+    invoice_id: UUID,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Versendet einen Beleg per E-Mail.
+    Body: { to_email: str (optional — wird sonst aus Kontakt gelesen) }
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
+
+    to_email = body.get("to_email", "")
+    if not to_email and recipient_contact:
+        to_email = (recipient_contact.data or {}).get("email", "")
+    if not to_email:
+        raise HTTPException(400, "Keine E-Mail-Adresse vorhanden. Bitte im Kontakt hinterlegen.")
+
+    try:
+        _send_invoice_email(inv, db, settings_d, inv_settings_d,
+                             sender_contact, recipient_contact, to_email, current_user.email)
+        db.commit()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"E-Mail konnte nicht gesendet werden: {str(e)}")
+
+    return {"ok": True, "to": to_email, "number": inv.number}
+
+
+@router.post("/bulk-send-email")
+async def bulk_send_email(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Versendet mehrere Belege per E-Mail.
+    Body: { invoice_ids: [str, ...] }
+    """
+    from uuid import UUID as _UUID
+    ids = [_UUID(i) for i in body.get("invoice_ids", [])]
+    if not ids:
+        raise HTTPException(400, "Keine Belege angegeben")
+
+    results = []
+    for inv_id in ids:
+        inv = db.query(Invoice).filter(Invoice.id == inv_id).first()
+        if not inv:
+            results.append({"id": str(inv_id), "ok": False, "error": "Nicht gefunden"})
+            continue
+
+        settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
+
+        to_email = (recipient_contact.data or {}).get("email", "") if recipient_contact else ""
+        if not to_email:
+            results.append({"id": str(inv_id), "number": inv.number, "ok": False,
+                             "error": "Keine E-Mail-Adresse im Kontakt"})
+            continue
+
+        try:
+            _send_invoice_email(inv, db, settings_d, inv_settings_d,
+                                 sender_contact, recipient_contact, to_email, current_user.email)
+            results.append({"id": str(inv_id), "number": inv.number, "ok": True, "to": to_email})
+        except Exception as e:
+            results.append({"id": str(inv_id), "number": inv.number, "ok": False, "error": str(e)})
+
+    db.commit()
+    sent = sum(1 for r in results if r["ok"])
+    return {"sent": sent, "total": len(ids), "results": results}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Zeiteinträge für Rechnung vorschlagen
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/time-entries/unbilled")
+async def get_unbilled_time_entries(
+    contact_id: Optional[UUID] = Query(None),
+    project_id: Optional[UUID] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Gibt alle abgeschlossenen, noch nicht verrechneten Zeiteinträge zurück.
+
+    Filterlogik:
+    - contact_id: Sucht zuerst per UUID-Spalte. Falls keine Treffer,
+      fällt zurück auf Textvergleich mit contact_name (weil ältere
+      Einträge contact_id=null haben können).
+    - project_id: Analog, mit Fallback auf project_name.
+    - search: Freitextsuche über Beschreibung, Kontakt- und Projektname.
+    """
+    from app.models.zeiterfassung import TimeEntry
+    from sqlalchemy import not_, or_ as _or_
+
+    billed_ids = db.query(InvoicePosition.time_entry_id).fi
