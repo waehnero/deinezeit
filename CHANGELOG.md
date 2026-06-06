@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.4] – 2026-06-06 – Kontaktsuche Bugfix
+
+### Aktualisierungen
+- ContactSearch zeigt Kontaktnamen nach asynchronem Laden korrekt an
+
+---
+
 ## [1.6.3] – 2026-06-06 – Kontaktanzeige in Belegen
 
 ### Aktualisierungen
