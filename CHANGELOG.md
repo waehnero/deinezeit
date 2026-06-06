@@ -5,6 +5,15 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.4.5] – 2026-06-06 – E-Mail-Versand und Abrechnung
+
+### Aktualisierungen
+- PDF-Kontext korrekt geladen
+- Unbilled Time Entries vollständig implementiert
+- E-Mail-Versand repariert
+
+---
+
 ## [1.4.4] – 2026-06-06 – E-Mail-Fehlerbehandlung verbessert
 
 ### Aktualisierungen

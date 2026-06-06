@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.4.5',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'PDF-Kontext korrekt geladen',
+      'Unbilled Time Entries vollständig implementiert',
+      'E-Mail-Versand repariert',
+    ],
+  },
+  {
     version: '1.4.4',
     day: '06',
     month: 'Juni',
