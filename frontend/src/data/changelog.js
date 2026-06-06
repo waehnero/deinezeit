@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.6.2',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'DatacenterPicker verarbeitet API-Antworten korrekt, wenn Anhänge als leeres Objekt statt Array zurückgegeben werden',
+    ],
+  },
+  {
     version: '1.6.1',
     day: '06',
     month: 'Juni',

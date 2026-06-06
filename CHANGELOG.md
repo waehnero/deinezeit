@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.2] – 2026-06-06 – DatacenterPicker API-Kompatibilität
+
+### Aktualisierungen
+- DatacenterPicker verarbeitet API-Antworten korrekt, wenn Anhänge als leeres Objekt statt Array zurückgegeben werden
+
+---
+
 ## [1.6.1] – 2026-06-06 – Anhänge-Feature korrigiert
 
 ### Aktualisierungen
