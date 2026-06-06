@@ -454,12 +454,4 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## [0.9.1] – 2026-05-26 – Update-Mechanismus überarbeitet & Wartungsseite
-
-### Neu
-- **Wartungsseite während Updates**: Statt des generischen „502 Bad Gateway"-Fehlers erscheint eine DeineZeit-Seite mit Spinner und dem Hinweis, dass ein Update läuft. Die Seite aktualisiert sich automatisch sobald das System wieder bereit ist.
-
-### Bugfixes & Verbesserungen
-- **Update-Prozess grundlegend überarbeitet**: Das Update läuft jetzt in einem unabhängigen `docker:cli`-Container außerhalb des Compose-Projekts — der Prozess übersteht den Neustart der eigenen Container und läuft sicher bis zum Ende durch
-- **Automatischer Rollback**: Schlägt Build oder Health-Check fehl, wird automatisch der vorherige Git-Commit wiederhergestellt und die Vorgänger-Version neu gestartet
-- **Domain-Konflikt behoben**: `update.sh` liest den echten Domain-Namen aus der laufenden nginx-Konfiguration, s
+## [0
