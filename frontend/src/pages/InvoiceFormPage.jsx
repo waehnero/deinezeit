@@ -50,6 +50,8 @@ function ContactSearch({ value, label, onChange }) {
   const [search, setSearch] = useState(label || '')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
+  // Sync wenn label von außen gesetzt wird (z.B. nach async Kontakt-Lookup beim Laden)
+  useEffect(() => { if (label) setSearch(label) }, [label])
   useEffect(() => {
     if (!open) return
     const t = setTimeout(async () => {
