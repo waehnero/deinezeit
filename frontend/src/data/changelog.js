@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.6.0',
+    day: '06',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Anhänge beim E-Mail-Versand hinzufügen',
+      'Datacenter-Browser für Dateiauswahl nutzen',
+      'Lokale Dateien als E-Mail-Anhänge hochladen',
+    ],
+    updates: [],
+  },
+  {
     version: '1.5.0',
     day: '06',
     month: 'Juni',

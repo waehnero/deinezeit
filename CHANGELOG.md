@@ -5,6 +5,15 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.0] – 2026-06-06 – E-Mail-Anhänge & Datacenter-Browser
+
+### Neu
+- Anhänge beim E-Mail-Versand hinzufügen
+- Datacenter-Browser für Dateiauswahl nutzen
+- Lokale Dateien als E-Mail-Anhänge hochladen
+
+---
+
 ## [1.5.0] – 2026-06-06 – Mail-Icons (grün/orange) nach Versand + Status immer auf gesendet setzen
 
 ### Neu
