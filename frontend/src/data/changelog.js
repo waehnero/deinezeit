@@ -14,10 +14,10 @@ export const changelog = [
       'Freigaben einzeln widerrufbar direkt aus der Übersicht',
     ],
     updates: [
-      'Share-Link Route-Reihenfolge fix (war: Not authenticated im privaten Fenster)',
+      'Share-Link Route-Reihenfolge fix (war: Not authenticated im privaten Browserfenster)',
     ],
   },
-  {
+    {
     version: '1.7.0',
     day: '07',
     month: 'Juni',
