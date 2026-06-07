@@ -20,6 +20,22 @@ export const changelog = [
     ],
   },
   {
+    version: '1.7.2',
+    day: '07',
+    month: 'Juni',
+    year: '2026',
+    features: [
+
+    ],
+    updates: [
+      'Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar',
+      'SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt',
+      'nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start',
+      'nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst',
+      'docker-compose.yml: certbot_conf Volume und Networks ergänzt',
+    ],
+  },
+  {
     version: '1.7.1',
     day: '07',
     month: 'Juni',
