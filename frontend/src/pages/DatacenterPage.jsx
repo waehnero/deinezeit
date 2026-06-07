@@ -3,7 +3,7 @@ import {
   HardDrive, FolderOpen, Folder, File, FileText, FileImage, FileVideo,
   FileArchive, Link2, Upload, Search, Download, Trash2, Share2, Eye,
   ChevronRight, ChevronDown, Loader2, X, ExternalLink, Copy, Check,
-  RefreshCw, Info
+  RefreshCw, Info, Clock, Ban, CalendarClock
 } from 'lucide-react'
 import { datacenterApi } from '../services/api'
 import toast from 'react-hot-toast'
@@ -145,6 +145,136 @@ function ShareDialog({ attachment, onClose }) {
   )
 }
 
+// ── ExtendDialog ─────────────────────────────────────────────────────────────
+
+function ExtendDialog({ attachment, onClose, onExtended }) {
+  const [loading, setLoading] = useState(false)
+  const [days, setDays]       = useState(7)
+
+  const extend = async () => {
+    setLoading(true)
+    try {
+      await datacenterApi.extendShareLink(attachment.id, days * 24)
+      toast.success('Freigabe verlängert')
+      onExtended()
+      onClose()
+    } catch {
+      toast.error('Verlängern fehlgeschlagen')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900">Freigabe verlängern</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-gray-600 truncate">
+            <strong>{attachment.display_name || attachment.filename}</strong>
+          </p>
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-600 whitespace-nowrap">Verlängern um</label>
+            <select value={days} onChange={e => setDays(Number(e.target.value))}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 flex-1">
+              <option value={1}>1 Tag</option>
+              <option value={7}>7 Tage</option>
+              <option value={30}>30 Tage</option>
+              <option value={90}>90 Tage</option>
+              <option value={0}>Unbegrenzt</option>
+            </select>
+          </div>
+          <button onClick={extend} disabled={loading}
+            className="w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition flex items-center justify-center gap-2">
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <CalendarClock size={15} />}
+            Verlängern
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── SharedFileRow ─────────────────────────────────────────────────────────────
+
+function SharedFileRow({ attachment, onRevoke, onExtend, onCopy }) {
+  const [confirmRevoke, setConfirmRevoke] = useState(false)
+
+  const isExpired = attachment.share_expires_at &&
+    new Date(attachment.share_expires_at) < new Date()
+
+  const expiresLabel = () => {
+    if (!attachment.share_expires_at) return 'Unbegrenzt'
+    const d = new Date(attachment.share_expires_at)
+    const diff = d - new Date()
+    if (diff < 0) return <span className="text-red-500">Abgelaufen</span>
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+    if (days === 1) return <span className="text-orange-500">Läuft heute ab</span>
+    if (days <= 3) return <span className="text-orange-400">Noch {days} Tage</span>
+    return `Noch ${days} Tage`
+  }
+
+  return (
+    <tr className={`hover:bg-gray-50 transition group ${isExpired ? 'opacity-60' : ''}`}>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <FileIcon mimetype={attachment.mimetype} type={attachment.type} size={17} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
+              {attachment.display_name || attachment.filename}
+            </p>
+            <p className="text-xs text-gray-400">
+              <span className="px-1.5 py-0.5 rounded-full bg-gray-100">{entityLabel(attachment.entity_type)}</span>
+            </p>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3 text-xs hidden md:table-cell">
+        <div className="flex items-center gap-1.5">
+          <Clock size={12} className="text-gray-400" />
+          <span className="text-gray-600">{expiresLabel()}</span>
+        </div>
+        {attachment.share_expires_at && (
+          <p className="text-gray-400 mt-0.5">
+            {new Date(attachment.share_expires_at).toLocaleDateString('de-AT', {
+              day: '2-digit', month: '2-digit', year: 'numeric'
+            })}
+          </p>
+        )}
+      </td>
+      <td className="px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">
+        {formatBytes(attachment.filesize)}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+          <button onClick={() => onCopy(attachment)} title="Link kopieren"
+            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+            <Copy size={14} />
+          </button>
+          <button onClick={() => onExtend(attachment)} title="Verlängern"
+            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
+            <CalendarClock size={14} />
+          </button>
+          <button
+            onClick={() => { if (confirmRevoke) onRevoke(attachment); else setConfirmRevoke(true) }}
+            onBlur={() => setTimeout(() => setConfirmRevoke(false), 200)}
+            title={confirmRevoke ? 'Nochmal klicken' : 'Freigabe widerrufen'}
+            className={`p-1.5 rounded-lg transition ${
+              confirmRevoke ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+            }`}>
+            <Ban size={14} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 // ── PreviewModal ─────────────────────────────────────────────────────────────
 
 function PreviewModal({ attachment, onClose }) {
@@ -206,6 +336,8 @@ function FolderTree({ folders, selected, onSelect }) {
 
   const toggle = (key) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
 
+  const isShared = selected === 'shared'
+
   return (
     <nav className="space-y-0.5">
       {/* Alle Dateien */}
@@ -218,6 +350,20 @@ function FolderTree({ folders, selected, onSelect }) {
         <HardDrive size={15} className={selected === null ? 'text-primary-600' : 'text-gray-400'} />
         <span>Alle Dateien</span>
         <span className="ml-auto text-xs text-gray-400">{folders.total}</span>
+      </button>
+
+      {/* Freigaben */}
+      <button
+        onClick={() => onSelect('shared')}
+        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
+          isShared ? 'bg-green-50 text-green-700 font-medium' : 'text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        <Share2 size={15} className={isShared ? 'text-green-600' : 'text-gray-400'} />
+        <span>Freigaben</span>
+        {folders.sharedCount > 0 && (
+          <span className="ml-auto text-xs text-gray-400">{folders.sharedCount}</span>
+        )}
       </button>
 
       {/* Entity-Typen */}
@@ -406,6 +552,7 @@ export default function DatacenterPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [previewItem, setPreviewItem] = useState(null)
   const [shareItem, setShareItem]     = useState(null)
+  const [extendItem, setExtendItem]   = useState(null)
 
   // Ordnerbaum laden
   const loadFolders = useCallback(async () => {
@@ -436,7 +583,8 @@ export default function DatacenterPage() {
         entities: Object.values(t.entityMap)
       }))
 
-      setFolders({ total: all.length, types })
+      const sharedCount = all.filter(a => a.has_share_link).length
+      setFolders({ total: all.length, types, sharedCount })
     } catch {
       toast.error('Ordnerstruktur konnte nicht geladen werden')
     } finally {
@@ -448,10 +596,13 @@ export default function DatacenterPage() {
   const loadAttachments = useCallback(async () => {
     setListLoading(true)
     try {
-      const entityType = selected?.type || null
-      const entityId   = selected?.entityId || null
+      const entityType = (selected && selected !== 'shared') ? selected.type : null
+      const entityId   = (selected && selected !== 'shared') ? selected.entityId : null
       const res = await datacenterApi.listAll(entityType, entityId)
       let items = res.data.attachments || []
+      if (selected === 'shared') {
+        items = items.filter(a => a.has_share_link)
+      }
       if (search) {
         const q = search.toLowerCase()
         items = items.filter(a =>
@@ -518,12 +669,29 @@ export default function DatacenterPage() {
     }
   }
 
+  const handleRevokeShare = async (attachment) => {
+    try {
+      await datacenterApi.deleteShareLink(attachment.id)
+      toast.success('Freigabe widerrufen')
+      await Promise.all([loadFolders(), loadAttachments()])
+    } catch {
+      toast.error('Widerrufen fehlgeschlagen')
+    }
+  }
+
+  const handleCopyShareLink = (attachment) => {
+    const base = window.location.origin
+    const url  = `${base}/api/datacenter/share/${attachment.share_token || ''}`
+    navigator.clipboard.writeText(url)
+    toast.success('Link kopiert')
+  }
+
   // Statistik
   const totalSize = attachments.filter(a => a.type === 'file').reduce((s, a) => s + (a.filesize || 0), 0)
   const fileCount = attachments.filter(a => a.type === 'file').length
   const linkCount = attachments.filter(a => a.type === 'link').length
 
-  // Titel der aktuellen Auswahl — bei Unterordner den sprechenden Namen aus dem Ordnerbaum holen
+  // Titel der aktuellen Auswahl
   const currentEntityLabel = selected?.entityId
     ? folders.types?.find(t => t.slug === selected.type)
         ?.entities?.find(e => e.id === selected.entityId)?.label
@@ -532,9 +700,11 @@ export default function DatacenterPage() {
 
   const currentTitle = selected === null
     ? 'Alle Dateien'
-    : selected.entityId
-      ? `${entityLabel(selected.type)} / ${currentEntityLabel}`
-      : entityLabel(selected.type)
+    : selected === 'shared'
+      ? 'Freigaben'
+      : selected.entityId
+        ? `${entityLabel(selected.type)} / ${currentEntityLabel}`
+        : entityLabel(selected.type)
 
   return (
     <div className="flex h-full overflow-hidden -m-6">
@@ -593,8 +763,8 @@ export default function DatacenterPage() {
           </button>
         </div>
 
-        {/* Upload-Zone (nur wenn Ordner ausgewählt) */}
-        {selected?.type && (
+        {/* Upload-Zone (nur wenn Ordner ausgewählt, nicht in Freigaben-Ansicht) */}
+        {selected?.type && selected !== 'shared' && (
           <div className="px-5 pt-4 flex-shrink-0">
             {uploading ? (
               <div className="border-2 border-dashed border-primary-300 rounded-xl p-5 bg-primary-50">
@@ -626,11 +796,32 @@ export default function DatacenterPage() {
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <HardDrive size={36} className="mb-3 text-gray-200" />
               <p className="text-sm font-medium">
-                {search ? 'Keine Ergebnisse' : 'Keine Dateien vorhanden'}
+                {search ? 'Keine Ergebnisse' : selected === 'shared' ? 'Keine aktiven Freigaben' : 'Keine Dateien vorhanden'}
               </p>
-              {!search && selected?.type && (
-                <p className="text-xs mt-1 text-gray-300">Dateien hierher ziehen um hochzuladen</p>
-              )}
+            </div>
+          ) : selected === 'shared' ? (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Datei</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Läuft ab</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Größe</th>
+                    <th className="px-4 py-2.5 w-28"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {attachments.map(a => (
+                    <SharedFileRow
+                      key={a.id}
+                      attachment={a}
+                      onRevoke={handleRevokeShare}
+                      onExtend={setExtendItem}
+                      onCopy={handleCopyShareLink}
+                    />
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -665,6 +856,13 @@ export default function DatacenterPage() {
       {/* Modals */}
       {previewItem && <PreviewModal attachment={previewItem} onClose={() => setPreviewItem(null)} />}
       {shareItem   && <ShareDialog  attachment={shareItem}   onClose={() => setShareItem(null)} />}
+      {extendItem  && (
+        <ExtendDialog
+          attachment={extendItem}
+          onClose={() => setExtendItem(null)}
+          onExtended={() => { loadFolders(); loadAttachments() }}
+        />
+      )}
     </div>
   )
 }

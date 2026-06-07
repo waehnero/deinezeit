@@ -149,6 +149,7 @@ export const datacenterApi = {
   preview:         (id) => api.get(`/datacenter/${id}/preview`, { responseType: 'blob' }),
   download_blob:   (id) => api.get(`/datacenter/${id}/download`, { responseType: 'blob' }),
   createShareLink: (id, expiresHours) => api.post(`/datacenter/${id}/share-link`, { expires_hours: expiresHours }),
+  extendShareLink: (id, expiresHours) => api.patch(`/datacenter/${id}/share-link`, { expires_hours: expiresHours }),
   deleteShareLink: (id) => api.delete(`/datacenter/${id}/share-link`),
   delete:          (id) => api.delete(`/datacenter/${id}`),
   getProviders:    () => api.get('/datacenter/providers'),
@@ -215,8 +216,4 @@ export const accountingApi = {
   createAccount:      (data)   => api.post('/accounting/accounts', data),
   updateAccount:      (id, data) => api.put(`/accounting/accounts/${id}`, data),
   deleteAccount:      (id)     => api.delete(`/accounting/accounts/${id}`),
-  setDefaultErloes:   (id)     => api.post(`/accounting/accounts/${id}/set-default-erloes`),
-  exportBmd:          (params) => api.get('/accounting/export/bmd', { params, responseType: 'blob' }),
-}
-
-export default api
+ 

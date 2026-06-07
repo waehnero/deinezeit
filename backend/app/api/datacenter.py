@@ -334,6 +334,37 @@ async def create_share_link(
     }
 
 
+# ── Share-Link verlängern (Token bleibt, nur Ablaufzeit ändern) ───────────────
+
+class ShareLinkExtendRequest(BaseModel):
+    expires_hours: int = 168  # 0 = unbegrenzt
+
+
+@router.patch("/{attachment_id}/share-link")
+async def extend_share_link(
+    attachment_id: str,
+    body:          ShareLinkExtendRequest,
+    db:            Session = Depends(get_db),
+    _:             User = Depends(get_current_user),
+):
+    """Ablaufzeit eines Share-Links verlängern ohne den Token zu ändern."""
+    att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
+    if not att or not att.share_token:
+        raise HTTPException(404, "Kein aktiver Share-Link für diesen Anhang")
+
+    if body.expires_hours > 0:
+        att.share_expires_at = datetime.now(timezone.utc) + timedelta(hours=body.expires_hours)
+    else:
+        att.share_expires_at = None  # unbegrenzt
+    db.commit()
+
+    base_url = os.environ.get("FRONTEND_URL", "http://localhost")
+    return {
+        "share_url":   f"{base_url}/api/datacenter/share/{att.share_token}",
+        "expires_at":  att.share_expires_at.isoformat() if att.share_expires_at else None,
+    }
+
+
 # ── Share-Link löschen ────────────────────────────────────────────────────────
 
 @router.delete("/{attachment_id}/share-link")
@@ -402,4 +433,7 @@ async def delete_attachment(
 
 @router.get("/providers")
 async def get_providers(_: User = Depends(get_current_user)):
-    """Liste der 
+    """Liste der unterstützten Cloud-Anbieter für Link-Anhänge."""
+    return {"providers": [
+        {"key": k, "label": v} for k, v in LINK_PROVIDERS.items()
+    ]}
