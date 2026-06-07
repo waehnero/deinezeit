@@ -4,6 +4,21 @@
  */
 export const changelog = [
   {
+    version: '1.7.0',
+    day: '07',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'TipTap Rich-Text Editor fuer E-Mail-Vorlagen',
+      'Vorlagen pro Belegart editierbar',
+      'CC-Feld im Versand-Dialog',
+    ],
+    updates: [
+      'Versionsanzeige-Logik korrigiert',
+      'bump-version.ps1 git-add repariert',
+    ],
+  },
+  {
     version: '1.6.8',
     day: '07',
     month: 'Juni',

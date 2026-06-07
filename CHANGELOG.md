@@ -1,4 +1,18 @@
-# Changelog – DeineZeit
+# C
+## [1.7.0] - 2026-06-07 - E-Mail-Vorlagen System
+
+
+### Neu
+- TipTap Rich-Text Editor fuer E-Mail-Vorlagen
+- Vorlagen pro Belegart editierbar
+- CC-Feld im Versand-Dialog
+
+### Aktualisierungen
+- Versionsanzeige-Logik korrigiert
+- bump-version.ps1 git-add repariert
+
+---
+hangelog – DeineZeit
 
 Alle Änderungen werden hier dokumentiert.
 Format: [Version] – Datum – Was hat sich geändert
