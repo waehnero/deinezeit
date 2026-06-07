@@ -1,4 +1,16 @@
 # C
+## [1.7.1] - 2026-06-07 - Datacenter Freigaben-Verwaltung
+
+### Neu
+- Datacenter: Freigaben-Ansicht zeigt alle aktiven Share-Links
+- Freigaben verlängerbar ohne Token-Änderung (1/7/30/90 Tage oder unbegrenzt)
+- Freigaben einzeln widerrufbar direkt aus der Übersicht
+
+### Fixes
+- Share-Link Route-Reihenfolge fix (war: "Not authenticated" im privaten Browserfenster)
+
+---
+
 ## [1.7.0] - 2026-06-07 - E-Mail-Vorlagen System
 
 
@@ -542,18 +554,4 @@ Format: [Version] – Datum – Was hat sich geändert
 - **Passkeys / Face ID / Windows Hello vollständig implementiert**: Anmeldung ohne Passwort funktioniert jetzt korrekt
 - Passkey hinzufügen (Profilseite) speichert Gerät korrekt in der Datenbank
 - Passkey-Login schließt den Vorgang ab und setzt den JWT-Token — vorher war kein Login möglich
-- Backend: Challenge-Speicher (In-Memory, TTL 5 Minuten) für Register- und Login-Flow ergänzt
-- Backend: `login/complete` Endpoint war komplett fehlend — jetzt vorhanden
-- Frontend: `webauthnRegisterComplete` und `webauthnLoginComplete` in api.js ergänzt
-
----
-
-## [0.8.0] – 2026-05-25 – Register-System für Stammdaten & Bugfixes
-
-### Neu
-- **Register (Tabs) in Stammdaten-Formularen**: Admin kann beliebig viele benannte Register anlegen (z.B. „Allgemein", „Bankdaten", „Kontakt")
-- **Felder Register zuweisen**: Jedes Feld kann per Dropdown oder Drag & Drop einem Register zugewiesen werden
-- **Tab-Navigation im Formular**: Beim Bearbeiten eines Datensatzes werden die Register als Reiter angezeigt
-- **Drag & Drop auf Tab-Reiter**: Felder durch Fallen-Lassen auf einen Tab-Reiter verschieben
-- **Neues Feld landet im richtigen Register**: Beim Hinzufügen eines Felds wird der aktuell aktive Tab vorausgewählt
-- **Relation-Felder**: Verknüpfungen zwischen verschiedenen Stammdate
+- Backend: Challen

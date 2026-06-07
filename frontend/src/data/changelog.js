@@ -8,9 +8,13 @@ export const changelog = [
     day: '07',
     month: 'Juni',
     year: '2026',
-    features: [],
+    features: [
+      'Datacenter: Freigaben-Ansicht mit allen aktiven Share-Links',
+      'Freigaben verlängerbar ohne Token-Änderung (1/7/30/90 Tage oder unbegrenzt)',
+      'Freigaben einzeln widerrufbar direkt aus der Übersicht',
+    ],
     updates: [
-      'Share-Link Route wurde vor der generischen Entity-Route verschoben, um Routing-Konflikte zu beheben.',
+      'Share-Link Route-Reihenfolge fix (war: Not authenticated im privaten Fenster)',
     ],
   },
   {
@@ -580,28 +584,3 @@ export const changelog = [
   {
     version: '0.3.0',
     day: '21',
-    month: 'Mai',
-    year: '2026',
-    features: [
-      'Snap-to-Grid Drag & Drop Layout-Builder für Felder',
-      'Feldbreite frei wählbar: 25% / 33% / 50% / 75% / 100%',
-      'CSV Export (Excel-kompatibel) und CSV Import mit Spalten-Zuordnung',
-      'Profilseite: Name, Sprache, Passwort, 2FA und Passkeys',
-      'Benutzerverwaltung für Admins',
-    ],
-    updates: [],
-  },
-  {
-    version: '0.2.0',
-    day: '21',
-    month: 'Mai',
-    year: '2026',
-    features: [
-      'Dynamische Stammdaten-Typen: Kunden, Lieferanten, Projekte — und beliebig mehr',
-      'Formular-Builder: Felder direkt in der Oberfläche definieren',
-      '9 Feldtypen: Text, Zahl, Datum, E-Mail, Telefon, Auswahl, Checkbox, URL, Textarea',
-      'Volltextsuche und Paginierung in Datensatz-Listen',
-    ],
-    updates: [],
-  },
-]
