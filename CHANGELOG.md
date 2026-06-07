@@ -12,6 +12,13 @@
 - bump-version.ps1 git-add repariert
 
 ---
+
+## [1.7.1] – 2026-06-07 – Share-Link Route-Optimierung
+
+### Aktualisierungen
+- Share-Link Route wurde vor der generischen Entity-Route verschoben, um Routing-Konflikte zu beheben.
+
+---
 hangelog – DeineZeit
 
 Alle Änderungen werden hier dokumentiert.

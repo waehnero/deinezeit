@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.7.1',
+    day: '07',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Share-Link Route wurde vor der generischen Entity-Route verschoben, um Routing-Konflikte zu beheben.',
+    ],
+  },
+  {
     version: '1.7.0',
     day: '07',
     month: 'Juni',
