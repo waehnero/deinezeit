@@ -1,4 +1,16 @@
 # C
+## [1.7.2] - 2026-06-07 - Versionsprüfung robuster + nginx Healthcheck
+
+
+### Aktualisierungen
+- Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
+- SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt
+- nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start
+- nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst
+- docker-compose.yml: certbot_conf Volume und Networks ergänzt
+
+---
+
 ## [1.7.1] - 2026-06-07 - Datacenter Freigaben-Verwaltung
 
 ### Neu
