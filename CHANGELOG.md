@@ -56,6 +56,17 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.9.0] – 2026-06-07 – E-Mail-Vorlagen System
+
+### Neu
+- E-Mail-Vorlagen pro Belegart (Rechnung, Angebot, AB, Gutschrift, Lieferschein)
+- Neuer Tab „E-Mail-Vorlagen" in Einstellungen mit Rich-Text-Editor (TipTap)
+- Platzhalter: {nummer}, {kontakt}, {firma}, {betrag}, {datum}, {faellig}, {belegart}
+- Versand-Dialog: Betreff und E-Mail-Text vor dem Senden editierbar
+- Betreff und Body werden aus der Vorlage vorausgefüllt
+
+---
+
 ## [1.8.0] – 2026-06-07 – E-Mail-Dialog: Kontaktinfo & CC-Empfänger
 
 ### Neu

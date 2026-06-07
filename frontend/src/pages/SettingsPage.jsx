@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
 import { settingsApi, systemApi, invoiceApi, accountingApi } from '../services/api'
 import toast from 'react-hot-toast'
+import RichTextEditor from '../components/RichTextEditor'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
   Save, Upload, Trash2, Download, Send, Loader2,
@@ -1813,6 +1814,126 @@ function TabSystemWrapper({ settings, onSaved }) {
   )
 }
 
+// ── Tab: E-Mail-Vorlagen ──────────────────────────────────────────────────────
+const DOC_TYPES_VORLAGEN = [
+  { key: 'rechnung',             label: 'Rechnung'            },
+  { key: 'angebot',              label: 'Angebot'             },
+  { key: 'auftragsbestaetigung', label: 'Auftragsbestätigung' },
+  { key: 'gutschrift',           label: 'Gutschrift'          },
+  { key: 'lieferschein',         label: 'Lieferschein'        },
+]
+
+const PLACEHOLDERS = [
+  { key: '{nummer}',   label: 'Belegnummer'   },
+  { key: '{kontakt}',  label: 'Kontakt'       },
+  { key: '{firma}',    label: 'Firma'         },
+  { key: '{betrag}',   label: 'Betrag'        },
+  { key: '{datum}',    label: 'Datum'         },
+  { key: '{faellig}',  label: 'Fällig am'     },
+  { key: '{belegart}', label: 'Belegart'      },
+]
+
+function TabEmailVorlagen() {
+  const [activeType, setActiveType] = useState('rechnung')
+  const [subject, setSubject] = useState('')
+  const [bodyHtml, setBodyHtml] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const subjectRef = React.useRef(null)
+
+  useEffect(() => {
+    setLoading(true)
+    invoiceApi.getEmailTemplate(activeType)
+      .then(r => { setSubject(r.data.subject || ''); setBodyHtml(r.data.body_html || '') })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [activeType])
+
+  function insertPlaceholder(ph) {
+    // Insert into focused element (subject or body)
+    const el = subjectRef.current
+    if (document.activeElement === el) {
+      const start = el.selectionStart
+      const end   = el.selectionEnd
+      const next  = subject.slice(0, start) + ph + subject.slice(end)
+      setSubject(next)
+      setTimeout(() => { el.setSelectionRange(start + ph.length, start + ph.length); el.focus() }, 0)
+    } else {
+      // Insert into TipTap editor (append at cursor)
+      setBodyHtml(prev => prev + ph)
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await invoiceApi.updateEmailTemplate(activeType, { subject, body_html: bodyHtml })
+      toast.success('Vorlage gespeichert')
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      {/* Belegart-Tabs */}
+      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 flex-wrap w-fit">
+        {DOC_TYPES_VORLAGEN.map(t => (
+          <button key={t.key} onClick={() => setActiveType(t.key)}
+            className={`px-3 py-1.5 text-sm rounded-md transition-all ${activeType === t.key ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-32"><Loader2 size={20} className="animate-spin text-neutral-400" /></div>
+      ) : (
+        <div className="space-y-4">
+          {/* Platzhalter */}
+          <div>
+            <p className="text-xs text-neutral-500 mb-1.5">Platzhalter einfügen — klicke einen an und er wird an der Cursorposition eingefügt:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PLACEHOLDERS.map(p => (
+                <button key={p.key} type="button" onClick={() => insertPlaceholder(p.key)}
+                  className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 font-mono">
+                  {p.key}
+                  <span className="font-sans text-blue-500 ml-1">({p.label})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Betreff */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Betreff</label>
+            <input
+              ref={subjectRef}
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+              placeholder="z.B. Rechnung {nummer} von {firma}"
+            />
+          </div>
+
+          {/* Body */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">E-Mail-Text</label>
+            <RichTextEditor value={bodyHtml} onChange={setBodyHtml} minHeight="220px" />
+          </div>
+
+          <div className="flex justify-end">
+            <button onClick={handleSave} disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving ? 'Speichert…' : 'Vorlage speichern'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('allgemein')
@@ -1821,6 +1942,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
     { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
+    { id: 'vorlagen',   label: 'E-Mail-Vorlagen', icon: Mail },
     { id: 'system',     label: 'System',     icon: Cpu       },
   ]
 
@@ -1846,6 +1968,7 @@ export default function SettingsPage() {
       <div className="card p-6">
         {activeTab === 'allgemein'  && <TabAllgemeinWrapper settings={settings} onSaved={loadSettings} />}
         {activeTab === 'parameter'  && <TabParameter />}
+        {activeTab === 'vorlagen'   && <TabEmailVorlagen />}
         {activeTab === 'system'     && <TabSystemWrapper settings={settings} onSaved={loadSettings} />}
       </div>
     </div>

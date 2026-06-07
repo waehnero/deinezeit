@@ -14,6 +14,7 @@ from app.models.user import User
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
                                  InvoiceNumberSequence, InvoiceSettings)
 from app.models.settings import Setting
+from app.models.email_template import EmailTemplate
 from app.models.masterdata import EntityRecord
 from app.services.invoice_pdf import generate_pdf, generate_html_preview
 from app.schemas.invoice import (
@@ -854,7 +855,8 @@ def _load_pdf_context(db: Session, invoice: Invoice):
 
 def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict,
                          sender_contact, recipient_contact, to_email: str, current_user_email: str,
-                         extra_attachments: list = None, cc_email: str = None):
+                         extra_attachments: list = None, cc_email: str = None,
+                         custom_subject: str = None, custom_body_html: str = None):
     """Generiert PDF und versendet per E-Mail.
     extra_attachments: Liste von Dicts mit:
       - type='datacenter': {type, id}  → wird aus Storage geladen
@@ -866,19 +868,56 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
     from app.models.attachment import Attachment
     from app.services import storage_service
 
-    doc_label = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
+    doc_label    = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
     company_name = settings_d.get("company_name", "DeineZeit")
 
     pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
                               sender_contact, recipient_contact)
 
     filename = f"{inv.number.replace('/', '-')}.pdf"
-    subject  = f"{doc_label} {inv.number} von {company_name}"
-    body     = (
-        f"Sehr geehrte Damen und Herren,\n\n"
-        f"anbei erhalten Sie {doc_label} {inv.number}.\n\n"
-        f"Mit freundlichen Grüßen\n{company_name}"
-    )
+
+    # Platzhalter für Vorlagen
+    contact_name = ""
+    if recipient_contact:
+        contact_name = recipient_contact.display_name or ""
+    betrag_str = f"{float(inv.total or 0):,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+    datum_str  = inv.date.strftime("%d.%m.%Y") if inv.date else ""
+    faellig_str = inv.due_date.strftime("%d.%m.%Y") if inv.due_date else ""
+    placeholders = {
+        "nummer":   inv.number or "",
+        "belegart": doc_label,
+        "firma":    company_name,
+        "kontakt":  contact_name,
+        "betrag":   betrag_str,
+        "datum":    datum_str,
+        "faellig":  faellig_str,
+    }
+
+    def _fill(text: str) -> str:
+        for k, v in placeholders.items():
+            text = text.replace("{" + k + "}", v)
+        return text
+
+    if custom_subject or custom_body_html:
+        subject   = _fill(custom_subject or "")
+        body_html = _fill(custom_body_html or "")
+        body      = ""  # plain-text fallback leer wenn HTML vorhanden
+    else:
+        # Vorlage aus DB laden
+        tmpl = db.query(EmailTemplate).filter(EmailTemplate.doc_type == inv.doc_type).first()
+        if tmpl and tmpl.subject:
+            subject   = _fill(tmpl.subject)
+            body_html = _fill(tmpl.body_html or "")
+            body      = ""
+        else:
+            # Fallback (kein Template konfiguriert)
+            subject   = f"{doc_label} {inv.number} von {company_name}"
+            body_html = ""
+            body      = (
+                f"Sehr geehrte Damen und Herren,\n\n"
+                f"anbei erhalten Sie {doc_label} {inv.number}.\n\n"
+                f"Mit freundlichen Grüßen\n{company_name}"
+            )
 
     attachments = [{"filename": filename, "data": pdf_bytes, "mime_type": "application/pdf"}]
 
@@ -908,6 +947,7 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
         to_email=to_email,
         subject=subject,
         body_text=body,
+        body_html=body_html if body_html else None,
         attachments=attachments,
         cc_email=cc_email or None,
     )
@@ -937,7 +977,9 @@ async def send_invoice_email(
     settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
 
     to_email = body.get("to_email", "")
-    cc_email = body.get("cc_email", "") or None
+    cc_email         = body.get("cc_email", "") or None
+    custom_subject   = body.get("subject") or None
+    custom_body_html = body.get("body_html") or None
     if not to_email and recipient_contact:
         to_email = (recipient_contact.data or {}).get("email", "")
     if not to_email:
@@ -948,7 +990,8 @@ async def send_invoice_email(
     try:
         _send_invoice_email(inv, db, settings_d, inv_settings_d,
                              sender_contact, recipient_contact, to_email, current_user.email,
-                             extra_attachments=extra_attachments, cc_email=cc_email)
+                             extra_attachments=extra_attachments, cc_email=cc_email,
+                             custom_subject=custom_subject, custom_body_html=custom_body_html)
         db.commit()
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -1003,6 +1046,37 @@ async def bulk_send_email(
 # ─────────────────────────────────────────────────────────────────────────────
 # Zeiteinträge für Rechnung vorschlagen
 # ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/email-templates/{doc_type}")
+async def get_email_template(
+    doc_type: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Lädt die E-Mail-Vorlage für eine Belegart."""
+    tmpl = db.query(EmailTemplate).filter(EmailTemplate.doc_type == doc_type).first()
+    if not tmpl:
+        return {"doc_type": doc_type, "subject": "", "body_html": ""}
+    return {"doc_type": tmpl.doc_type, "subject": tmpl.subject, "body_html": tmpl.body_html}
+
+
+@router.put("/email-templates/{doc_type}")
+async def update_email_template(
+    doc_type: str,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Speichert die E-Mail-Vorlage für eine Belegart."""
+    tmpl = db.query(EmailTemplate).filter(EmailTemplate.doc_type == doc_type).first()
+    if not tmpl:
+        tmpl = EmailTemplate(doc_type=doc_type)
+        db.add(tmpl)
+    tmpl.subject   = body.get("subject", "")
+    tmpl.body_html = body.get("body_html", "")
+    db.commit()
+    return {"ok": True}
+
 
 @router.get("/time-entries/unbilled")
 async def get_unbilled_time_entries(

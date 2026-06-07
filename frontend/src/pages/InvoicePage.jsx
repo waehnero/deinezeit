@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
+import RichTextEditor from '../components/RichTextEditor'
 import toast from 'react-hot-toast'
 import {
   Plus, Search, FileText, RefreshCw, Download,
@@ -499,16 +500,29 @@ function SendDialog({ invoices, onClose, onSent }) {
   const [showDcPicker, setShowDcPicker] = useState(false)
   const [ccEmail, setCcEmail] = useState('')
   const [contactEmail, setContactEmail] = useState('')
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailBody, setEmailBody] = useState('')
   const isBulk = invoices.length > 1
   const single = invoices[0]
 
-  // Kontakt-E-Mail laden (nur Einzelversand)
+  // Kontakt-E-Mail + Vorlage laden (nur Einzelversand)
   useEffect(() => {
     if (isBulk || !single?.contact_id) return
     masterdataApi.getRecord('kontakte', single.contact_id)
       .then(r => setContactEmail(r.data?.data?.email || ''))
       .catch(() => {})
   }, [single?.contact_id, isBulk])
+
+  useEffect(() => {
+    const dt = isBulk ? null : single?.doc_type
+    if (!dt) return
+    invoiceApi.getEmailTemplate(dt)
+      .then(r => {
+        setEmailSubject(r.data.subject || '')
+        setEmailBody(r.data.body_html || '')
+      })
+      .catch(() => {})
+  }, [single?.doc_type, isBulk])
 
   function buildExtraAttachments() {
     return attachments.map(a => {
@@ -547,7 +561,7 @@ function SendDialog({ invoices, onClose, onSent }) {
         const statusMap = {}
         res.data.results.forEach(r => { statusMap[r.id] = r.ok ? 'ok' : 'error' })
       } else {
-        await invoiceApi.sendEmail(single.id, null, extra, ccEmail)
+        await invoiceApi.sendEmail(single.id, null, extra, ccEmail, emailSubject, emailBody)
         toast.success(`${single.number} versendet`)
         onSent([single.id], 'ok', true)
         return
@@ -607,9 +621,26 @@ function SendDialog({ invoices, onClose, onSent }) {
           </div>
         )}
 
-        <p className="text-xs text-neutral-500 mb-4">
-          PDF wird generiert und an die E-Mail-Adresse des Kontakts gesendet. Status wird auf „Gesendet" gesetzt.
-        </p>
+        {/* Betreff */}
+        {!isBulk && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-neutral-500 mb-1">Betreff</label>
+            <input
+              value={emailSubject}
+              onChange={e => setEmailSubject(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              placeholder="Betreff"
+            />
+          </div>
+        )}
+
+        {/* E-Mail-Text */}
+        {!isBulk && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-neutral-500 mb-1">E-Mail-Text</label>
+            <RichTextEditor value={emailBody} onChange={setEmailBody} minHeight="140px" />
+          </div>
+        )}
 
         {/* Anhänge */}
         {attachments.length > 0 && (

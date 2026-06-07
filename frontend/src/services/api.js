@@ -178,7 +178,7 @@ export const invoiceApi = {
   setStatus:        (id, status) => api.post(`/invoices/${id}/set-status`, { status }),
   convertToAb:      (id) => api.post(`/invoices/${id}/convert-to-ab`),
   cancel:           (id, cancel_mode) => api.post(`/invoices/${id}/cancel`, { cancel_mode }),
-  sendEmail:        (id, to_email, extra_attachments = [], cc_email = '') => api.post(`/invoices/${id}/send-email`, { to_email, extra_attachments, cc_email }),
+  sendEmail:        (id, to_email, extra_attachments = [], cc_email = '', subject = '', body_html = '') => api.post(`/invoices/${id}/send-email`, { to_email, extra_attachments, cc_email, subject, body_html }),
   bulkSendEmail:    (invoice_ids) => api.post('/invoices/bulk-send-email', { invoice_ids }),
   markPaid:       (id, data) => api.post(`/invoices/${id}/mark-paid`, data),
   convertToInvoice: (id) => api.post(`/invoices/${id}/convert-to-invoice`),
@@ -189,6 +189,10 @@ export const invoiceApi = {
   // Rechnungsbuch
   book:           (params) => api.get('/invoices/book/list', { params }),
   bookCsv:        (params) => api.get('/invoices/book/csv', { params, responseType: 'blob' }),
+
+  // E-Mail-Vorlagen
+  getEmailTemplate:    (doc_type) => api.get(`/invoices/email-templates/${doc_type}`),
+  updateEmailTemplate: (doc_type, data) => api.put(`/invoices/email-templates/${doc_type}`, data),
 
   // Einstellungen
   getSettings:    () => api.get('/invoices/settings/all'),
