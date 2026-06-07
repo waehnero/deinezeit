@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.6.8',
+    day: '07',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Versionsanzeige zeigt korrekt die installierte Version an, auch wenn der GitHub-Cache veraltet ist',
+    ],
+  },
+  {
     version: '1.6.7',
     day: '06',
     month: 'Juni',

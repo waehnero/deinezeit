@@ -5,6 +5,13 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
+## [1.6.8] – 2026-06-07 – Versionsanzeige-Korrektur
+
+### Aktualisierungen
+- Versionsanzeige zeigt korrekt die installierte Version an, auch wenn der GitHub-Cache veraltet ist
+
+---
+
 ## [1.6.7] – 2026-06-06 – Stabilität und Mail-Verwaltung
 
 ### Aktualisierungen
