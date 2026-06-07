@@ -126,9 +126,11 @@ async def get_version_info():
             )
             if resp.status_code == 200:
                 v = _version_from_changelog_text(resp.text)
-                if v:
+                if v and _version_newer(v, current):
+                    # GitHub hat eine neuere Version als die installierte
                     latest = v
-                update_available = _version_newer(latest, current)
+                    update_available = True
+                # Wenn GitHub-Version älter/gleich ist → latest bleibt = current
     except Exception:
         pass
 
