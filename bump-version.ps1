@@ -1,4 +1,4 @@
-# bump-version.ps1
+﻿# bump-version.ps1
 # Aktualisiert alle Versions-Dateien auf einmal und committet.
 #
 # Verwendung:
@@ -22,7 +22,7 @@ function Write-Step([string]$msg) {
 
 Write-Host ""
 Write-Host "══════════════════════════════════════════" -ForegroundColor Yellow
-Write-Host "  DeineZeit  –  Version bump  →  $Version" -ForegroundColor Yellow
+Write-Host "  DeineZeit  -  Version bump  →  $Version" -ForegroundColor Yellow
 Write-Host "══════════════════════════════════════════" -ForegroundColor Yellow
 Write-Host ""
 
@@ -102,7 +102,7 @@ $aktSection    = if ($Updates.Count  -gt 0) { "`n`n### Aktualisierungen`n$update
 
 $newMdEntry = @"
 
-## [$Version] – $date – $Titel
+## [$Version] - $date - $Titel
 $neuSection$aktSection
 
 ---
@@ -111,7 +111,7 @@ $neuSection$aktSection
 
 # Nach der Überschrift + ersten "---" einfügen
 $clMd = $clMd -replace '(---\s*\n)', "`$1$newMdEntry"
-# Aber nur einmal (erster Treffer reicht — PowerShell ersetzt alle, daher begrenzen)
+# Aber nur einmal (erster Treffer reicht - PowerShell ersetzt alle, daher begrenzen)
 # Lösung: nur den ersten Block ersetzen
 $clMd = [regex]::Replace($clMd, '(---\s*\r?\n)', "$1$newMdEntry", [System.Text.RegularExpressions.RegexOptions]::None, [System.TimeSpan]::FromSeconds(5))
 # Doppelt-Einfügen durch zweimaligen Match verhindern: Datei neu aufbauen
@@ -124,18 +124,12 @@ Set-Content $clMdPath $clMd -NoNewline
 # ── 7. Git commit & push ────────────────────────────────────────────────────
 Write-Host ""
 Write-Step "git add + commit + push"
-git -C $Root add `
-    frontend/package.json `
-    backend/app/core/config.py `
-    docker-compose.yml `
-    docker-compose.local.yml `
-    "frontend/src/data/changelog.js" `
-    CHANGELOG.md
+git -C $Root add "frontend/package.json" "backend/app/core/config.py" "docker-compose.yml" "docker-compose.local.yml" "frontend/src/data/changelog.js" "CHANGELOG.md" "bump-version.ps1"
 
-$commitMsg = "chore: Version $Version — $Titel"
+$commitMsg = "chore: Version $Version - $Titel"
 git -C $Root commit -m $commitMsg
 git -C $Root push
 
 Write-Host ""
-Write-Host "✓ Version $Version erfolgreich gesetzt und gepusht." -ForegroundColor Green
+Write-Host "OK Version $Version erfolgreich gesetzt und gepusht." -ForegroundColor Green
 Write-Host ""
