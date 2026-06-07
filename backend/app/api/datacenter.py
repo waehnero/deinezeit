@@ -151,6 +151,35 @@ async def list_all_attachments(
     return {"attachments": [_to_response_with_label(r, label_map) for r in rows]}
 
 
+# ── Öffentlicher Download via Share-Token (kein Login nötig) ─────────────────
+# WICHTIG: Muss VOR /{entity_type}/{entity_id} stehen, sonst matched FastAPI
+# /share/{token} fälschlicherweise als entity_type="share", entity_id=token!
+
+@router.get("/share/{token}")
+async def download_via_share_link(
+    token: str,
+    db:    Session = Depends(get_db),
+):
+    """Öffentlicher Download via Share-Token — kein Login erforderlich."""
+    att = db.query(Attachment).filter(Attachment.share_token == token).first()
+    if not att or att.type != "file":
+        raise HTTPException(404, "Link ungültig oder abgelaufen")
+
+    if att.share_expires_at and att.share_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(410, "Dieser Download-Link ist abgelaufen")
+
+    data, content_type = storage_service.download_file(att.storage_key)
+
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{att.filename}"',
+            "Content-Length": str(len(data)),
+        }
+    )
+
+
 # ── Anhänge abrufen ───────────────────────────────────────────────────────────
 
 @router.get("/{entity_type}/{entity_id}")
@@ -322,33 +351,6 @@ async def delete_share_link(
     return {"ok": True}
 
 
-# ── Öffentlicher Download via Share-Token (kein Login nötig) ─────────────────
-
-@router.get("/share/{token}")
-async def download_via_share_link(
-    token: str,
-    db:    Session = Depends(get_db),
-):
-    """Öffentlicher Download via Share-Token — kein Login erforderlich."""
-    att = db.query(Attachment).filter(Attachment.share_token == token).first()
-    if not att or att.type != "file":
-        raise HTTPException(404, "Link ungültig oder abgelaufen")
-
-    if att.share_expires_at and att.share_expires_at < datetime.now(timezone.utc):
-        raise HTTPException(410, "Dieser Download-Link ist abgelaufen")
-
-    data, content_type = storage_service.download_file(att.storage_key)
-
-    return Response(
-        content=data,
-        media_type=content_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{att.filename}"',
-            "Content-Length": str(len(data)),
-        }
-    )
-
-
 # ── Vorschau (Bilder + PDFs direkt im Browser) ───────────────────────────────
 
 @router.get("/{attachment_id}/preview")
@@ -400,7 +402,4 @@ async def delete_attachment(
 
 @router.get("/providers")
 async def get_providers(_: User = Depends(get_current_user)):
-    """Liste der unterstützten Cloud-Anbieter für Link-Anhänge."""
-    return {"providers": [
-        {"key": k, "label": v} for k, v in LINK_PROVIDERS.items()
-    ]}
+    """Liste der 
