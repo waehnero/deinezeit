@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.8.0',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Cloudspeicher-Integration für Nextcloud, SeaDrive und WebDAV',
+      'Neuer Speicher-Tab in den Einstellungen',
+    ],
+    updates: [
+      'Fehlerhafte package.json repariert',
+    ],
+  },
+  {
     version: '1.7.5',
     day: '08',
     month: 'Juni',

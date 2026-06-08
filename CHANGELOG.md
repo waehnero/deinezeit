@@ -12,6 +12,17 @@
 
 ---
 
+## [1.8.0] – 2026-06-08 – Cloudspeicher-Integration und Stabilität
+
+### Neu
+- Cloudspeicher-Integration für Nextcloud, SeaDrive und WebDAV
+- Neuer Speicher-Tab in den Einstellungen
+
+### Aktualisierungen
+- Fehlerhafte package.json repariert
+
+---
+
 
 ## [1.7.3] - 2026-06-08 - Einstellungen umstrukturiert
 
