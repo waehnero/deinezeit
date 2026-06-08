@@ -117,6 +117,7 @@ async def get_version_info():
     current = _read_local_version()
     latest = current
     update_available = False
+    github_check_ok = False
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -125,19 +126,38 @@ async def get_version_info():
                 headers={"Cache-Control": "no-cache"}
             )
             if resp.status_code == 200:
+                github_check_ok = True
                 v = _version_from_changelog_text(resp.text)
                 if v and _version_newer(v, current):
-                    # GitHub hat eine neuere Version als die installierte
                     latest = v
                     update_available = True
-                # Wenn GitHub-Version älter/gleich ist → latest bleibt = current
+                elif v:
+                    latest = v  # GitHub erreichbar, Version gleich oder älter
     except Exception:
-        pass
+        github_check_ok = False
+
+    # Fallback: git-basierte Prüfung wenn GitHub nicht per HTTP erreichbar
+    if not github_check_ok:
+        try:
+            subprocess.run(
+                ["git", "-C", "/opt/deinezeit", "fetch", "origin", "main"],
+                capture_output=True, timeout=10
+            )
+            ahead = subprocess.run(
+                ["git", "-C", "/opt/deinezeit", "log", "HEAD..origin/main", "--oneline"],
+                capture_output=True, timeout=5, text=True
+            )
+            if ahead.stdout.strip():
+                update_available = True
+                latest = f"{current}+"   # Neue Commits vorhanden, Versionsnummer unbekannt
+        except Exception:
+            pass
 
     return {
         "current": current,
         "latest": latest,
         "update_available": update_available,
+        "github_check_ok": github_check_ok,
         "local_mode": _is_local_mode(),
     }
 

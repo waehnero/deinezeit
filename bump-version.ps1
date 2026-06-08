@@ -26,33 +26,35 @@ Write-Host "  DeineZeit  -  Version bump  →  $Version" -ForegroundColor Yellow
 Write-Host "══════════════════════════════════════════" -ForegroundColor Yellow
 Write-Host ""
 
+$Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
 # ── 1. frontend/package.json ────────────────────────────────────────────────
 Write-Step "frontend/package.json"
 $pkgPath = Join-Path $Root "frontend\package.json"
-$pkg = Get-Content $pkgPath -Raw
+$pkg = [System.IO.File]::ReadAllText($pkgPath, $Utf8NoBom)
 $pkg = $pkg -replace '"version":\s*"[^"]+"', "`"version`": `"$Version`""
-Set-Content $pkgPath $pkg -NoNewline
+[System.IO.File]::WriteAllText($pkgPath, $pkg, $Utf8NoBom)
 
 # ── 2. backend/app/core/config.py ───────────────────────────────────────────
 Write-Step "backend/app/core/config.py"
 $cfgPath = Join-Path $Root "backend\app\core\config.py"
-$cfg = Get-Content $cfgPath -Raw
+$cfg = [System.IO.File]::ReadAllText($cfgPath, $Utf8NoBom)
 $cfg = $cfg -replace 'APP_VERSION:\s*str\s*=\s*"[^"]+"', "APP_VERSION: str = `"$Version`""
-Set-Content $cfgPath $cfg -NoNewline
+[System.IO.File]::WriteAllText($cfgPath, $cfg, $Utf8NoBom)
 
 # ── 3. docker-compose.yml ───────────────────────────────────────────────────
 Write-Step "docker-compose.yml"
 $dcPath = Join-Path $Root "docker-compose.yml"
-$dc = Get-Content $dcPath -Raw
+$dc = [System.IO.File]::ReadAllText($dcPath, $Utf8NoBom)
 $dc = $dc -replace 'APP_VERSION: \$\{APP_VERSION:-[^}]+\}', "APP_VERSION: `${APP_VERSION:-$Version}"
-Set-Content $dcPath $dc -NoNewline
+[System.IO.File]::WriteAllText($dcPath, $dc, $Utf8NoBom)
 
 # ── 4. docker-compose.local.yml ─────────────────────────────────────────────
 Write-Step "docker-compose.local.yml"
 $dcLocalPath = Join-Path $Root "docker-compose.local.yml"
-$dcLocal = Get-Content $dcLocalPath -Raw
+$dcLocal = [System.IO.File]::ReadAllText($dcLocalPath, $Utf8NoBom)
 $dcLocal = $dcLocal -replace 'APP_VERSION: \$\{APP_VERSION:-[^}]+\}', "APP_VERSION: `${APP_VERSION:-$Version}"
-Set-Content $dcLocalPath $dcLocal -NoNewline
+[System.IO.File]::WriteAllText($dcLocalPath, $dcLocal, $Utf8NoBom)
 
 # ── 5. frontend/src/data/changelog.js ───────────────────────────────────────
 Write-Step "frontend/src/data/changelog.js"
@@ -85,7 +87,7 @@ $updatesJs
 
 # Eintrag ganz oben nach "export const changelog = [" einfügen
 $clJs = $clJs -replace '(export const changelog = \[)', "`$1`n$newEntry"
-Set-Content $clJsPath $clJs -NoNewline
+[System.IO.File]::WriteAllText($clJsPath, $clJs, $Utf8NoBom)
 
 # ── 6. CHANGELOG.md ─────────────────────────────────────────────────────────
 Write-Step "CHANGELOG.md"
@@ -119,7 +121,7 @@ $clMd = Get-Content $clMdPath -Raw
 $insertAfter = "---`n"
 $insertIdx = $clMd.IndexOf($insertAfter) + $insertAfter.Length
 $clMd = $clMd.Substring(0, $insertIdx) + $newMdEntry + $clMd.Substring($insertIdx)
-Set-Content $clMdPath $clMd -NoNewline
+[System.IO.File]::WriteAllText($clMdPath, $clMd, $Utf8NoBom)
 
 # ── 7. Git commit & push ────────────────────────────────────────────────────
 Write-Host ""
