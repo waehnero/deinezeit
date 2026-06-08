@@ -348,14 +348,17 @@ async def preview_file(
         raise HTTPException(404, "Anhang nicht gefunden")
 
     mimetype = att.mimetype or "application/octet-stream"
+    filename_lower = (att.filename or "").lower()
+    is_eml = mimetype in ("message/rfc822", "text/rfc822") or filename_lower.endswith(".eml")
 
-    if not any(mimetype.startswith(t) for t in PREVIEW_MIMETYPES):
+    # EML immer erlauben, auch wenn Browser "application/octet-stream" gesendet hat
+    if not is_eml and not any(mimetype.startswith(t) for t in PREVIEW_MIMETYPES):
         raise HTTPException(415, "Keine Vorschau für diesen Dateityp")
 
     data, content_type = storage_service.download_file(att.storage_key)
 
     # EML-Vorschau als HTML rendern
-    if mimetype in ("message/rfc822", "text/rfc822") or (att.filename or "").lower().endswith(".eml"):
+    if is_eml:
         html_content = _render_eml_preview(data)
         return HTMLResponse(content=html_content)
 
