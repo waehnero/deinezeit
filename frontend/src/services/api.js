@@ -124,6 +124,8 @@ export const settingsApi = {
   getContactOptions: () => api.get('/settings/contact-options'),
   testEmail: (toEmail) => api.post('/settings/test-email', { to_email: toEmail }),
   downloadBackup: () => api.get('/settings/backup/download', { responseType: 'blob' }),
+  testStorage:    (data) => api.post('/settings/storage/test', data),
+  applyStorage:   ()     => api.post('/settings/storage/apply'),
 }
 
 export const datacenterApi = {

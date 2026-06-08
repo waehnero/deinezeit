@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.7.5',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Cloudspeicher-Integration: Nextcloud und SeaDrive als Alternative zu MinIO',
+      'WebDAV-Provider mit automatischer Ordnererstellung',
+      'Speicher-Tab in den Einstellungen: Provider-Auswahl, Verbindungstest, Konfiguration',
+    ],
+    updates: [],
+  },
+  {
     version: '1.7.4',
     day: '08',
     month: 'Juni',

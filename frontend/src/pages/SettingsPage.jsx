@@ -1809,9 +1809,10 @@ function TabParameter() {
 function TabSystemWrapper({ settings, onSaved }) {
   const [sub, setSub] = useState('system')
   const subTabs = [
-    { id: 'system', label: 'System' },
-    { id: 'backup', label: 'Backup' },
-    { id: 'email',  label: 'E-Mail' },
+    { id: 'system',   label: 'System' },
+    { id: 'backup',   label: 'Backup' },
+    { id: 'email',    label: 'E-Mail' },
+    { id: 'speicher', label: 'Speicher' },
   ]
   return (
     <div>
@@ -1823,9 +1824,154 @@ function TabSystemWrapper({ settings, onSaved }) {
           </button>
         ))}
       </div>
-      {sub === 'system' && <TabSystem />}
-      {sub === 'backup' && <TabBackup settings={settings} onSaved={onSaved} />}
-      {sub === 'email'  && <TabEmail  settings={settings} onSaved={onSaved} />}
+      {sub === 'system'   && <TabSystem />}
+      {sub === 'backup'   && <TabBackup   settings={settings} onSaved={onSaved} />}
+      {sub === 'email'    && <TabEmail    settings={settings} onSaved={onSaved} />}
+      {sub === 'speicher' && <TabSpeicher settings={settings} onSaved={onSaved} />}
+    </div>
+  )
+}
+
+// ── Tab: Speicher ────────────────────────────────────────────────────────────
+const STORAGE_PROVIDERS = [
+  { id: 'minio',     label: 'MinIO',      icon: '🗄️',  hint: 'Lokaler MinIO-Objektspeicher (Standard)' },
+  { id: 'nextcloud', label: 'Nextcloud',  icon: '☁️',  hint: 'WebDAV-URL: https://cloud.example.com/remote.php/dav/files/BENUTZERNAME' },
+  { id: 'seadrive',  label: 'SeaDrive',   icon: '🌊',  hint: 'WebDAV-URL: https://seadrive.example.com/seafdav' },
+]
+
+function TabSpeicher({ settings, onSaved }) {
+  const rawBackend = settings.storage_backend || 'minio'
+  const initProvider = ['nextcloud','seadrive'].includes(rawBackend) ? rawBackend : 'minio'
+
+  const [provider,    setProvider]    = useState(initProvider)
+  const [url,         setUrl]         = useState(settings.webdav_url          || '')
+  const [user,        setUser]        = useState(settings.webdav_user         || '')
+  const [password,    setPassword]    = useState('')
+  const [rootFolder,  setRootFolder]  = useState(settings.webdav_root_folder  || 'DeineZeit')
+  const [saving,      setSaving]      = useState(false)
+  const [testing,     setTesting]     = useState(false)
+  const [testResult,  setTestResult]  = useState(null)
+
+  const isWebDav = provider !== 'minio'
+  const hint = STORAGE_PROVIDERS.find(p => p.id === provider)?.hint || ''
+
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const backend = isWebDav ? 'webdav' : 'minio'
+      const res = await settingsApi.testStorage({
+        storage_backend:    backend,
+        webdav_url:         url,
+        webdav_user:        user,
+        webdav_password:    password,
+        webdav_root_folder: rootFolder,
+      })
+      setTestResult(res.data)
+    } catch (e) {
+      setTestResult({ ok: false, message: e?.response?.data?.detail || e.message })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const backend = isWebDav ? 'webdav' : 'minio'
+      const payload = { storage_backend: backend }
+      if (isWebDav) {
+        payload.webdav_url         = url
+        payload.webdav_user        = user
+        payload.webdav_root_folder = rootFolder
+        if (password) payload.webdav_password = password
+      }
+      await settingsApi.update(payload)
+      await settingsApi.applyStorage()
+      toast.success('Speicher-Einstellungen gespeichert')
+      onSaved && onSaved()
+    } catch (e) {
+      toast.error('Fehler beim Speichern: ' + (e?.response?.data?.detail || e.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-2">Storage-Provider</label>
+        <div className="flex gap-2 flex-wrap">
+          {STORAGE_PROVIDERS.map(p => (
+            <button key={p.id} onClick={() => { setProvider(p.id); setTestResult(null) }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-all
+                ${provider === p.id
+                  ? 'bg-orange-50 border-orange-400 text-orange-700 font-medium'
+                  : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+              <span>{p.icon}</span>{p.label}
+            </button>
+          ))}
+        </div>
+        {hint && <p className="mt-2 text-xs text-neutral-500">{hint}</p>}
+      </div>
+
+      {isWebDav && (
+        <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-200">
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-1">WebDAV-URL</label>
+            <input type="text" value={url} onChange={e => setUrl(e.target.value)}
+              placeholder={provider === 'nextcloud'
+                ? 'https://cloud.example.com/remote.php/dav/files/BENUTZERNAME'
+                : 'https://seadrive.example.com/seafdav'}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-neutral-500 mb-1">Benutzername</label>
+              <input type="text" value={user} onChange={e => setUser(e.target.value)}
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-neutral-500 mb-1">Passwort / App-Passwort</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder={settings.webdav_password ? '••••••••' : ''}
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-1">Root-Ordner in der Cloud</label>
+            <input type="text" value={rootFolder} onChange={e => setRootFolder(e.target.value)}
+              placeholder="DeineZeit"
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            <p className="mt-1 text-xs text-neutral-400">Übergeordneter Ordner, unter dem alle Datacenter-Dateien abgelegt werden.</p>
+          </div>
+        </div>
+      )}
+
+      {testResult && (
+        <div className={`flex items-start gap-2 p-3 rounded-lg text-sm border
+          ${testResult.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+          {testResult.ok
+            ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-600" />
+            : <XCircle     size={16} className="mt-0.5 shrink-0 text-red-600" />}
+          <span>{testResult.message}</span>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        {isWebDav && (
+          <button onClick={handleTest} disabled={testing || !url || !user}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-200 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">
+            {testing ? <Loader2 size={14} className="animate-spin" /> : <Cloud size={14} />}
+            Verbindung testen
+          </button>
+        )}
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium disabled:opacity-50">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          Speichern
+        </button>
+      </div>
     </div>
   )
 }

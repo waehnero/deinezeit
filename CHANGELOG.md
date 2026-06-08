@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.5] – 2026-06-08 – Cloudspeicher-Integration
+
+### Neu
+- Cloudspeicher-Integration: Nextcloud und SeaDrive als Alternative zu MinIO
+- WebDAV-Provider (storage_service.py) mit automatischer Ordnererstellung via MKCOL
+- Speicher-Tab in den Einstellungen (Provider-Auswahl, WebDAV-Felder, Verbindungstest)
+- Backend-Endpunkte: POST /settings/storage/test + POST /settings/storage/apply
+- TTL-Cache (30 s) für Storage-Provider mit invalidate_provider_cache()
+- extract-msg==0.55.0 für MSG-Outlook-Datei-Vorschau
+
+---
+
+
 ## [1.7.3] - 2026-06-08 - Einstellungen umstrukturiert
 
 ### Neu
@@ -575,21 +588,4 @@ Format: [Version] – Datum – Was hat sich geändert
 - **Bericht-Optionen**: Zeitrunden auf 15/30 Minuten, Filterung nach Aufgabe, verschiedene Zeitraum-Voreinstellungen
 
 ### Technische Details
-- Migration 0005: Tabellen `time_entries` und `zeiterfassung_fields`
-- Neue Backend-API: `/api/zeiterfassung/*`
-- Neue Komponenten: `ZeiterfassungPage`, `ZeiterfassungFelder`, `BerichtDialog`
-- WeasyPrint für PDF-Generierung serverseitig
-
----
-
-## [0.6.0] – 2026-05-23 – Einstellungen, Backup & Branding
-
-### Neu
-- **Einstellungs-Seite**: Zentrales Admin-Panel mit vier Reitern
-  - *Allgemein*: Firmenname, Kontaktperson, Logo und Favicon hochladen
-  - *Design*: Primärfarbe und Akzentfarbe zur Laufzeit wechseln
-  - *Backup*: Datenbank-Backup herunterladen, Cloud-Speicher konfigurieren (OneDrive, Google Drive, Dropbox)
-  - *E-Mail*: SMTP-Konfiguration und Test-E-Mail
-- **Logo-Varianten**: Hochgeladenes Logo wird automatisch in hell/dunkel-Varianten generiert
-- **Favicon**: Eigenes Favicon hochladbar
-- **Automatisches Backup**: PowerSh
+- 

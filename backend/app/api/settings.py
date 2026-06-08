@@ -4,6 +4,7 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from PIL import Image
@@ -426,3 +427,43 @@ async def download_backup(
         raise HTTPException(500, "Backup-Timeout nach 60 Sekunden")
     except FileNotFoundError:
         raise HTTPException(500, "pg_dump nicht gefunden — bitte Container neu bauen (Dockerfile wurde aktualisiert)")
+
+
+# ── Storage-Provider ──────────────────────────────────────────────────────────
+
+class StorageTestRequest(BaseModel):
+    storage_backend:    str = "minio"
+    webdav_url:         str = ""
+    webdav_user:        str = ""
+    webdav_password:    str = ""
+    webdav_root_folder: str = "DeineZeit"
+
+
+@router.post("/storage/test")
+async def test_storage_connection(
+    body:    StorageTestRequest,
+    _:       User = Depends(require_admin),
+):
+    """Verbindungstest für den gewählten Storage-Provider."""
+    from app.services.storage_service import MinioProvider, WebDavProvider
+    if body.storage_backend == "webdav":
+        provider = WebDavProvider(
+            base_url    = body.webdav_url,
+            username    = body.webdav_user,
+            password    = body.webdav_password,
+            root_folder = body.webdav_root_folder,
+        )
+    else:
+        provider = MinioProvider()
+    return provider.test_connection()
+
+
+@router.post("/storage/apply")
+async def apply_storage_settings(
+    db: Session = Depends(get_db),
+    _:  User    = Depends(require_admin),
+):
+    """Provider-Cache leeren damit neue Storage-Settings sofort aktiv werden."""
+    from app.services.storage_service import invalidate_provider_cache
+    invalidate_provider_cache()
+    return {"ok": True}
