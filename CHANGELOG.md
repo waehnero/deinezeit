@@ -9,6 +9,10 @@
 
 ---
 
+## [1.7.4] – 2026-06-08 – Dokumentation und Datacenter-Updates
+
+---
+
 ## [1.7.4] – 2026-06-08 – Datacenter-Vorschau optimiert
 
 ### Neu

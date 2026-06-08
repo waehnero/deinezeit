@@ -9,6 +9,14 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [],
+    updates: [],
+  },
+  {
+    version: '1.7.4',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
     updates: [
       'Route-Reihenfolge im Datacenter korrigiert',
       'Vorschau-Funktion repariert',
