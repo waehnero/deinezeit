@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '1.7.7',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Cloudspeicher-Integration: Nextcloud, SeaDrive und MinIO wählbar',
+      'Speicher-Tab in Einstellungen: Provider-Auswahl, WebDAV-Felder, Verbindungstest',
+    ],
+    updates: [
+      'Upload-Fortschrittsanzeige korrigiert (weißer Browser behoben)',
+      'WebDAV-Upload: DB-Session wird korrekt übergeben',
+      'Storage-Provider korrekt in DB gespeichert und geladen',
+      'MSG-Datei-Vorschau im Datacenter',
+    ],
+  },
+  {
     version: '1.7.6',
     day: '08',
     month: 'Juni',

@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.7.7] – 2026-06-08 – Cloudspeicher-Integration abgeschlossen
+
+### Neu
+- Cloudspeicher: Nextcloud, SeaDrive und MinIO als Storage-Provider wählbar
+- Speicher-Tab in Einstellungen (Provider-Auswahl, WebDAV-URL, Verbindungstest)
+- MSG-Datei (.msg Outlook) Vorschau im Datacenter
+
+### Fixes
+- Upload-Fortschrittsanzeige (ProgressEvent → korrekter Prozentwert)
+- WebDAV-Upload: db=db an storage_service übergeben (Provider aus DB gelesen)
+- storage_backend wird korrekt als Providername (nextcloud/seadrive/minio) gespeichert
+- requests-Bibliothek in requirements.txt ergänzt
+
+---
+
+
 ## [1.7.5] – 2026-06-08 – Cloudspeicher-Integration
 
 ### Neu
