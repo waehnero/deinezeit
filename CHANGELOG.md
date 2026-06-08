@@ -12,6 +12,13 @@
 
 ---
 
+## [1.7.6] – 2026-06-08 – Upload-Fortschritt Optimierung
+
+### Aktualisierungen
+- Upload-Fortschritt wird nun korrekt aus ProgressEvent berechnet (Fehler in bestimmten Browsern behoben)
+
+---
+
 ## [1.7.6] – 2026-06-08 – Speicher-Backend Optimierung
 
 ### Aktualisierungen

@@ -10,6 +10,16 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
+      'Upload-Fortschritt wird nun korrekt aus ProgressEvent berechnet (Fehler in bestimmten Browsern behoben)',
+    ],
+  },
+  {
+    version: '1.7.6',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
       'Storage-Backend speichert Providernamen direkt (Nextcloud/Seadrive/Minio)',
     ],
   },
