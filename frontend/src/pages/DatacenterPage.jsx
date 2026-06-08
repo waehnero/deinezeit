@@ -286,8 +286,8 @@ function PreviewModal({ attachment, onClose }) {
     const fn = (attachment.filename || '').toLowerCase()
     const eml = attachment.mimetype === 'message/rfc822' ||
                 attachment.mimetype === 'text/rfc822' ||
-                fn.endsWith('.eml') ||
                 attachment.mimetype === 'application/vnd.ms-outlook' ||
+                fn.endsWith('.eml') ||
                 fn.endsWith('.msg')
     setIsEml(eml)
 
@@ -857,4 +857,31 @@ export default function DatacenterPage() {
                 <tbody className="divide-y divide-gray-50">
                   {attachments.map(a => (
                     <FileRow
-                      key=
+                      key={a.id}
+                      attachment={a}
+                      onPreview={setPreviewItem}
+                      onDownload={handleDownload}
+                      onShare={setShareItem}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modals */}
+      {previewItem && <PreviewModal attachment={previewItem} onClose={() => setPreviewItem(null)} />}
+      {shareItem   && <ShareDialog  attachment={shareItem}   onClose={() => setShareItem(null)} />}
+      {extendItem  && (
+        <ExtendDialog
+          attachment={extendItem}
+          onClose={() => setExtendItem(null)}
+          onExtended={() => { loadFolders(); loadAttachments() }}
+        />
+      )}
+    </div>
+  )
+}
