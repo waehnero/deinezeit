@@ -9,6 +9,13 @@
 
 ---
 
+## [1.7.4] – 2026-06-08 – Stabilität und Wiederherstellung
+
+### Aktualisierungen
+- API und Datacenter-Seite wiederhergestellt
+
+---
+
 ## [1.7.4] – 2026-06-08 – Datacenter-Seite neu aufgebaut
 
 ### Aktualisierungen

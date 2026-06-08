@@ -10,6 +10,16 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
+      'API und Datacenter-Seite wiederhergestellt',
+    ],
+  },
+  {
+    version: '1.7.4',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
       'DatacenterPage vollständig rekonstruiert mit verbesserter Stabilität',
       'EML/MSG-Datei-Vorschau hinzugefügt',
     ],
