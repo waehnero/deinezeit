@@ -9,6 +9,15 @@
 
 ---
 
+## [1.7.4] – 2026-06-08 – Datacenter-Vorschau optimiert
+
+### Aktualisierungen
+- Route-Reihenfolge im Datacenter korrigiert
+- Vorschau-Funktion repariert
+- EML-Datei-Vorschau hinzugefügt
+
+---
+
 ## [1.7.2] - 2026-06-07 - Versionspr�fung robuster + nginx Healthcheck
 
 

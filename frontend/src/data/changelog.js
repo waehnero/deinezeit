@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.7.4',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Route-Reihenfolge im Datacenter korrigiert',
+      'Vorschau-Funktion repariert',
+      'EML-Datei-Vorschau hinzugefügt',
+    ],
+  },
+  {
     version: '1.7.3',
     day: '08',
     month: 'Juni',
