@@ -198,7 +198,7 @@ def invalidate_provider_cache() -> None:
 
 def _build_provider(settings: dict) -> StorageProvider:
     backend = settings.get("storage_backend", "minio")
-    if backend == "webdav":
+    if backend in ("webdav", "nextcloud", "seadrive"):
         return WebDavProvider(
             base_url    = settings.get("webdav_url", ""),
             username    = settings.get("webdav_user", ""),

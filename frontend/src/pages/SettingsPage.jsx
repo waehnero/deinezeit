@@ -1841,7 +1841,7 @@ const STORAGE_PROVIDERS = [
 
 function TabSpeicher({ settings, onSaved }) {
   const rawBackend = settings.storage_backend || 'minio'
-  const initProvider = ['nextcloud','seadrive'].includes(rawBackend) ? rawBackend : 'minio'
+  const initProvider = ['minio','nextcloud','seadrive'].includes(rawBackend) ? rawBackend : 'minio'
 
   const [provider,    setProvider]    = useState(initProvider)
   const [url,         setUrl]         = useState(settings.webdav_url          || '')
@@ -1859,7 +1859,7 @@ function TabSpeicher({ settings, onSaved }) {
     setTesting(true)
     setTestResult(null)
     try {
-      const backend = isWebDav ? 'webdav' : 'minio'
+      const backend = isWebDav ? 'webdav' : 'minio'   // test endpoint still uses 'webdav'
       const res = await settingsApi.testStorage({
         storage_backend:    backend,
         webdav_url:         url,
@@ -1878,7 +1878,7 @@ function TabSpeicher({ settings, onSaved }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const backend = isWebDav ? 'webdav' : 'minio'
+      const backend = provider   // 'minio' | 'nextcloud' | 'seadrive'
       const payload = { storage_backend: backend }
       if (isWebDav) {
         payload.webdav_url         = url
