@@ -1199,7 +1199,11 @@ function TabSystem() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Neueste Version</span>
-              <span className="font-mono font-semibold text-gray-800">v{versionInfo?.latest}</span>
+              <span className="font-mono font-semibold text-gray-800">
+                {versionInfo?.github_check_ok === false
+                  ? <span className="text-amber-600">GitHub nicht erreichbar</span>
+                  : `v${versionInfo?.latest}`}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-500">Status</span>
@@ -1213,6 +1217,11 @@ function TabSystem() {
                   <AlertTriangle size={13} />
                   Update verfügbar
                 </span>
+              ) : versionInfo?.github_check_ok === false ? (
+                <span className="flex items-center gap-1 text-amber-600 font-medium">
+                  <AlertTriangle size={13} />
+                  Prüfung fehlgeschlagen
+                </span>
               ) : (
                 <span className="flex items-center gap-1 text-green-600 font-medium">
                   <CheckCircle2 size={13} />
@@ -1220,6 +1229,11 @@ function TabSystem() {
                 </span>
               )}
             </div>
+            {versionInfo?.github_check_ok === false && !isLocalMode && (
+              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-1">
+                GitHub konnte nicht erreicht werden. Verwenden Sie „Update erzwingen" um trotzdem zu aktualisieren.
+              </p>
+            )}
           </div>
         )}
 
@@ -1764,13 +1778,87 @@ function TabAllgemeinWrapper({ settings, onSaved }) {
   )
 }
 
+// ── Tab: E-Mail-Vorlagen ──────────────────────────────────────────────────────
+const EMAIL_TEMPLATE_TYPES = [
+  { id: 'rechnung',     label: 'Rechnung'     },
+  { id: 'angebot',      label: 'Angebot'      },
+  { id: 'gutschrift',   label: 'Gutschrift'   },
+  { id: 'lieferschein', label: 'Lieferschein' },
+]
+
+function TabEmailVorlagen() {
+  const [docType, setDocType]   = useState('rechnung')
+  const [subject, setSubject]   = useState('')
+  const [body,    setBody]      = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [saving,  setSaving]    = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    invoiceApi.getEmailTemplate(docType)
+      .then(r => { setSubject(r.data.subject || ''); setBody(r.data.body_html || '') })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [docType])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await invoiceApi.updateEmailTemplate(docType, { subject, body_html: body })
+      toast.success('E-Mail-Vorlage gespeichert')
+    } catch { toast.error('Fehler beim Speichern') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Belegart-Auswahl */}
+      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg w-fit">
+        {EMAIL_TEMPLATE_TYPES.map(t => (
+          <button key={t.id} onClick={() => setDocType(t.id)}
+            className={`px-4 py-1.5 text-sm rounded-md transition-all ${docType === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 size={22} className="animate-spin text-neutral-400" /></div>
+      ) : (
+        <>
+          <Field label="Betreff">
+            <Input value={subject} onChange={setSubject} placeholder="Ihre Rechnung von {{company_name}}" />
+          </Field>
+          <Field label="E-Mail-Text (HTML)" hint="Platzhalter: {{company_name}}, {{number}}, {{contact_name}}, {{date}}">
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              rows={12}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
+              spellCheck={false}
+            />
+          </Field>
+          <div className="flex justify-end">
+            <button onClick={handleSave} disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition">
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+              Vorlage speichern
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Tab: Parameter (horizontale Unter-Tabs) ───────────────────────────────────
 function TabParameter() {
   const [sub, setSub] = useState('belege')
   const subTabs = [
-    { id: 'belege',   label: 'Belegeinstellungen' },
-    { id: 'nummern',  label: 'Belegnummern'       },
-    { id: 'konten',   label: 'Kontenplan (EKR)'   },
+    { id: 'belege',        label: 'Belegeinstellungen' },
+    { id: 'nummern',       label: 'Belegnummern'       },
+    { id: 'konten',        label: 'Kontenplan (EKR)'   },
+    { id: 'emailvorlagen', label: 'E-Mail-Vorlagen'    },
   ]
   return (
     <div>
@@ -1782,9 +1870,10 @@ function TabParameter() {
           </button>
         ))}
       </div>
-      {sub === 'belege'  && <TabRechnung embedded />}
-      {sub === 'nummern' && <BelegnummernSection />}
-      {sub === 'konten'  && <TabBuchhaltung embedded />}
+      {sub === 'belege'        && <TabRechnung embedded />}
+      {sub === 'nummern'       && <BelegnummernSection />}
+      {sub === 'konten'        && <TabBuchhaltung embedded />}
+      {sub === 'emailvorlagen' && <TabEmailVorlagen />}
     </div>
   )
 }
