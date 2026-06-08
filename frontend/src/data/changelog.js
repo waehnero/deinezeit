@@ -10,6 +10,16 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
+      'Storage-Backend speichert Providernamen direkt (Nextcloud/Seadrive/Minio)',
+    ],
+  },
+  {
+    version: '1.7.6',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
       'WebDAV-Felder in den Einstellungen integriert',
     ],
   },

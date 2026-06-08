@@ -12,6 +12,13 @@
 
 ---
 
+## [1.7.6] – 2026-06-08 – Speicher-Backend Optimierung
+
+### Aktualisierungen
+- Storage-Backend speichert Providernamen direkt (Nextcloud/Seadrive/Minio)
+
+---
+
 ## [1.7.6] – 2026-06-08 – WebDAV-Speicherunterstützung hinzugefügt
 
 ### Aktualisierungen
