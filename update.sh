@@ -88,9 +88,14 @@ log "nginx/conf.d/app.conf auf Repo-Version zurückgesetzt"
 # ── 1. Neue Version von GitHub laden ─────────────────────────────────────────
 log ""
 log "[1/3] Neue Version von GitHub laden..."
-if ! git pull origin main >> "$LOG_FILE" 2>&1; then
-    log "FEHLER: git pull fehlgeschlagen – keine Änderungen übernommen, kein Rollback nötig."
+if ! git fetch origin main >> "$LOG_FILE" 2>&1; then
+    log "FEHLER: git fetch fehlgeschlagen – keine Änderungen übernommen, kein Rollback nötig."
     # Domain in app.conf wiederherstellen
+    [ -n "$DOMAIN" ] && sed -i "s/deine-domain.at/$DOMAIN/g" "$APPCONF"
+    exit 1
+fi
+if ! git reset --hard origin/main >> "$LOG_FILE" 2>&1; then
+    log "FEHLER: git reset fehlgeschlagen – keine Änderungen übernommen, kein Rollback nötig."
     [ -n "$DOMAIN" ] && sed -i "s/deine-domain.at/$DOMAIN/g" "$APPCONF"
     exit 1
 fi
