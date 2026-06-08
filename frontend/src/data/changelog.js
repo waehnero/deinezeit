@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.7.6',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'requests-Bibliothek in WebDAV-Provider integriert',
+    ],
+  },
+  {
     version: '1.8.0',
     day: '08',
     month: 'Juni',

@@ -12,6 +12,13 @@
 
 ---
 
+## [1.7.6] – 2026-06-08 – WebDAV-Integration stabilisiert
+
+### Aktualisierungen
+- requests-Bibliothek in WebDAV-Provider integriert
+
+---
+
 ## [1.8.0] – 2026-06-08 – Cloudspeicher-Integration und Stabilität
 
 ### Neu
