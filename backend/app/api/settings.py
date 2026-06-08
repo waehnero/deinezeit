@@ -78,7 +78,7 @@ def _generate_logo_variants(original_bytes: bytes, ext: str) -> tuple[bytes, byt
 async def get_settings(db: Session = Depends(get_db)):
     data = _load(db)
     # Secrets niemals zurückgeben
-    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret', 'webdav_password')}
+    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret', 'webdav_password', 'onedrive_client_secret')}
     return SettingsResponse(**{k: safe.get(k, '') for k in SettingsResponse.model_fields})
 
 
@@ -441,17 +441,39 @@ class StorageTestRequest(BaseModel):
 
 @router.post("/storage/test")
 async def test_storage_connection(
-    body:    StorageTestRequest,
-    _:       User = Depends(require_admin),
+    body: StorageTestRequest,
+    db:   Session = Depends(get_db),
+    _:    User    = Depends(require_admin),
 ):
     """Verbindungstest für den gewählten Storage-Provider."""
-    from app.services.storage_service import MinioProvider, WebDavProvider
+    from app.services.storage_service import MinioProvider, WebDavProvider, OneDriveProvider
     if body.storage_backend == "webdav":
         provider = WebDavProvider(
             base_url    = body.webdav_url,
             username    = body.webdav_user,
             password    = body.webdav_password,
             root_folder = body.webdav_root_folder,
+        )
+    elif body.storage_backend == "onedrive":
+        if body.onedrive_use_graph_creds == "true":
+            from app.models.settings import Setting as _Setting
+            rows = {r.key: r.value for r in db.query(_Setting).filter(
+                _Setting.key.in_(["ms_tenant_id", "ms_client_id", "ms_client_secret"])
+            ).all()}
+            tenant_id     = rows.get("ms_tenant_id", "")
+            client_id     = rows.get("ms_client_id", "")
+            client_secret = rows.get("ms_client_secret", "")
+        else:
+            tenant_id     = body.onedrive_tenant_id
+            client_id     = body.onedrive_client_id
+            client_secret = body.onedrive_client_secret
+        provider = OneDriveProvider(
+            tenant_id     = tenant_id,
+            client_id     = client_id,
+            client_secret = client_secret,
+            drive_type    = body.onedrive_drive_type,
+            site_id       = body.onedrive_site_id,
+            root_folder   = body.onedrive_root_folder,
         )
     else:
         provider = MinioProvider()

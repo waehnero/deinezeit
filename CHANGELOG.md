@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.8] - 2026-06-08
+### Neu
+- OneDrive-Integration: Microsoft OneDrive & SharePoint als Cloudspeicher-Option
+- Graph-Anmeldedaten aus E-Mail-Einstellungen können für OneDrive wiederverwendet werden
+- Persönliches OneDrive und SharePoint-Laufwerk konfigurierbar (inkl. Site-ID)
+
 ## [1.7.7] – 2026-06-08 – Cloudspeicher-Integration abgeschlossen
 
 ### Neu

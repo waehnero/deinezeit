@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.7.8',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'OneDrive-Integration: Microsoft OneDrive & SharePoint als Cloudspeicher',
+      'Graph-Anmeldedaten aus E-Mail-Einstellungen wiederverwendbar',
+      'Persönliches OneDrive und SharePoint-Laufwerk wählbar',
+    ],
+    updates: [],
+  },
+  {
     version: '1.7.7',
     day: '08',
     month: 'Juni',

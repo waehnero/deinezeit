@@ -38,6 +38,14 @@ class SettingsResponse(BaseModel):
     webdav_user:            str = ''
     webdav_root_folder:     str = 'DeineZeit'
     # webdav_password wird NICHT zurückgegeben (Sicherheit)
+    # OneDrive / Microsoft Graph
+    onedrive_use_graph_creds: str = 'false'   # 'true' = ms_* Felder wiederverwenden
+    onedrive_tenant_id:       str = ''
+    onedrive_client_id:       str = ''
+    onedrive_drive_type:      str = 'personal'  # 'personal' | 'sharepoint'
+    onedrive_site_id:         str = ''
+    onedrive_root_folder:     str = 'DeineZeit'
+    # onedrive_client_secret wird NICHT zurückgegeben (Sicherheit)
 
 
 class SettingsUpdate(BaseModel):
@@ -71,6 +79,14 @@ class SettingsUpdate(BaseModel):
     webdav_user:            Optional[str] = None
     webdav_password:        Optional[str] = None
     webdav_root_folder:     Optional[str] = None
+    # OneDrive / Microsoft Graph
+    onedrive_use_graph_creds: Optional[str] = None
+    onedrive_tenant_id:       Optional[str] = None
+    onedrive_client_id:       Optional[str] = None
+    onedrive_client_secret:   Optional[str] = None
+    onedrive_drive_type:      Optional[str] = None
+    onedrive_site_id:         Optional[str] = None
+    onedrive_root_folder:     Optional[str] = None
 
 
 class TestEmailRequest(BaseModel):

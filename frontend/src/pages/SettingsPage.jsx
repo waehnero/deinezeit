@@ -1834,39 +1834,59 @@ function TabSystemWrapper({ settings, onSaved }) {
 
 // ── Tab: Speicher ────────────────────────────────────────────────────────────
 const STORAGE_PROVIDERS = [
-  { id: 'minio',     label: 'MinIO',      icon: '🗄️',  hint: 'Lokaler MinIO-Objektspeicher (Standard)' },
-  { id: 'nextcloud', label: 'Nextcloud',  icon: '☁️',  hint: 'WebDAV-URL: https://cloud.example.com/remote.php/dav/files/BENUTZERNAME' },
-  { id: 'seadrive',  label: 'SeaDrive',   icon: '🌊',  hint: 'WebDAV-URL: https://seadrive.example.com/seafdav' },
+  { id: 'minio',     label: 'MinIO',     icon: '🗄️', hint: 'Lokaler MinIO-Objektspeicher (Standard)' },
+  { id: 'nextcloud', label: 'Nextcloud', icon: '☁️', hint: 'WebDAV-URL: https://cloud.example.com/remote.php/dav/files/BENUTZERNAME' },
+  { id: 'seadrive',  label: 'SeaDrive',  icon: '🌊', hint: 'WebDAV-URL: https://seadrive.example.com/seafdav' },
+  { id: 'onedrive',  label: 'OneDrive',  icon: '📁', hint: 'Microsoft OneDrive oder SharePoint via Graph API (App-Berechtigung Files.ReadWrite.All erforderlich)' },
 ]
 
 function TabSpeicher({ settings, onSaved }) {
   const rawBackend = settings.storage_backend || 'minio'
-  const initProvider = ['minio','nextcloud','seadrive'].includes(rawBackend) ? rawBackend : 'minio'
+  const initProvider = ['minio','nextcloud','seadrive','onedrive'].includes(rawBackend) ? rawBackend : 'minio'
 
-  const [provider,    setProvider]    = useState(initProvider)
-  const [url,         setUrl]         = useState(settings.webdav_url          || '')
-  const [user,        setUser]        = useState(settings.webdav_user         || '')
-  const [password,    setPassword]    = useState('')
-  const [rootFolder,  setRootFolder]  = useState(settings.webdav_root_folder  || 'DeineZeit')
+  const [provider,         setProvider]         = useState(initProvider)
+  // WebDAV
+  const [url,              setUrl]              = useState(settings.webdav_url         || '')
+  const [user,             setUser]             = useState(settings.webdav_user        || '')
+  const [password,         setPassword]         = useState('')
+  const [rootFolder,       setRootFolder]       = useState(settings.webdav_root_folder || 'DeineZeit')
+  // OneDrive
+  const [odUseGraph,       setOdUseGraph]       = useState(settings.onedrive_use_graph_creds === 'true')
+  const [odTenantId,       setOdTenantId]       = useState(settings.onedrive_tenant_id  || '')
+  const [odClientId,       setOdClientId]       = useState(settings.onedrive_client_id  || '')
+  const [odClientSecret,   setOdClientSecret]   = useState('')
+  const [odDriveType,      setOdDriveType]      = useState(settings.onedrive_drive_type || 'personal')
+  const [odSiteId,         setOdSiteId]         = useState(settings.onedrive_site_id    || '')
+  const [odRootFolder,     setOdRootFolder]     = useState(settings.onedrive_root_folder|| 'DeineZeit')
+
   const [saving,      setSaving]      = useState(false)
   const [testing,     setTesting]     = useState(false)
   const [testResult,  setTestResult]  = useState(null)
 
-  const isWebDav = provider !== 'minio'
-  const hint = STORAGE_PROVIDERS.find(p => p.id === provider)?.hint || ''
+  const isWebDav   = ['nextcloud','seadrive'].includes(provider)
+  const isOneDrive = provider === 'onedrive'
+  const providerHint = STORAGE_PROVIDERS.find(p => p.id === provider)?.hint || ''
 
   const handleTest = async () => {
     setTesting(true)
     setTestResult(null)
     try {
-      const backend = isWebDav ? 'webdav' : 'minio'   // test endpoint still uses 'webdav'
-      const res = await settingsApi.testStorage({
-        storage_backend:    backend,
-        webdav_url:         url,
-        webdav_user:        user,
-        webdav_password:    password,
-        webdav_root_folder: rootFolder,
-      })
+      const payload = { storage_backend: isOneDrive ? 'onedrive' : isWebDav ? 'webdav' : 'minio' }
+      if (isWebDav) {
+        Object.assign(payload, { webdav_url: url, webdav_user: user, webdav_password: password, webdav_root_folder: rootFolder })
+      }
+      if (isOneDrive) {
+        Object.assign(payload, {
+          onedrive_use_graph_creds: odUseGraph ? 'true' : 'false',
+          onedrive_tenant_id:       odTenantId,
+          onedrive_client_id:       odClientId,
+          onedrive_client_secret:   odClientSecret,
+          onedrive_drive_type:      odDriveType,
+          onedrive_site_id:         odSiteId,
+          onedrive_root_folder:     odRootFolder,
+        })
+      }
+      const res = await settingsApi.testStorage(payload)
       setTestResult(res.data)
     } catch (e) {
       setTestResult({ ok: false, message: e?.response?.data?.detail || e.message })
@@ -1878,13 +1898,23 @@ function TabSpeicher({ settings, onSaved }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const backend = provider   // 'minio' | 'nextcloud' | 'seadrive'
-      const payload = { storage_backend: backend }
+      const payload = { storage_backend: provider }
       if (isWebDav) {
         payload.webdav_url         = url
         payload.webdav_user        = user
         payload.webdav_root_folder = rootFolder
         if (password) payload.webdav_password = password
+      }
+      if (isOneDrive) {
+        payload.onedrive_use_graph_creds = odUseGraph ? 'true' : 'false'
+        payload.onedrive_drive_type      = odDriveType
+        payload.onedrive_site_id         = odSiteId
+        payload.onedrive_root_folder     = odRootFolder
+        if (!odUseGraph) {
+          payload.onedrive_tenant_id  = odTenantId
+          payload.onedrive_client_id  = odClientId
+          if (odClientSecret) payload.onedrive_client_secret = odClientSecret
+        }
       }
       await settingsApi.update(payload)
       await settingsApi.applyStorage()
@@ -1912,7 +1942,7 @@ function TabSpeicher({ settings, onSaved }) {
             </button>
           ))}
         </div>
-        {hint && <p className="mt-2 text-xs text-neutral-500">{hint}</p>}
+        {providerHint && <p className="mt-2 text-xs text-neutral-500">{providerHint}</p>}
       </div>
 
       {isWebDav && (
@@ -1948,7 +1978,75 @@ function TabSpeicher({ settings, onSaved }) {
         </div>
       )}
 
-      {testResult && (
+      {isOneDrive && (
+        <div className="space-y-4 p-4 bg-neutral-50 rounded-xl border border-neutral-200">
+          {/* Graph-Credentials Toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => setOdUseGraph(!odUseGraph)}
+              className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5
+                ${odUseGraph ? 'bg-orange-500' : 'bg-neutral-300'}`}>
+              <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform
+                ${odUseGraph ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+            <span className="text-sm text-neutral-700">Graph-Einstellungen aus E-Mail wiederverwenden</span>
+          </label>
+          {!odUseGraph && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-neutral-500 mb-1">Tenant-ID</label>
+                <input type="text" value={odTenantId} onChange={e => setOdTenantId(e.target.value)}
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 mb-1">Client-ID</label>
+                  <input type="text" value={odClientId} onChange={e => setOdClientId(e.target.value)}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 mb-1">Client-Secret</label>
+                  <input type="password" value={odClientSecret} onChange={e => setOdClientSecret(e.target.value)}
+                    placeholder={settings.onedrive_client_secret ? '••••••••' : ''}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Drive-Typ */}
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-2">Laufwerk</label>
+            <div className="flex gap-2">
+              {[{id:'personal',label:'Persönliches OneDrive'},{id:'sharepoint',label:'SharePoint'}].map(dt => (
+                <button key={dt.id} onClick={() => setOdDriveType(dt.id)}
+                  className={`px-3 py-1.5 rounded-lg border text-sm transition-all
+                    ${odDriveType === dt.id
+                      ? 'bg-orange-50 border-orange-400 text-orange-700 font-medium'
+                      : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+                  {dt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {odDriveType === 'sharepoint' && (
+            <div>
+              <label className="block text-xs font-medium text-neutral-500 mb-1">SharePoint Site-ID</label>
+              <input type="text" value={odSiteId} onChange={e => setOdSiteId(e.target.value)}
+                placeholder="contoso.sharepoint.com,abc123,def456"
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              <p className="mt-1 text-xs text-neutral-400">Format: hostname,siteId,webId — aus Graph API /sites/{'{'}hostname{'}'}:{'{'}sitePath{'}'}</p>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-1">Root-Ordner in OneDrive</label>
+            <input type="text" value={odRootFolder} onChange={e => setOdRootFolder(e.target.value)}
+              placeholder="DeineZeit"
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+        </div>
+      )}
+
+            {testResult && (
         <div className={`flex items-start gap-2 p-3 rounded-lg text-sm border
           ${testResult.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
           {testResult.ok
@@ -1959,8 +2057,9 @@ function TabSpeicher({ settings, onSaved }) {
       )}
 
       <div className="flex items-center gap-3">
-        {isWebDav && (
-          <button onClick={handleTest} disabled={testing || !url || !user}
+        {(isWebDav || isOneDrive) && (
+          <button onClick={handleTest}
+            disabled={testing || (isWebDav && (!url || !user)) || (isOneDrive && !odUseGraph && (!odTenantId || !odClientId))}
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-200 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">
             {testing ? <Loader2 size={14} className="animate-spin" /> : <Cloud size={14} />}
             Verbindung testen
