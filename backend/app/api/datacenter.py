@@ -551,7 +551,10 @@ async def upload_file(
             entity_type, entity_id, f"{uuid.uuid4().hex[:6]}_{filename}"
         )
 
-    storage_service.upload_file(storage_key, data, mimetype)
+    try:
+        storage_service.upload_file(storage_key, data, mimetype, db=db)
+    except Exception as exc:
+        raise HTTPException(500, f"Speicher-Fehler: {exc}")
 
     attachment = Attachment(
         entity_type=entity_type, entity_id=entity_id,
