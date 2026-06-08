@@ -651,7 +651,7 @@ export default function DatacenterPage() {
     setUploading(true)
     try {
       for (const file of files) {
-        await datacenterApi.upload(selected.type, entityId, file, (pct) => setUploadProgress(pct))
+        await datacenterApi.upload(selected.type, entityId, file, (e) => setUploadProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0))
       }
       toast.success(`${files.length} Datei${files.length > 1 ? 'en' : ''} hochgeladen`)
       await Promise.all([loadFolders(), loadAttachments()])
