@@ -9,6 +9,14 @@
 
 ---
 
+## [1.7.4] – 2026-06-08 – UTF-8 Encoding Verbesserungen
+
+### Aktualisierungen
+- UTF-8 Encoding in bump-version.ps1 korrigiert
+- Update-Prozess in system.py optimiert
+
+---
+
 ## [1.7.4] – 2026-06-08 – Dokumentation und Datacenter-Updates
 
 ---

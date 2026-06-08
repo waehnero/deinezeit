@@ -9,6 +9,17 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [],
+    updates: [
+      'UTF-8 Encoding in bump-version.ps1 korrigiert',
+      'Update-Prozess in system.py optimiert',
+    ],
+  },
+  {
+    version: '1.7.4',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
     updates: [],
   },
   {
