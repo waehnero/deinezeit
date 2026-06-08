@@ -7,6 +7,7 @@ WICHTIGE ROUTE-REIHENFOLGE:
   da FastAPI/Starlette in Definitionsreihenfolge matched und /{a}/{b} auch
   /{id}/preview abfangen würde.
 """
+import io
 import os
 import uuid
 import email
@@ -49,8 +50,9 @@ PREVIEW_MIMETYPES = [
     "image/",
     "application/pdf",
     "text/plain",
-    "message/rfc822",   # .eml
-    "text/rfc822",      # .eml (alternativ)
+    "message/rfc822",            # .eml
+    "text/rfc822",               # .eml (alternativ)
+    "application/vnd.ms-outlook", # .msg
 ]
 
 
@@ -234,6 +236,73 @@ def _render_eml_preview(raw: bytes) -> str:
 </html>"""
 
 
+def _render_msg_preview(raw: bytes) -> str:
+    """Parst eine .msg-Datei (Outlook) und gibt HTML für die Vorschau zurück."""
+    try:
+        import extract_msg
+        msg = extract_msg.Message(io.BytesIO(raw))
+    except Exception as e:
+        return f"<p>MSG-Datei konnte nicht gelesen werden: {html_mod.escape(str(e))}</p>"
+
+    def h(s):
+        return html_mod.escape(str(s or ""))
+
+    headers_html = ""
+    for field, val in [
+        ("From",    msg.sender),
+        ("To",      msg.to),
+        ("CC",      msg.cc),
+        ("Subject", msg.subject),
+        ("Date",    str(msg.date) if msg.date else ""),
+    ]:
+        if val:
+            headers_html += f'<tr><th>{h(field)}</th><td>{h(val)}</td></tr>'
+
+    # HTML-Body bevorzugen, sonst Plain-Text
+    body_html = getattr(msg, "htmlBody", None)
+    body_text = msg.body or ""
+
+    if body_html:
+        if isinstance(body_html, bytes):
+            body_html = body_html.decode("utf-8", errors="replace")
+        body_content = f"""
+          <div style="font-size:13px;color:#555;margin-bottom:8px;">
+            ⚠️ HTML-Inhalt wird in isolierter Vorschau angezeigt
+          </div>
+          <iframe srcdoc="{h(body_html)}"
+            style="width:100%;height:calc(100% - 160px);border:1px solid #e5e7eb;border-radius:8px;"
+            sandbox="allow-same-origin"></iframe>"""
+    else:
+        escaped = h(body_text) if body_text else "<em style='color:#999'>Kein Inhalt</em>"
+        body_content = f'<pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;color:#374151">{escaped}</pre>'
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #f9fafb; color: #111827; padding: 16px; height: 100vh; overflow: hidden; }}
+    .card {{ background: white; border-radius: 12px; border: 1px solid #e5e7eb; padding: 16px;
+             margin-bottom: 12px; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th {{ width: 70px; text-align: left; color: #6b7280; font-size: 12px;
+          font-weight: 600; padding: 4px 8px 4px 0; vertical-align: top; }}
+    td {{ font-size: 13px; color: #111827; padding: 4px 0; word-break: break-word; }}
+    .body {{ background: white; border-radius: 12px; border: 1px solid #e5e7eb;
+             padding: 16px; height: calc(100vh - 180px); overflow-y: auto; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <table>{headers_html}</table>
+  </div>
+  <div class="body">{body_content}</div>
+</body>
+</html>"""
+
+
 # ════════════════════════════════════════════════════════════════════════════════
 # ROUTEN – Reihenfolge ist entscheidend!
 # 1. Literal-Routen  (/all, /providers, /link, /share/...)
@@ -350,12 +419,16 @@ async def preview_file(
     mimetype = att.mimetype or "application/octet-stream"
     filename_lower = (att.filename or "").lower()
     is_eml = mimetype in ("message/rfc822", "text/rfc822") or filename_lower.endswith(".eml")
+    is_msg = mimetype == "application/vnd.ms-outlook" or filename_lower.endswith(".msg")
 
-    # EML immer erlauben, auch wenn Browser "application/octet-stream" gesendet hat
-    if not is_eml and not any(mimetype.startswith(t) for t in PREVIEW_MIMETYPES):
+    # EML/MSG immer erlauben, auch wenn Browser "application/octet-stream" gesendet hat
+    if not is_eml and not is_msg and not any(mimetype.startswith(t) for t in PREVIEW_MIMETYPES):
         raise HTTPException(415, "Keine Vorschau für diesen Dateityp")
 
     data, content_type = storage_service.download_file(att.storage_key)
+
+    if is_msg:
+        return HTMLResponse(content=_render_msg_preview(data))
 
     # EML-Vorschau als HTML rendern
     if is_eml:

@@ -283,12 +283,15 @@ function PreviewModal({ attachment, onClose }) {
   const [isEml, setIsEml]     = useState(false)
 
   useEffect(() => {
+    const fn = (attachment.filename || '').toLowerCase()
     const eml = attachment.mimetype === 'message/rfc822' ||
                 attachment.mimetype === 'text/rfc822' ||
-                (attachment.filename || '').toLowerCase().endsWith('.eml')
+                fn.endsWith('.eml') ||
+                attachment.mimetype === 'application/vnd.ms-outlook' ||
+                fn.endsWith('.msg')
     setIsEml(eml)
 
-    // Für EML liefert das Backend fertig gerendertes HTML (text) zurück
+    // Für EML/MSG liefert das Backend fertig gerendertes HTML (text) zurück
     const responseType = eml ? 'text' : 'blob'
     datacenterApi.previewRaw(attachment.id, responseType)
       .then(res => {
@@ -434,13 +437,16 @@ function FolderTree({ folders, selected, onSelect }) {
 
 function FileRow({ attachment, onPreview, onDownload, onShare, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const _fn = (attachment.filename || '').toLowerCase()
   const canPreview = attachment.type === 'file' && (
     attachment.mimetype?.startsWith('image/') ||
     attachment.mimetype === 'application/pdf' ||
     attachment.mimetype?.startsWith('text/') ||
     attachment.mimetype === 'message/rfc822' ||
     attachment.mimetype === 'text/rfc822' ||
-    (attachment.filename || '').toLowerCase().endsWith('.eml')
+    attachment.mimetype === 'application/vnd.ms-outlook' ||
+    _fn.endsWith('.eml') ||
+    _fn.endsWith('.msg')
   )
 
   return (
