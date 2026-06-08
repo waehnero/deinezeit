@@ -78,7 +78,7 @@ def _generate_logo_variants(original_bytes: bytes, ext: str) -> tuple[bytes, byt
 async def get_settings(db: Session = Depends(get_db)):
     data = _load(db)
     # Secrets niemals zurückgeben
-    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret')}
+    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret', 'webdav_password')}
     return SettingsResponse(**{k: safe.get(k, '') for k in SettingsResponse.model_fields})
 
 

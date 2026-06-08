@@ -32,6 +32,12 @@ class SettingsResponse(BaseModel):
     # Firmenkontakt
     company_contact_id:     str = ''
     company_contact_type:   str = ''
+    # Speicher / Storage
+    storage_backend:        str = 'minio'   # 'minio' | 'webdav'
+    webdav_url:             str = ''
+    webdav_user:            str = ''
+    webdav_root_folder:     str = 'DeineZeit'
+    # webdav_password wird NICHT zurückgegeben (Sicherheit)
 
 
 class SettingsUpdate(BaseModel):
@@ -59,6 +65,12 @@ class SettingsUpdate(BaseModel):
     # Firmenkontakt
     company_contact_id:     Optional[str] = None
     company_contact_type:   Optional[str] = None
+    # Speicher / Storage
+    storage_backend:        Optional[str] = None
+    webdav_url:             Optional[str] = None
+    webdav_user:            Optional[str] = None
+    webdav_password:        Optional[str] = None
+    webdav_root_folder:     Optional[str] = None
 
 
 class TestEmailRequest(BaseModel):
