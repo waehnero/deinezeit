@@ -12,6 +12,13 @@
 
 ---
 
+## [1.7.6] – 2026-06-08 – WebDAV-Speicherunterstützung hinzugefügt
+
+### Aktualisierungen
+- WebDAV-Felder in den Einstellungen integriert
+
+---
+
 ## [1.7.6] – 2026-06-08 – WebDAV-Integration stabilisiert
 
 ### Aktualisierungen

@@ -10,6 +10,16 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
+      'WebDAV-Felder in den Einstellungen integriert',
+    ],
+  },
+  {
+    version: '1.7.6',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
       'requests-Bibliothek in WebDAV-Provider integriert',
     ],
   },
