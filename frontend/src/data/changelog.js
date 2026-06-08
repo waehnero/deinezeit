@@ -33,9 +33,10 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-
+      'Datacenter: EML-Vorschau direkt im Browser (E-Mail-Dateien)',
     ],
     updates: [
+      'Datacenter: Vorschau-Route repariert (GIF und andere Formate wurden nicht geladen)',
       'Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar',
       'SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt',
       'nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start',

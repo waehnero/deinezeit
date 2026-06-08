@@ -11,34 +11,22 @@
 
 ## [1.7.4] – 2026-06-08 – Datacenter-Vorschau optimiert
 
+### Neu
+- Datacenter: EML-Vorschau direkt im Browser (E-Mail-Dateien)
+
 ### Aktualisierungen
-- Route-Reihenfolge im Datacenter korrigiert
-- Vorschau-Funktion repariert
-- EML-Datei-Vorschau hinzugefügt
+- Datacenter: Vorschau-Route repariert (GIF und andere Formate wurden nicht geladen)
 
 ---
 
-## [1.7.2] - 2026-06-07 - Versionspr�fung robuster + nginx Healthcheck
-
-
-### Aktualisierungen
-- Versionspr�fung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
-- SettingsPage: zeigt Warnung wenn GitHub-Pr�fung fehlschl�gt
-- nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start
-- nginx IP-Aufl�sung: Container-IPs dynamisch alle 10s neu aufgel�st
-- docker-compose.yml: certbot_conf Volume und Networks erg�nzt
-
----
-
-## [1.7.2] - 2026-06-07 - Versionspr�fung robuster + nginx Healthcheck
-
+## [1.7.2] - 2026-06-07 - Versionsprüfung robuster + nginx Healthcheck
 
 ### Aktualisierungen
-- Versionspr�fung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
-- SettingsPage: zeigt Warnung wenn GitHub-Pr�fung fehlschl�gt
+- Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
+- SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt
 - nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start
-- nginx IP-Aufl�sung: Container-IPs dynamisch alle 10s neu aufgel�st
-- docker-compose.yml: certbot_conf Volume und Networks erg�nzt
+- nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst
+- docker-compose.yml: certbot_conf Volume und Networks ergänzt
 
 ---
 
@@ -560,41 +548,4 @@ Format: [Version] – Datum – Was hat sich geändert
   - *E-Mail*: SMTP-Konfiguration und Test-E-Mail
 - **Logo-Varianten**: Hochgeladenes Logo wird automatisch in hell/dunkel-Varianten generiert
 - **Favicon**: Eigenes Favicon hochladbar
-- **Automatisches Backup**: PowerShell-Skript für geplante Backups (Windows Task Scheduler)
-- **Backup-Watcher**: Überwacht Backup-Verzeichnis und kopiert bei Änderung in Cloud-Speicher
-- **Wiederherstellungs-Skript**: Backup mit einem Befehl wiederherstellen
-
-### Technische Details
-- Migration 0006: `settings`-Tabelle für alle App-Konfigurationen
-- Pillow für Logo-Verarbeitung (Varianten, Transparenz)
-- Neue Skripte: `backup.ps1`, `backup.bat`, `backup-einrichten.ps1`, `wiederherstellen.ps1`, `backup-watcher.ps1`
-
----
-
-## [0.7.0] – 2026-05-23 – Datacenter (Datei-Verwaltung)
-
-### Neu
-- **Datacenter**: Zentrale Dateiverwaltung für alle Stammdaten-Datensätze
-- **Datei-Upload**: Beliebige Dateien direkt an Datensätze anhängen (Dokumente, Bilder, etc.)
-- **Weblinks speichern**: URLs als Verknüpfungen hinterlegen
-- **Download & Vorschau**: Dateien herunterladen oder direkt im Browser ansehen
-- **Shareable Links**: Zeitlich begrenzte Download-Links generieren und teilen
-- **Explorer-Ansicht**: Datacenter-Seite mit Ordnerstruktur (links) und Dateiliste (rechts)
-- **Ordner nach Datensatz benannt**: Statt UUIDs werden die echten Namen der verknüpften Datensätze als Ordnernamen angezeigt
-- **Datei-Anhänge im Bearbeitungs-Dialog**: Anhänge direkt beim Bearbeiten eines Datensatzes sehen und hochladen
-
-### Technische Details
-- Migration 0007/0008: `attachments`-Tabelle mit MinIO-Integration
-- MinIO (S3-kompatibler Objektspeicher) als separater Docker-Service
-- Presigned URLs für sichere Downloads und Vorschauen
-- Neue Backend-API: `/api/datacenter/*`
-
----
-
-## [0.8.1] – 2026-05-25 – Passkey & Face ID Bugfix
-
-### Bugfixes
-- **Passkeys / Face ID / Windows Hello vollständig implementiert**: Anmeldung ohne Passwort funktioniert jetzt korrekt
-- Passkey hinzufügen (Profilseite) speichert Gerät korrekt in der Datenbank
-- Passkey-Login schließt den Vorgang ab und setzt den JWT-Token — vorher war kein Login möglich
-- Backend: Challen
+- **Automatisches Backup**: PowerSh
