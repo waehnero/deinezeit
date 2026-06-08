@@ -8,6 +8,17 @@ export const changelog = [
     day: '08',
     month: 'Juni',
     year: '2026',
+    features: [],
+    updates: [
+      'DatacenterPage vollständig rekonstruiert mit verbesserter Stabilität',
+      'EML/MSG-Datei-Vorschau hinzugefügt',
+    ],
+  },
+  {
+    version: '1.7.4',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
     features: [
       'MSG-Vorschau im Datacenter hinzugefügt',
     ],

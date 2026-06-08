@@ -9,6 +9,14 @@
 
 ---
 
+## [1.7.4] – 2026-06-08 – Datacenter-Seite neu aufgebaut
+
+### Aktualisierungen
+- DatacenterPage vollständig rekonstruiert mit verbesserter Stabilität
+- EML/MSG-Datei-Vorschau hinzugefügt
+
+---
+
 ## [1.7.4] – 2026-06-08 – MSG-Vorschau und EML-Optimierung
 
 ### Neu
