@@ -8,6 +8,18 @@ export const changelog = [
     day: '08',
     month: 'Juni',
     year: '2026',
+    features: [
+      'MSG-Vorschau im Datacenter hinzugefügt',
+    ],
+    updates: [
+      'EML-Verarbeitung bei application/octet-stream-Dateien korrigiert',
+    ],
+  },
+  {
+    version: '1.7.4',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
     features: [],
     updates: [
       'E-Mail-Vorschau funktioniert nun auch bei application/octet-stream Dateitypen.',

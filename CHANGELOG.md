@@ -9,6 +9,16 @@
 
 ---
 
+## [1.7.4] – 2026-06-08 – MSG-Vorschau und EML-Optimierung
+
+### Neu
+- MSG-Vorschau im Datacenter hinzugefügt
+
+### Aktualisierungen
+- EML-Verarbeitung bei application/octet-stream-Dateien korrigiert
+
+---
+
 ## [1.7.4] – 2026-06-08 – E-Mail-Vorschau verbessert
 
 ### Aktualisierungen
