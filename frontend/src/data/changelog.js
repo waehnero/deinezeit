@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.8.0',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'OneDrive-Integration mit Microsoft Graph API',
+      'Unterstützung für persönliche OneDrive-Konten',
+      'Unterstützung für SharePoint-Dateien',
+    ],
+    updates: [],
+  },
+  {
     version: '1.7.8',
     day: '08',
     month: 'Juni',

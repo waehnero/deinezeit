@@ -21,6 +21,15 @@
 
 ---
 
+## [1.8.0] – 2026-06-08 – OneDrive-Integration
+
+### Neu
+- OneDrive-Integration mit Microsoft Graph API
+- Unterstützung für persönliche OneDrive-Konten
+- Unterstützung für SharePoint-Dateien
+
+---
+
 
 ## [1.7.5] – 2026-06-08 – Cloudspeicher-Integration
 
