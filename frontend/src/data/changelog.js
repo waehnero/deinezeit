@@ -12,27 +12,11 @@ export const changelog = [
 
     ],
     updates: [
-      'Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar',
-      'SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt',
+      'VersionsprÃ¼fung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar',
+      'SettingsPage: zeigt Warnung wenn GitHub-PrÃ¼fung fehlschlÃ¤gt',
       'nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start',
-      'nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst',
-      'docker-compose.yml: certbot_conf Volume und Networks ergänzt',
-    ],
-  },
-  {
-    version: '1.7.2',
-    day: '07',
-    month: 'Juni',
-    year: '2026',
-    features: [
-
-    ],
-    updates: [
-      'Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar',
-      'SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt',
-      'nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start',
-      'nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst',
-      'docker-compose.yml: certbot_conf Volume und Networks ergänzt',
+      'nginx IP-AuflÃ¶sung: Container-IPs dynamisch alle 10s neu aufgelÃ¶st',
+      'docker-compose.yml: certbot_conf Volume und Networks ergÃ¤nzt',
     ],
   },
   {
@@ -616,3 +600,28 @@ export const changelog = [
   {
     version: '0.3.0',
     day: '21',
+    month: 'Mai',
+    year: '2026',
+    features: [
+      'Snap-to-Grid Drag & Drop Layout-Builder fÃ¼r Felder',
+      'Feldbreite frei wÃ¤hlbar: 25% / 33% / 50% / 75% / 100%',
+      'CSV Export (Excel-kompatibel) und CSV Import mit Spalten-Zuordnung',
+      'Profilseite: Name, Sprache, Passwort, 2FA und Passkeys',
+      'Benutzerverwaltung fÃ¼r Admins',
+    ],
+    updates: [],
+  },
+  {
+    version: '0.2.0',
+    day: '21',
+    month: 'Mai',
+    year: '2026',
+    features: [
+      'Dynamische Stammdaten-Typen: Kunden, Lieferanten, Projekte â€” und beliebig mehr',
+      'Formular-Builder: Felder direkt in der OberflÃ¤che definieren',
+      '9 Feldtypen: Text, Zahl, Datum, E-Mail, Telefon, Auswahl, Checkbox, URL, Textarea',
+      'Volltextsuche und Paginierung in Datensatz-Listen',
+    ],
+    updates: [],
+  },
+]
