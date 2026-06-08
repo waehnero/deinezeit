@@ -10,6 +10,16 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
+      'WebDAV-Upload funktioniert wieder korrekt nach Datenbankverbindungs-Fix',
+    ],
+  },
+  {
+    version: '1.7.6',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
       'Upload-Fortschritt wird nun korrekt aus ProgressEvent berechnet (Fehler in bestimmten Browsern behoben)',
     ],
   },

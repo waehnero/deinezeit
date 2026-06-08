@@ -12,6 +12,13 @@
 
 ---
 
+## [1.7.6] – 2026-06-08 – WebDAV-Upload Fehlerbehebung
+
+### Aktualisierungen
+- WebDAV-Upload funktioniert wieder korrekt nach Datenbankverbindungs-Fix
+
+---
+
 ## [1.7.6] – 2026-06-08 – Upload-Fortschritt Optimierung
 
 ### Aktualisierungen
