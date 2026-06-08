@@ -1958,7 +1958,6 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
     { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
-    { id: 'vorlagen',   label: 'E-Mail-Vorlagen', icon: Mail },
     { id: 'system',     label: 'System',     icon: Cpu       },
   ]
 
@@ -1984,7 +1983,6 @@ export default function SettingsPage() {
       <div className="card p-6">
         {activeTab === 'allgemein'  && <TabAllgemeinWrapper settings={settings} onSaved={loadSettings} />}
         {activeTab === 'parameter'  && <TabParameter />}
-        {activeTab === 'vorlagen'   && <TabEmailVorlagen />}
         {activeTab === 'system'     && <TabSystemWrapper settings={settings} onSaved={loadSettings} />}
       </div>
     </div>
