@@ -9,6 +9,13 @@
 
 ---
 
+## [1.7.4] – 2026-06-08 – E-Mail-Vorschau verbessert
+
+### Aktualisierungen
+- E-Mail-Vorschau funktioniert nun auch bei application/octet-stream Dateitypen.
+
+---
+
 ## [1.7.4] – 2026-06-08 – UTF-8 Encoding Verbesserungen
 
 ### Aktualisierungen
