@@ -278,13 +278,23 @@ function SharedFileRow({ attachment, onRevoke, onExtend, onCopy }) {
 // ── PreviewModal ─────────────────────────────────────────────────────────────
 
 function PreviewModal({ attachment, onClose }) {
-  const [url, setUrl]       = useState(null)
+  const [url, setUrl]         = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isEml, setIsEml]     = useState(false)
 
   useEffect(() => {
-    datacenterApi.preview(attachment.id)
+    const eml = attachment.mimetype === 'message/rfc822' ||
+                attachment.mimetype === 'text/rfc822' ||
+                (attachment.filename || '').toLowerCase().endsWith('.eml')
+    setIsEml(eml)
+
+    // Für EML liefert das Backend fertig gerendertes HTML (text) zurück
+    const responseType = eml ? 'text' : 'blob'
+    datacenterApi.previewRaw(attachment.id, responseType)
       .then(res => {
-        const blob = new Blob([res.data], { type: attachment.mimetype || 'application/octet-stream' })
+        const blob = eml
+          ? new Blob([res.data], { type: 'text/html' })
+          : new Blob([res.data], { type: attachment.mimetype || 'application/octet-stream' })
         setUrl(URL.createObjectURL(blob))
       })
       .catch(() => toast.error('Vorschau nicht verfügbar'))
@@ -309,8 +319,8 @@ function PreviewModal({ attachment, onClose }) {
         ) : url ? (
           isImage ? (
             <img src={url} alt={attachment.filename} className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
-          ) : isPdf ? (
-            <iframe src={url} className="w-full h-full rounded-lg" title={attachment.filename} />
+          ) : isPdf || isEml ? (
+            <iframe src={url} className="w-full h-full rounded-lg bg-white" title={attachment.filename} />
           ) : (
             <div className="text-white text-center">
               <File size={48} className="mx-auto mb-3 text-gray-400" />
@@ -427,7 +437,10 @@ function FileRow({ attachment, onPreview, onDownload, onShare, onDelete }) {
   const canPreview = attachment.type === 'file' && (
     attachment.mimetype?.startsWith('image/') ||
     attachment.mimetype === 'application/pdf' ||
-    attachment.mimetype?.startsWith('text/')
+    attachment.mimetype?.startsWith('text/') ||
+    attachment.mimetype === 'message/rfc822' ||
+    attachment.mimetype === 'text/rfc822' ||
+    (attachment.filename || '').toLowerCase().endsWith('.eml')
   )
 
   return (
@@ -838,31 +851,4 @@ export default function DatacenterPage() {
                 <tbody className="divide-y divide-gray-50">
                   {attachments.map(a => (
                     <FileRow
-                      key={a.id}
-                      attachment={a}
-                      onPreview={setPreviewItem}
-                      onDownload={handleDownload}
-                      onShare={setShareItem}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Modals */}
-      {previewItem && <PreviewModal attachment={previewItem} onClose={() => setPreviewItem(null)} />}
-      {shareItem   && <ShareDialog  attachment={shareItem}   onClose={() => setShareItem(null)} />}
-      {extendItem  && (
-        <ExtendDialog
-          attachment={extendItem}
-          onClose={() => setExtendItem(null)}
-          onExtended={() => { loadFolders(); loadAttachments() }}
-        />
-      )}
-    </div>
-  )
-}
+                      key=

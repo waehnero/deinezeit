@@ -1,14 +1,22 @@
 """
 Datacenter API – Anhänge (Dateien + Links)
+
+WICHTIGE ROUTE-REIHENFOLGE:
+  Alle spezifischen GET-Routen (/{id}/download, /{id}/preview, /share/{token})
+  müssen VOR der generischen GET /{entity_type}/{entity_id} Route stehen,
+  da FastAPI/Starlette in Definitionsreihenfolge matched und /{a}/{b} auch
+  /{id}/preview abfangen würde.
 """
 import os
 import uuid
+import email
 import secrets
+import html as html_mod
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import StreamingResponse, Response, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -36,6 +44,15 @@ LINK_PROVIDERS = {
     "custom":      "Externer Link",
 }
 
+# Mimetypes die eine Vorschau unterstützen
+PREVIEW_MIMETYPES = [
+    "image/",
+    "application/pdf",
+    "text/plain",
+    "message/rfc822",   # .eml
+    "text/rfc822",      # .eml (alternativ)
+]
+
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -49,7 +66,11 @@ class LinkCreate(BaseModel):
 
 
 class ShareLinkRequest(BaseModel):
-    expires_hours: int = 24   # 1, 8, 24, 168 (7 Tage), 0 = unbegrenzt
+    expires_hours: int = 24
+
+
+class ShareLinkExtendRequest(BaseModel):
+    expires_hours: int = 168  # 0 = unbegrenzt
 
 
 class AttachmentResponse(BaseModel):
@@ -87,26 +108,20 @@ def _to_response(a: Attachment) -> dict:
         "link_url":      a.link_url,
         "link_provider": a.link_provider,
         "has_share_link": bool(a.share_token),
+        "share_token":   a.share_token,
         "share_expires_at": a.share_expires_at.isoformat() if a.share_expires_at else None,
         "uploaded_by":   str(a.uploaded_by) if a.uploaded_by else None,
         "created_at":    a.created_at.isoformat() if a.created_at else "",
     }
 
 
-# ── Alle Anhänge abrufen (optional gefiltert) ────────────────────────────────
+# ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 def _build_entity_label_map(db: Session, rows) -> dict:
-    """
-    Baut eine Map { (entity_type, entity_id) -> display_label } auf.
-    Für Stammdaten-Einträge wird EntityRecord.display_name genutzt.
-    """
     label_map = {}
-    # Sammle alle einzigartigen (type, id) Kombinationen
     pairs = set((r.entity_type, str(r.entity_id)) for r in rows)
-
     for etype, eid in pairs:
         try:
-            # Versuche Stammdaten-Eintrag zu finden (EntityRecord mit passendem EntityType.slug)
             et = db.query(EntityType).filter(EntityType.slug == etype).first()
             if et:
                 rec = db.query(EntityRecord).filter(
@@ -116,13 +131,11 @@ def _build_entity_label_map(db: Session, rows) -> dict:
                 if rec and rec.display_name:
                     label_map[(etype, eid)] = rec.display_name
                 elif rec and rec.data:
-                    # Fallback: ersten Nicht-Leer-Wert aus data nehmen
                     first_val = next((str(v) for v in rec.data.values() if v), None)
                     if first_val:
                         label_map[(etype, eid)] = first_val
         except Exception:
-            pass  # Bei Fehler einfach UUID anzeigen
-
+            pass
     return label_map
 
 
@@ -133,6 +146,105 @@ def _to_response_with_label(attachment: Attachment, label_map: dict) -> dict:
     return r
 
 
+def _render_eml_preview(raw: bytes) -> str:
+    """Parst eine .eml-Datei und gibt HTML für die Vorschau zurück."""
+    try:
+        msg = email.message_from_bytes(raw)
+    except Exception:
+        return "<p>E-Mail konnte nicht gelesen werden.</p>"
+
+    def h(s):
+        return html_mod.escape(str(s or ""))
+
+    headers_html = ""
+    for field in ("From", "To", "CC", "Subject", "Date"):
+        val = msg.get(field, "")
+        if val:
+            headers_html += f'<tr><th>{h(field)}</th><td>{h(val)}</td></tr>'
+
+    # Body extrahieren
+    body_text = ""
+    body_html = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            ct = part.get_content_type()
+            if ct == "text/html" and not body_html:
+                try:
+                    body_html = part.get_payload(decode=True).decode(
+                        part.get_content_charset() or "utf-8", errors="replace"
+                    )
+                except Exception:
+                    pass
+            elif ct == "text/plain" and not body_text:
+                try:
+                    body_text = part.get_payload(decode=True).decode(
+                        part.get_content_charset() or "utf-8", errors="replace"
+                    )
+                except Exception:
+                    pass
+    else:
+        try:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                charset = msg.get_content_charset() or "utf-8"
+                if msg.get_content_type() == "text/html":
+                    body_html = payload.decode(charset, errors="replace")
+                else:
+                    body_text = payload.decode(charset, errors="replace")
+        except Exception:
+            pass
+
+    if body_html:
+        # HTML-Body in Sandbox-iframe
+        body_content = f"""
+          <div style="font-size:13px;color:#555;margin-bottom:8px;">
+            ⚠️ HTML-Inhalt wird in isolierter Vorschau angezeigt
+          </div>
+          <iframe srcdoc="{h(body_html)}"
+            style="width:100%;height:calc(100% - 160px);border:1px solid #e5e7eb;border-radius:8px;"
+            sandbox="allow-same-origin"></iframe>"""
+    else:
+        escaped = h(body_text) if body_text else "<em style='color:#999'>Kein Inhalt</em>"
+        body_content = f'<pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;color:#374151">{escaped}</pre>'
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #f9fafb; color: #111827; padding: 16px; height: 100vh; overflow: hidden; }}
+    .card {{ background: white; border-radius: 12px; border: 1px solid #e5e7eb; padding: 16px;
+             margin-bottom: 12px; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th {{ width: 70px; text-align: left; color: #6b7280; font-size: 12px;
+          font-weight: 600; padding: 4px 8px 4px 0; vertical-align: top; }}
+    td {{ font-size: 13px; color: #111827; padding: 4px 0; word-break: break-word; }}
+    .body {{ background: white; border-radius: 12px; border: 1px solid #e5e7eb;
+             padding: 16px; height: calc(100vh - 180px); overflow-y: auto; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <table>{headers_html}</table>
+  </div>
+  <div class="body">{body_content}</div>
+</body>
+</html>"""
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# ROUTEN – Reihenfolge ist entscheidend!
+# 1. Literal-Routen  (/all, /providers, /link, /share/...)
+# 2. /{id}/suffix   (download, preview, share-link) – VOR /{type}/{id}!
+# 3. /{type}/{id}   (generische 2-Segment-Route)
+# 4. /{type}/{id}/upload
+# 5. DELETE /{id}
+# ════════════════════════════════════════════════════════════════════════════════
+
+# ── 1a. Alle Anhänge abrufen ─────────────────────────────────────────────────
+
 @router.get("/all")
 async def list_all_attachments(
     entity_type: Optional[str] = Query(None),
@@ -140,7 +252,6 @@ async def list_all_attachments(
     db:          Session = Depends(get_db),
     _:           User = Depends(get_current_user),
 ):
-    """Alle Anhänge abrufen – optional nach entity_type und/oder entity_id gefiltert."""
     q = db.query(Attachment)
     if entity_type:
         q = q.filter(Attachment.entity_type == entity_type)
@@ -151,28 +262,29 @@ async def list_all_attachments(
     return {"attachments": [_to_response_with_label(r, label_map) for r in rows]}
 
 
-# ── Öffentlicher Download via Share-Token (kein Login nötig) ─────────────────
-# WICHTIG: Muss VOR /{entity_type}/{entity_id} stehen, sonst matched FastAPI
-# /share/{token} fälschlicherweise als entity_type="share", entity_id=token!
+# ── 1b. Link-Anbieter ────────────────────────────────────────────────────────
+
+@router.get("/providers")
+async def get_providers(_: User = Depends(get_current_user)):
+    return {"providers": [{"key": k, "label": v} for k, v in LINK_PROVIDERS.items()]}
+
+
+# ── 1c. Öffentlicher Download via Share-Token (kein Login) ───────────────────
 
 @router.get("/share/{token}")
 async def download_via_share_link(
     token: str,
     db:    Session = Depends(get_db),
 ):
-    """Öffentlicher Download via Share-Token — kein Login erforderlich."""
     att = db.query(Attachment).filter(Attachment.share_token == token).first()
     if not att or att.type != "file":
         raise HTTPException(404, "Link ungültig oder abgelaufen")
-
     if att.share_expires_at and att.share_expires_at < datetime.now(timezone.utc):
         raise HTTPException(410, "Dieser Download-Link ist abgelaufen")
 
     data, content_type = storage_service.download_file(att.storage_key)
-
     return Response(
-        content=data,
-        media_type=content_type,
+        content=data, media_type=content_type,
         headers={
             "Content-Disposition": f'attachment; filename="{att.filename}"',
             "Content-Length": str(len(data)),
@@ -180,74 +292,7 @@ async def download_via_share_link(
     )
 
 
-# ── Anhänge abrufen ───────────────────────────────────────────────────────────
-
-@router.get("/{entity_type}/{entity_id}")
-async def list_attachments(
-    entity_type: str,
-    entity_id: str,
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    """Alle Anhänge für einen Datensatz abrufen."""
-    rows = db.query(Attachment).filter(
-        Attachment.entity_type == entity_type,
-        Attachment.entity_id   == entity_id,
-    ).order_by(Attachment.created_at.desc()).all()
-
-    return {"attachments": [_to_response(r) for r in rows]}
-
-
-# ── Datei hochladen ───────────────────────────────────────────────────────────
-
-@router.post("/{entity_type}/{entity_id}/upload")
-async def upload_file(
-    entity_type: str,
-    entity_id:   str,
-    file:        UploadFile = File(...),
-    db:          Session = Depends(get_db),
-    current:     User = Depends(get_current_user),
-):
-    """Datei hochladen und mit Datensatz verknüpfen."""
-    data = await file.read()
-
-    if len(data) > MAX_FILE_SIZE:
-        raise HTTPException(400, f"Datei zu groß (max. {MAX_FILE_SIZE // 1024 // 1024} MB)")
-
-    filename    = file.filename or "datei"
-    mimetype    = file.content_type or "application/octet-stream"
-    storage_key = storage_service.build_storage_key(entity_type, entity_id, filename)
-
-    # Eindeutigen Key sicherstellen
-    existing = db.query(Attachment).filter(
-        Attachment.storage_key == storage_key
-    ).first()
-    if existing:
-        storage_key = storage_service.build_storage_key(
-            entity_type, entity_id, f"{uuid.uuid4().hex[:6]}_{filename}"
-        )
-
-    storage_service.upload_file(storage_key, data, mimetype)
-
-    attachment = Attachment(
-        entity_type  = entity_type,
-        entity_id    = entity_id,
-        type         = "file",
-        storage_key  = storage_key,
-        filename     = filename,
-        filesize     = len(data),
-        mimetype     = mimetype,
-        display_name = filename,
-        uploaded_by  = current.id,
-    )
-    db.add(attachment)
-    db.commit()
-    db.refresh(attachment)
-
-    return _to_response(attachment)
-
-
-# ── Link hinzufügen ───────────────────────────────────────────────────────────
+# ── 1d. Link hinzufügen ──────────────────────────────────────────────────────
 
 @router.post("/link")
 async def add_link(
@@ -255,28 +300,21 @@ async def add_link(
     db:      Session = Depends(get_db),
     current: User = Depends(get_current_user),
 ):
-    """Externen Cloud-Link als Anhang speichern."""
     if body.link_provider not in LINK_PROVIDERS:
         body.link_provider = "custom"
-
     attachment = Attachment(
-        entity_type   = body.entity_type,
-        entity_id     = body.entity_id,
-        type          = "link",
-        link_url      = body.link_url,
-        link_provider = body.link_provider,
-        display_name  = body.display_name,
-        description   = body.description,
-        uploaded_by   = current.id,
+        entity_type=body.entity_type, entity_id=body.entity_id,
+        type="link", link_url=body.link_url, link_provider=body.link_provider,
+        display_name=body.display_name, description=body.description,
+        uploaded_by=current.id,
     )
     db.add(attachment)
     db.commit()
     db.refresh(attachment)
-
     return _to_response(attachment)
 
 
-# ── Datei herunterladen (eingeloggte User) ────────────────────────────────────
+# ── 2a. Download (eingeloggt) ─────────────────────────────────────────────────
 
 @router.get("/{attachment_id}/download")
 async def download_file(
@@ -284,16 +322,12 @@ async def download_file(
     db:            Session = Depends(get_db),
     _:             User = Depends(get_current_user),
 ):
-    """Datei herunterladen (nur für eingeloggte Benutzer)."""
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not att or att.type != "file":
         raise HTTPException(404, "Anhang nicht gefunden")
-
     data, content_type = storage_service.download_file(att.storage_key)
-
     return Response(
-        content=data,
-        media_type=content_type,
+        content=data, media_type=content_type,
         headers={
             "Content-Disposition": f'attachment; filename="{att.filename}"',
             "Content-Length": str(len(data)),
@@ -301,7 +335,37 @@ async def download_file(
     )
 
 
-# ── Share-Link erstellen ──────────────────────────────────────────────────────
+# ── 2b. Vorschau ──────────────────────────────────────────────────────────────
+
+@router.get("/{attachment_id}/preview")
+async def preview_file(
+    attachment_id: str,
+    db:            Session = Depends(get_db),
+    _:             User = Depends(get_current_user),
+):
+    att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
+    if not att or att.type != "file":
+        raise HTTPException(404, "Anhang nicht gefunden")
+
+    mimetype = att.mimetype or "application/octet-stream"
+
+    if not any(mimetype.startswith(t) for t in PREVIEW_MIMETYPES):
+        raise HTTPException(415, "Keine Vorschau für diesen Dateityp")
+
+    data, content_type = storage_service.download_file(att.storage_key)
+
+    # EML-Vorschau als HTML rendern
+    if mimetype in ("message/rfc822", "text/rfc822") or (att.filename or "").lower().endswith(".eml"):
+        html_content = _render_eml_preview(data)
+        return HTMLResponse(content=html_content)
+
+    return Response(
+        content=data, media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{att.filename}"'}
+    )
+
+
+# ── 2c. Share-Link erstellen ──────────────────────────────────────────────────
 
 @router.post("/{attachment_id}/share-link")
 async def create_share_link(
@@ -310,12 +374,11 @@ async def create_share_link(
     db:            Session = Depends(get_db),
     current:       User = Depends(get_current_user),
 ):
-    """Öffentlichen Download-Link erstellen (wie SeaDrive Share-Link)."""
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not att or att.type != "file":
         raise HTTPException(404, "Anhang nicht gefunden")
 
-    token = secrets.token_urlsafe(32)
+    token   = secrets.token_urlsafe(32)
     expires = None
     if body.expires_hours > 0:
         expires = datetime.now(timezone.utc) + timedelta(hours=body.expires_hours)
@@ -324,21 +387,13 @@ async def create_share_link(
     att.share_expires_at = expires
     db.commit()
 
-    base_url = os.environ.get("FRONTEND_URL", "http://localhost")
+    base_url  = os.environ.get("FRONTEND_URL", "http://localhost")
     share_url = f"{base_url}/api/datacenter/share/{token}"
-
-    return {
-        "share_url":    share_url,
-        "expires_at":   expires.isoformat() if expires else None,
-        "expires_hours": body.expires_hours,
-    }
+    return {"share_url": share_url, "expires_at": expires.isoformat() if expires else None,
+            "expires_hours": body.expires_hours}
 
 
-# ── Share-Link verlängern (Token bleibt, nur Ablaufzeit ändern) ───────────────
-
-class ShareLinkExtendRequest(BaseModel):
-    expires_hours: int = 168  # 0 = unbegrenzt
-
+# ── 2d. Share-Link verlängern ─────────────────────────────────────────────────
 
 @router.patch("/{attachment_id}/share-link")
 async def extend_share_link(
@@ -347,25 +402,24 @@ async def extend_share_link(
     db:            Session = Depends(get_db),
     _:             User = Depends(get_current_user),
 ):
-    """Ablaufzeit eines Share-Links verlängern ohne den Token zu ändern."""
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not att or not att.share_token:
         raise HTTPException(404, "Kein aktiver Share-Link für diesen Anhang")
 
-    if body.expires_hours > 0:
-        att.share_expires_at = datetime.now(timezone.utc) + timedelta(hours=body.expires_hours)
-    else:
-        att.share_expires_at = None  # unbegrenzt
+    att.share_expires_at = (
+        datetime.now(timezone.utc) + timedelta(hours=body.expires_hours)
+        if body.expires_hours > 0 else None
+    )
     db.commit()
 
     base_url = os.environ.get("FRONTEND_URL", "http://localhost")
     return {
-        "share_url":   f"{base_url}/api/datacenter/share/{att.share_token}",
-        "expires_at":  att.share_expires_at.isoformat() if att.share_expires_at else None,
+        "share_url":  f"{base_url}/api/datacenter/share/{att.share_token}",
+        "expires_at": att.share_expires_at.isoformat() if att.share_expires_at else None,
     }
 
 
-# ── Share-Link löschen ────────────────────────────────────────────────────────
+# ── 2e. Share-Link löschen ────────────────────────────────────────────────────
 
 @router.delete("/{attachment_id}/share-link")
 async def delete_share_link(
@@ -382,33 +436,60 @@ async def delete_share_link(
     return {"ok": True}
 
 
-# ── Vorschau (Bilder + PDFs direkt im Browser) ───────────────────────────────
+# ── 3. Anhänge eines Datensatzes abrufen ──────────────────────────────────────
 
-@router.get("/{attachment_id}/preview")
-async def preview_file(
-    attachment_id: str,
-    db:            Session = Depends(get_db),
-    _:             User = Depends(get_current_user),
+@router.get("/{entity_type}/{entity_id}")
+async def list_attachments(
+    entity_type: str,
+    entity_id:   str,
+    db:          Session = Depends(get_db),
+    _:           User = Depends(get_current_user),
 ):
-    """Datei-Vorschau im Browser (für Bilder und PDFs)."""
-    att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
-    if not att or att.type != "file":
-        raise HTTPException(404, "Anhang nicht gefunden")
+    rows = db.query(Attachment).filter(
+        Attachment.entity_type == entity_type,
+        Attachment.entity_id   == entity_id,
+    ).order_by(Attachment.created_at.desc()).all()
+    return {"attachments": [_to_response(r) for r in rows]}
 
-    preview_types = ["image/", "application/pdf", "text/plain"]
-    if not any(att.mimetype.startswith(t) for t in preview_types):
-        raise HTTPException(415, "Keine Vorschau für diesen Dateityp")
 
-    data, content_type = storage_service.download_file(att.storage_key)
+# ── 4. Datei hochladen ────────────────────────────────────────────────────────
 
-    return Response(
-        content=data,
-        media_type=content_type,
-        headers={"Content-Disposition": f'inline; filename="{att.filename}"'}
+@router.post("/{entity_type}/{entity_id}/upload")
+async def upload_file(
+    entity_type: str,
+    entity_id:   str,
+    file:        UploadFile = File(...),
+    db:          Session = Depends(get_db),
+    current:     User = Depends(get_current_user),
+):
+    data = await file.read()
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(400, f"Datei zu groß (max. {MAX_FILE_SIZE // 1024 // 1024} MB)")
+
+    filename    = file.filename or "datei"
+    mimetype    = file.content_type or "application/octet-stream"
+    storage_key = storage_service.build_storage_key(entity_type, entity_id, filename)
+
+    if db.query(Attachment).filter(Attachment.storage_key == storage_key).first():
+        storage_key = storage_service.build_storage_key(
+            entity_type, entity_id, f"{uuid.uuid4().hex[:6]}_{filename}"
+        )
+
+    storage_service.upload_file(storage_key, data, mimetype)
+
+    attachment = Attachment(
+        entity_type=entity_type, entity_id=entity_id,
+        type="file", storage_key=storage_key,
+        filename=filename, filesize=len(data), mimetype=mimetype,
+        display_name=filename, uploaded_by=current.id,
     )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+    return _to_response(attachment)
 
 
-# ── Anhang löschen ────────────────────────────────────────────────────────────
+# ── 5. Anhang löschen ─────────────────────────────────────────────────────────
 
 @router.delete("/{attachment_id}")
 async def delete_attachment(
@@ -416,24 +497,11 @@ async def delete_attachment(
     db:            Session = Depends(get_db),
     _:             User = Depends(get_current_user),
 ):
-    """Anhang löschen (Datei aus MinIO + Datenbank-Eintrag)."""
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not att:
         raise HTTPException(404, "Anhang nicht gefunden")
-
     if att.type == "file" and att.storage_key:
         storage_service.delete_file(att.storage_key)
-
     db.delete(att)
     db.commit()
     return {"ok": True}
-
-
-# ── Verfügbare Link-Anbieter ─────────────────────────────────────────────────
-
-@router.get("/providers")
-async def get_providers(_: User = Depends(get_current_user)):
-    """Liste der unterstützten Cloud-Anbieter für Link-Anhänge."""
-    return {"providers": [
-        {"key": k, "label": v} for k, v in LINK_PROVIDERS.items()
-    ]}
