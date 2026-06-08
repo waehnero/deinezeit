@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.7.3',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Einstellungen: Design als Unter-Tab unter Allgemein',
+      'Einstellungen: Backup & E-Mail als Unter-Tabs unter System',
+      'Einstellungen: E-Mail-Vorlagen als Unter-Tab unter Parameter',
+    ],
+    updates: [],
+  },
+  {
     version: '1.7.2',
     day: '07',
     month: 'Juni',

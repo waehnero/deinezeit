@@ -1,25 +1,35 @@
-# C
-## [1.7.2] - 2026-06-07 - Versionsprüfung robuster + nginx Healthcheck
+# Changelog
 
+## [1.7.3] - 2026-06-08 - Einstellungen umstrukturiert
 
-### Aktualisierungen
-- Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
-- SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt
-- nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start
-- nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst
-- docker-compose.yml: certbot_conf Volume und Networks ergänzt
+### Neu
+- Einstellungen: Design als Unter-Tab unter Allgemein
+- Einstellungen: Backup & E-Mail als Unter-Tabs unter System
+- Einstellungen: E-Mail-Vorlagen als Unter-Tab unter Parameter
 
 ---
 
-## [1.7.2] - 2026-06-07 - Versionsprüfung robuster + nginx Healthcheck
+## [1.7.2] - 2026-06-07 - Versionsprï¿½fung robuster + nginx Healthcheck
 
 
 ### Aktualisierungen
-- Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
-- SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt
+- Versionsprï¿½fung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
+- SettingsPage: zeigt Warnung wenn GitHub-Prï¿½fung fehlschlï¿½gt
 - nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start
-- nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst
-- docker-compose.yml: certbot_conf Volume und Networks ergänzt
+- nginx IP-Auflï¿½sung: Container-IPs dynamisch alle 10s neu aufgelï¿½st
+- docker-compose.yml: certbot_conf Volume und Networks ergï¿½nzt
+
+---
+
+## [1.7.2] - 2026-06-07 - Versionsprï¿½fung robuster + nginx Healthcheck
+
+
+### Aktualisierungen
+- Versionsprï¿½fung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
+- SettingsPage: zeigt Warnung wenn GitHub-Prï¿½fung fehlschlï¿½gt
+- nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start
+- nginx IP-Auflï¿½sung: Container-IPs dynamisch alle 10s neu aufgelï¿½st
+- docker-compose.yml: certbot_conf Volume und Networks ergï¿½nzt
 
 ---
 
