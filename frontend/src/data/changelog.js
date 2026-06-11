@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.8.2',
+    day: '11',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Fotos direkt per Kamera bei Zeiterfassung-Anhängen aufnehmen',
+    ],
+    updates: [],
+  },
+  {
     version: '1.8.1',
     day: '12',
     month: 'Juni',

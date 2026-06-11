@@ -30,6 +30,13 @@
 
 ---
 
+## [1.8.2] – 2026-06-11 – Foto-Upload für Zeiterfassung
+
+### Neu
+- Fotos direkt per Kamera bei Zeiterfassung-Anhängen aufnehmen
+
+---
+
 ## [1.8.0] – 2026-06-08 – OneDrive-Integration
 
 ### Neu
