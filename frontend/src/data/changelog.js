@@ -840,4 +840,10 @@ export const changelog = [
     year: '2026',
     features: [
       'Dynamische Stammdaten-Typen: Kunden, Lieferanten, Projekte — und beliebig mehr',
-     
+      'Formular-Builder: Felder direkt in der Oberfläche definieren',
+      '9 Feldtypen: Text, Zahl, Datum, E-Mail, Telefon, Auswahl, Checkbox, URL, Textarea',
+      'Volltextsuche und Paginierung in Datensatz-Listen',
+    ],
+    updates: [],
+  },
+]
