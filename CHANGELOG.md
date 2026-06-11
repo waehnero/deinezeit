@@ -683,5 +683,8 @@ Format: [Version] – Datum – Was hat sich geändert
 - **Zeiterfassung**: Timer starten/stoppen mit Projekt- und Aufgabenzuordnung
 - **Manuelle Einträge**: Zeiten nachträglich eintragen und bearbeiten
 - **Eigene Felder für Zeiteinträge**: Admin kann beliebige Zusatzfelder definieren (z.B. Ort, Fahrtzeit, Notiz)
-- **Statistik**: Tages- und Wochenübersicht der erfassten Stunden
-- **Projektzeitbericht als 
+- **Projektzeitbericht als PDF**: Gefilterte Auswertung nach Zeitraum, Mitarbeiter, Projekt als druckfertiges PDF
+- **Bericht-Optionen**: Zeitrunden auf 15/30 Minuten, Filterung nach Aufgabe, verschiedene Zeitraum-Voreinstellungen
+
+### Technische Details
+- 

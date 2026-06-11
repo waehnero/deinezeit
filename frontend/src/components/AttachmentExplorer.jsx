@@ -492,4 +492,13 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
   return (
     <div className="h-full flex flex-col">
       {content}
-      {
+      {showAddLink && (
+        <AddLinkDialog entityType={entityType} entityId={entityId} providers={providers}
+          onClose={() => setShowAddLink(false)}
+          onAdded={att => { setAttachments(prev => [att, ...prev]); setShowAddLink(false) }} />
+      )}
+      {shareTarget && <ShareDialog attachment={shareTarget} onClose={() => setShareTarget(null)} />}
+      {previewTarget && <PreviewModal attachment={previewTarget} onClose={() => setPreviewTarget(null)} />}
+    </div>
+  )
+}
