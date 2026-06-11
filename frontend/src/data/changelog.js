@@ -10,6 +10,17 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
+      'AttachmentExplorer.jsx vollständig repariert',
+      'CHANGELOG.md vollständig repariert',
+    ],
+  },
+  {
+    version: '1.8.2',
+    day: '11',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
       'Changelog-Datei vollständig repariert und wiederhergestellt',
     ],
   },

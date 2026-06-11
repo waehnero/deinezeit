@@ -30,6 +30,14 @@
 
 ---
 
+## [1.8.2] – 2026-06-11 – Behobene Dateien und Dokumentation
+
+### Aktualisierungen
+- AttachmentExplorer.jsx vollständig repariert
+- CHANGELOG.md vollständig repariert
+
+---
+
 ## [1.8.2] – 2026-06-11 – Changelog-Reparatur
 
 ### Aktualisierungen
