@@ -4,12 +4,24 @@
  */
 export const changelog = [
   {
-    version: '1.7.9',
+    version: '1.8.1',
     day: '12',
     month: 'Juni',
     year: '2026',
     features: [
       'Zeiterfassung: Anhänge per Kamera direkt vom Smartphone/Tablet aufnehmen (Fotos von Plänen, Lieferscheinen etc.)',
+    ],
+    updates: [],
+  },
+  {
+    version: '1.8.0',
+    day: '08',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'OneDrive-Integration mit Microsoft Graph API',
+      'Unterstützung für persönliche OneDrive-Konten',
+      'Unterstützung für SharePoint-Dateien',
     ],
     updates: [],
   },

@@ -1,9 +1,13 @@
 # Changelog
 
-## [1.7.9] - 2026-06-12
+## [1.8.1] - 2026-06-12
 ### Neu
 - Zeiterfassung-Anhänge: Neuer Button „Foto aufnehmen" öffnet direkt die Kamera des Geräts (iPhone/Android/Tablet)
 - Bestehender Drag & Drop-Upload-Bereich bleibt für lokale Dateien erhalten
+
+## [1.8.0] - 2026-06-08
+### Neu
+- OneDrive-Integration mit Microsoft Graph API (persönliche Konten & SharePoint)
 
 ## [1.7.8] - 2026-06-08
 ### Neu
@@ -23,6 +27,15 @@
 - WebDAV-Upload: db=db an storage_service übergeben (Provider aus DB gelesen)
 - storage_backend wird korrekt als Providername (nextcloud/seadrive/minio) gespeichert
 - requests-Bibliothek in requirements.txt ergänzt
+
+---
+
+## [1.8.0] – 2026-06-08 – OneDrive-Integration
+
+### Neu
+- OneDrive-Integration mit Microsoft Graph API
+- Unterstützung für persönliche OneDrive-Konten
+- Unterstützung für SharePoint-Dateien
 
 ---
 
