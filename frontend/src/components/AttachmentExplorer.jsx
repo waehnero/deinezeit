@@ -3,7 +3,7 @@ import {
   X, Upload, Link, Download, Eye, Share2, Trash2,
   ExternalLink, File, FileText, Image, Film, Archive,
   Plus, Copy, Check, Clock, Cloud, Loader2, FolderOpen,
-  Search, HardDrive
+  Search, HardDrive, Camera
 } from 'lucide-react'
 import { datacenterApi } from '../services/api'
 
@@ -250,6 +250,7 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
   const [previewTarget, setPreviewTarget] = useState(null)
   const [showAddLink, setShowAddLink]   = useState(false)
   const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
 
   const load = useCallback(async () => {
     if (!entityType || !entityId) return
@@ -320,6 +321,10 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
           className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
           <Link size={14} /> Cloud-Link
         </button>
+        <button onClick={() => cameraInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <Camera size={14} /> Foto aufnehmen
+        </button>
         <button onClick={() => fileInputRef.current?.click()}
           className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors">
           <Upload size={14} /> Hochladen
@@ -356,6 +361,8 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
         </div>
 
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => handleUpload(e.target.files)} />
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+          onChange={e => handleUpload(e.target.files)} />
 
         {/* Dateiliste */}
         {loading ? (
@@ -485,13 +492,4 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
   return (
     <div className="h-full flex flex-col">
       {content}
-      {showAddLink && (
-        <AddLinkDialog entityType={entityType} entityId={entityId} providers={providers}
-          onClose={() => setShowAddLink(false)}
-          onAdded={att => { setAttachments(prev => [att, ...prev]); setShowAddLink(false) }} />
-      )}
-      {shareTarget && <ShareDialog attachment={shareTarget} onClose={() => setShareTarget(null)} />}
-      {previewTarget && <PreviewModal attachment={previewTarget} onClose={() => setPreviewTarget(null)} />}
-    </div>
-  )
-}
+      {

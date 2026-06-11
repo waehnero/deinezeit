@@ -2032,9 +2032,9 @@ function TabSpeicher({ settings, onSaved }) {
             <div>
               <label className="block text-xs font-medium text-neutral-500 mb-1">SharePoint Site-ID</label>
               <input type="text" value={odSiteId} onChange={e => setOdSiteId(e.target.value)}
-                placeholder="contoso.sharepoint.com,abc123,def456"
+                placeholder="wwinterfacegmbh.sharepoint.com,abc123,def456"
                 className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-              <p className="mt-1 text-xs text-neutral-400">Format: hostname,siteId,webId — aus Graph API /sites/{'{'}hostname{'}'}:{'{'}sitePath{'}'}</p>
+              <p className="mt-1 text-xs text-neutral-400">Format: hostname,siteId,webId — z.B. https://graph.microsoft.com/v1.0/sites/wwinterfacegmbh.sharepoint.com:/sites/MeineSeite</p>
             </div>
           )}
           <div>

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.9] - 2026-06-12
+### Neu
+- Zeiterfassung-Anhänge: Neuer Button „Foto aufnehmen" öffnet direkt die Kamera des Geräts (iPhone/Android/Tablet)
+- Bestehender Drag & Drop-Upload-Bereich bleibt für lokale Dateien erhalten
+
 ## [1.7.8] - 2026-06-08
 ### Neu
 - OneDrive-Integration: Microsoft OneDrive & SharePoint als Cloudspeicher-Option
@@ -652,8 +657,4 @@ Format: [Version] – Datum – Was hat sich geändert
 - **Manuelle Einträge**: Zeiten nachträglich eintragen und bearbeiten
 - **Eigene Felder für Zeiteinträge**: Admin kann beliebige Zusatzfelder definieren (z.B. Ort, Fahrtzeit, Notiz)
 - **Statistik**: Tages- und Wochenübersicht der erfassten Stunden
-- **Projektzeitbericht als PDF**: Gefilterte Auswertung nach Zeitraum, Mitarbeiter, Projekt als druckfertiges PDF
-- **Bericht-Optionen**: Zeitrunden auf 15/30 Minuten, Filterung nach Aufgabe, verschiedene Zeitraum-Voreinstellungen
-
-### Technische Details
-- 
+- **Projektzeitbericht als 

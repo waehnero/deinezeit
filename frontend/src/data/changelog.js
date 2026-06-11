@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.7.9',
+    day: '12',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Zeiterfassung: Anhänge per Kamera direkt vom Smartphone/Tablet aufnehmen (Fotos von Plänen, Lieferscheinen etc.)',
+    ],
+    updates: [],
+  },
+  {
     version: '1.7.8',
     day: '08',
     month: 'Juni',
@@ -808,10 +818,4 @@ export const changelog = [
     year: '2026',
     features: [
       'Dynamische Stammdaten-Typen: Kunden, Lieferanten, Projekte — und beliebig mehr',
-      'Formular-Builder: Felder direkt in der Oberfläche definieren',
-      '9 Feldtypen: Text, Zahl, Datum, E-Mail, Telefon, Auswahl, Checkbox, URL, Textarea',
-      'Volltextsuche und Paginierung in Datensatz-Listen',
-    ],
-    updates: [],
-  },
-]
+     
