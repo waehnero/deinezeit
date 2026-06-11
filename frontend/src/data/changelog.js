@@ -8,6 +8,16 @@ export const changelog = [
     day: '11',
     month: 'Juni',
     year: '2026',
+    features: [],
+    updates: [
+      'Changelog-Datei vollständig repariert und wiederhergestellt',
+    ],
+  },
+  {
+    version: '1.8.2',
+    day: '11',
+    month: 'Juni',
+    year: '2026',
     features: [
       'Fotos direkt per Kamera bei Zeiterfassung-Anhängen aufnehmen',
     ],

@@ -30,6 +30,13 @@
 
 ---
 
+## [1.8.2] – 2026-06-11 – Changelog-Reparatur
+
+### Aktualisierungen
+- Changelog-Datei vollständig repariert und wiederhergestellt
+
+---
+
 ## [1.8.2] – 2026-06-11 – Foto-Upload für Zeiterfassung
 
 ### Neu
