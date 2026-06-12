@@ -4,6 +4,28 @@
  */
 export const changelog = [
   {
+    version: '1.8.4',
+    day: '13',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Projektzeit-Hauptseite (Timer-Start/laufend) und Nachtragen-Dialog für Mobilgeräte optimiert (Hoch- und Querformat)',
+    ],
+  },
+  {
+    version: '1.8.3',
+    day: '13',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Schnellzugriff für Anhänge (Cloud-Link, Foto aufnehmen, Hochladen) direkt auf der Projektzeit-Hauptseite und im Nachtragen-Dialog',
+    ],
+    updates: [
+      'Beim Hinzufügen eines Anhangs ohne gespeicherten Eintrag wird die Aufgabe automatisch gespeichert',
+    ],
+  },
+  {
     version: '1.8.2',
     day: '11',
     month: 'Juni',

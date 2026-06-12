@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.4] - 2026-06-13
+### Geändert
+- Projektzeit-Hauptseite: Layout der Start- und laufenden Timer-Karte für Mobilgeräte (Hoch- und Querformat) überarbeitet, Spalten stapeln sich statt sich zu überlappen
+- "Projektzeit nachtragen"-Dialog: Formularfelder stapeln sich auf schmalen Bildschirmen statt sich zu überlappen
+- Anhang-Schnellzugriff-Buttons umbrechen jetzt bei wenig Platz
+
+## [1.8.3] - 2026-06-13
+### Neu
+- Schnellzugriff-Leiste für Anhänge (Cloud-Link, Foto aufnehmen, Hochladen) direkt auf der Projektzeit-Hauptseite (Start- und laufende Timer-Karte) und im "Projektzeit nachtragen"-Dialog
+### Geändert
+- Wird ein Anhang hinzugefügt, bevor der Zeiteintrag gespeichert wurde, wird die Aufgabe automatisch validiert und gespeichert
+
 ## [1.8.1] - 2026-06-12
 ### Neu
 - Zeiterfassung-Anhänge: Neuer Button „Foto aufnehmen" öffnet direkt die Kamera des Geräts (iPhone/Android/Tablet)

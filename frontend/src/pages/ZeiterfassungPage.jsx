@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import BerichtDialog from '../components/BerichtDialog'
 import AttachmentPanel from '../components/AttachmentPanel'
+import AttachmentQuickBar from '../components/AttachmentQuickBar'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 function fmtMinutes(min) {
@@ -176,9 +177,9 @@ function RunningTimerCard({ entry, onStop, onPause, onSwitch, onDelete, onUpdate
       <div className={`h-1 ${billable ? 'bg-gradient-to-r from-green-400 to-green-500' : 'bg-gradient-to-r from-orange-400 to-orange-500'}`} />
 
       <div className="p-5">
-        <div className="flex gap-6">
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
           {/* Stoppuhr-Icon */}
-          <div className="flex-shrink-0 pt-1">
+          <div className="hidden sm:block flex-shrink-0 pt-1">
             <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
               <Timer size={18} className="text-green-600" />
             </div>
@@ -203,7 +204,7 @@ function RunningTimerCard({ entry, onStop, onPause, onSwitch, onDelete, onUpdate
           </div>
 
           {/* Rechte Spalte: Startzeit, Endzeit (live), Pause, Verrechenbar */}
-          <div className="flex-shrink-0 w-48 grid grid-cols-1 gap-3">
+          <div className="w-full sm:w-48 sm:flex-shrink-0 grid grid-cols-2 sm:grid-cols-1 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Startzeit</label>
               <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
@@ -232,6 +233,11 @@ function RunningTimerCard({ entry, onStop, onPause, onSwitch, onDelete, onUpdate
               <label htmlFor="run-billable" className="text-sm text-gray-700 cursor-pointer">Verrechenbar</label>
             </div>
           </div>
+        </div>
+
+        {/* Schnellzugriff: Anhänge */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <AttachmentQuickBar entityType="zeiterfassung" entityId={entry.id} />
         </div>
 
         {/* Action-Bar */}
@@ -298,12 +304,26 @@ function StartTimerCard({ onStart }) {
     }
   }
 
+  // Für Anhänge ohne laufenden Timer: Aufgabe ist Pflicht, dann sofort starten
+  const ensureEntity = async () => {
+    if (!project.projectId) {
+      toast.error('Bitte zuerst eine Aufgabe wählen')
+      return null
+    }
+    try {
+      const created = await onStart({ project, note, billable })
+      return created?.id || null
+    } catch {
+      return null
+    }
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
       <div className="h-1 bg-gray-100" />
       <div className="p-5">
-        <div className="flex gap-6">
-          <div className="flex-shrink-0 pt-1">
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+          <div className="hidden sm:block flex-shrink-0 pt-1">
             <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center">
               <Timer size={18} className="text-gray-400" />
             </div>
@@ -327,7 +347,7 @@ function StartTimerCard({ onStart }) {
             </div>
           </div>
 
-          <div className="flex-shrink-0 w-48 flex flex-col gap-3 justify-between">
+          <div className="w-full sm:w-48 sm:flex-shrink-0 flex flex-col gap-3 justify-between">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Startzeit</label>
               <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
@@ -346,6 +366,11 @@ function StartTimerCard({ onStart }) {
               Start
             </button>
           </div>
+        </div>
+
+        {/* Schnellzugriff: Anhänge */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <AttachmentQuickBar entityType="zeiterfassung" entityId={null} onEnsureEntity={ensureEntity} />
         </div>
       </div>
     </div>
@@ -418,31 +443,62 @@ function EntryModal({ entry, onClose, onSaved }) {
   const [billable, setBillable] = useState(entry?.billable ?? true)
   const [loading, setLoading] = useState(false)
   const [createAnother, setCreateAnother] = useState(false)
+  const [createdEntry, setCreatedEntry] = useState(null)
+  const [attachmentsRefresh, setAttachmentsRefresh] = useState(0)
 
   const startedAt = localToIso(startDate, startTime)
   const endedAt = localToIso(endDate, endTime)
   const durationMin = calcDuration(startedAt, endedAt, pause)
 
+  const buildPayload = () => ({
+    project_id: project.projectId || null,
+    project_name: project.projectName || null,
+    contact_id: null, contact_name: project.contactName || null,
+    started_at: startedAt, ended_at: endedAt || null,
+    pause_minutes: Number(pause) || 0,
+    note: note || null, billable, data: {},
+  })
+
+  // Für Anhänge ohne gespeicherten Eintrag: Projekt + Startzeit sind Pflicht,
+  // dann sofort speichern, um eine entityId zu erhalten
+  const ensureEntity = async () => {
+    if (createdEntry) return createdEntry.id
+    if (isEdit) return entry.id
+    if (!project.projectId) {
+      toast.error('Bitte zuerst ein Projekt wählen')
+      return null
+    }
+    if (!startedAt) {
+      toast.error('Bitte Startzeit angeben')
+      return null
+    }
+    setLoading(true)
+    try {
+      const res = await zeiterfassungApi.createEntry(buildPayload())
+      setCreatedEntry(res.data)
+      toast.success('Zeiteintrag gespeichert')
+      return res.data.id
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Fehler beim Speichern')
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSave = async () => {
     if (!startedAt) return toast.error('Bitte Startzeit angeben')
     setLoading(true)
     try {
-      const payload = {
-        project_id: project.projectId || null,
-        project_name: project.projectName || null,
-        contact_id: null, contact_name: project.contactName || null,
-        started_at: startedAt, ended_at: endedAt || null,
-        pause_minutes: Number(pause) || 0,
-        note: note || null, billable, data: {},
-      }
-      if (isEdit) {
-        await zeiterfassungApi.updateEntry(entry.id, payload)
+      const payload = buildPayload()
+      if (isEdit || createdEntry) {
+        await zeiterfassungApi.updateEntry((entry || createdEntry).id, payload)
         toast.success('Zeiteintrag aktualisiert')
       } else {
         await zeiterfassungApi.createEntry(payload)
         toast.success('Zeiteintrag gespeichert')
       }
-      if (createAnother && !isEdit) {
+      if (createAnother && !isEdit && !createdEntry) {
         setNote(''); setPause(0)
         setStartTime(endTime); setStartDate(endDate)
         setEndTime(isoToTimeLocal(new Date().toISOString()))
@@ -463,12 +519,12 @@ function EntryModal({ entry, onClose, onSaved }) {
             <X size={20} />
           </button>
         </div>
-        <div className="p-5 grid grid-cols-2 gap-4">
-          <div className="col-span-2">
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Projekt</label>
             <ProjectSearch value={project} onChange={setProject} />
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Notiz</label>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
               placeholder="Was wurde gemacht?"
@@ -503,15 +559,20 @@ function EntryModal({ entry, onClose, onSaved }) {
               {fmtMinutes(durationMin)} h
             </div>
           </div>
-          <div className="col-span-2 flex items-center gap-3">
+          <div className="sm:col-span-2 flex items-center gap-3">
             <input type="checkbox" id="modal-billable" checked={billable} onChange={(e) => setBillable(e.target.checked)}
               className="w-5 h-5 rounded accent-primary-600" />
             <label htmlFor="modal-billable" className="text-sm font-medium text-gray-700 cursor-pointer">Verrechenbar</label>
           </div>
         </div>
-        <div className="flex items-center gap-3 p-5 border-t border-gray-100">
-          {!isEdit && (
-            <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer mr-auto">
+        <div className="flex flex-wrap items-center gap-3 p-5 border-t border-gray-100">
+          <AttachmentQuickBar entityType="zeiterfassung"
+            entityId={isEdit ? entry.id : createdEntry?.id || null}
+            onEnsureEntity={ensureEntity}
+            onUploaded={() => setAttachmentsRefresh(n => n + 1)}
+            className="mr-auto" />
+          {!isEdit && !createdEntry && (
+            <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
               <input type="checkbox" checked={createAnother} onChange={(e) => setCreateAnother(e.target.checked)}
                 className="w-4 h-4 rounded accent-primary-600" />
               Weiteren erstellen
@@ -527,10 +588,10 @@ function EntryModal({ entry, onClose, onSaved }) {
           </button>
         </div>
 
-        {/* Anhänge – nur bei bestehenden Einträgen */}
-        {isEdit && (
+        {/* Anhänge – Dateiliste bei bestehenden oder bereits gespeicherten Einträgen */}
+        {(isEdit || createdEntry) && (
           <div className="px-5 pb-5 border-t border-gray-100">
-            <AttachmentPanel entityType="zeiterfassung" entityId={entry.id} />
+            <AttachmentPanel key={attachmentsRefresh} entityType="zeiterfassung" entityId={(entry || createdEntry).id} />
           </div>
         )}
       </div>
@@ -651,6 +712,7 @@ export default function ZeiterfassungPage() {
       setRunning(res.data)
       toast.success('Timer gestartet')
       loadAll()
+      return res.data
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Fehler beim Starten')
       throw err

@@ -140,7 +140,7 @@ function ShareDialog({ attachment, onClose }) {
 }
 
 // ── Link hinzufügen Dialog ────────────────────────────────────────────────────
-function AddLinkDialog({ entityType, entityId, providers, onClose, onAdded }) {
+export function AddLinkDialog({ entityType, entityId, providers, onClose, onAdded }) {
   const [form, setForm] = useState({ display_name: '', link_url: '', link_provider: 'custom', description: '' })
   const [loading, setLoading] = useState(false)
 
