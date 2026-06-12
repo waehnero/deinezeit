@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.8.5',
+    day: '12',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Schnellzugriff auf Anhänge hinzugefügt',
+      'Mobiles Layout für Projektzeit verbessert',
+    ],
+    updates: [],
+  },
+  {
     version: '1.8.4',
     day: '13',
     month: 'Juni',

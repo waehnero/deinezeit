@@ -42,6 +42,14 @@
 
 ---
 
+## [1.8.5] – 2026-06-12 – Anhänge und Mobile-Optimierung
+
+### Neu
+- Schnellzugriff auf Anhänge hinzugefügt
+- Mobiles Layout für Projektzeit verbessert
+
+---
+
 ## [1.8.2] – 2026-06-11 – Behobene Dateien und Dokumentation
 
 ### Aktualisierungen
