@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.9.0',
+    day: '13',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'DeineZeit kann jetzt als App installiert werden ("Zum Home-Bildschirm hinzufügen") – eigenes Icon, Vollbild ohne Browserleiste',
+    ],
+    updates: [
+      'Service Worker für schnelleres Laden und grundlegende Offline-Nutzung der App-Oberfläche',
+    ],
+  },
+  {
     version: '1.8.5',
     day: '12',
     month: 'Juni',

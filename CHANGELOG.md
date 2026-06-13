@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.0] - 2026-06-13
+### Neu
+- DeineZeit als PWA: Installation über "Zum Home-Bildschirm hinzufügen" (eigenes Icon, Vollbildmodus ohne Browserleiste)
+- Web App Manifest mit Icons (192px, 512px, maskable, Apple Touch Icon) und Theme-Farbe
+- Service Worker (vite-plugin-pwa) für Caching der App-Shell und grundlegende Offline-Nutzung
+### Geändert
+- iOS-Meta-Tags für Installation über Safari ergänzt
+- nginx-Konfiguration: Service Worker und Manifest werden nicht mehr langfristig gecacht
+
+## [1.8.5] - 2026-06-13
+### Geändert
+- Anhang-Buttons (Cloud-Link, Foto aufnehmen, Hochladen) zeigen auf schmalen Bildschirmen nur noch Icons – passen jetzt in eine Zeile
+
 ## [1.8.4] - 2026-06-13
 ### Geändert
 - Projektzeit-Hauptseite: Layout der Start- und laufenden Timer-Karte für Mobilgeräte (Hoch- und Querformat) überarbeitet, Spalten stapeln sich statt sich zu überlappen

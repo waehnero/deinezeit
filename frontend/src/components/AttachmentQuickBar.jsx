@@ -54,17 +54,17 @@ export default function AttachmentQuickBar({ entityType, entityId, onEnsureEntit
   return (
     <>
       <div className={`flex items-center flex-wrap gap-2 ${className}`}>
-        <button type="button" onClick={openCloudLink} disabled={uploading}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
-          <Link size={14} /> Cloud-Link
+        <button type="button" onClick={openCloudLink} disabled={uploading} title="Cloud-Link"
+          className="flex items-center gap-1.5 px-2.5 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+          <Link size={14} /> <span className="hidden sm:inline">Cloud-Link</span>
         </button>
-        <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploading}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
-          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />} Foto aufnehmen
+        <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={uploading} title="Foto aufnehmen"
+          className="flex items-center gap-1.5 px-2.5 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />} <span className="hidden sm:inline">Foto aufnehmen</span>
         </button>
-        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50">
-          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Hochladen
+        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Hochladen"
+          className="flex items-center gap-1.5 px-2.5 py-2 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors disabled:opacity-50">
+          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} <span className="hidden sm:inline">Hochladen</span>
         </button>
       </div>
 
