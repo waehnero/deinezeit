@@ -64,6 +64,13 @@
 
 ---
 
+## [1.10.2] – 2026-06-13 – Merge-Konflikte aufgelöst
+
+### Aktualisierungen
+- Merge-Konflikte behoben
+
+---
+
 ## [1.10.0] – 2026-06-13 – PWA-Unterstützung für DeineZeit
 
 ### Neu
