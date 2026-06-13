@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.10.0',
+    day: '13',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Progressive Web App (PWA) ermöglicht die Nutzung von DeineZeit als installierbare App',
+    ],
+    updates: [],
+  },
+  {
     version: '1.9.0',
     day: '13',
     month: 'Juni',

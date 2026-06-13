@@ -55,6 +55,13 @@
 
 ---
 
+## [1.10.0] – 2026-06-13 – PWA-Unterstützung für DeineZeit
+
+### Neu
+- Progressive Web App (PWA) ermöglicht die Nutzung von DeineZeit als installierbare App
+
+---
+
 ## [1.8.5] – 2026-06-12 – Anhänge und Mobile-Optimierung
 
 ### Neu
