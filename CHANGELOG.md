@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.1] - 2026-06-13
+### Geändert
+- Projektzeit-Seite: Buttons "Bericht erstellen" und "Projektzeit nachtragen" zeigen auf schmalen Bildschirmen (Handy) nur noch Icons
+- Start-Formular: "Verrechenbar"-Option steht jetzt neben der Startzeit statt darunter, spart Platz auf mobilen Geräten
+
+## [1.10.0] - 2026-06-13
+### Neu
+- Progressive Web App (PWA) ermöglicht die Nutzung von DeineZeit als installierbare App
+
 ## [1.9.0] - 2026-06-13
 ### Neu
 - DeineZeit als PWA: Installation über "Zum Home-Bildschirm hinzufügen" (eigenes Icon, Vollbildmodus ohne Browserleiste)

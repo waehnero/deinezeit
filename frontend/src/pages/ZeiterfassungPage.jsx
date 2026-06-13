@@ -348,17 +348,19 @@ function StartTimerCard({ onStart }) {
           </div>
 
           <div className="w-full sm:w-48 sm:flex-shrink-0 flex flex-col gap-3 justify-between">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Startzeit</label>
-              <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
-                <Clock size={13} className="text-gray-400 flex-shrink-0" />
-                <LiveTime />
+            <div className="flex items-end gap-3">
+              <div className="w-24 sm:flex-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Startzeit</label>
+                <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                  <Clock size={13} className="text-gray-400 flex-shrink-0" />
+                  <LiveTime />
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="start-billable" checked={billable} onChange={(e) => setBillable(e.target.checked)}
-                className="w-4 h-4 rounded accent-primary-600" />
-              <label htmlFor="start-billable" className="text-sm text-gray-700 cursor-pointer">Verrechenbar</label>
+              <div className="flex items-center gap-2 py-2">
+                <input type="checkbox" id="start-billable" checked={billable} onChange={(e) => setBillable(e.target.checked)}
+                  className="w-4 h-4 rounded accent-primary-600" />
+                <label htmlFor="start-billable" className="text-sm text-gray-700 cursor-pointer">Verrechenbar</label>
+              </div>
             </div>
             <button onClick={handleStart} disabled={starting}
               className="w-full py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-lg transition flex items-center justify-center gap-2">
@@ -812,15 +814,15 @@ export default function ZeiterfassungPage() {
             className="p-2.5 border border-gray-300 rounded-xl text-gray-500 hover:bg-gray-50 transition">
             <Settings2 size={16} />
           </button>
-          <button onClick={() => setBerichtOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+          <button onClick={() => setBerichtOpen(true)} title="Bericht erstellen"
+            className="flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
             <FileText size={16} />
-            Bericht erstellen
+            <span className="hidden sm:inline">Bericht erstellen</span>
           </button>
-          <button onClick={() => setModalEntry(null)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+          <button onClick={() => setModalEntry(null)} title="Projektzeit nachtragen"
+            className="flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
             <Plus size={16} />
-            Projektzeit nachtragen
+            <span className="hidden sm:inline">Projektzeit nachtragen</span>
           </button>
         </div>
       </div>

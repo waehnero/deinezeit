@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.10.1',
+    day: '13',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Mobile Ansicht der Projektzeit verbessert: Buttons "Bericht erstellen" und "Projektzeit nachtragen" zeigen am Handy nur noch Symbole',
+      '„Verrechenbar" steht beim Start-Formular jetzt platzsparend neben der Startzeit',
+    ],
+  },
+  {
     version: '1.10.0',
     day: '13',
     month: 'Juni',
