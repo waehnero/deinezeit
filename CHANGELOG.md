@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.2] - 2026-06-15
+### Geändert
+- Berichts-Dialog: Datum-, Gruppierungs- und Filterfelder stapeln sich auf schmalen Bildschirmen statt sich zu überlappen
+- Anhänge-Verwaltung: Aktionssymbole (Öffnen, Teilen, Löschen) sind am Handy immer sichtbar; Vorschau-Kacheln zeigen auf schmalen Bildschirmen 2 statt 3 Spalten
+
 ## [1.10.1] - 2026-06-13
 ### Geändert
 - Projektzeit-Seite: Buttons "Bericht erstellen" und "Projektzeit nachtragen" zeigen auf schmalen Bildschirmen (Handy) nur noch Icons

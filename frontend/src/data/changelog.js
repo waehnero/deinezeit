@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.10.2',
+    day: '15',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Berichts-Dialog: Formularfelder und Gruppierungsoptionen stapeln sich auf schmalen Bildschirmen',
+      'Anhänge-Verwaltung: Aktionssymbole sind am Handy jetzt immer sichtbar, Vorschau-Kacheln passen sich der Bildschirmbreite an',
+    ],
+  },
+  {
     version: '1.10.1',
     day: '13',
     month: 'Juni',
