@@ -875,4 +875,39 @@ export default function DatacenterPage() {
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Bereich</th>
-                    <th className="px-4 py-2.5 text-l
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Größe / Typ</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden xl:table-cell">Erstellt</th>
+                    <th className="px-4 py-2.5 w-28"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {attachments.map(a => (
+                    <FileRow
+                      key={a.id}
+                      attachment={a}
+                      onPreview={setPreviewItem}
+                      onDownload={handleDownload}
+                      onShare={setShareItem}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modals */}
+      {previewItem && <PreviewModal attachment={previewItem} onClose={() => setPreviewItem(null)} />}
+      {shareItem   && <ShareDialog  attachment={shareItem}   onClose={() => setShareItem(null)} />}
+      {extendItem  && (
+        <ExtendDialog
+          attachment={extendItem}
+          onClose={() => setExtendItem(null)}
+          onExtended={() => { loadFolders(); loadAttachments() }}
+        />
+      )}
+    </div>
+  )
+}

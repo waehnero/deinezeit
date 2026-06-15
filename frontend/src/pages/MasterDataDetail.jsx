@@ -383,3 +383,13 @@ export default function MasterDataDetail() {
 
       {/* Modal */}
       {modalRecord !== undefined && (
+        <RecordModal
+          entityType={entityType}
+          record={modalRecord}
+          onClose={() => setModalRecord(undefined)}
+          onSaved={handleSaved}
+        />
+      )}
+    </div>
+  )
+}

@@ -472,4 +472,8 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
           <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
         </div>
       </div>
-      <input value={pos.detai
+      <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
+        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-white text-neutral-500" />
+    </div>
+  )
+}

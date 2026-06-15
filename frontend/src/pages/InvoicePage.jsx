@@ -709,4 +709,22 @@ function SendDialog({ invoices, onClose, onSent }) {
                 <div key={r.id} className={`flex items-center gap-2 text-sm p-2 rounded ${r.ok ? 'bg-green-50' : 'bg-red-50'}`}>
                   {r.ok ? <CheckCircle2 size={14} className="text-green-600 shrink-0" /> : <XCircle size={14} className="text-red-500 shrink-0" />}
                   <span className="font-medium">{r.number}</span>
-                  {r.ok ? <span className="text-neutral-500 text-xs">→ {r.to}</span> : <span c
+                  {r.ok ? <span className="text-neutral-500 text-xs">→ {r.to}</span> : <span className="text-red-500 text-xs">{r.error}</span>}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <button onClick={() => {
+                const okIds = results.filter(r => r.ok).map(r => r.id)
+                const errIds = results.filter(r => !r.ok).map(r => r.id)
+                if (okIds.length) onSent(okIds, 'ok', false)
+                if (errIds.length) onSent(errIds, 'error', false)
+                onSent([], 'ok', true)
+              }} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">Schließen</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
