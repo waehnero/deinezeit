@@ -249,16 +249,18 @@ export default function MasterDataDetail() {
             {total} {total === 1 ? 'Eintrag' : 'Einträge'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <CsvExportButton slug={entityType.slug} entityName={entityType.name} />
-          <CsvImportButton
-            slug={entityType.slug}
-            entityType={entityType}
-            onImported={() => loadRecords()}
-          />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-2">
+            <CsvExportButton slug={entityType.slug} entityName={entityType.name} />
+            <CsvImportButton
+              slug={entityType.slug}
+              entityType={entityType}
+              onImported={() => loadRecords()}
+            />
+          </div>
           <button
             onClick={() => setModalRecord(null)}
-            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
+            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
           >
             <Plus size={18} />
             Neu anlegen
@@ -287,7 +289,7 @@ export default function MasterDataDetail() {
 
       {/* Typ-Filter (nur bei Kontakte) */}
       {slug === 'kontakte' && (
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 overflow-x-auto flex-nowrap sm:flex-wrap -mx-4 px-4 sm:mx-0 sm:px-0">
           {[
             { value: '',            label: 'Alle' },
             { value: 'Kunde',       label: 'Kunden' },
@@ -297,7 +299,7 @@ export default function MasterDataDetail() {
             <button
               key={value}
               onClick={() => { setTypFilter(value); setPage(1) }}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition border ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition border whitespace-nowrap shrink-0 ${
                 typFilter === value
                   ? 'bg-primary-600 text-white border-primary-600'
                   : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400 hover:text-primary-600'
@@ -381,13 +383,3 @@ export default function MasterDataDetail() {
 
       {/* Modal */}
       {modalRecord !== undefined && (
-        <RecordModal
-          entityType={entityType}
-          record={modalRecord}
-          onClose={() => setModalRecord(undefined)}
-          onSaved={handleSaved}
-        />
-      )}
-    </div>
-  )
-}

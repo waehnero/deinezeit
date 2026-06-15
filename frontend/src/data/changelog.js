@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.10.3',
+    day: '15',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Belege-Liste: Header-Buttons, Belegtypen-Tabs und Tabelle für Mobilgeräte optimiert (scrollbar, gestapelt, weniger Spalten)',
+      'Beleg bearbeiten: Header-Buttons und Positionszeilen passen sich auf schmalen Bildschirmen an',
+      'Datacenter: Ordnerübersicht ist am Handy als ausklappbares Menü verfügbar, Aktionssymbole immer sichtbar',
+      'Kontakte/Stammdaten: Header-Buttons und Typ-Filter wurden für Mobilgeräte responsiv gestaltet',
+    ],
+  },
+  {
     version: '1.10.2',
     day: '15',
     month: 'Juni',
@@ -925,23 +938,4 @@ export const changelog = [
     features: [
       'Snap-to-Grid Drag & Drop Layout-Builder für Felder',
       'Feldbreite frei wählbar: 25% / 33% / 50% / 75% / 100%',
-      'CSV Export (Excel-kompatibel) und CSV Import mit Spalten-Zuordnung',
-      'Profilseite: Name, Sprache, Passwort, 2FA und Passkeys',
-      'Benutzerverwaltung für Admins',
-    ],
-    updates: [],
-  },
-  {
-    version: '0.2.0',
-    day: '21',
-    month: 'Mai',
-    year: '2026',
-    features: [
-      'Dynamische Stammdaten-Typen: Kunden, Lieferanten, Projekte — und beliebig mehr',
-      'Formular-Builder: Felder direkt in der Oberfläche definieren',
-      '9 Feldtypen: Text, Zahl, Datum, E-Mail, Telefon, Auswahl, Checkbox, URL, Textarea',
-      'Volltextsuche und Paginierung in Datensatz-Listen',
-    ],
-    updates: [],
-  },
-]
+      'CSV Export (Excel-kompatibel) und CSV Import mit Spalten-Zuo

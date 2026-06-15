@@ -134,52 +134,56 @@ export default function InvoicePage() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Belege</h1>
           <p className="text-sm text-neutral-500 mt-0.5">Rechnungen · Angebote · Auftragsbestätigungen · Gutschriften · Lieferscheine</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           {selected.size > 0 && (
             <button onClick={() => setSendDialog({ invoices: invoices.filter(i => selected.has(i.id)), mode: 'bulk' })}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <Mail size={15} /> {selected.size} Beleg{selected.size > 1 ? 'e' : ''} senden
             </button>
           )}
-          <button onClick={() => navigate('/invoices/book')}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-            <Book size={15} /> Belegbuch
-          </button>
-          <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-            <Plus size={15} /> Neu erstellen
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/invoices/book')}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
+              <Book size={15} /> Belegbuch
+            </button>
+            <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+              <Plus size={15} /> Neu erstellen
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-4 w-fit flex-wrap">
+      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-4 overflow-x-auto flex-nowrap sm:flex-wrap sm:w-fit -mx-4 px-4 sm:mx-0 sm:px-1">
         {DOC_TYPES.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`px-3 py-1.5 text-sm rounded-md transition-all ${activeTab === t.key ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded-md transition-all whitespace-nowrap shrink-0 ${activeTab === t.key ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nummer, Titel, Referenz…"
             className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300" />
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="text-sm border border-neutral-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-300">
-          <option value="">Alle Status</option>
-          {Object.entries(STATUS_BADGE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <button onClick={load} className="p-2 text-neutral-500 hover:text-neutral-800">
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-3">
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="flex-1 sm:flex-none text-sm border border-neutral-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-300">
+            <option value="">Alle Status</option>
+            {Object.entries(STATUS_BADGE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <button onClick={load} className="p-2 text-neutral-500 hover:text-neutral-800">
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-xl overflow-visible">
@@ -194,6 +198,7 @@ export default function InvoicePage() {
             <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))} className="mt-3 text-sm text-primary-600 hover:underline">Erstes Dokument erstellen</button>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50">
@@ -203,10 +208,10 @@ export default function InvoicePage() {
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500 w-8"></th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Nummer</th>
-                <th className="text-left px-4 py-3 font-medium text-neutral-500">Datum</th>
-                <th className="text-left px-4 py-3 font-medium text-neutral-500">Fällig</th>
-                <th className="text-left px-4 py-3 font-medium text-neutral-500">Titel</th>
-                <th className="text-left px-4 py-3 font-medium text-neutral-500">Kontakt</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-500 hidden md:table-cell">Datum</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-500 hidden md:table-cell">Fällig</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-500 hidden sm:table-cell">Titel</th>
+                <th className="text-left px-4 py-3 font-medium text-neutral-500 hidden lg:table-cell">Kontakt</th>
                 <th className="text-right px-4 py-3 font-medium text-neutral-500">Betrag</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Status</th>
                 <th className="px-4 py-3 w-10"></th>
@@ -221,18 +226,18 @@ export default function InvoicePage() {
                     <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggleSelect(inv.id)} className="w-4 h-4 rounded cursor-pointer" />
                   </td>
                   <td className="px-4 py-3"><DocTypeBadge type={inv.doc_type} /></td>
-                  <td className="px-4 py-3 font-mono font-medium text-neutral-800">{inv.number}</td>
-                  <td className="px-4 py-3 text-neutral-600">{fmtDate(inv.date)}</td>
-                  <td className="px-4 py-3 text-neutral-600">
+                  <td className="px-4 py-3 font-mono font-medium text-neutral-800 whitespace-nowrap">{inv.number}</td>
+                  <td className="px-4 py-3 text-neutral-600 hidden md:table-cell whitespace-nowrap">{fmtDate(inv.date)}</td>
+                  <td className="px-4 py-3 text-neutral-600 hidden md:table-cell whitespace-nowrap">
                     {inv.due_date ? (
                       <span className={new Date(inv.due_date) < new Date() && inv.status === 'offen' ? 'text-red-600 font-medium' : ''}>
                         {fmtDate(inv.due_date)}
                       </span>
                     ) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-neutral-700">{inv.title || '—'}</td>
-                  <td className="px-4 py-3 text-neutral-500 text-sm">{inv.contact_name || '—'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-neutral-800">{fmtEuro(inv.total)}</td>
+                  <td className="px-4 py-3 text-neutral-700 hidden sm:table-cell">{inv.title || '—'}</td>
+                  <td className="px-4 py-3 text-neutral-500 text-sm hidden lg:table-cell">{inv.contact_name || '—'}</td>
+                  <td className="px-4 py-3 text-right font-medium text-neutral-800 whitespace-nowrap">{fmtEuro(inv.total)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <StatusBadge status={inv.status} />
@@ -268,6 +273,7 @@ export default function InvoicePage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -703,22 +709,4 @@ function SendDialog({ invoices, onClose, onSent }) {
                 <div key={r.id} className={`flex items-center gap-2 text-sm p-2 rounded ${r.ok ? 'bg-green-50' : 'bg-red-50'}`}>
                   {r.ok ? <CheckCircle2 size={14} className="text-green-600 shrink-0" /> : <XCircle size={14} className="text-red-500 shrink-0" />}
                   <span className="font-medium">{r.number}</span>
-                  {r.ok ? <span className="text-neutral-500 text-xs">→ {r.to}</span> : <span className="text-red-500 text-xs">{r.error}</span>}
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end">
-              <button onClick={() => {
-                const okIds = results.filter(r => r.ok).map(r => r.id)
-                const errIds = results.filter(r => !r.ok).map(r => r.id)
-                if (okIds.length) onSent(okIds, 'ok', false)
-                if (errIds.length) onSent(errIds, 'error', false)
-                onSent([], 'ok', true)
-              }} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">Schließen</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
+                  {r.ok ? <span className="text-neutral-500 text-xs">→ {r.to}</span> : <span c

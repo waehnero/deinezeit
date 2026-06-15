@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.3] - 2026-06-15
+### Geändert
+- Belege-Liste: Header-Buttons, Belegtypen-Tabs und Tabelle für Mobilgeräte optimiert (scrollbar, gestapelt, weniger Spalten)
+- Beleg bearbeiten: Header-Buttons und Positionszeilen passen sich auf schmalen Bildschirmen an
+- Datacenter: Ordnerübersicht ist am Handy als ausklappbares Menü verfügbar, Aktionssymbole immer sichtbar
+- Kontakte/Stammdaten: Header-Buttons und Typ-Filter wurden für Mobilgeräte responsiv gestaltet
+
 ## [1.10.2] - 2026-06-15
 ### Geändert
 - Berichts-Dialog: Datum-, Gruppierungs- und Filterfelder stapeln sich auf schmalen Bildschirmen statt sich zu überlappen
@@ -742,18 +749,4 @@ Format: [Version] – Datum – Was hat sich geändert
 ### Technische Details
 - Migration 0004: Kontakte-Konsolidierung (Kunden + Lieferanten → Kontakte mit `typ`-Feld)
 - Neue npm-Pakete: `slowapi` (Rate Limiting)
-- Tailwind CSS auf CSS-Variablen umgestellt (`--color-primary-*`) für Laufzeit-Farbwechsel
-
----
-
-## [0.5.0] – 2026-05-22 – Zeiterfassung
-
-### Neu
-- **Zeiterfassung**: Timer starten/stoppen mit Projekt- und Aufgabenzuordnung
-- **Manuelle Einträge**: Zeiten nachträglich eintragen und bearbeiten
-- **Eigene Felder für Zeiteinträge**: Admin kann beliebige Zusatzfelder definieren (z.B. Ort, Fahrtzeit, Notiz)
-- **Projektzeitbericht als PDF**: Gefilterte Auswertung nach Zeitraum, Mitarbeiter, Projekt als druckfertiges PDF
-- **Bericht-Optionen**: Zeitrunden auf 15/30 Minuten, Filterung nach Aufgabe, verschiedene Zeitraum-Voreinstellungen
-
-### Technische Details
-- 
+- Tailwind CSS auf CSS-Variablen umgestellt (`--color-primary-*`) für Laufzeit-Farbwech

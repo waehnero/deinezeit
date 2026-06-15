@@ -298,7 +298,7 @@ export default function InvoiceFormPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/invoices')} className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500"><ArrowLeft size={18} /></button>
           <div>
@@ -306,7 +306,7 @@ export default function InvoiceFormPage() {
             {isNew && nextNumber && <p className="text-sm text-neutral-400 mt-0.5">Nummer: {nextNumber}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {!isNew && (
             <>
               <button onClick={async () => {
@@ -317,7 +317,7 @@ export default function InvoiceFormPage() {
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement('a'); a.href = url; a.download = id + '.pdf'; a.click(); URL.revokeObjectURL(url)
                 } catch { toast.error('PDF-Fehler') }
-              }} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
+              }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
                 <Download size={14} /> PDF
               </button>
               <button onClick={async () => {
@@ -330,12 +330,12 @@ export default function InvoiceFormPage() {
                   window.open(url, '_blank')
                   setTimeout(() => URL.revokeObjectURL(url), 10000)
                 } catch { toast.error('Vorschau-Fehler') }
-              }} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
+              }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
                 <Eye size={14} /> Vorschau
               </button>
             </>
           )}
-          <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
+          <button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
             {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />} Speichern
           </button>
         </div>
@@ -439,25 +439,25 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
   const lineTotal = calcLine(pos)
   return (
     <div className="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
-      <div className="grid grid-cols-12 gap-2 items-start">
-        <div className="col-span-12 md:col-span-5">
+      <div className="grid grid-cols-2 md:grid-cols-12 gap-2 items-start">
+        <div className="col-span-2 md:col-span-5">
           <input value={pos.description} onChange={e => onChange('description', e.target.value)} placeholder="Beschreibung *"
             className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white" />
         </div>
-        <div className="col-span-3 md:col-span-1">
-          <input type="number" value={pos.quantity} onChange={e => onChange('quantity', e.target.value)}
+        <div className="col-span-1 md:col-span-1">
+          <input type="number" value={pos.quantity} onChange={e => onChange('quantity', e.target.value)} placeholder="Menge"
             className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white text-right" />
         </div>
-        <div className="col-span-3 md:col-span-1">
+        <div className="col-span-1 md:col-span-1">
           <input value={pos.unit || ''} onChange={e => onChange('unit', e.target.value)} placeholder="Einh."
             className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white" />
         </div>
-        <div className="col-span-3 md:col-span-2">
-          <input type="number" step="0.01" value={pos.unit_price} onChange={e => onChange('unit_price', e.target.value)}
+        <div className="col-span-1 md:col-span-2">
+          <input type="number" step="0.01" value={pos.unit_price} onChange={e => onChange('unit_price', e.target.value)} placeholder="Preis"
             className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white text-right" />
         </div>
         {taxMode !== 'kleinunternehmer' && (
-          <div className="col-span-3 md:col-span-1">
+          <div className="col-span-1 md:col-span-1">
             <select value={pos.tax_rate} onChange={e => onChange('tax_rate', e.target.value)}
               className="w-full border border-neutral-200 rounded px-1 py-1.5 text-sm bg-white">
               <option value="20">20%</option><option value="10">10%</option>
@@ -465,15 +465,11 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
             </select>
           </div>
         )}
-        <div className="col-span-2 md:col-span-1 flex items-center justify-end">
+        <div className="col-span-1 md:col-span-1 flex items-center justify-end">
           <span className="text-sm font-medium text-neutral-800">{fmtEuro(lineTotal)}</span>
         </div>
-        <div className="col-span-1 flex items-center justify-center">
+        <div className="col-span-1 md:col-span-1 flex items-center justify-center">
           <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
         </div>
       </div>
-      <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
-        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-white text-neutral-500" />
-    </div>
-  )
-}
+      <input value={pos.detai

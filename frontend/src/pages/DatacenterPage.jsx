@@ -251,7 +251,7 @@ function SharedFileRow({ attachment, onRevoke, onExtend, onCopy }) {
         {formatBytes(attachment.filesize)}
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+        <div className="flex items-center justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition">
           <button onClick={() => onCopy(attachment)} title="Link kopieren"
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
             <Copy size={14} />
@@ -481,7 +481,7 @@ function FileRow({ attachment, onPreview, onDownload, onShare, onDelete }) {
         {formatDate(attachment.created_at)}
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+        <div className="flex items-center justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition">
           {canPreview && (
             <button onClick={() => onPreview(attachment)} title="Vorschau"
               className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
@@ -572,6 +572,7 @@ export default function DatacenterPage() {
   const [previewItem, setPreviewItem] = useState(null)
   const [shareItem, setShareItem]     = useState(null)
   const [extendItem, setExtendItem]   = useState(null)
+  const [mobileFoldersOpen, setMobileFoldersOpen] = useState(false)
 
   // Ordnerbaum laden
   const loadFolders = useCallback(async () => {
@@ -725,42 +726,67 @@ export default function DatacenterPage() {
         ? `${entityLabel(selected.type)} / ${currentEntityLabel}`
         : entityLabel(selected.type)
 
-  return (
-    <div className="flex h-full overflow-hidden -m-6">
-      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
-      <aside className="w-56 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-        <div className="px-4 py-4 border-b border-gray-100">
+  const sidebarContent = (
+    <>
+      <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
           <div className="flex items-center gap-2">
             <HardDrive size={17} className="text-primary-600" />
             <h2 className="font-bold text-gray-900 text-sm">Datacenter</h2>
           </div>
           <p className="text-xs text-gray-400 mt-0.5">Dateien & Links</p>
         </div>
+        <button onClick={() => setMobileFoldersOpen(false)} className="lg:hidden p-1.5 text-gray-400 hover:text-gray-700 rounded-lg" aria-label="Schließen">
+          <X size={18} />
+        </button>
+      </div>
 
-        <div className="flex-1 overflow-y-auto px-2 py-3">
-          {foldersLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={20} className="animate-spin text-gray-300" />
-            </div>
-          ) : (
-            <FolderTree folders={folders} selected={selected} onSelect={setSelected} />
-          )}
-        </div>
-
-        {/* Speicherinfo */}
-        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-          <div className="flex items-center gap-1.5 text-xs text-gray-400">
-            <Info size={12} />
-            <span>{folders.total} Dateien gesamt</span>
+      <div className="flex-1 overflow-y-auto px-2 py-3">
+        {foldersLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 size={20} className="animate-spin text-gray-300" />
           </div>
+        ) : (
+          <FolderTree folders={folders} selected={selected} onSelect={(s) => { setSelected(s); setMobileFoldersOpen(false) }} />
+        )}
+      </div>
+
+      {/* Speicherinfo */}
+      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <Info size={12} />
+          <span>{folders.total} Dateien gesamt</span>
         </div>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="flex h-full overflow-hidden -m-6">
+      {/* ── Sidebar (Desktop) ─────────────────────────────────────────────── */}
+      <aside className="hidden lg:flex w-56 flex-shrink-0 bg-white border-r border-gray-200 flex-col overflow-hidden">
+        {sidebarContent}
       </aside>
+
+      {/* ── Sidebar (Mobile Overlay) ──────────────────────────────────────── */}
+      {mobileFoldersOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileFoldersOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden shadow-xl">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
 
       {/* ── Hauptbereich ──────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
         {/* Toolbar */}
-        <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 flex-shrink-0">
-          <div className="flex-1">
+        <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 flex-wrap sm:flex-nowrap flex-shrink-0">
+          <button onClick={() => setMobileFoldersOpen(true)}
+            className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            <Folder size={14} /> Ordner
+          </button>
+          <div className="flex-1 min-w-[120px]">
             <h3 className="font-semibold text-gray-900 text-sm">{currentTitle}</h3>
             <p className="text-xs text-gray-400">
               {fileCount} {fileCount === 1 ? 'Datei' : 'Dateien'}
@@ -768,12 +794,12 @@ export default function DatacenterPage() {
               {fileCount > 0 && ` · ${formatBytes(totalSize)}`}
             </p>
           </div>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto order-3 sm:order-none">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Suchen…"
-              className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
+              className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-48"
             />
           </div>
           <button onClick={() => { loadFolders(); loadAttachments() }}
@@ -849,39 +875,4 @@ export default function DatacenterPage() {
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Bereich</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Größe / Typ</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden xl:table-cell">Erstellt</th>
-                    <th className="px-4 py-2.5 w-28"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {attachments.map(a => (
-                    <FileRow
-                      key={a.id}
-                      attachment={a}
-                      onPreview={setPreviewItem}
-                      onDownload={handleDownload}
-                      onShare={setShareItem}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Modals */}
-      {previewItem && <PreviewModal attachment={previewItem} onClose={() => setPreviewItem(null)} />}
-      {shareItem   && <ShareDialog  attachment={shareItem}   onClose={() => setShareItem(null)} />}
-      {extendItem  && (
-        <ExtendDialog
-          attachment={extendItem}
-          onClose={() => setExtendItem(null)}
-          onExtended={() => { loadFolders(); loadAttachments() }}
-        />
-      )}
-    </div>
-  )
-}
+                    <th className="px-4 py-2.5 text-l
