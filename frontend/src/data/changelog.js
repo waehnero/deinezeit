@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.10.3',
+    day: '15',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Berichts-Dialog für mobile Geräte optimiert',
+      'Anhänge-Handling verbessert',
+    ],
+  },
+  {
     version: '1.10.2',
     day: '15',
     month: 'Juni',

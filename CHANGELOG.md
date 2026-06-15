@@ -69,6 +69,14 @@
 
 ---
 
+## [1.10.3] – 2026-06-15 – Mobile-Optimierungen und Verbesserungen
+
+### Aktualisierungen
+- Berichts-Dialog für mobile Geräte optimiert
+- Anhänge-Handling verbessert
+
+---
+
 ## [1.10.2] – 2026-06-13 – Merge-Konflikte aufgelöst
 
 ### Aktualisierungen
