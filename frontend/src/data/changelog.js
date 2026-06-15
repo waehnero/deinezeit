@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.10.4',
+    day: '15',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Mobile-Responsiveness für Belege, Beleg-Formular, Datacenter und Kontakte optimiert',
+      'Synchronisierungsfehler bei mobilen Ansichten behoben',
+    ],
+  },
+  {
     version: '1.10.3',
     day: '15',
     month: 'Juni',

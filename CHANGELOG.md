@@ -76,6 +76,14 @@
 
 ---
 
+## [1.10.4] – 2026-06-15 – Mobile-Responsiveness verbessert
+
+### Aktualisierungen
+- Mobile-Responsiveness für Belege, Beleg-Formular, Datacenter und Kontakte optimiert
+- Synchronisierungsfehler bei mobilen Ansichten behoben
+
+---
+
 ## [1.10.3] – 2026-06-15 – Mobile-Optimierungen und Verbesserungen
 
 ### Aktualisierungen
