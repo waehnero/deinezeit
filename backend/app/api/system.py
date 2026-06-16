@@ -76,12 +76,16 @@ def _version_newer(v1: str, v2: str) -> bool:
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 def _version_from_changelog_text(text: str) -> str:
-    """Erste Versionsnummer aus CHANGELOG.md-Inhalt extrahieren."""
+    """Höchste Versionsnummer aus CHANGELOG.md-Inhalt extrahieren."""
+    found = []
     for line in text.splitlines():
         m = re.match(r'^## \[(\d+\.\d+\.\d+)\]', line)
         if m:
-            return m.group(1)
-    return ""
+            found.append(tuple(int(x) for x in m.group(1).split(".")))
+    if not found:
+        return ""
+    best = max(found)
+    return ".".join(str(x) for x in best)
 
 
 def _is_local_mode() -> bool:

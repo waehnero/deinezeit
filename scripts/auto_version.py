@@ -272,16 +272,16 @@ def update_changelog_md(version: str, titel: str, features: list, updates: list)
     if updates:
         akt_section = "\n\n### Aktualisierungen\n" + "\n".join(f"- {u}" for u in updates)
 
-    new_entry = f"\n## [{version}] – {today} – {titel}{neu_section}{akt_section}\n\n---\n"
+    new_entry = f"## [{version}] – {today} – {titel}{neu_section}{akt_section}\n\n---\n\n"
 
-    # Nach dem ersten "---" einfügen
-    insert_marker = "---\n"
-    idx = content.find(insert_marker)
-    if idx == -1:
-        # Fallback: einfach nach der ersten Zeile einfügen
-        idx = content.find("\n") + 1
-    else:
-        idx += len(insert_marker)
+    # Immer direkt nach der Überschriftszeile ("# Changelog") einfügen
+    first_newline = content.find("\n")
+    if first_newline == -1:
+        first_newline = 0
+    idx = first_newline + 1
+    # Leere Zeilen nach der Überschrift überspringen
+    while idx < len(content) and content[idx] == "\n":
+        idx += 1
     content = content[:idx] + new_entry + content[idx:]
 
     with open(path, "w", encoding="utf-8", newline="\n") as f:
