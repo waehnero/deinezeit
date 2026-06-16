@@ -179,7 +179,7 @@ def _send_graph(
             for att in attachments
         ]
 
-    payload = json.dumps({"message": message, "saveToSentItems": False}).encode("utf-8")
+    payload = json.dumps({"message": message, "saveToSentItems": True}).encode("utf-8")
     url     = f"https://graph.microsoft.com/v1.0/users/{from_email}/sendMail"
 
     req = urllib.request.Request(url, data=payload, method="POST")
