@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
 import RichTextEditor from '../components/RichTextEditor'
@@ -251,12 +252,18 @@ export default function InvoicePage() {
                   </td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div className="relative">
-                      <button onClick={() => setActionMenu(actionMenu === inv.id ? null : inv.id)}
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setActionMenu(actionMenu === inv.id ? null : { id: inv.id, rect })
+                        }}
                         className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700">
                         <MoreHorizontal size={16} />
                       </button>
-                      {actionMenu === inv.id && (
+                      {actionMenu?.id === inv.id && (
                         <ActionMenu invoice={inv}
+                          anchorRect={actionMenu.rect}
                           onClose={() => setActionMenu(null)}
                           onSetStatus={s => { setActionMenu(null); handleSetStatus(inv, s) }}
                           onConvertToAb={() => { setActionMenu(null); handleConvertToAb(inv) }}
@@ -300,22 +307,30 @@ export default function InvoicePage() {
   )
 }
 
-function ActionMenu({ invoice, onClose, onSetStatus, onConvertToAb, onConvertToInvoice, onSend, onCancel, onPaid, onDelete, onEdit }) {
+function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, onConvertToInvoice, onSend, onCancel, onPaid, onDelete, onEdit }) {
   const menuRef = useRef(null)
-  const [openUp, setOpenUp] = useState(false)
+  const MENU_WIDTH = 224 // w-56 = 14rem = 224px
 
   useEffect(() => {
-    const h = () => onClose()
-    document.addEventListener('click', h)
-    return () => document.removeEventListener('click', h)
+    const h = e => { if (!menuRef.current?.contains(e.target)) onClose() }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
   }, [onClose])
 
-  useLayoutEffect(() => {
-    if (menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect()
-      if (rect.bottom > window.innerHeight - 8) setOpenUp(true)
-    }
-  }, [])
+  // Berechne Position: unter oder über dem Button
+  const spaceBelow = window.innerHeight - anchorRect.bottom
+  const estimatedHeight = 320 // px, Schätzung
+  const openUp = spaceBelow < estimatedHeight && anchorRect.top > estimatedHeight
+
+  const style = {
+    position: 'fixed',
+    right: window.innerWidth - anchorRect.right,
+    zIndex: 9999,
+    width: MENU_WIDTH,
+    ...(openUp
+      ? { bottom: window.innerHeight - anchorRect.top }
+      : { top: anchorRect.bottom + 4 }),
+  }
 
   const { status, doc_type } = invoice
   const isRe = doc_type === 'rechnung'
@@ -323,8 +338,8 @@ function ActionMenu({ invoice, onClose, onSetStatus, onConvertToAb, onConvertToI
   const isAb = doc_type === 'auftragsbestaetigung'
   const isGs = doc_type === 'gutschrift'
 
-  return (
-    <div ref={menuRef} className={`absolute right-0 ${openUp ? 'bottom-7' : 'top-7'} bg-white border border-neutral-200 rounded-lg shadow-lg py-1 w-56`} style={{zIndex: 9999}}>
+  return createPortal(
+    <div ref={menuRef} style={style} className="bg-white border border-neutral-200 rounded-lg shadow-lg py-1">
       <button onClick={onEdit} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
         <Eye size={14} /> Öffnen / Bearbeiten
       </button>
@@ -396,7 +411,8 @@ function ActionMenu({ invoice, onClose, onSetStatus, onConvertToAb, onConvertToI
           </button>
         </>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
 
