@@ -1,220 +1,218 @@
-# Changelog
+# C
+## [1.11.3] - 2026-06-17 - Kontextmenü-Fix Portal-Rendering
+
+
+---
+hangelog
 
 ## [1.11.1] - 2026-06-17
-### Geändert
-- Graph API: Gesendete E-Mails werden jetzt im Outlook-Ordner „Gesendete Elemente" gespeichert
+### GeÃ¤ndert
+- Graph API: Gesendete E-Mails werden jetzt im Outlook-Ordner â€žGesendete Elemente" gespeichert
 
 ## [1.10.3] - 2026-06-15
-### Geändert
-- Belege-Liste: Header-Buttons, Belegtypen-Tabs und Tabelle für Mobilgeräte optimiert (scrollbar, gestapelt, weniger Spalten)
+### GeÃ¤ndert
+- Belege-Liste: Header-Buttons, Belegtypen-Tabs und Tabelle fÃ¼r MobilgerÃ¤te optimiert (scrollbar, gestapelt, weniger Spalten)
 - Beleg bearbeiten: Header-Buttons und Positionszeilen passen sich auf schmalen Bildschirmen an
-- Datacenter: Ordnerübersicht ist am Handy als ausklappbares Menü verfügbar, Aktionssymbole immer sichtbar
-- Kontakte/Stammdaten: Header-Buttons und Typ-Filter wurden für Mobilgeräte responsiv gestaltet
+- Datacenter: OrdnerÃ¼bersicht ist am Handy als ausklappbares MenÃ¼ verfÃ¼gbar, Aktionssymbole immer sichtbar
+- Kontakte/Stammdaten: Header-Buttons und Typ-Filter wurden fÃ¼r MobilgerÃ¤te responsiv gestaltet
 
 ## [1.10.2] - 2026-06-15
-### Geändert
-- Berichts-Dialog: Datum-, Gruppierungs- und Filterfelder stapeln sich auf schmalen Bildschirmen statt sich zu überlappen
-- Anhänge-Verwaltung: Aktionssymbole (Öffnen, Teilen, Löschen) sind am Handy immer sichtbar; Vorschau-Kacheln zeigen auf schmalen Bildschirmen 2 statt 3 Spalten
+### GeÃ¤ndert
+- Berichts-Dialog: Datum-, Gruppierungs- und Filterfelder stapeln sich auf schmalen Bildschirmen statt sich zu Ã¼berlappen
+- AnhÃ¤nge-Verwaltung: Aktionssymbole (Ã–ffnen, Teilen, LÃ¶schen) sind am Handy immer sichtbar; Vorschau-Kacheln zeigen auf schmalen Bildschirmen 2 statt 3 Spalten
 
 ## [1.10.1] - 2026-06-13
-### Geändert
+### GeÃ¤ndert
 - Projektzeit-Seite: Buttons "Bericht erstellen" und "Projektzeit nachtragen" zeigen auf schmalen Bildschirmen (Handy) nur noch Icons
-- Start-Formular: "Verrechenbar"-Option steht jetzt neben der Startzeit statt darunter, spart Platz auf mobilen Geräten
+- Start-Formular: "Verrechenbar"-Option steht jetzt neben der Startzeit statt darunter, spart Platz auf mobilen GerÃ¤ten
 
 ## [1.10.0] - 2026-06-13
 ### Neu
-- Progressive Web App (PWA) ermöglicht die Nutzung von DeineZeit als installierbare App
+- Progressive Web App (PWA) ermÃ¶glicht die Nutzung von DeineZeit als installierbare App
 
 ## [1.9.0] - 2026-06-13
 ### Neu
-- DeineZeit als PWA: Installation über "Zum Home-Bildschirm hinzufügen" (eigenes Icon, Vollbildmodus ohne Browserleiste)
+- DeineZeit als PWA: Installation Ã¼ber "Zum Home-Bildschirm hinzufÃ¼gen" (eigenes Icon, Vollbildmodus ohne Browserleiste)
 - Web App Manifest mit Icons (192px, 512px, maskable, Apple Touch Icon) und Theme-Farbe
-- Service Worker (vite-plugin-pwa) für Caching der App-Shell und grundlegende Offline-Nutzung
-### Geändert
-- iOS-Meta-Tags für Installation über Safari ergänzt
+- Service Worker (vite-plugin-pwa) fÃ¼r Caching der App-Shell und grundlegende Offline-Nutzung
+### GeÃ¤ndert
+- iOS-Meta-Tags fÃ¼r Installation Ã¼ber Safari ergÃ¤nzt
 - nginx-Konfiguration: Service Worker und Manifest werden nicht mehr langfristig gecacht
 
 ## [1.8.5] - 2026-06-13
-### Geändert
-- Anhang-Buttons (Cloud-Link, Foto aufnehmen, Hochladen) zeigen auf schmalen Bildschirmen nur noch Icons – passen jetzt in eine Zeile
+### GeÃ¤ndert
+- Anhang-Buttons (Cloud-Link, Foto aufnehmen, Hochladen) zeigen auf schmalen Bildschirmen nur noch Icons â€“ passen jetzt in eine Zeile
 
 ## [1.8.4] - 2026-06-13
-### Geändert
-- Projektzeit-Hauptseite: Layout der Start- und laufenden Timer-Karte für Mobilgeräte (Hoch- und Querformat) überarbeitet, Spalten stapeln sich statt sich zu überlappen
-- "Projektzeit nachtragen"-Dialog: Formularfelder stapeln sich auf schmalen Bildschirmen statt sich zu überlappen
+### GeÃ¤ndert
+- Projektzeit-Hauptseite: Layout der Start- und laufenden Timer-Karte fÃ¼r MobilgerÃ¤te (Hoch- und Querformat) Ã¼berarbeitet, Spalten stapeln sich statt sich zu Ã¼berlappen
+- "Projektzeit nachtragen"-Dialog: Formularfelder stapeln sich auf schmalen Bildschirmen statt sich zu Ã¼berlappen
 - Anhang-Schnellzugriff-Buttons umbrechen jetzt bei wenig Platz
 
 ## [1.8.3] - 2026-06-13
 ### Neu
-- Schnellzugriff-Leiste für Anhänge (Cloud-Link, Foto aufnehmen, Hochladen) direkt auf der Projektzeit-Hauptseite (Start- und laufende Timer-Karte) und im "Projektzeit nachtragen"-Dialog
-### Geändert
-- Wird ein Anhang hinzugefügt, bevor der Zeiteintrag gespeichert wurde, wird die Aufgabe automatisch validiert und gespeichert
+- Schnellzugriff-Leiste fÃ¼r AnhÃ¤nge (Cloud-Link, Foto aufnehmen, Hochladen) direkt auf der Projektzeit-Hauptseite (Start- und laufende Timer-Karte) und im "Projektzeit nachtragen"-Dialog
+### GeÃ¤ndert
+- Wird ein Anhang hinzugefÃ¼gt, bevor der Zeiteintrag gespeichert wurde, wird die Aufgabe automatisch validiert und gespeichert
 
 ## [1.8.1] - 2026-06-12
 ### Neu
-- Zeiterfassung-Anhänge: Neuer Button „Foto aufnehmen" öffnet direkt die Kamera des Geräts (iPhone/Android/Tablet)
-- Bestehender Drag & Drop-Upload-Bereich bleibt für lokale Dateien erhalten
+- Zeiterfassung-AnhÃ¤nge: Neuer Button â€žFoto aufnehmen" Ã¶ffnet direkt die Kamera des GerÃ¤ts (iPhone/Android/Tablet)
+- Bestehender Drag & Drop-Upload-Bereich bleibt fÃ¼r lokale Dateien erhalten
 
 ## [1.8.0] - 2026-06-08
 ### Neu
-- OneDrive-Integration mit Microsoft Graph API (persönliche Konten & SharePoint)
+- OneDrive-Integration mit Microsoft Graph API (persÃ¶nliche Konten & SharePoint)
 
 ## [1.7.8] - 2026-06-08
 ### Neu
 - OneDrive-Integration: Microsoft OneDrive & SharePoint als Cloudspeicher-Option
-- Graph-Anmeldedaten aus E-Mail-Einstellungen können für OneDrive wiederverwendet werden
-- Persönliches OneDrive und SharePoint-Laufwerk konfigurierbar (inkl. Site-ID)
+- Graph-Anmeldedaten aus E-Mail-Einstellungen kÃ¶nnen fÃ¼r OneDrive wiederverwendet werden
+- PersÃ¶nliches OneDrive und SharePoint-Laufwerk konfigurierbar (inkl. Site-ID)
 
-## [1.7.7] – 2026-06-08 – Cloudspeicher-Integration abgeschlossen
+## [1.7.7] â€“ 2026-06-08 â€“ Cloudspeicher-Integration abgeschlossen
 
 ### Neu
-- Cloudspeicher: Nextcloud, SeaDrive und MinIO als Storage-Provider wählbar
+- Cloudspeicher: Nextcloud, SeaDrive und MinIO als Storage-Provider wÃ¤hlbar
 - Speicher-Tab in Einstellungen (Provider-Auswahl, WebDAV-URL, Verbindungstest)
 - MSG-Datei (.msg Outlook) Vorschau im Datacenter
 
 ### Fixes
-- Upload-Fortschrittsanzeige (ProgressEvent → korrekter Prozentwert)
-- WebDAV-Upload: db=db an storage_service übergeben (Provider aus DB gelesen)
+- Upload-Fortschrittsanzeige (ProgressEvent â†’ korrekter Prozentwert)
+- WebDAV-Upload: db=db an storage_service Ã¼bergeben (Provider aus DB gelesen)
 - storage_backend wird korrekt als Providername (nextcloud/seadrive/minio) gespeichert
-- requests-Bibliothek in requirements.txt ergänzt
+- requests-Bibliothek in requirements.txt ergÃ¤nzt
 
 ---
 
-## [1.11.2] – 2026-06-16 – Kontextmenü-Positionierung optimiert
-
-### Aktualisierungen
-- Kontextmenü wird jetzt nach oben geöffnet, wenn unten nicht genug Platz vorhanden ist
-
----
-
-## [1.11.0] – 2026-06-16 – Office 365 E-Mail Integration
+## [1.11.0] â€“ 2026-06-16 â€“ Office 365 E-Mail Integration
 
 ### Neu
-- Office 365 E-Mail-Anbindung über Microsoft Graph API
+- Office 365 E-Mail-Anbindung Ã¼ber Microsoft Graph API
 
 ---
 
-## [1.10.4] – 2026-06-15 – Mobile-Responsiveness verbessert
+## [1.10.4] â€“ 2026-06-15 â€“ Mobile-Responsiveness verbessert
 
 ### Aktualisierungen
-- Mobile-Responsiveness für Belege, Beleg-Formular, Datacenter und Kontakte optimiert
+- Mobile-Responsiveness fÃ¼r Belege, Beleg-Formular, Datacenter und Kontakte optimiert
 - Synchronisierungsfehler bei mobilen Ansichten behoben
 
 ---
 
-## [1.10.3] – 2026-06-15 – Mobile-Optimierungen und Verbesserungen
+## [1.10.3] â€“ 2026-06-15 â€“ Mobile-Optimierungen und Verbesserungen
 
 ### Aktualisierungen
-- Berichts-Dialog für mobile Geräte optimiert
-- Anhänge-Handling verbessert
+- Berichts-Dialog fÃ¼r mobile GerÃ¤te optimiert
+- AnhÃ¤nge-Handling verbessert
 
 ---
 
-## [1.10.2] – 2026-06-13 – Merge-Konflikte aufgelöst
+## [1.10.2] â€“ 2026-06-13 â€“ Merge-Konflikte aufgelÃ¶st
 
 ### Aktualisierungen
 - Merge-Konflikte behoben
 
 ---
 
-## [1.10.0] – 2026-06-13 – PWA-Unterstützung für DeineZeit
+## [1.10.0] â€“ 2026-06-13 â€“ PWA-UnterstÃ¼tzung fÃ¼r DeineZeit
 
 ### Neu
-- Progressive Web App (PWA) ermöglicht die Nutzung von DeineZeit als installierbare App
+- Progressive Web App (PWA) ermÃ¶glicht die Nutzung von DeineZeit als installierbare App
 
 ---
 
-## [1.8.5] – 2026-06-12 – Anhänge und Mobile-Optimierung
+## [1.8.5] â€“ 2026-06-12 â€“ AnhÃ¤nge und Mobile-Optimierung
 
 ### Neu
-- Schnellzugriff auf Anhänge hinzugefügt
-- Mobiles Layout für Projektzeit verbessert
+- Schnellzugriff auf AnhÃ¤nge hinzugefÃ¼gt
+- Mobiles Layout fÃ¼r Projektzeit verbessert
 
 ---
 
-## [1.8.2] – 2026-06-11 – Behobene Dateien und Dokumentation
+## [1.8.2] â€“ 2026-06-11 â€“ Behobene Dateien und Dokumentation
 
 ### Aktualisierungen
-- AttachmentExplorer.jsx vollständig repariert
-- CHANGELOG.md vollständig repariert
+- AttachmentExplorer.jsx vollstÃ¤ndig repariert
+- CHANGELOG.md vollstÃ¤ndig repariert
 
 ---
 
-## [1.8.2] – 2026-06-11 – Changelog-Reparatur
+## [1.8.2] â€“ 2026-06-11 â€“ Changelog-Reparatur
 
 ### Aktualisierungen
-- Changelog-Datei vollständig repariert und wiederhergestellt
+- Changelog-Datei vollstÃ¤ndig repariert und wiederhergestellt
 
 ---
 
-## [1.8.2] – 2026-06-11 – Foto-Upload für Zeiterfassung
+## [1.8.2] â€“ 2026-06-11 â€“ Foto-Upload fÃ¼r Zeiterfassung
 
 ### Neu
-- Fotos direkt per Kamera bei Zeiterfassung-Anhängen aufnehmen
+- Fotos direkt per Kamera bei Zeiterfassung-AnhÃ¤ngen aufnehmen
 
 ---
 
-## [1.8.0] – 2026-06-08 – OneDrive-Integration
+## [1.8.0] â€“ 2026-06-08 â€“ OneDrive-Integration
 
 ### Neu
 - OneDrive-Integration mit Microsoft Graph API
-- Unterstützung für persönliche OneDrive-Konten
-- Unterstützung für SharePoint-Dateien
+- UnterstÃ¼tzung fÃ¼r persÃ¶nliche OneDrive-Konten
+- UnterstÃ¼tzung fÃ¼r SharePoint-Dateien
 
 ---
 
 
-## [1.7.5] – 2026-06-08 – Cloudspeicher-Integration
+## [1.7.5] â€“ 2026-06-08 â€“ Cloudspeicher-Integration
 
 ### Neu
 - Cloudspeicher-Integration: Nextcloud und SeaDrive als Alternative zu MinIO
 - WebDAV-Provider (storage_service.py) mit automatischer Ordnererstellung via MKCOL
 - Speicher-Tab in den Einstellungen (Provider-Auswahl, WebDAV-Felder, Verbindungstest)
 - Backend-Endpunkte: POST /settings/storage/test + POST /settings/storage/apply
-- TTL-Cache (30 s) für Storage-Provider mit invalidate_provider_cache()
-- extract-msg==0.55.0 für MSG-Outlook-Datei-Vorschau
+- TTL-Cache (30 s) fÃ¼r Storage-Provider mit invalidate_provider_cache()
+- extract-msg==0.55.0 fÃ¼r MSG-Outlook-Datei-Vorschau
 
 ---
 
-## [1.7.6] – 2026-06-08 – WebDAV-Upload Fehlerbehebung
+## [1.7.6] â€“ 2026-06-08 â€“ WebDAV-Upload Fehlerbehebung
 
 ### Aktualisierungen
 - WebDAV-Upload funktioniert wieder korrekt nach Datenbankverbindungs-Fix
 
 ---
 
-## [1.7.6] – 2026-06-08 – Upload-Fortschritt Optimierung
+## [1.7.6] â€“ 2026-06-08 â€“ Upload-Fortschritt Optimierung
 
 ### Aktualisierungen
 - Upload-Fortschritt wird nun korrekt aus ProgressEvent berechnet (Fehler in bestimmten Browsern behoben)
 
 ---
 
-## [1.7.6] – 2026-06-08 – Speicher-Backend Optimierung
+## [1.7.6] â€“ 2026-06-08 â€“ Speicher-Backend Optimierung
 
 ### Aktualisierungen
 - Storage-Backend speichert Providernamen direkt (Nextcloud/Seadrive/Minio)
 
 ---
 
-## [1.7.6] – 2026-06-08 – WebDAV-Speicherunterstützung hinzugefügt
+## [1.7.6] â€“ 2026-06-08 â€“ WebDAV-SpeicherunterstÃ¼tzung hinzugefÃ¼gt
 
 ### Aktualisierungen
 - WebDAV-Felder in den Einstellungen integriert
 
 ---
 
-## [1.7.6] – 2026-06-08 – WebDAV-Integration stabilisiert
+## [1.7.6] â€“ 2026-06-08 â€“ WebDAV-Integration stabilisiert
 
 ### Aktualisierungen
 - requests-Bibliothek in WebDAV-Provider integriert
 
 ---
 
-## [1.8.0] – 2026-06-08 – Cloudspeicher-Integration und Stabilität
+## [1.8.0] â€“ 2026-06-08 â€“ Cloudspeicher-Integration und StabilitÃ¤t
 
 ### Neu
-- Cloudspeicher-Integration für Nextcloud, SeaDrive und WebDAV
+- Cloudspeicher-Integration fÃ¼r Nextcloud, SeaDrive und WebDAV
 - Neuer Speicher-Tab in den Einstellungen
 
 ### Aktualisierungen
@@ -232,39 +230,39 @@
 
 ---
 
-## [1.7.4] – 2026-06-08 – Stabilität und Wiederherstellung
+## [1.7.4] â€“ 2026-06-08 â€“ StabilitÃ¤t und Wiederherstellung
 
 ### Aktualisierungen
 - API und Datacenter-Seite wiederhergestellt
 
 ---
 
-## [1.7.4] – 2026-06-08 – Datacenter-Seite neu aufgebaut
+## [1.7.4] â€“ 2026-06-08 â€“ Datacenter-Seite neu aufgebaut
 
 ### Aktualisierungen
-- DatacenterPage vollständig rekonstruiert mit verbesserter Stabilität
-- EML/MSG-Datei-Vorschau hinzugefügt
+- DatacenterPage vollstÃ¤ndig rekonstruiert mit verbesserter StabilitÃ¤t
+- EML/MSG-Datei-Vorschau hinzugefÃ¼gt
 
 ---
 
-## [1.7.4] – 2026-06-08 – MSG-Vorschau und EML-Optimierung
+## [1.7.4] â€“ 2026-06-08 â€“ MSG-Vorschau und EML-Optimierung
 
 ### Neu
-- MSG-Vorschau im Datacenter hinzugefügt
+- MSG-Vorschau im Datacenter hinzugefÃ¼gt
 
 ### Aktualisierungen
 - EML-Verarbeitung bei application/octet-stream-Dateien korrigiert
 
 ---
 
-## [1.7.4] – 2026-06-08 – E-Mail-Vorschau verbessert
+## [1.7.4] â€“ 2026-06-08 â€“ E-Mail-Vorschau verbessert
 
 ### Aktualisierungen
 - E-Mail-Vorschau funktioniert nun auch bei application/octet-stream Dateitypen.
 
 ---
 
-## [1.7.4] – 2026-06-08 – UTF-8 Encoding Verbesserungen
+## [1.7.4] â€“ 2026-06-08 â€“ UTF-8 Encoding Verbesserungen
 
 ### Aktualisierungen
 - UTF-8 Encoding in bump-version.ps1 korrigiert
@@ -272,11 +270,11 @@
 
 ---
 
-## [1.7.4] – 2026-06-08 – Dokumentation und Datacenter-Updates
+## [1.7.4] â€“ 2026-06-08 â€“ Dokumentation und Datacenter-Updates
 
 ---
 
-## [1.7.4] – 2026-06-08 – Datacenter-Vorschau optimiert
+## [1.7.4] â€“ 2026-06-08 â€“ Datacenter-Vorschau optimiert
 
 ### Neu
 - Datacenter: EML-Vorschau direkt im Browser (E-Mail-Dateien)
@@ -286,14 +284,14 @@
 
 ---
 
-## [1.7.2] - 2026-06-07 - Versionsprüfung robuster + nginx Healthcheck
+## [1.7.2] - 2026-06-07 - VersionsprÃ¼fung robuster + nginx Healthcheck
 
 ### Aktualisierungen
-- Versionsprüfung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
-- SettingsPage: zeigt Warnung wenn GitHub-Prüfung fehlschlägt
+- VersionsprÃ¼fung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar
+- SettingsPage: zeigt Warnung wenn GitHub-PrÃ¼fung fehlschlÃ¤gt
 - nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start
-- nginx IP-Auflösung: Container-IPs dynamisch alle 10s neu aufgelöst
-- docker-compose.yml: certbot_conf Volume und Networks ergänzt
+- nginx IP-AuflÃ¶sung: Container-IPs dynamisch alle 10s neu aufgelÃ¶st
+- docker-compose.yml: certbot_conf Volume und Networks ergÃ¤nzt
 
 ---
 
@@ -301,8 +299,8 @@
 
 ### Neu
 - Datacenter: Freigaben-Ansicht zeigt alle aktiven Share-Links
-- Freigaben verlängerbar ohne Token-Änderung (1/7/30/90 Tage oder unbegrenzt)
-- Freigaben einzeln widerrufbar direkt aus der Übersicht
+- Freigaben verlÃ¤ngerbar ohne Token-Ã„nderung (1/7/30/90 Tage oder unbegrenzt)
+- Freigaben einzeln widerrufbar direkt aus der Ãœbersicht
 
 ### Fixes
 - Share-Link Route-Reihenfolge fix (war: "Not authenticated" im privaten Browserfenster)
@@ -323,56 +321,56 @@
 
 ---
 
-## [1.7.1] – 2026-06-07 – Share-Link Route-Optimierung
+## [1.7.1] â€“ 2026-06-07 â€“ Share-Link Route-Optimierung
 
 ### Aktualisierungen
 - Share-Link Route wurde vor der generischen Entity-Route verschoben, um Routing-Konflikte zu beheben.
 
 ---
-hangelog – DeineZeit
+hangelog â€“ DeineZeit
 
-Alle Änderungen werden hier dokumentiert.
-Format: [Version] – Datum – Was hat sich geändert
+Alle Ã„nderungen werden hier dokumentiert.
+Format: [Version] â€“ Datum â€“ Was hat sich geÃ¤ndert
 
 ---
 
-## [1.6.8] – 2026-06-07 – Versionsanzeige-Korrektur
+## [1.6.8] â€“ 2026-06-07 â€“ Versionsanzeige-Korrektur
 
 ### Aktualisierungen
 - Versionsanzeige zeigt korrekt die installierte Version an, auch wenn der GitHub-Cache veraltet ist
 
 ---
 
-## [1.6.7] – 2026-06-06 – Stabilität und Mail-Verwaltung
+## [1.6.7] â€“ 2026-06-06 â€“ StabilitÃ¤t und Mail-Verwaltung
 
 ### Aktualisierungen
 - Mail-Icon in Rechnungsstatus bleibt nach Seitenwechsel erhalten
-- API und Abhängigkeiten wiederhergestellt, CC-Feld hinzugefügt
+- API und AbhÃ¤ngigkeiten wiederhergestellt, CC-Feld hinzugefÃ¼gt
 
 ---
 
-## [1.6.6] – 2026-06-06 – E-Mail-Kommunikation erweitert
+## [1.6.6] â€“ 2026-06-06 â€“ E-Mail-Kommunikation erweitert
 
 ### Neu
-- E-Mail-Dialog mit Kontaktinfo, Empfänger-Mail und CC-Feld hinzugefügt
+- E-Mail-Dialog mit Kontaktinfo, EmpfÃ¤nger-Mail und CC-Feld hinzugefÃ¼gt
 
 ---
 
-## [1.6.5] – 2026-06-06 – Kontaktname in Belegliste korrigiert
+## [1.6.5] â€“ 2026-06-06 â€“ Kontaktname in Belegliste korrigiert
 
 ### Aktualisierungen
 - Kontaktnamen werden in der Belegliste nun korrekt angezeigt
 
 ---
 
-## [1.6.4] – 2026-06-06 – Kontaktsuche Bugfix
+## [1.6.4] â€“ 2026-06-06 â€“ Kontaktsuche Bugfix
 
 ### Aktualisierungen
 - ContactSearch zeigt Kontaktnamen nach asynchronem Laden korrekt an
 
 ---
 
-## [1.6.3] – 2026-06-06 – Kontaktanzeige in Belegen
+## [1.6.3] â€“ 2026-06-06 â€“ Kontaktanzeige in Belegen
 
 ### Aktualisierungen
 - Kontakt wird nun in der Belegliste angezeigt
@@ -380,41 +378,41 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## [1.6.2] – 2026-06-06 – DatacenterPicker API-Kompatibilität
+## [1.6.2] â€“ 2026-06-06 â€“ DatacenterPicker API-KompatibilitÃ¤t
 
 ### Aktualisierungen
-- DatacenterPicker verarbeitet API-Antworten korrekt, wenn Anhänge als leeres Objekt statt Array zurückgegeben werden
+- DatacenterPicker verarbeitet API-Antworten korrekt, wenn AnhÃ¤nge als leeres Objekt statt Array zurÃ¼ckgegeben werden
 
 ---
 
-## [1.6.1] – 2026-06-06 – Anhänge-Feature korrigiert
+## [1.6.1] â€“ 2026-06-06 â€“ AnhÃ¤nge-Feature korrigiert
 
 ### Aktualisierungen
-- InvoicePage: Anhänge-Feature korrekt integriert ohne Duplikate
+- InvoicePage: AnhÃ¤nge-Feature korrekt integriert ohne Duplikate
 
 ---
 
-## [1.9.0] – 2026-06-07 – E-Mail-Vorlagen System
+## [1.9.0] â€“ 2026-06-07 â€“ E-Mail-Vorlagen System
 
 ### Neu
 - E-Mail-Vorlagen pro Belegart (Rechnung, Angebot, AB, Gutschrift, Lieferschein)
-- Neuer Tab „E-Mail-Vorlagen" in Einstellungen mit Rich-Text-Editor (TipTap)
+- Neuer Tab â€žE-Mail-Vorlagen" in Einstellungen mit Rich-Text-Editor (TipTap)
 - Platzhalter: {nummer}, {kontakt}, {firma}, {betrag}, {datum}, {faellig}, {belegart}
 - Versand-Dialog: Betreff und E-Mail-Text vor dem Senden editierbar
-- Betreff und Body werden aus der Vorlage vorausgefüllt
+- Betreff und Body werden aus der Vorlage vorausgefÃ¼llt
 
 ---
 
-## [1.8.0] – 2026-06-07 – E-Mail-Dialog: Kontaktinfo & CC-Empfänger
+## [1.8.0] â€“ 2026-06-07 â€“ E-Mail-Dialog: Kontaktinfo & CC-EmpfÃ¤nger
 
 ### Neu
-- E-Mail-Versand-Dialog zeigt Kontaktname und Empfänger-E-Mail an
+- E-Mail-Versand-Dialog zeigt Kontaktname und EmpfÃ¤nger-E-Mail an
 - CC-Adresse kann optional eingetragen werden
-- Backend: CC-Unterstützung für SMTP und Microsoft Graph API
+- Backend: CC-UnterstÃ¼tzung fÃ¼r SMTP und Microsoft Graph API
 
 ---
 
-## [1.7.0] – 2026-06-06 – Kontakt in Belegliste & Formular
+## [1.7.0] â€“ 2026-06-06 â€“ Kontakt in Belegliste & Formular
 
 ### Neu
 - Belegliste: Spalte "Titel / Kontakt" in zwei getrennte Spalten "Titel" und "Kontakt" aufgeteilt
@@ -423,92 +421,92 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## [1.6.0] – 2026-06-06 – E-Mail-Anhänge & Datacenter-Browser
+## [1.6.0] â€“ 2026-06-06 â€“ E-Mail-AnhÃ¤nge & Datacenter-Browser
 
 ### Neu
-- Anhänge beim E-Mail-Versand hinzufügen
-- Datacenter-Browser für Dateiauswahl nutzen
-- Lokale Dateien als E-Mail-Anhänge hochladen
+- AnhÃ¤nge beim E-Mail-Versand hinzufÃ¼gen
+- Datacenter-Browser fÃ¼r Dateiauswahl nutzen
+- Lokale Dateien als E-Mail-AnhÃ¤nge hochladen
 
 ---
 
-## [1.5.0] – 2026-06-06 – Mail-Icons (grün/orange) nach Versand + Status immer auf gesendet setzen
+## [1.5.0] â€“ 2026-06-06 â€“ Mail-Icons (grÃ¼n/orange) nach Versand + Status immer auf gesendet setzen
 
 ### Neu
-- Mail-Icons (grün/orange) nach Versand + Status immer auf gesendet setzen
+- Mail-Icons (grÃ¼n/orange) nach Versand + Status immer auf gesendet setzen
 
 ---
 
-## [1.4.5] – 2026-06-06 – E-Mail-Versand und Abrechnung
+## [1.4.5] â€“ 2026-06-06 â€“ E-Mail-Versand und Abrechnung
 
 ### Aktualisierungen
 - PDF-Kontext korrekt geladen
-- Unbilled Time Entries vollständig implementiert
+- Unbilled Time Entries vollstÃ¤ndig implementiert
 - E-Mail-Versand repariert
 
 ---
 
-## [1.4.4] – 2026-06-06 – E-Mail-Fehlerbehandlung verbessert
+## [1.4.4] â€“ 2026-06-06 â€“ E-Mail-Fehlerbehandlung verbessert
 
 ### Aktualisierungen
 - Fehlermeldungen beim E-Mail-Versand werden nun dauerhaft im Dialog angezeigt.
 
 ---
 
-## [1.4.3] – 2026-06-06 – E-Mail-Versand repariert
+## [1.4.3] â€“ 2026-06-06 â€“ E-Mail-Versand repariert
 
 ### Aktualisierungen
 - E-Mail-Versand und Rechnungsgenerierung wiederhergestellt
 
 ---
 
-## [1.4.2] – 2026-06-06 – Nginx-Stabilität und Docker-Verbesserungen
+## [1.4.2] â€“ 2026-06-06 â€“ Nginx-StabilitÃ¤t und Docker-Verbesserungen
 
 ### Aktualisierungen
-- Healthcheck und dynamische DNS-Auflösung für Nginx optimiert
-- Docker-Compose-Konfiguration vervollständigt
+- Healthcheck und dynamische DNS-AuflÃ¶sung fÃ¼r Nginx optimiert
+- Docker-Compose-Konfiguration vervollstÃ¤ndigt
 
 ---
 
-## [1.4.1] – 2026-06-06 – nginx Healthcheck-Fix
+## [1.4.1] â€“ 2026-06-06 â€“ nginx Healthcheck-Fix
 
 ### Behoben
 - nginx wartet beim Start auf Backend-Healthcheck (`/api/health`) bevor es Anfragen weiterleitet
-- nginx löst Container-IPs dynamisch alle 10 Sekunden neu auf (Docker DNS-Resolver `127.0.0.11`) — kein manueller Neustart nach Backend-Recreate nötig
-- docker-compose.yml: fehlende Named Volumes (`certbot_conf`) und Networks-Sektion ergänzt
+- nginx lÃ¶st Container-IPs dynamisch alle 10 Sekunden neu auf (Docker DNS-Resolver `127.0.0.11`) â€” kein manueller Neustart nach Backend-Recreate nÃ¶tig
+- docker-compose.yml: fehlende Named Volumes (`certbot_conf`) und Networks-Sektion ergÃ¤nzt
 
 ---
 
-## [1.4.0] – 2026-06-06 – E-Mail-Integration und Stabilität
+## [1.4.0] â€“ 2026-06-06 â€“ E-Mail-Integration und StabilitÃ¤t
 
 ### Neu
 - Office 365 E-Mail-Integration via Microsoft Graph API
 
 ### Aktualisierungen
-- Weißer Bildschirm im Changelog-Panel der Anmeldeseite behoben
+- WeiÃŸer Bildschirm im Changelog-Panel der Anmeldeseite behoben
 - Update-Watchdog und HTTPS Health-Check optimiert
 - Belegbuch-Endpoints implementiert (Listenansicht, CSV- und PDF-Export)
-- Backup-Watcher mit Administratorrechten ausgeführt
-- Quellcode-Verwaltung für zuverlässige Docker-basierte Updates verbessert
+- Backup-Watcher mit Administratorrechten ausgefÃ¼hrt
+- Quellcode-Verwaltung fÃ¼r zuverlÃ¤ssige Docker-basierte Updates verbessert
 
 ---
 
-## [1.3.13] – 2026-06-06 – Update-Mechanismus Test
+## [1.3.13] â€“ 2026-06-06 â€“ Update-Mechanismus Test
 
 ### Neu
 - Update-Mechanismus End-to-End erfolgreich getestet
 
 ---
 
-## [1.3.12] – 2026-06-06 – Weißer Bildschirm nach Update behoben
+## [1.3.12] â€“ 2026-06-06 â€“ WeiÃŸer Bildschirm nach Update behoben
 
 ### Behoben
-- Absturz auf der Anmeldeseite wenn ein Changelog-Eintrag weder "features" noch "updates" enthält (optional chaining)
+- Absturz auf der Anmeldeseite wenn ein Changelog-Eintrag weder "features" noch "updates" enthÃ¤lt (optional chaining)
 - changelog.js v1.3.11: "changes" in "updates" umbenannt damit Eintrag im Updates-Tab erscheint
 
 ---
 
-## [1.3.11] – 2026-06-06 – Update-Prozess Stabilitätsverbesserungen
+## [1.3.11] â€“ 2026-06-06 â€“ Update-Prozess StabilitÃ¤tsverbesserungen
 
 ### Behoben
 - Update-Status bleibt nicht mehr dauerhaft auf "updating" wenn kein neuer Commit vorhanden (Watchdog nach 5 Min)
@@ -518,86 +516,86 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## [1.3.10] – 2026-06-05 – Lokale Instanzerkennung und Stabilitätsverbesserungen
+## [1.3.10] â€“ 2026-06-05 â€“ Lokale Instanzerkennung und StabilitÃ¤tsverbesserungen
 
 ### Neu
 - Lokale Instanzerkennung implementiert
 
 ### Aktualisierungen
 - Update-Tab zeigt git pull Anleitung statt Button
-- Changelog-Konflikte gelöst
-- Changelog mit fehlenden Versionen 1.2.1–1.3.8 synchronisiert
+- Changelog-Konflikte gelÃ¶st
+- Changelog mit fehlenden Versionen 1.2.1â€“1.3.8 synchronisiert
 
 ---
 
-## [1.3.9] – 2026-06-05 – Lokale Instanz erkennung
+## [1.3.9] â€“ 2026-06-05 â€“ Lokale Instanz erkennung
 
 ### Aktualisierungen
-- Lokale Entwicklungsinstanz wird automatisch erkannt — Update-Button zeigt stattdessen Anleitung für git pull
+- Lokale Entwicklungsinstanz wird automatisch erkannt â€” Update-Button zeigt stattdessen Anleitung fÃ¼r git pull
 - Backend blockiert Update-Start in lokalem Modus mit klarer Fehlermeldung
 
 ---
 
-## [1.3.8] – 2026-06-05 – Frontend-Integration
+## [1.3.8] â€“ 2026-06-05 â€“ Frontend-Integration
 
 ### Aktualisierungen
 - Gesamtes Frontend in Versionskontrolle integriert
 
 ---
 
-## [1.3.7] – 2026-06-05 – Backend-Infrastruktur aktualisiert
+## [1.3.7] â€“ 2026-06-05 â€“ Backend-Infrastruktur aktualisiert
 
 ### Aktualisierungen
 - Backend-App-Verzeichnis in Versionskontrolle integriert
 
 ---
 
-## [1.3.6] – 2026-06-05 – Konfigurationsstabilität verbessert
+## [1.3.6] â€“ 2026-06-05 â€“ KonfigurationsstabilitÃ¤t verbessert
 
 ### Aktualisierungen
 - ConfigParser-Interpolation in alembic.ini entfernt
 
 ---
 
-## [1.3.5] – 2026-06-05 – Datenbankmigrationen hinzugefügt
+## [1.3.5] â€“ 2026-06-05 â€“ Datenbankmigrationen hinzugefÃ¼gt
 
 ### Aktualisierungen
-- Alembic-Migrationen zur Versionskontrolle hinzugefügt
+- Alembic-Migrationen zur Versionskontrolle hinzugefÃ¼gt
 
 ---
 
-## [1.3.4] – 2026-06-05 – Backend-Infrastruktur erweitert
+## [1.3.4] â€“ 2026-06-05 â€“ Backend-Infrastruktur erweitert
 
 ### Aktualisierungen
-- Backend-Grunddateien für Docker-Containerisierung hinzugefügt
+- Backend-Grunddateien fÃ¼r Docker-Containerisierung hinzugefÃ¼gt
 
 ---
 
-## [1.3.3] – 2026-06-05 – Docker-Compose Integration
+## [1.3.3] â€“ 2026-06-05 â€“ Docker-Compose Integration
 
 ### Aktualisierungen
-- Docker-Compose Dateien zum Repository hinzugefügt
+- Docker-Compose Dateien zum Repository hinzugefÃ¼gt
 
 ---
 
-## [1.3.2] – 2026-06-05 – Versions-Anzeige korrigiert
+## [1.3.2] â€“ 2026-06-05 â€“ Versions-Anzeige korrigiert
 
 ### Aktualisierungen
 - Versions-Anzeige liest nun aus CHANGELOG.md statt aus package.json oder config.py
 
 ---
 
-## [1.3.1] – 2026-06-05 – Rechnungs-Widget Darstellung optimiert
+## [1.3.1] â€“ 2026-06-05 â€“ Rechnungs-Widget Darstellung optimiert
 
 ### Aktualisierungen
 - Rechnungs-Widget wird nun auch bei bestehender Dashboard-Konfiguration korrekt angezeigt.
 
 ---
 
-## [1.3.0] – 2026-06-05 – Dashboard und Einstellungen überarbeitet
+## [1.3.0] â€“ 2026-06-05 â€“ Dashboard und Einstellungen Ã¼berarbeitet
 
 ### Neu
-- Rechnungs-Widget im Dashboard hinzugefügt
+- Rechnungs-Widget im Dashboard hinzugefÃ¼gt
 - Automatischer Versions-Bump via GitHub Actions
 - E-Mail als Unter-Tab unter System verschoben
 - Backup als Unter-Tab unter System integriert
@@ -612,102 +610,102 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## [1.2.1] – 2026-06-05 – Dashboard: Rechnungs-Widget
+## [1.2.1] â€“ 2026-06-05 â€“ Dashboard: Rechnungs-Widget
 
 ### Neu
-- Dashboard-Widget „Rechnungen": zeigt offene, überfällige und diesen Monat bezahlte Rechnungen mit Anzahl und Brutto-Summe
-- Widget ist standardmäßig im Dashboard enthalten, verschiebbar und in der Größe anpassbar
+- Dashboard-Widget â€žRechnungen": zeigt offene, Ã¼berfÃ¤llige und diesen Monat bezahlte Rechnungen mit Anzahl und Brutto-Summe
+- Widget ist standardmÃ¤ÃŸig im Dashboard enthalten, verschiebbar und in der GrÃ¶ÃŸe anpassbar
 
 ---
 
-## [1.2.0] – 2026-06-05 – Auftragsbestätigung & Rechnungsmodul-Erweiterungen
+## [1.2.0] â€“ 2026-06-05 â€“ AuftragsbestÃ¤tigung & Rechnungsmodul-Erweiterungen
 
 ### Neu
-- Auftragsbestätigung (AB) als neuer Dokumenttyp mit eigenem Nummernkreis (AB-2026-001, …)
-- E-Mail-Versand direkt aus dem Rechnungsmodul — einzeln oder als Bulk-Versand für mehrere Belege
-- Statusworkflow mit kontextabhängigem Aktionsmenü: Entwurf → Offen → Bezahlt, Angenommen / Abgelehnt, Storniert
-- Angebote können nach Annahme direkt in eine Auftragsbestätigung oder Rechnung umgewandelt werden
+- AuftragsbestÃ¤tigung (AB) als neuer Dokumenttyp mit eigenem Nummernkreis (AB-2026-001, â€¦)
+- E-Mail-Versand direkt aus dem Rechnungsmodul â€” einzeln oder als Bulk-Versand fÃ¼r mehrere Belege
+- Statusworkflow mit kontextabhÃ¤ngigem AktionsmenÃ¼: Entwurf â†’ Offen â†’ Bezahlt, Angenommen / Abgelehnt, Storniert
+- Angebote kÃ¶nnen nach Annahme direkt in eine AuftragsbestÃ¤tigung oder Rechnung umgewandelt werden
 
 ### Aktualisierungen
-- Parameter-Tab in den Einstellungen: Präfixe und Nummernformate pro Dokumenttyp frei konfigurierbar
-- Dokumenttyp-Bezeichnungen können umbenannt werden
+- Parameter-Tab in den Einstellungen: PrÃ¤fixe und Nummernformate pro Dokumenttyp frei konfigurierbar
+- Dokumenttyp-Bezeichnungen kÃ¶nnen umbenannt werden
 
 ---
 
-## [1.1.0] – 2026-06-04 – Buchhaltungsmodul
+## [1.1.0] â€“ 2026-06-04 â€“ Buchhaltungsmodul
 
 ### Neu
-- Kontenplan nach EKR (Einheitskontenrahmen) vorbefüllt und durchsuchbar
-- BMD-Export für die steuerliche Übergabe an den Steuerberater
+- Kontenplan nach EKR (Einheitskontenrahmen) vorbefÃ¼llt und durchsuchbar
+- BMD-Export fÃ¼r die steuerliche Ãœbergabe an den Steuerberater
 - Debitor- und Kreditornummern direkt bei Kontakten hinterlegbar
-- Erlöskonto pro Artikel festlegbar — wird automatisch auf Rechnungspositionen übernommen
-- Konto pro Rechnungsposition individuell überschreibbar
+- ErlÃ¶skonto pro Artikel festlegbar â€” wird automatisch auf Rechnungspositionen Ã¼bernommen
+- Konto pro Rechnungsposition individuell Ã¼berschreibbar
 - Kontakte: neuer Finanz-Tab mit IBAN, BIC und Bankname (Migration 0012/0013)
 
 ---
 
-## [1.0.0] – 2026-06-03 – Rechnungsmodul
+## [1.0.0] â€“ 2026-06-03 â€“ Rechnungsmodul
 
 ### Neu
 - Rechnungen, Angebote, Gutschriften und Lieferscheine erstellen
-- Automatische Nummerierung pro Dokumenttyp (RE-2026-001, AN-2026-001, …)
-- Stornierung mit automatischer Gutschrift oder nur Statusänderung
-- Angebote können direkt in Rechnungen umgewandelt werden
-- Zeiteinträge aus der Zeiterfassung direkt auf Rechnung übernehmen
+- Automatische Nummerierung pro Dokumenttyp (RE-2026-001, AN-2026-001, â€¦)
+- Stornierung mit automatischer Gutschrift oder nur StatusÃ¤nderung
+- Angebote kÃ¶nnen direkt in Rechnungen umgewandelt werden
+- ZeiteintrÃ¤ge aus der Zeiterfassung direkt auf Rechnung Ã¼bernehmen
 - Positionen aus Artikel-Stammdaten oder als Freitext
-- MwSt.: pro Position wählbar, ein Satz, oder Kleinunternehmerregelung
-- PDF-Export mit 5 wählbaren Vorlagen (Klassisch, Modern, Kompakt, Elegant, Farbenfroh)
-- Rechnungsbuch filterbar nach Monat/Quartal/Jahr und/oder Kunde — als PDF oder CSV
-- Zahlungsstatus: offen, bezahlt, überfällig, storniert
-- Wiederkehrende Rechnungsvorlagen (wöchentlich, monatlich, quartalsweise, jährlich)
+- MwSt.: pro Position wÃ¤hlbar, ein Satz, oder Kleinunternehmerregelung
+- PDF-Export mit 5 wÃ¤hlbaren Vorlagen (Klassisch, Modern, Kompakt, Elegant, Farbenfroh)
+- Rechnungsbuch filterbar nach Monat/Quartal/Jahr und/oder Kunde â€” als PDF oder CSV
+- Zahlungsstatus: offen, bezahlt, Ã¼berfÃ¤llig, storniert
+- Wiederkehrende Rechnungsvorlagen (wÃ¶chentlich, monatlich, quartalsweise, jÃ¤hrlich)
 - Bankverbindung aus den App-Einstellungen automatisch auf jedem Dokument
 
 ---
 
-## [0.9.5] – 2026-06-03 – Dashboard konfigurierbar
+## [0.9.5] â€“ 2026-06-03 â€“ Dashboard konfigurierbar
 
 ### Neu
 - Dashboard-Bausteine per Drag & Drop frei anordnen
-- Breite der Bausteine stufenweise anpassen (¼ / ½ / Vollbreite)
-- Layout wird im Browser gespeichert und beim nächsten Besuch wiederhergestellt
-- Neues Zeiterfassung-Widget auf dem Dashboard mit Heute/Woche/Monat-Übersicht
+- Breite der Bausteine stufenweise anpassen (Â¼ / Â½ / Vollbreite)
+- Layout wird im Browser gespeichert und beim nÃ¤chsten Besuch wiederhergestellt
+- Neues Zeiterfassung-Widget auf dem Dashboard mit Heute/Woche/Monat-Ãœbersicht
 
 ---
 
-## [0.9.4] – 2026-06-03 – Update-Prozess robuster
+## [0.9.4] â€“ 2026-06-03 â€“ Update-Prozess robuster
 
 ### Aktualisierungen
-- Backend führt Alembic-Migrationen jetzt automatisch beim Start aus — zukünftige Updates brauchen kein manuelles `alembic upgrade head` mehr
-- Migrations-Fehler beim Start verhindern nun das Hochkommen des Backends → Health-Check schlägt fehl → automatischer Rollback greift korrekt
+- Backend fÃ¼hrt Alembic-Migrationen jetzt automatisch beim Start aus â€” zukÃ¼nftige Updates brauchen kein manuelles `alembic upgrade head` mehr
+- Migrations-Fehler beim Start verhindern nun das Hochkommen des Backends â†’ Health-Check schlÃ¤gt fehl â†’ automatischer Rollback greift korrekt
 - Rollback im Update-Skript stellt jetzt auch die gesicherten Docker-Images wieder her, nicht nur den Git-Commit
 
 ---
 
-## [0.9.3] – 2026-06-02 – Stammdaten vereinheitlicht
+## [0.9.3] â€“ 2026-06-02 â€“ Stammdaten vereinheitlicht
 
 ### Aktualisierungen
-- Stammdaten-Typen vereinheitlicht: Kunden und Lieferanten zusammengeführt zu „Kontakte" mit Typ-Feld (Kunde / Lieferant / Interessent)
-- Neuer Stammdaten-Typ „Artikel" für Produkte und Dienstleistungen (Bezeichnung, Artikelnummer, Preis, Beschreibung)
-- Bestehende Kunden- und Lieferanten-Datensätze werden bei Migration automatisch nach Kontakte übernommen
+- Stammdaten-Typen vereinheitlicht: Kunden und Lieferanten zusammengefÃ¼hrt zu â€žKontakte" mit Typ-Feld (Kunde / Lieferant / Interessent)
+- Neuer Stammdaten-Typ â€žArtikel" fÃ¼r Produkte und Dienstleistungen (Bezeichnung, Artikelnummer, Preis, Beschreibung)
+- Bestehende Kunden- und Lieferanten-DatensÃ¤tze werden bei Migration automatisch nach Kontakte Ã¼bernommen
 - Alembic-Migration 0010 stellt einheitlichen Stand bei Neu- und Bestandsinstallationen sicher
 
 ---
 
-## [0.1.0] – 2026-05-21 – Grundfundament
+## [0.1.0] â€“ 2026-05-21 â€“ Grundfundament
 
 ### Neu
 - Projektstruktur mit Backend (Python/FastAPI), Frontend (React) und Datenbank (PostgreSQL)
-- Docker Compose Setup für einfaches Deployment
+- Docker Compose Setup fÃ¼r einfaches Deployment
 - Benutzerverwaltung mit Rollen (Admin / Mitarbeiter)
 - Sicheres Login-System:
-  - Passwort-Login mit verschlüsselter Speicherung
+  - Passwort-Login mit verschlÃ¼sselter Speicherung
   - Zwei-Faktor-Authentifizierung (TOTP / Google Authenticator)
   - Face ID / Fingerabdruck Login via WebAuthn/Passkeys
 - JWT-Token-basierte Authentifizierung mit automatischer Erneuerung
-- Mehrsprachigkeit: Deutsch und Englisch (sprachabhängig pro Benutzer)
-- Responsives Design (Mobile-First für Handy, Tablet und Desktop)
+- Mehrsprachigkeit: Deutsch und Englisch (sprachabhÃ¤ngig pro Benutzer)
+- Responsives Design (Mobile-First fÃ¼r Handy, Tablet und Desktop)
 - Datenbank-Migrationen via Alembic (sichere Schema-Updates)
-- nginx Reverse Proxy mit HTTPS / Let's Encrypt Unterstützung
+- nginx Reverse Proxy mit HTTPS / Let's Encrypt UnterstÃ¼tzung
 - Sicherheits-Header (HSTS, XSS-Schutz, Frame-Schutz)
 
 ### Technische Details
@@ -720,23 +718,23 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## [0.2.0] – 2026-05-21 – Dynamische Stammdaten-Verwaltung
+## [0.2.0] â€“ 2026-05-21 â€“ Dynamische Stammdaten-Verwaltung
 
 ### Neu
 - **Stammdaten-Typen**: Kunden, Lieferanten und Projekte vorinstalliert
-- **Beliebige neue Typen**: Jederzeit weitere anlegen (z.B. Mitarbeiter, Fahrzeuge, Verträge…)
-- **Dynamischer Formular-Builder**: Felder direkt in der Oberfläche hinzufügen, bearbeiten und entfernen — ohne Programmieraufwand
+- **Beliebige neue Typen**: Jederzeit weitere anlegen (z.B. Mitarbeiter, Fahrzeuge, VertrÃ¤geâ€¦)
+- **Dynamischer Formular-Builder**: Felder direkt in der OberflÃ¤che hinzufÃ¼gen, bearbeiten und entfernen â€” ohne Programmieraufwand
 - **9 Feldtypen**: Text, mehrzeiliger Text, Zahl, Datum, E-Mail, Telefon, Auswahlliste, Ja/Nein, Webseite
 - **Pflichtfelder** und **Listenansicht** pro Feld konfigurierbar
-- **Datensatz-Verwaltung**: Anlegen, bearbeiten und löschen mit automatisch generiertem Formular
-- **Suche**: Volltextsuche über alle Felder eines Stammdaten-Typs
-- **Paginierung**: Große Datenmengen werden seitenweise angezeigt
-- **Dashboard**: Schnellübersicht aller Stammdaten-Typen mit Eintrags-Zähler
-- **Datenbank**: JSONB-basierter Speicher mit GIN-Index für schnelle Suche
+- **Datensatz-Verwaltung**: Anlegen, bearbeiten und lÃ¶schen mit automatisch generiertem Formular
+- **Suche**: Volltextsuche Ã¼ber alle Felder eines Stammdaten-Typs
+- **Paginierung**: GroÃŸe Datenmengen werden seitenweise angezeigt
+- **Dashboard**: SchnellÃ¼bersicht aller Stammdaten-Typen mit Eintrags-ZÃ¤hler
+- **Datenbank**: JSONB-basierter Speicher mit GIN-Index fÃ¼r schnelle Suche
 
 ### Technische Details
 - Neue Datenbankmodelle: `entity_types`, `field_definitions`, `entity_records`
-- Migration 0002 mit vordefinierten Standard-Feldern für Kunden/Lieferanten/Projekte
+- Migration 0002 mit vordefinierten Standard-Feldern fÃ¼r Kunden/Lieferanten/Projekte
 - Neue API-Endpoints: `/api/masterdata/types/*` und `/api/masterdata/types/{slug}/records/*`
 - Neue Komponenten: `FieldBuilder`, `DynamicForm`, `MasterDataOverview`, `MasterDataDetail`
 
@@ -744,57 +742,9 @@ Format: [Version] – Datum – Was hat sich geändert
 
 ---
 
-## [0.3.0] – 2026-05-21 – Grid-Layout, Import/Export & Benutzerverwaltung
+## [0.3.0] â€“ 2026-05-21 â€“ Grid-Layout, Import/Export & Benutzerverwaltung
 
 ### Neu
-- **Snap-to-Grid Drag & Drop Layout-Builder**: Felder per Maus oder Touch-Geste frei verschieben — ein unsichtbares 12-Spalten-Raster sorgt dafür, dass alles sauber einrastet
-- **Feldbreite frei wählbar**: 25% / 33% / 50% / 75% / 100% — direkt per Klick am Feld einstellbar; mehrere Felder können nebeneinander in einer Zeile angezeigt werden
-- **Formular respektiert Layout**: Die Erfassungsmaske zeigt Felder exakt im definierten Raster-Layout — auf Desktop und Tablet; auf Mobilgeräten werden alle Felder automatisch auf volle Breite gestreckt
-- **CSV Export**: Alle Datensätze eines Stammdaten-Typs mit einem Klick als CSV exportieren (Excel-kompatibel mit BOM und Semikolon-Trennung)
-- **CSV Import**: CSV-Datei hochladen, Spalten per Dropdown den Feldern zuordnen, Vorschau prüfen, dann importieren
-- **Profilseite**: Jeder Benutzer kann Name, Sprache und Passwort selbst ändern sowie 2FA und Passkeys verwalten
-- **Benutzerverwaltung**: Admin-Seite zum Anlegen neuer Benutzer mit Rolle und Sprache, Deaktivierung bestehender Benutzer
-
-### Technische Details
-- Neue Spalte `col_span` in `field_definitions` (Migration 0003)
-- Neue Backend-Endpoints: `/fields-layout` (Bulk-Update), `/records/export/csv`, `/records/import/csv`
-- Neue npm-Pakete: `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`, `papaparse`
-- Neue Komponenten: `GridFieldBuilder`, `CsvImportExport`, `ProfilePage`, `UserManagementPage`
-
----
-
----
-
-## [0.4.0] – 2026-05-22 – Sicherheit & Design-Upgrade
-
-### Neu
-- **Farbschema zur Laufzeit änderbar**: Primärfarbe und Akzentfarbe über die Einstellungen wählbar — kein Neustart nötig
-- **Login-Seite neu gestaltet**: Modernes Design mit Markenbild
-- **Sidebar neu gestaltet**: Schlankere Navigation, bessere Lesbarkeit
-- **Dashboard neu gestaltet**: Übersichtlichere Kacheldarstellung
-- **Admin-Benutzerbearbeitung**: Admins können Benutzerdaten direkt bearbeiten
-- **Passwort vergessen Seite**: Eigene Seite mit Kontaktinformationen für Passwort-Reset
-- **Kontakte zusammengeführt**: Kunden und Lieferanten wurden zu einem gemeinsamen „Kontakte"-Typ zusammengeführt, Typ-Filter (Kunden / Lieferanten / Interessenten) in der Listenansicht
-- **Rate Limiting**: Login-Endpunkt ist gegen Brute-Force-Angriffe geschützt
-- **Sicherheits-Header**: HSTS, XSS-Schutz, Frame-Schutz, Content-Type-Sniffing-Schutz
-- **API-Docs gesperrt**: Swagger-UI nur noch im Debug-Modus erreichbar
-- **Upload-Limit**: Maximale Dateigröße für Uploads konfigurierbar
-
-### Technische Details
-- Migration 0004: Kontakte-Konsolidierung (Kunden + Lieferanten → Kontakte mit `typ`-Feld)
-- Neue npm-Pakete: `slowapi` (Rate Limiting)
-- Tailwind CSS auf CSS-Variablen umgestellt (`--color-primary-*`) für Laufzeit-Farbwechsel
-
----
-
-## [0.5.0] – 2026-05-22 – Zeiterfassung
-
-### Neu
-- **Zeiterfassung**: Timer starten/stoppen mit Projekt- und Aufgabenzuordnung
-- **Manuelle Einträge**: Zeiten nachträglich eintragen und bearbeiten
-- **Eigene Felder für Zeiteinträge**: Admin kann beliebige Zusatzfelder definieren (z.B. Ort, Fahrtzeit, Notiz)
-- **Projektzeitbericht als PDF**: Gefilterte Auswertung nach Zeitraum, Mitarbeiter, Projekt als druckfertiges PDF
-- **Bericht-Optionen**: Zeitrunden auf 15/30 Minuten, Filterung nach Aufgabe, verschiedene Zeitraum-Voreinstellungen
-
-### Technische Details
-- 
+- **Snap-to-Grid Drag & Drop Layout-Builder**: Felder per Maus oder Touch-Geste frei verschieben â€” ein unsichtbares 12-Spalten-Raster sorgt dafÃ¼r, dass alles sauber einrastet
+- **Feldbreite frei wÃ¤hlbar**: 25% / 33% / 50% / 75% / 100% â€” direkt per Klick am Feld einstellbar; mehrere Felder kÃ¶nnen nebeneinander in einer Zeile angezeigt werden
+- **Formular respektiert Layout**: Die Erfassungsmaske zeigt Felder exakt im

@@ -44,7 +44,7 @@ services:
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
       INSTALL_DIR: /opt/deinezeit
-      APP_VERSION: ${APP_VERSION:-1.11.2}
+      APP_VERSION: ${APP_VERSION:-1.11.3}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/deinezeit:/opt/deinezeit
@@ -95,13 +95,4 @@ services:
     command: /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'
 
 volumes:
-  postgres_data:
-  minio_data:
-  certbot_www:
-  certbot_conf:
-
-networks:
-  internal:
-    driver: bridge
-  external:
-    driver: bridge
+  

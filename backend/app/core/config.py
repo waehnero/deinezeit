@@ -5,7 +5,7 @@ from typing import List
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "DeineZeit"
-    APP_VERSION: str = "1.11.2"
+    APP_VERSION: str = "1.11.3"
     DEBUG: bool = False
 
     # Datenbank
@@ -22,11 +22,4 @@ class Settings(BaseSettings):
 
     # WebAuthn
     WEBAUTHN_RP_ID: str = "localhost"
-    WEBAUTHN_RP_NAME: str = "DeineZeit"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-
-
-settings = Settings()
+    WEBAUTHN_R
