@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.11.1] - 2026-06-17
+### Geändert
+- Graph API: Gesendete E-Mails werden jetzt im Outlook-Ordner „Gesendete Elemente" gespeichert
+
 ## [1.10.3] - 2026-06-15
 ### Geändert
 - Belege-Liste: Header-Buttons, Belegtypen-Tabs und Tabelle für Mobilgeräte optimiert (scrollbar, gestapelt, weniger Spalten)

@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.11.1',
+    day: '17',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Gesendete E-Mails erscheinen jetzt im Outlook-Ordner „Gesendete Elemente"',
+    ],
+  },
+  {
     version: '1.11.0',
     day: '16',
     month: 'Juni',
