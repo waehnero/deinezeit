@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.11.0',
+    day: '16',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Office 365 E-Mail-Anbindung über Microsoft Graph API',
+    ],
+    updates: [],
+  },
+  {
     version: '1.10.4',
     day: '15',
     month: 'Juni',

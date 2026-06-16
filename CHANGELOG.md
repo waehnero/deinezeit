@@ -76,6 +76,13 @@
 
 ---
 
+## [1.11.0] – 2026-06-16 – Office 365 E-Mail Integration
+
+### Neu
+- Office 365 E-Mail-Anbindung über Microsoft Graph API
+
+---
+
 ## [1.10.4] – 2026-06-15 – Mobile-Responsiveness verbessert
 
 ### Aktualisierungen
