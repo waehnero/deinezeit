@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.11.2',
+    day: '16',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Kontextmenü wird jetzt nach oben geöffnet, wenn unten nicht genug Platz vorhanden ist',
+    ],
+  },
+  {
     version: '1.11.1',
     day: '17',
     month: 'Juni',

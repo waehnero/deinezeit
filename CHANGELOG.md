@@ -80,6 +80,13 @@
 
 ---
 
+## [1.11.2] – 2026-06-16 – Kontextmenü-Positionierung optimiert
+
+### Aktualisierungen
+- Kontextmenü wird jetzt nach oben geöffnet, wenn unten nicht genug Platz vorhanden ist
+
+---
+
 ## [1.11.0] – 2026-06-16 – Office 365 E-Mail Integration
 
 ### Neu
