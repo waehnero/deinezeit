@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
 import RichTextEditor from '../components/RichTextEditor'
@@ -301,11 +301,21 @@ export default function InvoicePage() {
 }
 
 function ActionMenu({ invoice, onClose, onSetStatus, onConvertToAb, onConvertToInvoice, onSend, onCancel, onPaid, onDelete, onEdit }) {
+  const menuRef = useRef(null)
+  const [openUp, setOpenUp] = useState(false)
+
   useEffect(() => {
     const h = () => onClose()
     document.addEventListener('click', h)
     return () => document.removeEventListener('click', h)
   }, [onClose])
+
+  useLayoutEffect(() => {
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect()
+      if (rect.bottom > window.innerHeight - 8) setOpenUp(true)
+    }
+  }, [])
 
   const { status, doc_type } = invoice
   const isRe = doc_type === 'rechnung'
@@ -314,7 +324,7 @@ function ActionMenu({ invoice, onClose, onSetStatus, onConvertToAb, onConvertToI
   const isGs = doc_type === 'gutschrift'
 
   return (
-    <div className="absolute right-0 top-7 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 w-56" style={{zIndex: 9999}}>
+    <div ref={menuRef} className={`absolute right-0 ${openUp ? 'bottom-7' : 'top-7'} bg-white border border-neutral-200 rounded-lg shadow-lg py-1 w-56`} style={{zIndex: 9999}}>
       <button onClick={onEdit} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
         <Eye size={14} /> Öffnen / Bearbeiten
       </button>
