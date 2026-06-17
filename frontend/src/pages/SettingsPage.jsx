@@ -2198,7 +2198,15 @@ function TabEmailVorlagen() {
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('allgemein')
+  const [reloading, setReloading] = useState(false)
   const { settings, loading, loadSettings } = useSettings()
+
+  const handleReload = async () => {
+    setReloading(true)
+    await loadSettings()
+    setReloading(false)
+    toast.success('Einstellungen neu geladen')
+  }
 
   const tabs = [
     { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
@@ -2220,7 +2228,9 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
           <p className="text-sm text-gray-400 mt-0.5">Programm konfigurieren</p>
         </div>
-        <button onClick={loadSettings} className="ml-auto p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition" title="Neu laden"><RefreshCw size={16} /></button>
+        <button onClick={handleReload} disabled={reloading} className="ml-auto p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition" title="Neu laden">
+          <RefreshCw size={16} className={reloading ? 'animate-spin' : ''} />
+        </button>
       </div>
       <div className="flex gap-2 mb-6 flex-wrap">
         {tabs.map(t => <Tab key={t.id} {...t} active={activeTab === t.id} onClick={setActiveTab} />)}
