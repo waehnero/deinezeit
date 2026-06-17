@@ -22,4 +22,21 @@ class Settings(BaseSettings):
 
     # WebAuthn
     WEBAUTHN_RP_ID: str = "localhost"
-    WEBAUTHN_R
+    WEBAUTHN_RP_NAME: str = "DeineZeit"
+
+    # MinIO
+    MINIO_ENDPOINT: str = "minio:9000"
+    MINIO_ROOT_USER: str = "minioadmin"
+    MINIO_ROOT_PASSWORD: str = "minioadmin123"
+    MINIO_BUCKET: str = "deinezeit-files"
+    MINIO_PUBLIC_URL: str = "http://localhost"
+
+    # Deploy-Modus
+    DEPLOY_MODE: str = "production"
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+
+settings = Settings()
