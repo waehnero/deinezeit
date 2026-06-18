@@ -94,5 +94,15 @@ services:
       - certbot_conf:/etc/letsencrypt
     command: /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'
 
+
 volumes:
-  
+  postgres_data:
+  minio_data:
+  certbot_www:
+  certbot_conf:
+
+networks:
+  internal:
+    driver: bridge
+  external:
+    driver: bridge
