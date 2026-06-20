@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.12.3',
+    day: '20',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Automatische Versionserkennung in check.sh implementiert',
+      'Lock-Schutz für Versionsverwaltung hinzugefügt',
+    ],
+  },
+  {
     version: '1.12.2',
     day: '20',
     month: 'Juni',

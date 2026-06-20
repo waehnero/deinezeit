@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.3] – 2026-06-20 – Automatische Versionsverwaltung mit Schutz
+
+### Aktualisierungen
+- Automatische Versionserkennung in check.sh implementiert
+- Lock-Schutz für Versionsverwaltung hinzugefügt
+
+---
+
 ## [1.12.2] – 2026-06-20 – Versionsprüfung und Release-Management
 
 ### Neu
