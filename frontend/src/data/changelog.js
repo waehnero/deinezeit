@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.2',
+    day: '20',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Versionsprüfungstool zur Überprüfung von Versionsnummern',
+      'Automatisierte Versionscheck-Funktion implementiert',
+      'Push-Freigabe basierend auf Versionsstatus',
+    ],
+    updates: [],
+  },
+  {
     version: '1.12.1',
     day: '20',
     month: 'Juni',

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.2] – 2026-06-20 – Versionsprüfung und Release-Management
+
+### Neu
+- Versionsprüfungstool zur Überprüfung von Versionsnummern
+- Automatisierte Versionscheck-Funktion implementiert
+- Push-Freigabe basierend auf Versionsstatus
+
+---
+
 ## [1.12.1] – 2026-06-20 – Projektplanung und Stabilität
 
 ### Neu
