@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import os
 from app.core.config import settings
-from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting
+from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan
 from app.api import settings as settings_api
 from app.services import storage_service
 from app.api.system import record_activity
@@ -55,6 +55,7 @@ app.include_router(datacenter.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
 app.include_router(invoice.router, prefix="/api")
 app.include_router(accounting.router, prefix="/api")
+app.include_router(projektplan.router, prefix="/api")
 
 
 # ── Aktivitäts-Middleware: letzte Aktivität pro Benutzer tracken ──────────────

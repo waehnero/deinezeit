@@ -50,6 +50,11 @@ class TimeEntry(Base):
     contact_id = Column(UUID(as_uuid=True), nullable=True)
     contact_name = Column(String(300), nullable=True)
 
+    # Optionale Verknüpfung zu einer Planungsaufgabe (Projekt-Aufzeichnungstool).
+    # Erfasste Zeit fließt so ins Ist/Soll der Aufgabe. NULL = keine Aufgabe.
+    task_id = Column(UUID(as_uuid=True), nullable=True)
+    task_title = Column(String(500), nullable=True)
+
     # Kernfelder Zeiterfassung
     started_at = Column(DateTime(timezone=True), nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=True)   # NULL = läuft noch

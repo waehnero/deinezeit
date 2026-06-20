@@ -223,5 +223,64 @@ export const accountingApi = {
   exportBmd:          (params) => api.get('/accounting/export/bmd', { params, responseType: 'blob' }),
 }
 
+// ── Projekt-Aufzeichnungstool (Projektplanung) ───────────────────────────────
+export const projektplanApi = {
+  // Projekte
+  listProjects:   (params) => api.get('/projektplan/projects', { params }),
+  getProject:     (id)     => api.get(`/projektplan/projects/${id}`),
+  createProject:  (data)   => api.post('/projektplan/projects', data),
+  updateProject:  (id, data) => api.put(`/projektplan/projects/${id}`, data),
+  deleteProject:  (id)     => api.delete(`/projektplan/projects/${id}`),
+  duplicateProject: (id, opts) => api.post(`/projektplan/projects/${id}/duplicate`, opts || {}),
+
+  // Aufgaben
+  createTask:     (projectId, data) => api.post(`/projektplan/projects/${projectId}/tasks`, data),
+  updateTask:     (taskId, data)    => api.put(`/projektplan/tasks/${taskId}`, data),
+  deleteTask:     (taskId)          => api.delete(`/projektplan/tasks/${taskId}`),
+  promoteTask:    (taskId, data)    => api.post(`/projektplan/tasks/${taskId}/promote`, data || {}),
+
+  // Abhängigkeiten
+  createDependency: (data)  => api.post('/projektplan/dependencies', data),
+  deleteDependency: (id)    => api.delete(`/projektplan/dependencies/${id}`),
+
+  // Gantt: Termine mehrerer Aufgaben aktualisieren (Drag)
+  updateTaskDates: (updates) => api.put('/projektplan/tasks/dates', { updates }),
+
+  // Meilensteine
+  createMilestone: (projectId, data) => api.post(`/projektplan/projects/${projectId}/milestones`, data),
+  updateMilestone: (id, data)        => api.put(`/projektplan/milestones/${id}`, data),
+  deleteMilestone: (id)              => api.delete(`/projektplan/milestones/${id}`),
+
+  // Konfigurierbare Aufgaben-Felder
+  listFields:     ()         => api.get('/projektplan/fields'),
+  createField:    (data)     => api.post('/projektplan/fields', data),
+  updateField:    (id, data) => api.put(`/projektplan/fields/${id}`, data),
+  deleteField:    (id)       => api.delete(`/projektplan/fields/${id}`),
+
+  // Projekt-Einstellungen (Tags, Status, Prioritäten)
+  getSettings:    ()     => api.get('/projektplan/settings'),
+  updateSettings: (data) => api.put('/projektplan/settings', data),
+
+  // Checklisten (parentType: 'project' | 'task')
+  listChecklist:   (parentType, parentId) => api.get(`/projektplan/checklist/${parentType}/${parentId}`),
+  addChecklist:    (parentType, parentId, data) => api.post(`/projektplan/checklist/${parentType}/${parentId}`, data),
+  updateChecklist: (itemId, data) => api.put(`/projektplan/checklist/item/${itemId}`, data),
+  deleteChecklist: (itemId) => api.delete(`/projektplan/checklist/item/${itemId}`),
+  checklistToTask: (itemId) => api.post(`/projektplan/checklist/item/${itemId}/promote`),
+  assignChecklist: (itemId, data) => api.post(`/projektplan/checklist/item/${itemId}/assign`, data),
+}
+
+// ── Anlagen (Datacenter-API, generisch über entity_type/entity_id) ────────────
+export const attachmentApi = {
+  list:     (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),
+  upload:   (entityType, entityId, formData) =>
+    api.post(`/datacenter/${entityType}/${entityId}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  remove:   (attachmentId) => api.delete(`/datacenter/${attachmentId}`),
+  previewUrl:  (attachmentId) => `/api/datacenter/${attachmentId}/preview`,
+  downloadUrl: (attachmentId) => `/api/datacenter/${attachmentId}/download`,
+}
+
 export default api
  

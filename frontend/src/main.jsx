@@ -22,6 +22,9 @@ import DatacenterPage from './pages/DatacenterPage'
 import InvoicePage from './pages/InvoicePage'
 import InvoiceFormPage from './pages/InvoiceFormPage'
 import InvoiceBookPage from './pages/InvoiceBookPage'
+import ProjektplanPage from './pages/ProjektplanPage'
+import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
+import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }) {
@@ -61,6 +64,9 @@ function App() {
                       <Route path="/profile"              element={<ProfilePage />} />
                       <Route path="/users"                element={<UserManagementPage />} />
                       <Route path="/zeiterfassung"        element={<ZeiterfassungPage />} />
+                      <Route path="/projekte"             element={<ProjektplanPage />} />
+                      <Route path="/projekte/einstellungen" element={<AdminRoute><ProjekteEinstellungen /></AdminRoute>} />
+                      <Route path="/projekte/:id"         element={<ProjektplanDetailPage />} />
                       <Route path="/datacenter"           element={<DatacenterPage />} />
                       {/* Rechnungsmodul */}
                       <Route path="/invoices"            element={<InvoicePage />} />

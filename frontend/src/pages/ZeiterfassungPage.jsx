@@ -74,7 +74,7 @@ function ProjectSearch({ value, onChange, disabled, placeholder = 'Projekt suche
     const t = setTimeout(async () => {
       setLoading(true)
       try {
-        const res = await masterdataApi.listRecords('projekte', { search: search || undefined, page_size: 20 })
+        const res = await masterdataApi.listRecords('projektzeiten', { search: search || undefined, page_size: 20 })
         setResults(res.data.items.map(r => ({
           id: r.id,
           name: r.display_name,

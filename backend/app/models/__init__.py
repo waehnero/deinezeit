@@ -4,3 +4,4 @@ from app.models.zeiterfassung import TimeEntry, TimeEntryField
 from app.models.settings import Setting
 from app.models.invoice import Invoice, InvoicePosition, InvoiceAttachment, InvoiceNumberSequence, InvoiceSettings
 from app.models.accounting import AccountingAccount
+from app.models.projektplan import PlanningProject, Task, TaskDependency, Milestone, ProjectTaskField, ChecklistItem

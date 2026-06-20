@@ -1,14 +1,32 @@
-# C
+# Changelog
+
+## [1.12.0] - 2026-06-20 - Neues Modul: Projektplanung
+
+### Neu
+- **Projektplanungs-Modul** (Menüpunkt „Projekte"): eigenständiges Projekt-Aufzeichnungstool ähnlich MS Project / OpenProject, mobile-first
+- Planungsprojekte anlegen, bearbeiten, duplizieren (mit Auswahl, wie viel mitkopiert wird), archivieren und löschen
+- Aufgaben & beliebig tief verschachtelbare Teilaufgaben mit Quick-Add zur raschen Erfassung am Handy
+- Konfigurierbare Status, Prioritäten, Tags und eigene Aufgaben-Felder (Projekt-Einstellungen)
+- Verantwortliche und Kontakte je Projekt und je Aufgabe (Aufgaben erben den Projekt-Kontakt, überschreibbar)
+- Anlagen (Dateien/Fotos) an Aufgaben über den bestehenden MinIO-Speicher
+- Checklisten an Projekten und Aufgaben: Elemente abhaken, als Aufgabe anlegen, an Benutzer/Kontakt zuweisen inkl. E-Mail-Benachrichtigung
+- Gantt-/Zeitschienen-Ansicht: Aufgabenbalken, Meilensteine, Heute-Linie, Abhängigkeiten mit kritischem Pfad, Termine per Drag verschiebbar
+- Zeiterfassung: optionale Verknüpfung eines Zeiteintrags mit einer Planungsaufgabe (Ist-/Soll-Stunden)
+
+### Geändert
+- Stammdaten „Projekte" in „Projektzeiten" umbenannt
+- Projektfarbe wird als Farbkreis in Projektübersicht und -detail angezeigt
+
+### Datenbank
+- Migrationen 0016–0019 (Planungsprojekte, Aufgaben, Abhängigkeiten, Meilensteine, konfigurierbare Felder, Checklisten; Kontakt- und Aufgaben-Verknüpfung an Zeiteinträgen)
+
+
+---
+
 ## [1.11.3] - 2026-06-17 - Kontextmenü Portal-Fix
 
 
 ---
-
-## [1.11.3] - 2026-06-17 - KontextmenÃ¼-Fix Portal-Rendering
-
-
----
-hangelog
 
 ## [1.11.1] - 2026-06-17
 ### GeÃƒÂ¤ndert
