@@ -1,8 +1,27 @@
 /**
- * Strukturierte Changelog-Daten f++r das News-Panel auf der Anmeldeseite.
- * Bei neuen Releases hier oben einen Eintrag hinzuf++gen.
+ * Strukturierte Changelog-Daten fÃ¼r das News-Panel auf der Anmeldeseite.
+ * Bei neuen Releases hier oben einen Eintrag hinzufÃ¼gen.
  */
 export const changelog = [
+  {
+    version: '1.12.0',
+    day: '20',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Neues Modul â€žProjekte": eigenstÃ¤ndiges Projektplanungs-Tool, mobile-first',
+      'Aufgaben mit beliebig tiefen Teilaufgaben und Quick-Add zur raschen Erfassung',
+      'Konfigurierbare Status, PrioritÃ¤ten, Tags und eigene Aufgaben-Felder',
+      'Verantwortliche, Kontakte und Anlagen (Dateien/Fotos) je Aufgabe',
+      'Checklisten mit Zuweisung an Benutzer/Kontakt inkl. E-Mail-Benachrichtigung',
+      'Gantt-/Zeitschienen-Ansicht mit Meilensteinen, AbhÃ¤ngigkeiten und kritischem Pfad',
+      'Projekte duplizieren, archivieren und mit Projektfarbe kennzeichnen',
+    ],
+    updates: [
+      'Zeiterfassung kann optional mit einer Projektaufgabe verknÃ¼pft werden',
+      'Stammdaten â€žProjekte" in â€žProjektzeiten" umbenannt',
+    ],
+  },
   {
     version: '1.11.2',
     day: '16',
@@ -10,7 +29,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Kontextmen++ wird jetzt nach oben ge+Âffnet, wenn unten nicht genug Platz vorhanden ist',
+      'Kontextmen++ wird jetzt nach oben ge+ï¿½ffnet, wenn unten nicht genug Platz vorhanden ist',
     ],
   },
   {
@@ -20,7 +39,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Gesendete E-Mails erscheinen jetzt im Outlook-Ordner ÔÇ×Gesendete Elemente"',
+      'Gesendete E-Mails erscheinen jetzt im Outlook-Ordner ï¿½ï¿½ï¿½Gesendete Elemente"',
     ],
   },
   {
@@ -51,10 +70,10 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Belege-Liste: Header-Buttons, Belegtypen-Tabs und Tabelle f++r Mobilger+ñte optimiert (scrollbar, gestapelt, weniger Spalten)',
+      'Belege-Liste: Header-Buttons, Belegtypen-Tabs und Tabelle f++r Mobilger+ï¿½te optimiert (scrollbar, gestapelt, weniger Spalten)',
       'Beleg bearbeiten: Header-Buttons und Positionszeilen passen sich auf schmalen Bildschirmen an',
       'Datacenter: Ordner++bersicht ist am Handy als ausklappbares Men++ verf++gbar, Aktionssymbole immer sichtbar',
-      'Kontakte/Stammdaten: Header-Buttons und Typ-Filter wurden f++r Mobilger+ñte responsiv gestaltet',
+      'Kontakte/Stammdaten: Header-Buttons und Typ-Filter wurden f++r Mobilger+ï¿½te responsiv gestaltet',
     ],
   },
   {
@@ -65,7 +84,7 @@ export const changelog = [
     features: [],
     updates: [
       'Berichts-Dialog: Formularfelder und Gruppierungsoptionen stapeln sich auf schmalen Bildschirmen',
-      'Anh+ñnge-Verwaltung: Aktionssymbole sind am Handy jetzt immer sichtbar, Vorschau-Kacheln passen sich der Bildschirmbreite an',
+      'Anh+ï¿½nge-Verwaltung: Aktionssymbole sind am Handy jetzt immer sichtbar, Vorschau-Kacheln passen sich der Bildschirmbreite an',
     ],
   },
   {
@@ -76,7 +95,7 @@ export const changelog = [
     features: [],
     updates: [
       'Mobile Ansicht der Projektzeit verbessert: Buttons "Bericht erstellen" und "Projektzeit nachtragen" zeigen am Handy nur noch Symbole',
-      'ÔÇ×Verrechenbar" steht beim Start-Formular jetzt platzsparend neben der Startzeit',
+      'ï¿½ï¿½ï¿½Verrechenbar" steht beim Start-Formular jetzt platzsparend neben der Startzeit',
     ],
   },
   {
@@ -85,7 +104,7 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Progressive Web App (PWA) erm+Âglicht die Nutzung von DeineZeit als installierbare App',
+      'Progressive Web App (PWA) erm+ï¿½glicht die Nutzung von DeineZeit als installierbare App',
     ],
     updates: [],
   },
@@ -95,10 +114,10 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'DeineZeit kann jetzt als App installiert werden ("Zum Home-Bildschirm hinzuf++gen") ÔÇô eigenes Icon, Vollbild ohne Browserleiste',
+      'DeineZeit kann jetzt als App installiert werden ("Zum Home-Bildschirm hinzuf++gen") ï¿½ï¿½ï¿½ eigenes Icon, Vollbild ohne Browserleiste',
     ],
     updates: [
-      'Service Worker f++r schnelleres Laden und grundlegende Offline-Nutzung der App-Oberfl+ñche',
+      'Service Worker f++r schnelleres Laden und grundlegende Offline-Nutzung der App-Oberfl+ï¿½che',
     ],
   },
   {
@@ -107,7 +126,7 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Schnellzugriff auf Anh+ñnge hinzugef++gt',
+      'Schnellzugriff auf Anh+ï¿½nge hinzugef++gt',
       'Mobiles Layout f++r Projektzeit verbessert',
     ],
     updates: [],
@@ -119,7 +138,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Projektzeit-Hauptseite (Timer-Start/laufend) und Nachtragen-Dialog f++r Mobilger+ñte optimiert (Hoch- und Querformat)',
+      'Projektzeit-Hauptseite (Timer-Start/laufend) und Nachtragen-Dialog f++r Mobilger+ï¿½te optimiert (Hoch- und Querformat)',
     ],
   },
   {
@@ -128,7 +147,7 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Schnellzugriff f++r Anh+ñnge (Cloud-Link, Foto aufnehmen, Hochladen) direkt auf der Projektzeit-Hauptseite und im Nachtragen-Dialog',
+      'Schnellzugriff f++r Anh+ï¿½nge (Cloud-Link, Foto aufnehmen, Hochladen) direkt auf der Projektzeit-Hauptseite und im Nachtragen-Dialog',
     ],
     updates: [
       'Beim Hinzuf++gen eines Anhangs ohne gespeicherten Eintrag wird die Aufgabe automatisch gespeichert',
@@ -141,8 +160,8 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'AttachmentExplorer.jsx vollst+ñndig repariert',
-      'CHANGELOG.md vollst+ñndig repariert',
+      'AttachmentExplorer.jsx vollst+ï¿½ndig repariert',
+      'CHANGELOG.md vollst+ï¿½ndig repariert',
     ],
   },
   {
@@ -152,7 +171,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Changelog-Datei vollst+ñndig repariert und wiederhergestellt',
+      'Changelog-Datei vollst+ï¿½ndig repariert und wiederhergestellt',
     ],
   },
   {
@@ -161,7 +180,7 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Fotos direkt per Kamera bei Zeiterfassung-Anh+ñngen aufnehmen',
+      'Fotos direkt per Kamera bei Zeiterfassung-Anh+ï¿½ngen aufnehmen',
     ],
     updates: [],
   },
@@ -171,7 +190,7 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Zeiterfassung: Anh+ñnge per Kamera direkt vom Smartphone/Tablet aufnehmen (Fotos von Pl+ñnen, Lieferscheinen etc.)',
+      'Zeiterfassung: Anh+ï¿½nge per Kamera direkt vom Smartphone/Tablet aufnehmen (Fotos von Pl+ï¿½nen, Lieferscheinen etc.)',
     ],
     updates: [],
   },
@@ -182,7 +201,7 @@ export const changelog = [
     year: '2026',
     features: [
       'OneDrive-Integration mit Microsoft Graph API',
-      'Unterst++tzung f++r pers+Ânliche OneDrive-Konten',
+      'Unterst++tzung f++r pers+ï¿½nliche OneDrive-Konten',
       'Unterst++tzung f++r SharePoint-Dateien',
     ],
     updates: [],
@@ -195,7 +214,7 @@ export const changelog = [
     features: [
       'OneDrive-Integration: Microsoft OneDrive & SharePoint als Cloudspeicher',
       'Graph-Anmeldedaten aus E-Mail-Einstellungen wiederverwendbar',
-      'Pers+Ânliches OneDrive und SharePoint-Laufwerk w+ñhlbar',
+      'Pers+ï¿½nliches OneDrive und SharePoint-Laufwerk w+ï¿½hlbar',
     ],
     updates: [],
   },
@@ -205,11 +224,11 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Cloudspeicher-Integration: Nextcloud, SeaDrive und MinIO w+ñhlbar',
+      'Cloudspeicher-Integration: Nextcloud, SeaDrive und MinIO w+ï¿½hlbar',
       'Speicher-Tab in Einstellungen: Provider-Auswahl, WebDAV-Felder, Verbindungstest',
     ],
     updates: [
-      'Upload-Fortschrittsanzeige korrigiert (wei+ƒer Browser behoben)',
+      'Upload-Fortschrittsanzeige korrigiert (wei+ï¿½er Browser behoben)',
       'WebDAV-Upload: DB-Session wird korrekt ++bergeben',
       'Storage-Provider korrekt in DB gespeichert und geladen',
       'MSG-Datei-Vorschau im Datacenter',
@@ -307,7 +326,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'DatacenterPage vollst+ñndig rekonstruiert mit verbesserter Stabilit+ñt',
+      'DatacenterPage vollst+ï¿½ndig rekonstruiert mit verbesserter Stabilit+ï¿½t',
       'EML/MSG-Datei-Vorschau hinzugef++gt',
     ],
   },
@@ -387,10 +406,10 @@ export const changelog = [
     updates: [
       'Datacenter: Vorschau-Route repariert (GIF und andere Formate wurden nicht geladen)',
       'Versionspr++fung: GitHub-Fallback via git wenn raw.githubusercontent.com nicht erreichbar',
-      'SettingsPage: zeigt Warnung wenn GitHub-Pr++fung fehlschl+ñgt',
+      'SettingsPage: zeigt Warnung wenn GitHub-Pr++fung fehlschl+ï¿½gt',
       'nginx Healthcheck: wartet auf Backend-Bereitschaft vor Start',
-      'nginx IP-Aufl+Âsung: Container-IPs dynamisch alle 10s neu aufgel+Âst',
-      'docker-compose.yml: certbot_conf Volume und Networks erg+ñnzt',
+      'nginx IP-Aufl+ï¿½sung: Container-IPs dynamisch alle 10s neu aufgel+ï¿½st',
+      'docker-compose.yml: certbot_conf Volume und Networks erg+ï¿½nzt',
     ],
   },
   {
@@ -400,8 +419,8 @@ export const changelog = [
     year: '2026',
     features: [
       'Datacenter: Freigaben-Ansicht mit allen aktiven Share-Links',
-      'Freigaben verl+ñngerbar ohne Token-+änderung (1/7/30/90 Tage oder unbegrenzt)',
-      'Freigaben einzeln widerrufbar direkt aus der +£bersicht',
+      'Freigaben verl+ï¿½ngerbar ohne Token-+ï¿½nderung (1/7/30/90 Tage oder unbegrenzt)',
+      'Freigaben einzeln widerrufbar direkt aus der +ï¿½bersicht',
     ],
     updates: [
       'Share-Link Route-Reihenfolge fix (war: Not authenticated im privaten Browserfenster)',
@@ -440,7 +459,7 @@ export const changelog = [
     features: [],
     updates: [
       'Mail-Icon in Rechnungsstatus bleibt nach Seitenwechsel erhalten',
-      'API und Abh+ñngigkeiten wiederhergestellt, CC-Feld hinzugef++gt',
+      'API und Abh+ï¿½ngigkeiten wiederhergestellt, CC-Feld hinzugef++gt',
     ],
   },
   {
@@ -449,7 +468,7 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'E-Mail-Dialog mit Kontaktinfo, Empf+ñnger-Mail und CC-Feld hinzugef++gt',
+      'E-Mail-Dialog mit Kontaktinfo, Empf+ï¿½nger-Mail und CC-Feld hinzugef++gt',
     ],
     updates: [],
   },
@@ -491,7 +510,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'DatacenterPicker verarbeitet API-Antworten korrekt, wenn Anh+ñnge als leeres Objekt statt Array zur++ckgegeben werden',
+      'DatacenterPicker verarbeitet API-Antworten korrekt, wenn Anh+ï¿½nge als leeres Objekt statt Array zur++ckgegeben werden',
     ],
   },
   {
@@ -501,7 +520,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'InvoicePage: Anh+ñnge-Feature korrekt integriert ohne Duplikate',
+      'InvoicePage: Anh+ï¿½nge-Feature korrekt integriert ohne Duplikate',
     ],
   },
   {
@@ -510,9 +529,9 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Anh+ñnge beim E-Mail-Versand hinzuf++gen',
+      'Anh+ï¿½nge beim E-Mail-Versand hinzuf++gen',
       'Datacenter-Browser f++r Dateiauswahl nutzen',
-      'Lokale Dateien als E-Mail-Anh+ñnge hochladen',
+      'Lokale Dateien als E-Mail-Anh+ï¿½nge hochladen',
     ],
     updates: [],
   },
@@ -534,7 +553,7 @@ export const changelog = [
     features: [],
     updates: [
       'PDF-Kontext korrekt geladen',
-      'Unbilled Time Entries vollst+ñndig implementiert',
+      'Unbilled Time Entries vollst+ï¿½ndig implementiert',
       'E-Mail-Versand repariert',
     ],
   },
@@ -565,8 +584,8 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Healthcheck und dynamische DNS-Aufl+Âsung f++r Nginx optimiert',
-      'Docker-Compose-Konfiguration vervollst+ñndigt',
+      'Healthcheck und dynamische DNS-Aufl+ï¿½sung f++r Nginx optimiert',
+      'Docker-Compose-Konfiguration vervollst+ï¿½ndigt',
     ],
   },
   {
@@ -576,8 +595,8 @@ export const changelog = [
     year: '2026',
     updates: [
       'nginx-Healthcheck auf Backend: nginx startet erst wenn Backend bereit ist',
-      'nginx l+Âst Container-IPs dynamisch alle 10 Sekunden neu auf ÔÇö kein manueller Neustart nach Backend-Recreate n+Âtig',
-      'docker-compose.yml: fehlende Volumes (certbot_conf) und Networks erg+ñnzt',
+      'nginx l+ï¿½st Container-IPs dynamisch alle 10 Sekunden neu auf ï¿½ï¿½ï¿½ kein manueller Neustart nach Backend-Recreate n+ï¿½tig',
+      'docker-compose.yml: fehlende Volumes (certbot_conf) und Networks erg+ï¿½nzt',
     ],
   },
   {
@@ -589,11 +608,11 @@ export const changelog = [
       'Office 365 E-Mail-Integration via Microsoft Graph API',
     ],
     updates: [
-      'Wei+ƒer Bildschirm im Changelog-Panel der Anmeldeseite behoben',
+      'Wei+ï¿½er Bildschirm im Changelog-Panel der Anmeldeseite behoben',
       'Update-Watchdog und HTTPS Health-Check optimiert',
       'Belegbuch-Endpoints implementiert (Listenansicht, CSV- und PDF-Export)',
       'Backup-Watcher mit Administratorrechten ausgef++hrt',
-      'Quellcode-Verwaltung f++r zuverl+ñssige Docker-basierte Updates verbessert',
+      'Quellcode-Verwaltung f++r zuverl+ï¿½ssige Docker-basierte Updates verbessert',
     ],
   },
   {
@@ -610,9 +629,9 @@ export const changelog = [
     day: '06',
     month: 'Juni',
     year: '2026',
-    title: 'Wei+ƒer Bildschirm nach Update behoben',
+    title: 'Wei+ï¿½er Bildschirm nach Update behoben',
     updates: [
-      'Absturz auf der Anmeldeseite bei Changelog-Eintr+ñgen ohne features/updates-Schl++ssel behoben',
+      'Absturz auf der Anmeldeseite bei Changelog-Eintr+ï¿½gen ohne features/updates-Schl++ssel behoben',
       'Changelog-Eintrag 1.3.11 korrekt im Updates-Tab sichtbar',
     ],
   },
@@ -621,9 +640,9 @@ export const changelog = [
     day: '06',
     month: 'Juni',
     year: '2026',
-    title: 'Update-Prozess Stabilit+ñtsverbesserungen',
+    title: 'Update-Prozess Stabilit+ï¿½tsverbesserungen',
     updates: [
-      'Update-Status bleibt nicht mehr auf "Aktualisierung l+ñuft" stecken (Watchdog nach 5 Min)',
+      'Update-Status bleibt nicht mehr auf "Aktualisierung l+ï¿½uft" stecken (Watchdog nach 5 Min)',
       'Health-Check im Update-Script auf HTTPS umgestellt',
       'nginx-Konfiguration und update.sh jetzt in git versioniert',
     ],
@@ -638,8 +657,8 @@ export const changelog = [
     ],
     updates: [
       'Update-Tab zeigt git pull Anleitung statt Button',
-      'Changelog-Konflikte gel+Âst',
-      'Changelog mit fehlenden Versionen 1.2.1ÔÇô1.3.8 synchronisiert',
+      'Changelog-Konflikte gel+ï¿½st',
+      'Changelog mit fehlenden Versionen 1.2.1ï¿½ï¿½ï¿½1.3.8 synchronisiert',
     ],
   },
   {
@@ -649,7 +668,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Lokale Entwicklungsinstanz wird automatisch erkannt ÔÇö Update-Button zeigt stattdessen Anleitung f++r git pull',
+      'Lokale Entwicklungsinstanz wird automatisch erkannt ï¿½ï¿½ï¿½ Update-Button zeigt stattdessen Anleitung f++r git pull',
       'Backend blockiert Update-Start in lokalem Modus mit klarer Fehlermeldung',
     ],
   },
@@ -660,7 +679,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Gesamtes Frontend in Versionskontrolle integriert ÔÇö erm+Âglicht automatische Updates ++ber GitHub Actions',
+      'Gesamtes Frontend in Versionskontrolle integriert ï¿½ï¿½ï¿½ erm+ï¿½glicht automatische Updates ++ber GitHub Actions',
     ],
   },
   {
@@ -680,7 +699,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Stabilit+ñtsverbesserung bei der Datenbank-Konfiguration',
+      'Stabilit+ï¿½tsverbesserung bei der Datenbank-Konfiguration',
     ],
   },
   {
@@ -700,7 +719,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Backend-Infrastruktur (Dockerfile, Abh+ñngigkeiten) in Versionskontrolle integriert',
+      'Backend-Infrastruktur (Dockerfile, Abh+ï¿½ngigkeiten) in Versionskontrolle integriert',
     ],
   },
   {
@@ -710,7 +729,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Docker-Compose Konfiguration in Versionskontrolle integriert ÔÇö erm+Âglicht vollautomatische Server-Updates',
+      'Docker-Compose Konfiguration in Versionskontrolle integriert ï¿½ï¿½ï¿½ erm+ï¿½glicht vollautomatische Server-Updates',
     ],
   },
   {
@@ -720,7 +739,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Versionsanzeige liest nun direkt aus CHANGELOG.md ÔÇö installierte und neueste Version immer korrekt',
+      'Versionsanzeige liest nun direkt aus CHANGELOG.md ï¿½ï¿½ï¿½ installierte und neueste Version immer korrekt',
     ],
   },
   {
@@ -739,8 +758,8 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Rechnungs-Widget im Dashboard: zeigt offene, ++berf+ñllige und bezahlte Rechnungen auf einen Blick',
-      'Automatischer Versions-Bump via GitHub Actions ÔÇö Versionen werden bei jedem Push selbstst+ñndig erh+Âht',
+      'Rechnungs-Widget im Dashboard: zeigt offene, ++berf+ï¿½llige und bezahlte Rechnungen auf einen Blick',
+      'Automatischer Versions-Bump via GitHub Actions ï¿½ï¿½ï¿½ Versionen werden bei jedem Push selbstst+ï¿½ndig erh+ï¿½ht',
       'E-Mail-Einstellungen als Unter-Tab unter System zusammengefasst',
       'Backup als Unter-Tab unter System integriert',
       'Design-Einstellungen als Unter-Tab unter Allgemein eingebaut',
@@ -753,8 +772,8 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Dashboard-Widget ÔÇ×Rechnungen": zeigt offene, ++berf+ñllige und diesen Monat bezahlte Rechnungen mit Anzahl und Brutto-Summe',
-      'Widget ist standardm+ñ+ƒig im Dashboard enthalten, verschiebbar und in der Gr+Â+ƒe anpassbar',
+      'Dashboard-Widget ï¿½ï¿½ï¿½Rechnungen": zeigt offene, ++berf+ï¿½llige und diesen Monat bezahlte Rechnungen mit Anzahl und Brutto-Summe',
+      'Widget ist standardm+ï¿½+ï¿½ig im Dashboard enthalten, verschiebbar und in der Gr+ï¿½+ï¿½e anpassbar',
     ],
     updates: [],
   },
@@ -764,14 +783,14 @@ export const changelog = [
     month: 'Juni',
     year: '2026',
     features: [
-      'Auftragsbest+ñtigung (AB) als neuer Dokumenttyp mit eigenem Nummernkreis (AB-2026-001, ÔÇª)',
-      'E-Mail-Versand direkt aus dem Rechnungsmodul ÔÇö einzeln oder als Bulk-Versand',
-      'Statusworkflow mit kontextabh+ñngigem Aktionsmen++: Entwurf ÔåÆ Offen ÔåÆ Bezahlt, Angenommen/Abgelehnt, Storniert',
-      'Angebote nach Annahme direkt in Auftragsbest+ñtigung oder Rechnung umwandeln',
+      'Auftragsbest+ï¿½tigung (AB) als neuer Dokumenttyp mit eigenem Nummernkreis (AB-2026-001, ï¿½Çª)',
+      'E-Mail-Versand direkt aus dem Rechnungsmodul ï¿½ï¿½ï¿½ einzeln oder als Bulk-Versand',
+      'Statusworkflow mit kontextabh+ï¿½ngigem Aktionsmen++: Entwurf ï¿½ï¿½ï¿½ Offen ï¿½ï¿½ï¿½ Bezahlt, Angenommen/Abgelehnt, Storniert',
+      'Angebote nach Annahme direkt in Auftragsbest+ï¿½tigung oder Rechnung umwandeln',
     ],
     updates: [
-      'Parameter-Tab in den Einstellungen: Pr+ñfixe und Nummernformate pro Dokumenttyp konfigurierbar',
-      'Dokumenttyp-Bezeichnungen k+Ânnen umbenannt werden',
+      'Parameter-Tab in den Einstellungen: Pr+ï¿½fixe und Nummernformate pro Dokumenttyp konfigurierbar',
+      'Dokumenttyp-Bezeichnungen k+ï¿½nnen umbenannt werden',
     ],
   },
   {
@@ -781,9 +800,9 @@ export const changelog = [
     year: '2026',
     features: [
       'Buchhaltungsmodul: Kontenplan nach EKR (Einheitskontenrahmen) vorbef++llt und durchsuchbar',
-      'BMD-Export f++r die steuerliche +£bergabe an den Steuerberater',
+      'BMD-Export f++r die steuerliche +ï¿½bergabe an den Steuerberater',
       'Debitor- und Kreditornummern direkt bei Kontakten hinterlegbar',
-      'Erl+Âskonto pro Artikel festlegbar ÔÇö wird automatisch auf Rechnungspositionen ++bernommen',
+      'Erl+ï¿½skonto pro Artikel festlegbar ï¿½ï¿½ï¿½ wird automatisch auf Rechnungspositionen ++bernommen',
       'Konto pro Rechnungsposition individuell ++berschreibbar',
       'Kontakte: neuer Finanz-Tab mit IBAN, BIC und Bankname',
     ],
@@ -796,16 +815,16 @@ export const changelog = [
     year: '2026',
     features: [
       'Rechnungsmodul: Rechnungen, Angebote, Gutschriften und Lieferscheine erstellen',
-      'Automatische Nummerierung pro Dokumenttyp (RE-2026-001, AN-2026-001, ÔÇª)',
-      'Stornierung mit automatischer Gutschrift oder nur Status+ñnderung',
-      'Angebote k+Ânnen direkt in Rechnungen umgewandelt werden',
-      'Zeiteintr+ñge aus der Zeiterfassung direkt auf Rechnung ++bernehmen',
+      'Automatische Nummerierung pro Dokumenttyp (RE-2026-001, AN-2026-001, ï¿½Çª)',
+      'Stornierung mit automatischer Gutschrift oder nur Status+ï¿½nderung',
+      'Angebote k+ï¿½nnen direkt in Rechnungen umgewandelt werden',
+      'Zeiteintr+ï¿½ge aus der Zeiterfassung direkt auf Rechnung ++bernehmen',
       'Positionen aus Artikel-Stammdaten oder als Freitext',
-      'MwSt.: pro Position w+ñhlbar, ein Satz, oder Kleinunternehmerregelung',
-      'PDF-Export mit 5 w+ñhlbaren Vorlagen (Klassisch, Modern, Kompakt, Elegant, Farbenfroh)',
-      'Rechnungsbuch filterbar nach Monat/Quartal/Jahr und/oder Kunde ÔÇö als PDF oder CSV',
-      'Zahlungsstatus: offen, bezahlt, ++berf+ñllig, storniert',
-      'Wiederkehrende Rechnungsvorlagen (w+Âchentlich, monatlich, quartalsweise, j+ñhrlich)',
+      'MwSt.: pro Position w+ï¿½hlbar, ein Satz, oder Kleinunternehmerregelung',
+      'PDF-Export mit 5 w+ï¿½hlbaren Vorlagen (Klassisch, Modern, Kompakt, Elegant, Farbenfroh)',
+      'Rechnungsbuch filterbar nach Monat/Quartal/Jahr und/oder Kunde ï¿½ï¿½ï¿½ als PDF oder CSV',
+      'Zahlungsstatus: offen, bezahlt, ++berf+ï¿½llig, storniert',
+      'Wiederkehrende Rechnungsvorlagen (w+ï¿½chentlich, monatlich, quartalsweise, j+ï¿½hrlich)',
       'Bankverbindung aus den App-Einstellungen automatisch auf jedem Dokument',
     ],
     updates: [],
@@ -817,9 +836,9 @@ export const changelog = [
     year: '2026',
     features: [
       'Dashboard: Bausteine per Drag & Drop frei anordnen',
-      'Dashboard: Breite der Bausteine anpassen (-+ / -¢ / Vollbreite)',
-      'Dashboard: Layout wird pro Browser gespeichert und beim n+ñchsten Besuch wiederhergestellt',
-      'Dashboard: Zeiterfassung-Widget mit Heute/Woche/Monat +£bersicht direkt am Dashboard',
+      'Dashboard: Breite der Bausteine anpassen (-+ / -ï¿½ / Vollbreite)',
+      'Dashboard: Layout wird pro Browser gespeichert und beim n+ï¿½chsten Besuch wiederhergestellt',
+      'Dashboard: Zeiterfassung-Widget mit Heute/Woche/Monat +ï¿½bersicht direkt am Dashboard',
     ],
     updates: [],
   },
@@ -830,8 +849,8 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Update-Prozess: Alembic-Migrationen laufen jetzt automatisch beim Backend-Start ÔÇö kein manuelles Eingreifen mehr n+Âtig',
-      'Update-Prozess: Rollback stellt nun auch die Docker-Images der Vorg+ñnger-Version wieder her, nicht nur den Code',
+      'Update-Prozess: Alembic-Migrationen laufen jetzt automatisch beim Backend-Start ï¿½ï¿½ï¿½ kein manuelles Eingreifen mehr n+ï¿½tig',
+      'Update-Prozess: Rollback stellt nun auch die Docker-Images der Vorg+ï¿½nger-Version wieder her, nicht nur den Code',
     ],
   },
   {
@@ -843,7 +862,7 @@ export const changelog = [
     updates: [
       'Stammdaten-Typen vereinheitlicht: Kunden und Lieferanten zusammengef++hrt zu "Kontakte" mit Typ-Feld (Kunde/Lieferant/Interessent)',
       'Neuer Stammdaten-Typ "Artikel" f++r Produkte und Dienstleistungen',
-      'Bestehende Kunden- und Lieferanten-Datens+ñtze automatisch nach Kontakte migriert',
+      'Bestehende Kunden- und Lieferanten-Datens+ï¿½tze automatisch nach Kontakte migriert',
     ],
   },
   {
@@ -862,13 +881,13 @@ export const changelog = [
     month: 'Mai',
     year: '2026',
     features: [
-      'Wartungsseite w+ñhrend Updates ÔÇö statt "502 Bad Gateway" erscheint eine DeineZeit-Seite mit Spinner',
+      'Wartungsseite w+ï¿½hrend Updates ï¿½ï¿½ï¿½ statt "502 Bad Gateway" erscheint eine DeineZeit-Seite mit Spinner',
       'Wartungsseite aktualisiert sich automatisch sobald das System wieder bereit ist',
     ],
     updates: [
-      'Update-Mechanismus grundlegend ++berarbeitet: l+ñuft jetzt in einem unabh+ñngigen Container, ++bersteht den eigenen Neustart zuverl+ñssig',
-      'Automatischer Rollback auf Vorg+ñnger-Version wenn Build oder Health-Check fehlschl+ñgt',
-      'Update-Skript erkennt Domain automatisch ÔÇö kein git-Konflikt mehr bei app.conf',
+      'Update-Mechanismus grundlegend ++berarbeitet: l+ï¿½uft jetzt in einem unabh+ï¿½ngigen Container, ++bersteht den eigenen Neustart zuverl+ï¿½ssig',
+      'Automatischer Rollback auf Vorg+ï¿½nger-Version wenn Build oder Health-Check fehlschl+ï¿½gt',
+      'Update-Skript erkennt Domain automatisch ï¿½ï¿½ï¿½ kein git-Konflikt mehr bei app.conf',
       'Health-Check nach Update: Backend muss in 2 Minuten antworten, sonst wird zur++ckgerollt',
     ],
   },
@@ -878,9 +897,9 @@ export const changelog = [
     month: 'Mai',
     year: '2026',
     features: [
-      'Update-Verwaltung direkt im Browser ÔÇö kein SSH-Zugriff mehr n+Âtig',
-      'System-Tab in den Einstellungen: aktuelle Version, Changelog und Benutzer-Z+ñhler',
-      'Update starten mit 2-Minuten-Countdown ÔÇö alle aktiven Benutzer werden benachrichtigt',
+      'Update-Verwaltung direkt im Browser ï¿½ï¿½ï¿½ kein SSH-Zugriff mehr n+ï¿½tig',
+      'System-Tab in den Einstellungen: aktuelle Version, Changelog und Benutzer-Z+ï¿½hler',
+      'Update starten mit 2-Minuten-Countdown ï¿½ï¿½ï¿½ alle aktiven Benutzer werden benachrichtigt',
       'Countdown-Banner oben im Bildschirm mit automatischer Abmeldung',
       'Erfolgsmeldung nach erfolgreichem Update auf der Anmeldeseite',
     ],
@@ -893,9 +912,9 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Passkeys & Face ID / Windows Hello vollst+ñndig implementiert ÔÇö Anmeldung ohne Passwort funktioniert jetzt',
-      'Passkey hinzuf++gen (Profilseite) speichert Ger+ñt korrekt in der Datenbank',
-      'Passkey-Login schlie+ƒt den Vorgang ab und setzt den JWT-Token',
+      'Passkeys & Face ID / Windows Hello vollst+ï¿½ndig implementiert ï¿½ï¿½ï¿½ Anmeldung ohne Passwort funktioniert jetzt',
+      'Passkey hinzuf++gen (Profilseite) speichert Ger+ï¿½t korrekt in der Datenbank',
+      'Passkey-Login schlie+ï¿½t den Vorgang ab und setzt den JWT-Token',
     ],
   },
   {
@@ -904,14 +923,14 @@ export const changelog = [
     month: 'Mai',
     year: '2026',
     features: [
-      'Register (Tabs) in Stammdaten-Formularen ÔÇö Felder auf benannte Reiter aufteilen',
+      'Register (Tabs) in Stammdaten-Formularen ï¿½ï¿½ï¿½ Felder auf benannte Reiter aufteilen',
       'Drag & Drop auf Tab-Reiter zum Verschieben von Feldern',
       'Relation-Felder: Verkn++pfungen zwischen verschiedenen Stammdaten-Typen',
-      'Neuen Stammdaten-Typ anlegen direkt aus der +£bersicht',
+      'Neuen Stammdaten-Typ anlegen direkt aus der +ï¿½bersicht',
     ],
     updates: [
       'Anlegen neuer Stammdaten-Typen funktioniert wieder korrekt',
-      'Neue Felder ++bernehmen Tab-Zugeh+Ârigkeit und Feldbreite',
+      'Neue Felder ++bernehmen Tab-Zugeh+ï¿½rigkeit und Feldbreite',
       'React-Absturz bei Backend-Fehlermeldungen behoben',
     ],
   },
@@ -921,8 +940,8 @@ export const changelog = [
     month: 'Mai',
     year: '2026',
     features: [
-      'Datacenter: Zentrale Datei-Verwaltung f++r alle Datens+ñtze',
-      'Datei-Upload direkt an Datens+ñtze anh+ñngen (Dokumente, Bilder)',
+      'Datacenter: Zentrale Datei-Verwaltung f++r alle Datens+ï¿½tze',
+      'Datei-Upload direkt an Datens+ï¿½tze anh+ï¿½ngen (Dokumente, Bilder)',
       'Weblinks als Verkn++pfungen speichern',
       'Download & Vorschau direkt im Browser',
       'Shareable Links mit Ablaufdatum generieren',
@@ -950,8 +969,8 @@ export const changelog = [
     month: 'Mai',
     year: '2026',
     features: [
-      'Zeiterfassung mit Timer und manuellen Eintr+ñgen',
-      'Eigene Zusatzfelder f++r Zeiteintr+ñge',
+      'Zeiterfassung mit Timer und manuellen Eintr+ï¿½gen',
+      'Eigene Zusatzfelder f++r Zeiteintr+ï¿½ge',
       'Projektzeitbericht als druckfertiges PDF',
       'Zeitrundung auf 15/30 Minuten, Filterung nach Aufgabe',
     ],
@@ -963,7 +982,7 @@ export const changelog = [
     month: 'Mai',
     year: '2026',
     features: [
-      'Farbschema zur Laufzeit +ñnderbar ÔÇö kein Neustart n+Âtig',
+      'Farbschema zur Laufzeit +ï¿½nderbar ï¿½ï¿½ï¿½ kein Neustart n+ï¿½tig',
       'Login-, Sidebar- und Dashboard-Design komplett ++berarbeitet',
       'Kontakte: Kunden und Lieferanten zusammengef++hrt mit Typ-Filter',
       'Rate Limiting gegen Brute-Force-Angriffe',
@@ -978,7 +997,7 @@ export const changelog = [
     year: '2026',
     features: [
       'Snap-to-Grid Drag & Drop Layout-Builder f++r Felder',
-      'Feldbreite frei w+ñhlbar: 25% / 33% / 50% / 75% / 100%',
+      'Feldbreite frei w+ï¿½hlbar: 25% / 33% / 50% / 75% / 100%',
       'CSV Export (Excel-kompatibel) und CSV Import mit Spalten-Zuordnung',
       'Profilseite: Name, Sprache, Passwort, 2FA und Passkeys',
       'Benutzerverwaltung f++r Admins',
@@ -991,8 +1010,8 @@ export const changelog = [
     month: 'Mai',
     year: '2026',
     features: [
-      'Dynamische Stammdaten-Typen: Kunden, Lieferanten, Projekte ÔÇö und beliebig mehr',
-      'Formular-Builder: Felder direkt in der Oberfl+ñche definieren',
+      'Dynamische Stammdaten-Typen: Kunden, Lieferanten, Projekte ï¿½ï¿½ï¿½ und beliebig mehr',
+      'Formular-Builder: Felder direkt in der Oberfl+ï¿½che definieren',
       '9 Feldtypen: Text, Zahl, Datum, E-Mail, Telefon, Auswahl, Checkbox, URL, Textarea',
       'Volltextsuche und Paginierung in Datensatz-Listen',
     ],
