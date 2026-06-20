@@ -22,10 +22,25 @@ head() { printf "\n${BLUE}== %s ==${NC}\n" "$1"; }
 
 printf "\n${BLUE}DeineZeit – Statuscheck${NC}\n"
 
+# ── Verwaiste Git-Lock aufräumen ──────────────────────────────────────────────
+# GitHub Desktop u.ä. hinterlassen manchmal eine .git/index.lock, die Git
+# blockiert. Wenn KEIN echter git-Prozess läuft, ist sie verwaist -> entfernen.
+clean_git_lock() {
+  if [ -f ".git/index.lock" ]; then
+    if pgrep -x git >/dev/null 2>&1; then
+      warn "Es läuft gerade ein git-Vorgang – Lock wird NICHT angefasst."
+    else
+      rm -f ".git/index.lock"
+      warn "Verwaiste .git/index.lock entfernt (von GitHub Desktop o.ä.)."
+    fi
+  fi
+}
+
 # ── 1. Richtiger Ordner? ──────────────────────────────────────────────────────
 head "Projektordner"
 if [ -f "docker-compose.local.yml" ] && [ -d ".git" ]; then
   ok "Du bist im richtigen Projektordner ($(pwd))"
+  clean_git_lock
 else
   err "Das sieht NICHT nach dem Projektordner aus. Bitte ins DeineZeit-Verzeichnis wechseln."
   exit 1
@@ -61,8 +76,26 @@ if git fetch origin --quiet 2>/dev/null; then
   if [ "$LOCAL" = "$REMOTE" ]; then
     ok "Lokal und GitHub sind auf demselben Stand"; SYNC="gleichauf"
   elif [ "$LOCAL" = "$BASE" ]; then
-    warn "GitHub ist VORAUS – du hinkst hinterher."; SYNC="hinten"
-    printf "    ${YELLOW}→ Hole den neuen Stand:  git pull origin main${NC}\n"
+    warn "GitHub ist VORAUS – du hinkst hinterher (oft die automatische Versionserhöhung)."; SYNC="hinten"
+    REMOTE_MSG=$(git log -1 --format=%s origin/main 2>/dev/null)
+    printf "    Neuester Stand auf GitHub: %s\n" "$REMOTE_MSG"
+    # Nur anbieten, wenn lokal sauber ist (sonst kein Fast-Forward möglich)
+    if [ -z "$(git status --porcelain 2>/dev/null)" ]; then
+      printf "    Jetzt holen (git pull)? [J/n]: "
+      read -r PULLNOW
+      case "$PULLNOW" in
+        n|N) printf "    ${YELLOW}Übersprungen. Bei Bedarf:  git pull origin main${NC}\n" ;;
+        *)
+          if git merge --ff-only origin/main >/dev/null 2>&1; then
+            ok "Aktualisiert – lokal ist jetzt auf dem neuesten Stand"; SYNC="gleichauf"
+          else
+            warn "Kein sauberer Fast-Forward – bitte 'git pull origin main' manuell ausführen"
+          fi
+          ;;
+      esac
+    else
+      printf "    ${YELLOW}→ Erst lokale Änderungen klären, dann:  git pull origin main${NC}\n"
+    fi
   elif [ "$REMOTE" = "$BASE" ]; then
     warn "Du bist VORAUS – es gibt ungepushte Commits."; SYNC="vorne"
     printf "    ${YELLOW}→ Nach Freigabe pushen:  git push origin main${NC}\n"
@@ -120,9 +153,47 @@ if [ -n "$CHANGES" ]; then
         printf "${YELLOW}Keine Nachricht eingegeben – verwende: \"$MSG\"${NC}\n"
       fi
       printf "\n"
-      git add -A && git commit -m "$MSG" && git push origin main
-      if [ $? -eq 0 ]; then
-        printf "\n${GREEN}✔ Erledigt.${NC} Änderungen sind auf GitHub. Der Server kann jetzt updaten.\n\n"
+      clean_git_lock   # falls GitHub Desktop zwischenzeitlich gesperrt hat
+      if git add -A && git commit -m "$MSG" && git push origin main; then
+        printf "\n${GREEN}✔ Push erledigt.${NC} Änderungen sind auf GitHub.\n"
+
+        # ── Auto-Version abholen ────────────────────────────────────────────
+        # Auf GitHub läuft die Action 'auto-version.yml': sie erhöht nach dem
+        # Push automatisch die Versionsnummer und pusht einen zusätzlichen
+        # Commit ("chore: Version x.y.z") zurück nach main. Damit localhost
+        # nicht hinterherhinkt, holen wir diesen Bot-Commit jetzt zurück.
+        printf "\n${BLUE}Hole automatische Versionserhöhung vom Server …${NC}\n"
+        printf "(Die GitHub-Action braucht ein paar Sekunden.)\n"
+        GOT_BUMP="nein"
+        for i in 1 2 3 4 5 6; do
+          sleep 5
+          git fetch origin --quiet 2>/dev/null
+          NEW_REMOTE=$(git rev-parse origin/main 2>/dev/null)
+          MINE=$(git rev-parse HEAD 2>/dev/null)
+          if [ "$NEW_REMOTE" != "$MINE" ]; then
+            # Es gibt einen neuen Commit auf main -> ist es der Versions-Bump?
+            MSG_REMOTE=$(git log -1 --format=%s origin/main 2>/dev/null)
+            if git merge --ff-only origin/main >/dev/null 2>&1; then
+              printf "${GREEN}✔ Versionserhöhung geholt:${NC} %s\n" "$MSG_REMOTE"
+              GOT_BUMP="ja"
+            else
+              printf "${YELLOW}!${NC} Server hat neue Commits, aber kein sauberer Fast-Forward.\n"
+              printf "  ${YELLOW}→ Bitte 'git pull origin main' manuell ausführen.${NC}\n"
+              GOT_BUMP="manuell"
+            fi
+            break
+          fi
+          printf "  … warte (%s/6)\n" "$i"
+        done
+
+        if [ "$GOT_BUMP" = "nein" ]; then
+          printf "${YELLOW}!${NC} Keine automatische Versionserhöhung erkannt.\n"
+          printf "  Das ist okay (z. B. wenn nur Doku gepusht wurde). Bei Bedarf:\n"
+          printf "  ${YELLOW}git pull origin main${NC}\n"
+        fi
+
+        NEWV=$(grep -m1 '"version"' frontend/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+        printf "\n${GREEN}Fertig.${NC} Lokal und GitHub sind synchron (v%s). Der Server kann jetzt updaten.\n\n" "$NEWV"
       else
         printf "\n${RED}Es gab ein Problem beim Commit/Push.${NC} Bitte Ausgabe oben prüfen/melden.\n\n"
       fi
