@@ -4,6 +4,24 @@
  */
 export const changelog = [
   {
+    version: '1.12.1',
+    day: '20',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Neues Projektplanungs-Modul für erweiterte Projektverwaltung',
+      'News-Panel auf der Anmeldeseite für aktuelle Informationen',
+    ],
+    updates: [
+      'Vite PWA Plugin als Abhängigkeit hinzugefügt',
+      'Docker-Compose-Konfiguration mit Volumes und Networks erweitert',
+      'Neu-laden-Button in Einstellungen mit visuellen Rückmeldungen verbessert',
+      'config.py vollständig wiederhergestellt',
+      'Kontextmenü Portal-Rendering gegen unerwünschtes Abschneiden optimiert',
+      'Entrypoint-Skript als ausführbar markiert',
+    ],
+  },
+  {
     version: '1.12.0',
     day: '20',
     month: 'Juni',

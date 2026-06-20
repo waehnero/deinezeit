@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.12.1] – 2026-06-20 – Projektplanung und Stabilität
+
+### Neu
+- Neues Projektplanungs-Modul für erweiterte Projektverwaltung
+- News-Panel auf der Anmeldeseite für aktuelle Informationen
+
+### Aktualisierungen
+- Vite PWA Plugin als Abhängigkeit hinzugefügt
+- Docker-Compose-Konfiguration mit Volumes und Networks erweitert
+- Neu-laden-Button in Einstellungen mit visuellen Rückmeldungen verbessert
+- config.py vollständig wiederhergestellt
+- Kontextmenü Portal-Rendering gegen unerwünschtes Abschneiden optimiert
+- Entrypoint-Skript als ausführbar markiert
+
+---
+
 ## [1.12.0] - 2026-06-20 - Neues Modul: Projektplanung
 
 ### Neu
