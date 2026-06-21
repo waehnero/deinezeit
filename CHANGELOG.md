@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.8] – 2026-06-21 – Navigation zum Dashboard vereinfacht
+
+### Neu
+- Logo oder Firmennamen können zum Dashboard angetippt werden
+
+---
+
 ## [1.12.7] – 2026-06-21 – Schnellzugriff für Projekte
 
 ### Neu
