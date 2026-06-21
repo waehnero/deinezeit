@@ -134,7 +134,8 @@ export default function Layout({ children }) {
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-56 bg-white shadow-xl z-50">
+          <aside className="absolute left-0 top-0 bottom-0 w-56 bg-white shadow-xl z-50 overflow-y-auto"
+            style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <SidebarContent />
           </aside>
         </div>
@@ -142,8 +143,9 @@ export default function Layout({ children }) {
 
       {/* Hauptbereich */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-neutral-200">
+        {/* Mobile Header – berücksichtigt iOS Safe Area (Notch/Statusleiste) */}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-neutral-200"
+          style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}>
           <div className="flex items-center gap-3">
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="w-7 h-7 object-contain"
