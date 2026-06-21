@@ -36,7 +36,7 @@ from app.schemas.projektplan import (
     TaskFieldCreate, TaskFieldUpdate, TaskFieldResponse,
     ProjektplanSettings, StatusOption,
     ChecklistItemCreate, ChecklistItemUpdate, ChecklistItemResponse, ChecklistAssign,
-    TaskDatesBatch,
+    TaskDatesBatch, AutomationRule,
 )
 
 router = APIRouter(prefix="/projektplan", tags=["Projektplanung"])
@@ -58,6 +58,11 @@ DEFAULT_SETTINGS = ProjektplanSettings(
         StatusOption(value="kritisch", label="Kritisch", color="#ef4444"),
     ],
     tags=[],
+    task_types=[
+        StatusOption(value="aufgabe", label="Aufgabe", color="#6b7280"),
+        StatusOption(value="meilenstein", label="Meilenstein", color="#534AB7"),
+        StatusOption(value="golive", label="GoLive", color="#1d9e75"),
+    ],
 )
 
 
@@ -245,6 +250,17 @@ async def list_projects(
         q = q.filter(PlanningProject.is_archived == False)  # noqa: E712
     projects = q.order_by(PlanningProject.created_at.desc()).all()
 
+    # Kontakt-Typ (data.typ) gebündelt für alle verknüpften Kontakte nachschlagen
+    contact_ids = {p.contact_id for p in projects if p.contact_id}
+    contact_types: Dict[UUID, str] = {}
+    if contact_ids:
+        recs = db.query(EntityRecord).filter(EntityRecord.id.in_(contact_ids)).all()
+        for r in recs:
+            if isinstance(r.data, dict):
+                t = r.data.get("typ") or r.data.get("kategorie")
+                if t:
+                    contact_types[r.id] = str(t)
+
     result = []
     for p in projects:
         item = PlanningProjectListItem.model_validate(p)
@@ -252,6 +268,7 @@ async def list_projects(
         item.task_count = stats["task_count"]
         item.done_count = stats["done_count"]
         item.progress_percent = stats["progress_percent"]
+        item.contact_type = contact_types.get(p.contact_id) if p.contact_id else None
         result.append(item)
     return result
 
@@ -305,12 +322,19 @@ def _project_detail(db: Session, proj: PlanningProject) -> PlanningProjectDetail
     task_ids = [t.id for t in tasks]
     logged = _logged_minutes_by_task(db, task_ids)
     task_checklists = _checklist_by_parent(db, "task", task_ids)
-    # Abhängigkeiten dieses Projekts laden + kritischen Pfad berechnen
-    deps = (
-        db.query(TaskDependency)
-        .filter(TaskDependency.successor_id.in_(task_ids) if task_ids else False)
-        .all()
-    ) if task_ids else []
+    # Abhängigkeiten dieses Projekts laden (beide Richtungen) + kritischen Pfad
+    if task_ids:
+        from sqlalchemy import or_
+        deps = (
+            db.query(TaskDependency)
+            .filter(or_(
+                TaskDependency.successor_id.in_(task_ids),
+                TaskDependency.predecessor_id.in_(task_ids),
+            ))
+            .all()
+        )
+    else:
+        deps = []
     critical = _critical_task_ids(tasks, deps)
     detail.tasks = _build_tree(tasks, logged, task_checklists, critical)
     detail.dependencies = [DependencyResponse.model_validate(d) for d in deps]
@@ -504,12 +528,124 @@ async def update_task_dates(
     return {"updated": updated}
 
 
+def _load_settings(db: Session) -> ProjektplanSettings:
+    """Lädt die Projekt-Einstellungen (inkl. Regeln) aus dem Setting-Store."""
+    row = db.query(Setting).filter(Setting.key == SETTINGS_KEY).first()
+    if not row or not row.value:
+        return DEFAULT_SETTINGS
+    try:
+        return ProjektplanSettings(**json.loads(row.value))
+    except Exception:
+        return DEFAULT_SETTINGS
+
+
+def _run_automation(db: Session, task: Task, settings: ProjektplanSettings, actor: User):
+    """
+    Wertet die Automatisierungsregeln für EINE Aufgabe aus, nachdem sie
+    aktualisiert wurde. Führt erfüllte Regeln genau einmal aus (Dedup über
+    task.data['_fired_rules']).
+    """
+    rules = settings.rules or []
+    if not rules:
+        return
+
+    data = dict(task.data or {})
+    fired = set(data.get("_fired_rules", []))
+    task_type = (data.get("task_type") or "").lower()
+    changed_fired = False
+
+    for rule in rules:
+        if not rule.enabled or not rule.id:
+            continue
+        # Typ-Filter
+        if rule.applies_to_type and rule.applies_to_type.lower() != task_type:
+            continue
+        # Trigger prüfen (mind. eine Bedingung muss konfiguriert + erfüllt sein)
+        trigger_ok = False
+        if rule.trigger_progress_min is not None and (task.progress or 0) >= rule.trigger_progress_min:
+            trigger_ok = True
+        if rule.trigger_status and task.status == rule.trigger_status:
+            trigger_ok = True
+        if not trigger_ok:
+            continue
+        # Schon ausgelöst? (einmalig je Regel)
+        if rule.id in fired:
+            continue
+
+        # ── Aktionen ausführen ──
+        # 1) Status der Aufgabe ändern
+        if rule.action_set_status:
+            task.status = rule.action_set_status
+
+        # 2) Nachfolger aktivieren (über Abhängigkeiten: diese Aufgabe = predecessor)
+        if rule.action_activate_successors:
+            succ_deps = db.query(TaskDependency).filter(
+                TaskDependency.predecessor_id == task.id
+            ).all()
+            for dep in succ_deps:
+                succ = db.query(Task).filter(Task.id == dep.successor_id).first()
+                if succ and succ.status not in ("erledigt",):
+                    succ.status = "in_arbeit"
+
+        # 3) E-Mail an Verantwortlichen
+        if rule.action_email_assignee and task.assignee_id:
+            try:
+                _send_automation_email(db, task, rule, actor)
+            except Exception as exc:
+                print(f"[Automation] E-Mail-Versand fehlgeschlagen: {exc}")
+
+        fired.add(rule.id)
+        changed_fired = True
+
+    if changed_fired:
+        data["_fired_rules"] = sorted(fired)
+        task.data = data
+        # SQLAlchemy braucht den Hinweis, dass das JSONB-Feld geändert wurde
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(task, "data")
+
+
+def _send_automation_email(db: Session, task: Task, rule: AutomationRule, actor: User):
+    """Benachrichtigt den Verantwortlichen der Aufgabe über die ausgelöste Regel."""
+    from app.services.email_service import send_email
+
+    u = db.query(User).filter(User.id == task.assignee_id).first()
+    to_email = (u.email if u else "") or ""
+    if not to_email:
+        return
+
+    settings_d = {r.key: r.value for r in db.query(Setting).all()}
+    company = settings_d.get("company_name", "DeineZeit")
+
+    proj = db.query(PlanningProject).filter(PlanningProject.id == task.project_id).first()
+    project_name = proj.name if proj else ""
+
+    rule_name = rule.name or "Automatische Benachrichtigung"
+    subject = f"Aufgabe '{task.title}' - {rule_name}"
+    body_text = (
+        f"Hallo,\n\n"
+        f"die Aufgabe '{task.title}' (Projekt: {project_name}) hat eine "
+        f"Automatisierung ausgeloest: {rule_name}.\n\n"
+        f"Aktueller Status: {task.status}\nFortschritt: {task.progress or 0}%\n\n"
+        f"Mit freundlichen Gruessen\n{company}"
+    )
+    body_html = (
+        f"<p>Hallo,</p>"
+        f"<p>die Aufgabe <strong>{task.title}</strong> (Projekt: {project_name}) "
+        f"hat eine Automatisierung ausgeloest: <strong>{rule_name}</strong>.</p>"
+        f"<p>Aktueller Status: {task.status}<br>Fortschritt: {task.progress or 0}%</p>"
+        f"<p>Mit freundlichen Gruessen<br>{company}</p>"
+    )
+    send_email(settings=settings_d, to_email=to_email, subject=subject,
+               body_text=body_text, body_html=body_html)
+
+
 @router.put("/tasks/{task_id}", response_model=TaskResponse)
 async def update_task(
     task_id: UUID,
     body: TaskUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
     task = _get_task_or_404(db, task_id)
     payload = body.model_dump(exclude_unset=True)
@@ -520,11 +656,28 @@ async def update_task(
 
     for k, v in payload.items():
         setattr(task, k, v)
+
+    # Aufgaben-Typ <-> Meilenstein synchronisieren: Typ "meilenstein" -> is_milestone.
+    # data.task_type ist die Quelle der Wahrheit; is_milestone wird daraus abgeleitet.
+    if isinstance(task.data, dict):
+        ttype = task.data.get("task_type")
+        if ttype is not None:
+            task.is_milestone = (str(ttype).lower() == "meilenstein")
+
+    # Automatisierungsregeln auswerten (nach dem Setzen der neuen Werte)
+    try:
+        _run_automation(db, task, _load_settings(db), user)
+    except Exception as exc:
+        print(f"[Automation] Auswertung fehlgeschlagen: {exc}")
+
     db.commit()
     db.refresh(task)
-    resp = TaskResponse.model_validate(task)
+    # children explizit leeren, bevor validiert wird (ORM-Relationship kann ein
+    # einzelnes Objekt statt Liste sein -> sonst ValidationError).
+    resp = TaskResponse.model_validate(task, from_attributes=True)
     resp.logged_minutes = _logged_minutes_by_task(db, [task.id]).get(task.id, 0)
     resp.children = []
+    resp.checklist = []
     return resp
 
 
@@ -549,8 +702,28 @@ async def create_dependency(
 ):
     if body.predecessor_id == body.successor_id:
         raise HTTPException(status_code=400, detail="Aufgabe kann nicht von sich selbst abhängen")
-    _get_task_or_404(db, body.predecessor_id)
-    _get_task_or_404(db, body.successor_id)
+    pred = _get_task_or_404(db, body.predecessor_id)
+    succ = _get_task_or_404(db, body.successor_id)
+
+    # Beide Aufgaben müssen im selben Projekt sein
+    if pred.project_id != succ.project_id:
+        raise HTTPException(status_code=400, detail="Aufgaben gehören zu verschiedenen Projekten")
+
+    # Duplikat verhindern (gleiche Richtung)
+    existing = db.query(TaskDependency).filter(
+        TaskDependency.predecessor_id == body.predecessor_id,
+        TaskDependency.successor_id == body.successor_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Diese Verknüpfung besteht bereits")
+
+    # Direkten Zyklus verhindern (B->A existiert schon, A->B würde Zyklus bilden)
+    reverse = db.query(TaskDependency).filter(
+        TaskDependency.predecessor_id == body.successor_id,
+        TaskDependency.successor_id == body.predecessor_id,
+    ).first()
+    if reverse:
+        raise HTTPException(status_code=400, detail="Das würde einen Zyklus erzeugen (umgekehrte Verknüpfung besteht bereits)")
 
     dep = TaskDependency(id=uuid4(), **body.model_dump())
     db.add(dep)
@@ -955,7 +1128,16 @@ async def get_projektplan_settings(
     if not row or not row.value:
         return DEFAULT_SETTINGS
     try:
-        return ProjektplanSettings(**json.loads(row.value))
+        s = ProjektplanSettings(**json.loads(row.value))
+        # Migration für Bestands-Einstellungen: Felder, die es früher noch nicht
+        # gab, mit den Defaults auffüllen, statt leer zurückzugeben.
+        if not s.task_types:
+            s.task_types = DEFAULT_SETTINGS.task_types
+        if not s.statuses:
+            s.statuses = DEFAULT_SETTINGS.statuses
+        if not s.priorities:
+            s.priorities = DEFAULT_SETTINGS.priorities
+        return s
     except Exception:
         return DEFAULT_SETTINGS
 

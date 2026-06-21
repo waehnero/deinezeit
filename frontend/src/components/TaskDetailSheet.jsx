@@ -1,13 +1,29 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
-  X, Trash2, ArrowUpRight, Paperclip, Upload, FileText, Image as ImageIcon,
-  Loader2, Calendar, User as UserIcon, Flag, Tag as TagIcon, Save,
+  X, Trash2, Paperclip, Upload, FileText, Image as ImageIcon,
+  Loader2, Calendar, User as UserIcon, Flag, Tag as TagIcon, Save, GitBranch, Plus,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import errMsg from '../utils/errMsg'
 import { projektplanApi, attachmentApi, usersApi } from '../services/api'
 import ContactSearch from './ContactSearch'
 import Checklist from './Checklist'
+
+const DEP_TYPE_LABEL = {
+  FS: 'Ende → Anfang (Standard)',
+  SS: 'Anfang → Anfang',
+  FF: 'Ende → Ende',
+  SF: 'Anfang → Ende',
+}
+
+// Aufgabenbaum flach machen (für Auswahl-Dropdown)
+function flattenTasks(tasks, out = []) {
+  for (const t of tasks || []) {
+    out.push(t)
+    if (t.children?.length) flattenTasks(t.children, out)
+  }
+  return out
+}
 
 const ENTITY_TYPE = 'planning_task'
 
@@ -16,7 +32,7 @@ const ENTITY_TYPE = 'planning_task'
  * Beschreibung, Verantwortlicher, Termine, Status, Priorität, Tags,
  * geschätzte Stunden, eigene (konfigurierbare) Felder und Anlagen.
  */
-export default function TaskDetailSheet({ task, settings, fields, projectContact, onClose, onChanged, onPromote }) {
+export default function TaskDetailSheet({ task, settings, fields, project, projectContact, onClose, onChanged }) {
   const [form, setForm] = useState(() => ({
     title: task.title || '',
     description: task.description || '',
@@ -30,6 +46,7 @@ export default function TaskDetailSheet({ task, settings, fields, projectContact
     due_date: task.due_date || '',
     estimate_hours: task.estimate_minutes ? (task.estimate_minutes / 60) : '',
     tags: task.data?.tags || [],
+    task_type: task.data?.task_type || '',
     data: task.data || {},
   }))
   // Erbt die Aufgabe den Projekt-Kontakt? (gleiche ID wie Projekt)
@@ -73,7 +90,7 @@ export default function TaskDetailSheet({ task, settings, fields, projectContact
         start_date: form.start_date || null,
         due_date: form.due_date || null,
         estimate_minutes: form.estimate_hours ? Math.round(Number(form.estimate_hours) * 60) : null,
-        data: { ...form.data, tags: form.tags },
+        data: { ...form.data, tags: form.tags, task_type: form.task_type || null },
       })
       toast.success('Gespeichert')
       onChanged?.()
@@ -114,7 +131,56 @@ export default function TaskDetailSheet({ task, settings, fields, projectContact
 
   const statuses = settings?.statuses?.length ? settings.statuses : [{ value: 'offen', label: 'Offen' }]
   const priorities = settings?.priorities?.length ? settings.priorities : [{ value: 'mittel', label: 'Mittel' }]
+  // Typen aus den Einstellungen; Fallback auf sinnvolle Standardtypen, damit das
+  // Dropdown auch dann erscheint, wenn noch keine Typen konfiguriert wurden.
+  const taskTypes = settings?.task_types?.length ? settings.task_types : [
+    { value: 'aufgabe', label: 'Aufgabe' },
+    { value: 'meilenstein', label: 'Meilenstein' },
+    { value: 'golive', label: 'GoLive' },
+  ]
   const allTags = settings?.tags || []
+
+  // ── Abhängigkeiten ──────────────────────────────────────────────────────────
+  const allProjectTasks = useMemo(() => flattenTasks(project?.tasks || []), [project])
+  const taskName = (id) => allProjectTasks.find(t => String(t.id) === String(id))?.title || '?'
+  const deps = project?.dependencies || []
+  const predecessors = deps.filter(d => String(d.successor_id) === String(task.id))   // diese hängt von …
+  const successors = deps.filter(d => String(d.predecessor_id) === String(task.id))   // … hängt von dieser
+  // Auswahl-Kandidaten: alle Aufgaben außer dieser
+  const otherTasks = allProjectTasks.filter(t => String(t.id) !== String(task.id))
+
+  const [depMode, setDepMode] = useState('pred')   // 'pred' = Vorgänger, 'succ' = Nachfolger
+  const [depTaskId, setDepTaskId] = useState('')
+  const [depType, setDepType] = useState('FS')
+  const [depBusy, setDepBusy] = useState(false)
+
+  const addDependency = async () => {
+    if (!depTaskId) return toast.error('Bitte eine Aufgabe wählen')
+    setDepBusy(true)
+    try {
+      // pred-Modus: gewählte Aufgabe ist Vorgänger DIESER Aufgabe
+      const payload = depMode === 'pred'
+        ? { predecessor_id: depTaskId, successor_id: task.id, dep_type: depType }
+        : { predecessor_id: task.id, successor_id: depTaskId, dep_type: depType }
+      await projektplanApi.createDependency(payload)
+      toast.success('Verknüpfung hinzugefügt')
+      setDepTaskId('')
+      onChanged?.()   // lädt Projekt neu -> deps aktualisiert
+    } catch (err) {
+      toast.error(errMsg(err, 'Verknüpfung konnte nicht angelegt werden'))
+    } finally {
+      setDepBusy(false)
+    }
+  }
+
+  const removeDependency = async (id) => {
+    try {
+      await projektplanApi.deleteDependency(id)
+      onChanged?.()
+    } catch {
+      toast.error('Verknüpfung konnte nicht gelöscht werden')
+    }
+  }
 
   const renderCustomField = (f) => {
     const val = form.data?.[f.key] ?? ''
@@ -186,6 +252,21 @@ export default function TaskDetailSheet({ task, settings, fields, projectContact
               </select>
             </div>
           </div>
+
+          {/* Aufgaben-Typ */}
+          {taskTypes.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Typ</label>
+              <select value={form.task_type} onChange={(e) => set({ task_type: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">– Standard –</option>
+                {taskTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              {form.task_type === 'meilenstein' && (
+                <p className="text-[11px] text-primary-500 mt-1">Wird im Gantt als Meilenstein-Raute dargestellt.</p>
+              )}
+            </div>
+          )}
 
           {/* Verantwortlicher */}
           <div>
@@ -272,6 +353,62 @@ export default function TaskDetailSheet({ task, settings, fields, projectContact
             </div>
           )}
 
+          {/* Abhängigkeiten */}
+          <div className="border-t border-gray-100 pt-3">
+            <label className="text-xs text-gray-500 mb-2 block flex items-center gap-1">
+              <GitBranch size={12} /> Abhängigkeiten
+            </label>
+
+            {predecessors.length === 0 && successors.length === 0 && (
+              <p className="text-xs text-gray-400 mb-2">Noch keine Verknüpfungen.</p>
+            )}
+
+            {predecessors.map(d => (
+              <div key={d.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 mb-1 text-sm">
+                <span className="text-gray-400 text-[11px] shrink-0">hängt ab von</span>
+                <span className="flex-1 min-w-0 truncate">{taskName(d.predecessor_id)}</span>
+                <span className="text-[10px] text-gray-400 shrink-0">{d.dep_type}</span>
+                <button onClick={() => removeDependency(d.id)} className="text-gray-400 hover:text-red-600 shrink-0"><Trash2 size={14} /></button>
+              </div>
+            ))}
+            {successors.map(d => (
+              <div key={d.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 mb-1 text-sm">
+                <span className="text-gray-400 text-[11px] shrink-0">Vorgänger von</span>
+                <span className="flex-1 min-w-0 truncate">{taskName(d.successor_id)}</span>
+                <span className="text-[10px] text-gray-400 shrink-0">{d.dep_type}</span>
+                <button onClick={() => removeDependency(d.id)} className="text-gray-400 hover:text-red-600 shrink-0"><Trash2 size={14} /></button>
+              </div>
+            ))}
+
+            {/* Hinzufügen */}
+            {otherTasks.length > 0 && (
+              <div className="mt-2 space-y-2">
+                <div className="flex gap-2">
+                  <select value={depMode} onChange={(e) => setDepMode(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="pred">hängt ab von</option>
+                    <option value="succ">Vorgänger von</option>
+                  </select>
+                  <select value={depTaskId} onChange={(e) => setDepTaskId(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="">– Aufgabe wählen –</option>
+                    {otherTasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <select value={depType} onChange={(e) => setDepType(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    {Object.entries(DEP_TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                  <button onClick={addDependency} disabled={depBusy || !depTaskId}
+                    className="flex items-center gap-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white px-3 rounded-lg text-sm">
+                    <Plus size={15} /> Verknüpfen
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Checkliste */}
           <div className="border-t border-gray-100 pt-3">
             <Checklist parentType="task" parentId={task.id} onItemPromoted={onChanged} />
@@ -320,16 +457,10 @@ export default function TaskDetailSheet({ task, settings, fields, projectContact
             className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition">
             <Save size={18} /> {saving ? 'Speichern…' : 'Speichern'}
           </button>
-          <div className="flex gap-2">
-            <button onClick={() => onPromote(task)}
-              className="flex-1 flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-lg text-sm font-medium transition">
-              <ArrowUpRight size={16} /> Detailprojekt
-            </button>
-            <button onClick={() => onChanged?.('delete', task)}
-              className="flex-1 flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 py-2.5 rounded-lg text-sm font-medium transition">
-              <Trash2 size={16} /> Löschen
-            </button>
-          </div>
+          <button onClick={() => onChanged?.('delete', task)}
+            className="w-full flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 py-2.5 rounded-lg text-sm font-medium transition">
+            <Trash2 size={16} /> Aufgabe löschen
+          </button>
         </div>
       </div>
     </div>

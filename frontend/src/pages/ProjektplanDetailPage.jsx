@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Loader2, CheckCircle2, Circle, Clock, User as UserIcon,
   Calendar, Flag, X, ChevronRight, ArrowUpRight, Trash2, Diamond, Tag as TagIcon, MoreVertical,
-  GanttChartSquare, List as ListIcon,
+  GanttChartSquare, List as ListIcon, LayoutGrid,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import errMsg from '../utils/errMsg'
@@ -11,6 +11,7 @@ import { projektplanApi } from '../services/api'
 import TaskDetailSheet from '../components/TaskDetailSheet'
 import Checklist from '../components/Checklist'
 import GanttChart from '../components/GanttChart'
+import KanbanBoard from '../components/KanbanBoard'
 import {
   EditProjectDialog, DuplicateProjectDialog, DeleteProjectDialog, ProjectActionsMenu,
 } from '../components/ProjektDialoge'
@@ -61,6 +62,11 @@ function TaskRow({ task, depth, onToggle, onAddSub, onOpen }) {
         <button onClick={() => onOpen(task)} className="flex-1 min-w-0 text-left">
           <p className={`text-sm ${done ? 'line-through text-gray-400' : 'text-gray-900'}`}>
             {task.title}
+            {task.data?.task_type && task.data.task_type !== 'aufgabe' && (
+              <span className="ml-2 text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded align-middle">
+                {task.data.task_type}
+              </span>
+            )}
           </p>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] text-gray-400">
             {(estimate > 0 || logged > 0) && (
@@ -195,17 +201,6 @@ export default function ProjektplanDetailPage() {
     }
   }
 
-  const promote = async (task) => {
-    try {
-      const { data } = await projektplanApi.promoteTask(task.id, { move_subtasks: true, link_back: true })
-      toast.success('Detailprojekt erstellt')
-      setDetailTask(null)
-      navigate(`/projekte/${data.id}`)
-    } catch (err) {
-      toast.error(errMsg(err, 'Fehler beim Erstellen'))
-    }
-  }
-
   const deleteTask = async (task) => {
     try {
       await projektplanApi.deleteTask(task.id)
@@ -226,7 +221,7 @@ export default function ProjektplanDetailPage() {
   if (!project) return null
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 pb-28">
+    <div className={`mx-auto px-4 md:px-6 py-6 pb-28 ${view === 'liste' ? 'max-w-3xl' : 'max-w-6xl'}`}>
       {/* Kopf */}
       <div className="flex items-center gap-3 mb-1">
         <button onClick={() => navigate('/projekte')} className="text-gray-400 hover:text-gray-700">
@@ -260,6 +255,7 @@ export default function ProjektplanDetailPage() {
       <div className="flex gap-1 mb-4 ml-8">
         {[
           { id: 'liste', label: 'Liste', icon: ListIcon },
+          { id: 'board', label: 'Board', icon: LayoutGrid },
           { id: 'gantt', label: 'Zeitschiene', icon: GanttChartSquare },
         ].map(v => (
           <button key={v.id} onClick={() => setView(v.id)}
@@ -272,7 +268,9 @@ export default function ProjektplanDetailPage() {
       </div>
 
       {view === 'gantt' ? (
-        <GanttChart project={project} onChanged={load} />
+        <GanttChart project={project} onChanged={load} onOpenTask={setDetailTask} />
+      ) : view === 'board' ? (
+        <KanbanBoard project={project} settings={settings} onOpenTask={setDetailTask} onChanged={load} />
       ) : (
         /* Aufgabenliste (rekursiv) */
         <div className="bg-white border border-gray-200 rounded-xl py-1.5">
@@ -363,9 +361,9 @@ export default function ProjektplanDetailPage() {
           task={detailTask}
           settings={settings}
           fields={fields}
+          project={project}
           projectContact={{ contact_id: project.contact_id, contact_name: project.contact_name }}
           onClose={() => setDetailTask(null)}
-          onPromote={(t) => promote(t)}
           onChanged={(action, t) => {
             if (action === 'delete') { deleteTask(t || detailTask); setDetailTask(null) }
             else load()

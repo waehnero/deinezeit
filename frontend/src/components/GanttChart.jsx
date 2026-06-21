@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from 'react'
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import { projektplanApi } from '../services/api'
 import toast from 'react-hot-toast'
 
@@ -10,9 +10,14 @@ function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); retu
 function diffDays(a, b) { return Math.round((b - a) / DAY) }
 function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 
-const DAY_W = 28          // Pixel pro Tag
-const ROW_H = 36          // Zeilenhöhe
-const NAME_W = 160        // Breite der fixierten Namensspalte
+// Maße je nach Bildschirmbreite: Desktop großzügiger, Mobile kompakt (wie bisher).
+// md = 768px (Tailwind-Breakpoint), passend zu den anderen Modulen.
+function ganttDims() {
+  const desktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  return desktop
+    ? { DAY_W: 36, ROW_H: 44, NAME_W: 220 }   // Notebook 13"+ : breite Namen, mehr Zeitbereich
+    : { DAY_W: 28, ROW_H: 36, NAME_W: 110 }   // iPhone: kompakt, scrollbar
+}
 
 /** Flacht den Aufgabenbaum zu einer Liste mit Tiefe ab. */
 function flatten(tasks, depth = 0, out = []) {
@@ -23,10 +28,19 @@ function flatten(tasks, depth = 0, out = []) {
   return out
 }
 
-export default function GanttChart({ project, onChanged }) {
+export default function GanttChart({ project, onChanged, onOpenTask }) {
   const scrollRef = useRef(null)
+  // Responsive Maße, aktualisiert bei Größenänderung des Fensters
+  const [dims, setDims] = useState(ganttDims)
+  useEffect(() => {
+    const onResize = () => setDims(ganttDims())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const { DAY_W, ROW_H, NAME_W } = dims
   const [drag, setDrag] = useState(null)   // { id, mode:'move'|'start'|'end', startX, origStart, origEnd }
   const [preview, setPreview] = useState({})  // id -> {start_date, due_date}
+  const [moved, setMoved] = useState(false)   // ob seit PointerDown wirklich gezogen wurde
 
   const rows = useMemo(() => flatten(project.tasks || []), [project.tasks])
 
@@ -42,7 +56,7 @@ export default function GanttChart({ project, onChanged }) {
     return { minDate: min, totalDays: Math.max(14, diffDays(min, max)) }
   }, [rows, project.milestones])
 
-  const dateToX = useCallback((d) => diffDays(minDate, d) * DAY_W, [minDate])
+  const dateToX = useCallback((d) => diffDays(minDate, d) * DAY_W, [minDate, DAY_W])
   const today = startOfDay(new Date())
 
   // Tagesraster + Monatsbeschriftung
@@ -58,13 +72,15 @@ export default function GanttChart({ project, onChanged }) {
     e.preventDefault(); e.stopPropagation()
     const { s, e: end } = effDates(t)
     if (!s || !end) return
-    setDrag({ id: t.id, mode, startX: e.clientX, origStart: s, origEnd: end })
+    setMoved(false)
+    setDrag({ id: t.id, mode, startX: e.clientX, origStart: s, origEnd: end, task: t })
   }
 
   const onPointerMove = (e) => {
     if (!drag) return
     const deltaDays = Math.round((e.clientX - drag.startX) / DAY_W)
     if (deltaDays === 0) { setPreview(p => { const n = { ...p }; delete n[drag.id]; return n }); return }
+    if (!moved) setMoved(true)
     let ns = drag.origStart, ne = drag.origEnd
     if (drag.mode === 'move') { ns = addDays(drag.origStart, deltaDays); ne = addDays(drag.origEnd, deltaDays) }
     else if (drag.mode === 'start') { ns = addDays(drag.origStart, deltaDays); if (ns >= ne) ns = addDays(ne, -1) }
@@ -74,16 +90,22 @@ export default function GanttChart({ project, onChanged }) {
 
   const onPointerUp = async () => {
     if (!drag) return
-    const pv = preview[drag.id]
+    const cur = drag
+    const pv = preview[cur.id]
     setDrag(null)
-    if (!pv) return
+
+    // Kein echtes Ziehen -> als Klick werten und Detailansicht öffnen
+    if (!moved || !pv) {
+      onOpenTask?.(cur.task)
+      return
+    }
     try {
-      await projektplanApi.updateTaskDates([{ id: drag.id, start_date: pv.start_date, due_date: pv.due_date }])
+      await projektplanApi.updateTaskDates([{ id: cur.id, start_date: pv.start_date, due_date: pv.due_date }])
       toast.success('Termin aktualisiert')
       onChanged?.()
     } catch {
       toast.error('Termin konnte nicht gespeichert werden')
-      setPreview(p => { const n = { ...p }; delete n[drag.id]; return n })
+      setPreview(p => { const n = { ...p }; delete n[cur.id]; return n })
     }
   }
 
@@ -129,11 +151,12 @@ export default function GanttChart({ project, onChanged }) {
         <div className="shrink-0 border-r border-gray-200" style={{ width: NAME_W }}>
           <div className="h-[34px] border-b border-gray-200 bg-gray-50 flex items-center px-3 text-xs text-gray-500">Aufgabe</div>
           {rows.map((t) => (
-            <div key={t.id} className="flex items-center text-sm text-gray-800 border-b border-gray-100 px-3 truncate"
+            <button key={t.id} onClick={() => onOpenTask?.(t)}
+              className="w-full flex items-center text-sm text-gray-800 border-b border-gray-100 px-3 truncate text-left hover:bg-gray-50"
               style={{ height: ROW_H, paddingLeft: 12 + t._depth * 12 }}>
               {t.is_critical && <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5 shrink-0" />}
               <span className="truncate">{t.title}</span>
-            </div>
+            </button>
           ))}
         </div>
 
@@ -190,7 +213,8 @@ export default function GanttChart({ project, onChanged }) {
                   const d = s || parseDate(t.due_date)
                   if (!d) return null
                   const cx = dateToX(d) + DAY_W / 2
-                  return <div key={t.id} className="absolute z-20" title={t.title}
+                  return <div key={t.id} className="absolute z-20 cursor-pointer" title={t.title}
+                    onClick={() => onOpenTask?.(t)}
                     style={{ left: cx - 7, top: y + ROW_H / 2 - 7, width: 14, height: 14, background: '#534AB7', transform: 'rotate(45deg)', borderRadius: 2 }} />
                 }
                 const bar = barFor(t)

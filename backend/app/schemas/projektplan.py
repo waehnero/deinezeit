@@ -210,6 +210,8 @@ class PlanningProjectListItem(PlanningProjectBase):
     task_count: int = 0
     done_count: int = 0
     progress_percent: int = 0
+    # Kontakt-Typ aus den Stammdaten (data.typ), vom Endpoint per Lookup gefüllt
+    contact_type: Optional[str] = None
 
 
 class PlanningProjectDetail(PlanningProjectListItem):
@@ -275,11 +277,37 @@ class StatusOption(BaseModel):
     color: Optional[str] = None
 
 
+class AutomationRule(BaseModel):
+    """
+    Eine Automatisierungsregel: WENN ein Trigger erfüllt ist, DANN Aktionen.
+    Gespeichert global in den Projekt-Einstellungen.
+    """
+    id: Optional[str] = None
+    name: str = ""
+    enabled: bool = True
+
+    # ── Geltung ──
+    applies_to_type: Optional[str] = None   # nur für diesen Aufgaben-Typ (value), None = alle
+
+    # ── Trigger (mind. einer aktiv) ──
+    trigger_progress_min: Optional[int] = None   # Fortschritt >= x % (z. B. 80)
+    trigger_status: Optional[str] = None         # Status erreicht (value)
+
+    # ── Aktionen ──
+    action_email_assignee: bool = False          # E-Mail an Verantwortlichen
+    action_set_status: Optional[str] = None      # Status der Aufgabe auf diesen Wert setzen
+    action_activate_successors: bool = False     # Nachfolger (Abhängigkeiten) auf "in_arbeit"
+
+
 class ProjektplanSettings(BaseModel):
     """Frei konfigurierbare Listen für das Projektmodul."""
     statuses: List[StatusOption] = Field(default_factory=list)
     priorities: List[StatusOption] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
+    # Frei konfigurierbare Aufgaben-Typen (z. B. Aufgabe, Meilenstein, GoLive)
+    task_types: List[StatusOption] = Field(default_factory=list)
+    # Automatisierungsregeln
+    rules: List[AutomationRule] = Field(default_factory=list)
 
 
 # ── Aktion: Aufgabe -> Detailprojekt ──────────────────────────────────────────
