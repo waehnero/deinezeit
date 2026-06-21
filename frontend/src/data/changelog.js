@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.7',
+    day: '21',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Neues Projekte-Widget für schnellen Zugriff',
+    ],
+    updates: [],
+  },
+  {
     version: '1.12.6',
     day: '21',
     month: 'Juni',

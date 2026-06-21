@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.7] – 2026-06-21 – Schnellzugriff für Projekte
+
+### Neu
+- Neues Projekte-Widget für schnellen Zugriff
+
+---
+
 ## [1.12.6] – 2026-06-21 – iPhone Header Bugfix
 
 ### Aktualisierungen
