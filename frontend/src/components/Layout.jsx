@@ -40,8 +40,12 @@ export default function Layout({ children }) {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Logo / Firmenname */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-neutral-100">
+      {/* Logo / Firmenname – führt zum Dashboard */}
+      <button
+        onClick={() => { navigate('/dashboard'); setMobileOpen(false) }}
+        className="flex items-center gap-3 px-4 py-5 border-b border-neutral-100 w-full text-left hover:bg-neutral-50 transition-colors"
+        title="Zum Dashboard"
+      >
         {logoUrl ? (
           <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain flex-shrink-0" />
         ) : (
@@ -57,7 +61,7 @@ export default function Layout({ children }) {
             <span className="text-[10px] text-neutral-400 block truncate">{settings.app_subtitle}</span>
           )}
         </div>
-      </div>
+      </button>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
@@ -146,7 +150,7 @@ export default function Layout({ children }) {
         {/* Mobile Header – berücksichtigt iOS Safe Area (Notch/Statusleiste) */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-neutral-200"
           style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}>
-          <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-3" title="Zum Dashboard">
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="w-7 h-7 object-contain"
                 onError={e => { e.target.style.display='none' }} />
@@ -156,7 +160,7 @@ export default function Layout({ children }) {
               </div>
             )}
             <span className="font-semibold text-neutral-900 text-sm">{companyName}</span>
-          </div>
+          </button>
           <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-600">
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
