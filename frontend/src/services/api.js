@@ -227,6 +227,7 @@ export const accountingApi = {
 export const projektplanApi = {
   // Projekte
   listProjects:   (params) => api.get('/projektplan/projects', { params }),
+  recentProjects: (limit = 5) => api.get('/projektplan/projects/recent', { params: { limit } }),
   getProject:     (id)     => api.get(`/projektplan/projects/${id}`),
   createProject:  (data)   => api.post('/projektplan/projects', data),
   updateProject:  (id, data) => api.put(`/projektplan/projects/${id}`, data),

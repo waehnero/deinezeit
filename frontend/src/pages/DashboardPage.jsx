@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { masterdataApi, authApi, zeiterfassungApi, invoiceApi } from '../services/api'
+import { masterdataApi, authApi, zeiterfassungApi, invoiceApi, projektplanApi } from '../services/api'
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
@@ -11,7 +11,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   GripVertical, Settings2, ChevronRight, Plus,
-  Database, Clock, Check, FileText,
+  Database, Clock, Check, FileText, GanttChartSquare,
 } from 'lucide-react'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
@@ -221,38 +221,121 @@ function RechnungWidget({ invoiceStats, editMode, onClick }) {
   )
 }
 
-// ── Widget: Schnellzugriff ────────────────────────────────────────────────────
+// ── Schnellzugriff: verfügbare Module ─────────────────────────────────────────
+const QUICK_LINKS = [
+  { key: 'zeiterfassung', label: 'Zeiterfassung',       sub: 'Zeiten erfassen und auswerten',  path: '/zeiterfassung', icon: Clock },
+  { key: 'projekte',      label: 'Projekte',            sub: 'Projektplanung und Aufgaben',    path: '/projekte',      icon: GanttChartSquare },
+  { key: 'invoices',      label: 'Belege',              sub: 'Rechnungen, Angebote, Belege',   path: '/invoices',      icon: FileText },
+  { key: 'masterdata',    label: 'Stammdaten verwalten',sub: 'Typen und Felder konfigurieren', path: '/masterdata',    icon: Database },
+  { key: 'datacenter',    label: 'Datacenter',          sub: 'Dateien und Anhänge',            path: '/datacenter',    icon: Database },
+  { key: 'users',         label: 'Benutzer',            sub: 'Benutzer verwalten',             path: '/users',         icon: Database },
+]
+const QUICK_LS_KEY = 'dashboard_quickaccess_v1'
+const QUICK_DEFAULT = ['masterdata', 'zeiterfassung']  // wie bisher
+
+// ── Widget: Schnellzugriff (konfigurierbar) ───────────────────────────────────
 function QuickAccessWidget({ editMode, navigate }) {
-  const links = [
-    { label: 'Stammdaten verwalten',  sub: 'Typen und Felder konfigurieren', path: '/masterdata', icon: <Database size={16} className="text-primary-600" /> },
-    { label: 'Zeiterfassung',          sub: 'Zeiten erfassen und auswerten',  path: '/zeiterfassung', icon: <Clock size={16} className="text-primary-600" /> },
-  ]
+  const [selected, setSelected] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(QUICK_LS_KEY))
+      return Array.isArray(saved) ? saved : QUICK_DEFAULT
+    } catch { return QUICK_DEFAULT }
+  })
+  const [configOpen, setConfigOpen] = useState(false)
+
+  const toggle = (key) => {
+    setSelected(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+      localStorage.setItem(QUICK_LS_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  // In gewählter Reihenfolge der QUICK_LINKS-Definition anzeigen
+  const links = QUICK_LINKS.filter(l => selected.includes(l.key))
+
   return (
     <div className={`card p-5 h-full ${editMode ? 'rounded-tl-none rounded-tr-none' : ''}`}>
-      <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">Schnellzugriff</h3>
-      <div className="flex flex-col gap-2">
-        {links.map(l => (
-          <button
-            key={l.path}
-            disabled={editMode}
-            onClick={editMode ? undefined : () => navigate(l.path)}
-            className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-              editMode
-                ? 'bg-neutral-50 cursor-default'
-                : 'hover:bg-primary-50 group cursor-pointer'
-            }`}
-          >
-            <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
-              {l.icon}
-            </div>
-            <div className="text-left flex-1 min-w-0">
-              <p className="text-sm font-semibold text-neutral-900 truncate">{l.label}</p>
-              <p className="text-xs text-neutral-400 truncate">{l.sub}</p>
-            </div>
-            {!editMode && <ChevronRight size={14} className="text-neutral-300 group-hover:text-primary-500 flex-shrink-0" />}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider">Schnellzugriff</h3>
+        {!editMode && (
+          <button onClick={() => setConfigOpen(o => !o)}
+            className="text-neutral-400 hover:text-primary-600" title="Schnellzugriff anpassen">
+            <Settings2 size={16} />
           </button>
-        ))}
+        )}
       </div>
+
+      {configOpen && !editMode ? (
+        <div className="space-y-1.5">
+          <p className="text-xs text-neutral-400 mb-2">Welche Module sollen erscheinen?</p>
+          {QUICK_LINKS.map(l => (
+            <label key={l.key} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-neutral-50 cursor-pointer">
+              <input type="checkbox" checked={selected.includes(l.key)} onChange={() => toggle(l.key)} />
+              <l.icon size={15} className="text-primary-600" />
+              <span className="text-sm text-neutral-800">{l.label}</span>
+            </label>
+          ))}
+          <button onClick={() => setConfigOpen(false)}
+            className="mt-2 w-full text-sm text-primary-600 hover:text-primary-700 py-1.5">Fertig</button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {links.length === 0 && <p className="text-sm text-neutral-400">Keine Module gewählt. Über das Zahnrad oben anpassen.</p>}
+          {links.map(l => (
+            <button key={l.key} disabled={editMode}
+              onClick={editMode ? undefined : () => navigate(l.path)}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all ${editMode ? 'bg-neutral-50 cursor-default' : 'hover:bg-primary-50 group cursor-pointer'}`}>
+              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <l.icon size={16} className="text-primary-600" />
+              </div>
+              <div className="text-left flex-1 min-w-0">
+                <p className="text-sm font-semibold text-neutral-900 truncate">{l.label}</p>
+                <p className="text-xs text-neutral-400 truncate">{l.sub}</p>
+              </div>
+              {!editMode && <ChevronRight size={14} className="text-neutral-300 group-hover:text-primary-500 flex-shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Widget: Projekte (5 zuletzt bearbeitete) ──────────────────────────────────
+function ProjekteWidget({ projects, editMode, navigate }) {
+  return (
+    <div className={`card p-5 h-full ${editMode ? 'rounded-tl-none rounded-tr-none' : ''}`}>
+      <button
+        disabled={editMode}
+        onClick={editMode ? undefined : () => navigate('/projekte')}
+        className={`flex items-center gap-3 mb-3 w-full text-left ${editMode ? '' : 'group'}`}
+      >
+        <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+          <GanttChartSquare size={20} className="text-primary-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-neutral-900">Projekte</p>
+          <p className="text-xs text-neutral-400">Zuletzt bearbeitet</p>
+        </div>
+        {!editMode && <ChevronRight size={16} className="text-neutral-300 group-hover:text-primary-500" />}
+      </button>
+
+      {(!projects || projects.length === 0) ? (
+        <p className="text-sm text-neutral-400 py-2">Noch keine Projekte.</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {projects.map(p => (
+            <button key={p.id} disabled={editMode}
+              onClick={editMode ? undefined : () => navigate(`/projekte/${p.id}`)}
+              className={`flex items-center gap-2.5 p-2 rounded-lg transition-all ${editMode ? 'bg-neutral-50 cursor-default' : 'hover:bg-primary-50 group cursor-pointer'}`}>
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color || '#9ca3af' }} />
+              <span className="text-sm text-neutral-800 truncate flex-1 min-w-0 text-left">{p.name}</span>
+              <span className="text-xs text-neutral-400 flex-shrink-0">{p.progress_percent}%</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -268,6 +351,7 @@ function buildDefaultConfig(types) {
 const FIXED_WIDGETS = [
   { id: 'widget_zeit',       type: 'zeiterfassung', size: 2 },
   { id: 'widget_rechnungen', type: 'rechnungen',    size: 2 },
+  { id: 'widget_projekte',   type: 'projekte',      size: 2 },
   { id: 'widget_quick',      type: 'quick_access',  size: 2 },
 ]
 
@@ -298,6 +382,7 @@ export default function DashboardPage() {
   const [user,     setUser]     = useState(null)
   const [stats,    setStats]    = useState(null)
   const [invoiceStats, setInvoiceStats] = useState(null)
+  const [recentProjects, setRecentProjects] = useState([])
   const [widgets,  setWidgets]  = useState([])
   const [editMode, setEditMode] = useState(false)
   const [loading,  setLoading]  = useState(true)
@@ -309,11 +394,13 @@ export default function DashboardPage() {
       authApi.me(),
       zeiterfassungApi.getStats().catch(() => ({ data: null })),
       invoiceApi.list({ doc_type: 'rechnung' }).catch(() => ({ data: [] })),
-    ]).then(([typesRes, meRes, statsRes, invRes]) => {
+      projektplanApi.recentProjects(5).catch(() => ({ data: [] })),
+    ]).then(([typesRes, meRes, statsRes, invRes, recentRes]) => {
       const loadedTypes = typesRes.data
       setTypes(loadedTypes)
       setUser(meRes.data)
       setStats(statsRes.data)
+      setRecentProjects(recentRes.data || [])
 
       // Rechnungs-Statistiken berechnen
       const invList = invRes.data || []
@@ -464,6 +551,9 @@ export default function DashboardPage() {
                     editMode={editMode}
                     onClick={() => navigate('/invoices')}
                   />
+                )}
+                {widget.type === 'projekte' && (
+                  <ProjekteWidget projects={recentProjects} editMode={editMode} navigate={navigate} />
                 )}
                 {widget.type === 'quick_access' && (
                   <QuickAccessWidget editMode={editMode} navigate={navigate} />

@@ -273,6 +273,31 @@ async def list_projects(
     return result
 
 
+@router.get("/projects/recent", response_model=List[PlanningProjectListItem])
+async def recent_projects(
+    limit: int = Query(5, ge=1, le=20),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Die zuletzt bearbeiteten (nicht archivierten) Projekte – fürs Dashboard."""
+    projects = (
+        db.query(PlanningProject)
+        .filter(PlanningProject.is_archived == False)  # noqa: E712
+        .order_by(PlanningProject.updated_at.desc().nullslast())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for p in projects:
+        item = PlanningProjectListItem.model_validate(p)
+        stats = _project_stats(db, p.id)
+        item.task_count = stats["task_count"]
+        item.done_count = stats["done_count"]
+        item.progress_percent = stats["progress_percent"]
+        result.append(item)
+    return result
+
+
 @router.post("/projects", response_model=PlanningProjectDetail)
 async def create_project(
     body: PlanningProjectCreate,
