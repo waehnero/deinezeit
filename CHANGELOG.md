@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.5] – 2026-06-21 – Board und Projektübersicht erweitert
+
+### Neu
+- Neues Board-System für verbesserte Projektorganisation
+- Erweiterte Automatisierungsmöglichkeiten für Workflows
+- Neue Projektübersicht mit besserer Darstellung
+- Neue Typen zur flexibleren Datenverwaltung
+
+### Aktualisierungen
+- Abhängigkeiten aktualisiert und optimiert
+- Desktop-Ansicht für bessere Usability überarbeitet
+
+---
+
 ## [1.12.4] – 2026-06-21 – Stabilitätsverbesserung Projekt-Details
 
 ### Aktualisierungen

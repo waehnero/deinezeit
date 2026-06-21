@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '1.12.5',
+    day: '21',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Neues Board-System für verbesserte Projektorganisation',
+      'Erweiterte Automatisierungsmöglichkeiten für Workflows',
+      'Neue Projektübersicht mit besserer Darstellung',
+      'Neue Typen zur flexibleren Datenverwaltung',
+    ],
+    updates: [
+      'Abhängigkeiten aktualisiert und optimiert',
+      'Desktop-Ansicht für bessere Usability überarbeitet',
+    ],
+  },
+  {
     version: '1.12.4',
     day: '21',
     month: 'Juni',
