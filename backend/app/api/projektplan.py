@@ -280,7 +280,27 @@ async def get_project(
 
 
 def _project_detail(db: Session, proj: PlanningProject) -> PlanningProjectDetail:
-    detail = PlanningProjectDetail.model_validate(proj)
+    # WICHTIG: NICHT model_validate(proj) verwenden – das würde die SQLAlchemy-
+    # Relationships (tasks/children) aus dem ORM ziehen, wobei task.children ein
+    # einzelnes Task-Objekt statt einer Liste sein kann -> ValidationError.
+    # Stattdessen nur die Kopf-Felder des Projekts übernehmen; die Listen
+    # (tasks, milestones, checklist, dependencies) setzen wir unten selbst.
+    detail = PlanningProjectDetail(
+        id=proj.id,
+        name=proj.name,
+        description=proj.description,
+        masterdata_project_id=proj.masterdata_project_id,
+        masterdata_project_name=proj.masterdata_project_name,
+        contact_id=proj.contact_id,
+        contact_name=proj.contact_name,
+        status=proj.status,
+        color=proj.color,
+        start_date=proj.start_date,
+        end_date=proj.end_date,
+        is_archived=proj.is_archived,
+        origin_task_id=proj.origin_task_id,
+        created_at=proj.created_at,
+    )
     tasks = db.query(Task).filter(Task.project_id == proj.id).all()
     task_ids = [t.id for t in tasks]
     logged = _logged_minutes_by_task(db, task_ids)
@@ -294,9 +314,12 @@ def _project_detail(db: Session, proj: PlanningProject) -> PlanningProjectDetail
     critical = _critical_task_ids(tasks, deps)
     detail.tasks = _build_tree(tasks, logged, task_checklists, critical)
     detail.dependencies = [DependencyResponse.model_validate(d) for d in deps]
+    # Robust sortieren: Meilensteine ohne Datum ans Ende; kein Vergleich date<->str.
+    from datetime import date as _date
+    _far = _date.max
     detail.milestones = [
         MilestoneResponse.model_validate(m)
-        for m in sorted(proj.milestones, key=lambda m: (m.sort_order, m.due_date or ""))
+        for m in sorted(proj.milestones, key=lambda m: (m.sort_order or 0, m.due_date or _far))
     ]
     detail.checklist = _checklist_by_parent(db, "project", [proj.id]).get(proj.id, [])
     stats = _project_stats(db, proj.id)
