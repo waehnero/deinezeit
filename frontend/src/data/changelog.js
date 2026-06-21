@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.4',
+    day: '21',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Projekt-Detail stürzt nicht mehr bei verschachtelten Aufgaben ab',
+    ],
+  },
+  {
     version: '1.12.3',
     day: '20',
     month: 'Juni',

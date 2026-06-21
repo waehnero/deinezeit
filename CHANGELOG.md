@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.4] – 2026-06-21 – Stabilitätsverbesserung Projekt-Details
+
+### Aktualisierungen
+- Projekt-Detail stürzt nicht mehr bei verschachtelten Aufgaben ab
+
+---
+
 ## [1.12.3] – 2026-06-20 – Automatische Versionsverwaltung mit Schutz
 
 ### Aktualisierungen
