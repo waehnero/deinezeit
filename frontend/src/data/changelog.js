@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.6',
+    day: '21',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'iPhone Header lokal behoben',
+    ],
+  },
+  {
     version: '1.12.5',
     day: '21',
     month: 'Juni',

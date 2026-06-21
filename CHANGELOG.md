@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.6] – 2026-06-21 – iPhone Header Bugfix
+
+### Aktualisierungen
+- iPhone Header lokal behoben
+
+---
+
 ## [1.12.5] – 2026-06-21 – Board und Projektübersicht erweitert
 
 ### Neu
