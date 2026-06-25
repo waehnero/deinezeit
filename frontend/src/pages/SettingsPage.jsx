@@ -3,6 +3,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { settingsApi, systemApi, invoiceApi, accountingApi } from '../services/api'
 import toast from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
+import UserManagementPage from './UserManagementPage'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
   Save, Upload, Trash2, Download, Send, Loader2,
@@ -2211,6 +2212,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
     { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
+    { id: 'benutzer',   label: 'Benutzer',   icon: Users     },
     { id: 'system',     label: 'System',     icon: Cpu       },
   ]
 
@@ -2238,6 +2240,7 @@ export default function SettingsPage() {
       <div className="card p-6">
         {activeTab === 'allgemein'  && <TabAllgemeinWrapper settings={settings} onSaved={loadSettings} />}
         {activeTab === 'parameter'  && <TabParameter />}
+        {activeTab === 'benutzer'   && <UserManagementPage />}
         {activeTab === 'system'     && <TabSystemWrapper settings={settings} onSaved={loadSettings} />}
       </div>
     </div>

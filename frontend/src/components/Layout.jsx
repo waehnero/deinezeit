@@ -17,7 +17,6 @@ const NAV_ITEMS = [
   { to: '/invoices',     icon: Receipt,         label: 'Belege' },
   { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },
   { to: '/datacenter',   icon: HardDrive,       label: 'Datacenter' },
-  { to: '/users',        icon: Users,           label: 'Benutzer' },
 ]
 
 export default function Layout({ children }) {
