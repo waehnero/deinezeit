@@ -7,6 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Service Worker bewusst deaktiviert: Der PWA-Cache hat wiederholt alten
+      // JS-Code festgehalten, sodass Updates (z.B. Upload-Fix) nicht griffen.
+      // selfDestroying erzeugt einen einmaligen SW, der bei jedem Nutzer alle
+      // alten Service Worker + Caches entfernt und sich dann selbst abschaltet.
+      // Updates greifen danach immer sofort. (Kein Offline-Modus / keine
+      // Homescreen-Installation mehr – für eine interne Web-App akzeptabel.)
+      selfDestroying: true,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'DeineZeit',

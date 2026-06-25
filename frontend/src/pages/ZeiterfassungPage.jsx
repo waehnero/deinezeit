@@ -568,11 +568,16 @@ function EntryModal({ entry, onClose, onSaved }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 p-5 border-t border-gray-100">
-          <AttachmentQuickBar entityType="zeiterfassung"
-            entityId={isEdit ? entry.id : createdEntry?.id || null}
-            onEnsureEntity={ensureEntity}
-            onUploaded={() => setAttachmentsRefresh(n => n + 1)}
-            className="mr-auto" />
+          {/* Quick-Upload nur beim Nachtragen (kein gespeicherter Eintrag).
+              Beim Bearbeiten erfolgt der Upload zuverlässig über den
+              "Öffnen"-Bereich (Anhänge & Dateien) weiter unten. */}
+          {!isEdit && (
+            <AttachmentQuickBar entityType="zeiterfassung"
+              entityId={createdEntry?.id || null}
+              onEnsureEntity={ensureEntity}
+              onUploaded={() => setAttachmentsRefresh(n => n + 1)}
+              className="mr-auto" />
+          )}
           {!isEdit && !createdEntry && (
             <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
               <input type="checkbox" checked={createAnother} onChange={(e) => setCreateAnother(e.target.checked)}
@@ -580,7 +585,7 @@ function EntryModal({ entry, onClose, onSaved }) {
               Weiteren erstellen
             </label>
           )}
-          <button onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium transition">
+          <button onClick={onClose} className={`px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium transition ${isEdit ? 'ml-auto' : ''}`}>
             Abbrechen
           </button>
           <button onClick={handleSave} disabled={loading}
