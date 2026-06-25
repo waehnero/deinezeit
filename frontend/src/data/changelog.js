@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.10',
+    day: '25',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Dialog zum Bearbeiten von Zeiteinträgen wurde korrigiert.',
+    ],
+  },
+  {
     version: '1.12.9',
     day: '25',
     month: 'Juni',

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.10] – 2026-06-25 – Bugfix Zeiteintrag-Dialog
+
+### Aktualisierungen
+- Dialog zum Bearbeiten von Zeiteinträgen wurde korrigiert.
+
+---
+
 ## [1.12.9] – 2026-06-25 – Datei-Upload Stabilität
 
 ### Aktualisierungen
