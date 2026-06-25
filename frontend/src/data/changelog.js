@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.11',
+    day: '25',
+    month: 'Juni',
+    year: '2026',
+    features: [
+      'Dateien werden jetzt nach Modul und Kontakt organisiert',
+      'Vererbungsmechanismus für Dateistrukturen implementiert',
+      'Automatisches Backfill von Bestandsdaten',
+    ],
+    updates: [],
+  },
+  {
     version: '1.12.10',
     day: '25',
     month: 'Juni',

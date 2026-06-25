@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.12.11] – 2026-06-25 – Datacenter-Reorganisation mit Vererbung
+
+### Neu
+- Dateien werden jetzt nach Modul und Kontakt organisiert
+- Vererbungsmechanismus für Dateistrukturen implementiert
+- Automatisches Backfill von Bestandsdaten
+
+---
+
 ## [1.12.10] – 2026-06-25 – Bugfix Zeiteintrag-Dialog
 
 ### Aktualisierungen
