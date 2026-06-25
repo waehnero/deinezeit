@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.9] – 2026-06-25 – Datei-Upload Stabilität
+
+### Aktualisierungen
+- Datei-Upload mit korrekter Multipart-Boundary-Handhabung repariert
+- Anhänge-Zähler wird nun zuverlässig aktualisiert
+
+---
+
 ## [1.12.8] – 2026-06-21 – Navigation zum Dashboard vereinfacht
 
 ### Neu

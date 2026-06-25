@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.12.9',
+    day: '25',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Datei-Upload mit korrekter Multipart-Boundary-Handhabung repariert',
+      'Anhänge-Zähler wird nun zuverlässig aktualisiert',
+    ],
+  },
+  {
     version: '1.12.8',
     day: '21',
     month: 'Juni',
