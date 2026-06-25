@@ -27,6 +27,11 @@ class Attachment(Base):
     display_name  = Column(String(255), nullable=False)
     description   = Column(Text,        nullable=True)
 
+    # Kontaktbezug (EntityRecord aus Stammdaten, denormalisiert).
+    # Wird beim Upload aus dem Ursprungs-Datensatz vererbt, nachträglich änderbar.
+    contact_id    = Column(UUID(as_uuid=True), nullable=True)
+    contact_name  = Column(String(300), nullable=True)
+
     # Share-Link
     share_token      = Column(String(64),  nullable=True, unique=True)
     share_expires_at = Column(DateTime(timezone=True), nullable=True)

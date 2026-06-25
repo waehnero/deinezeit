@@ -130,12 +130,15 @@ export const settingsApi = {
 
 export const datacenterApi = {
   // Alle Anhänge laden (optional gefiltert nach entityType und/oder entityId)
-  listAll:         (entityType, entityId) => {
+  listAll:         (entityType, entityId, contactId) => {
     const params = {}
     if (entityType) params.entity_type = entityType
     if (entityId)   params.entity_id   = entityId
+    if (contactId !== undefined && contactId !== null) params.contact_id = contactId
     return api.get('/datacenter/all', { params })
   },
+  updateContact:   (attachmentId, contactId, contactName) =>
+    api.patch(`/datacenter/${attachmentId}/contact`, { contact_id: contactId, contact_name: contactName }),
   // Anhänge für einen konkreten Datensatz laden
   list:            (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),
   upload:          (entityType, entityId, file, onProgress) => {

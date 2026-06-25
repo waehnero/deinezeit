@@ -28,6 +28,54 @@ from app.models.user import User
 from app.api.deps import get_current_user
 from app.services import storage_service
 
+
+# ── Kontakt-Vererbung ─────────────────────────────────────────────────────────
+
+def resolve_contact(db: Session, entity_type: str, entity_id: str):
+    """Ermittelt den Kontakt (contact_id, contact_name) für eine Datei anhand
+    ihres Ursprungs-Datensatzes. Gibt (None, None) zurück, wenn keiner
+    ermittelbar ist ("Ohne Kontakt").
+
+    Regeln:
+      - kontakte               -> der Datensatz selbst
+      - zeiterfassung          -> Kontakt des Zeiteintrags
+      - planning_task          -> Kontakt der Aufgabe, sonst des Projekts
+      - alle anderen Stammdaten-Typen, die selbst Kontakte sind, bleiben offen
+    """
+    try:
+        if entity_type == "zeiterfassung":
+            from app.models.zeiterfassung import TimeEntry
+            te = db.query(TimeEntry).filter(TimeEntry.id == entity_id).first()
+            if te and te.contact_id:
+                return te.contact_id, te.contact_name
+
+        elif entity_type == "planning_task":
+            from app.models.projektplan import Task, PlanningProject
+            task = db.query(Task).filter(Task.id == entity_id).first()
+            if task:
+                if task.contact_id:
+                    return task.contact_id, task.contact_name
+                proj = db.query(PlanningProject).filter(
+                    PlanningProject.id == task.project_id
+                ).first()
+                if proj and getattr(proj, "contact_id", None):
+                    return proj.contact_id, proj.contact_name
+
+        else:
+            # Stammdaten-Datensatz: ist er selbst ein Kontakt, verweist er auf sich.
+            rec = db.query(EntityRecord).filter(EntityRecord.id == entity_id).first()
+            if rec:
+                et = db.query(EntityType).filter(EntityType.id == rec.entity_type_id).first()
+                if et and et.slug in ("kontakte", "kontakt"):
+                    name = rec.display_name
+                    if not name and rec.data:
+                        name = next((str(v) for v in rec.data.values() if v), None)
+                    return rec.id, name
+    except Exception:
+        # Vererbung ist best-effort: schlägt sie fehl, bleibt die Datei "ohne Kontakt".
+        return None, None
+    return None, None
+
 router = APIRouter(prefix="/datacenter", tags=["Datacenter"])
 
 # Max. Dateigröße: 100 MB
@@ -65,6 +113,11 @@ class LinkCreate(BaseModel):
     link_url:      str
     link_provider: str = "custom"
     description:   Optional[str] = None
+
+
+class ContactUpdate(BaseModel):
+    contact_id:   Optional[str] = None
+    contact_name: Optional[str] = None
 
 
 class ShareLinkRequest(BaseModel):
@@ -114,6 +167,8 @@ def _to_response(a: Attachment) -> dict:
         "share_expires_at": a.share_expires_at.isoformat() if a.share_expires_at else None,
         "uploaded_by":   str(a.uploaded_by) if a.uploaded_by else None,
         "created_at":    a.created_at.isoformat() if a.created_at else "",
+        "contact_id":    str(a.contact_id) if a.contact_id else None,
+        "contact_name":  a.contact_name,
     }
 
 
@@ -124,6 +179,38 @@ def _build_entity_label_map(db: Session, rows) -> dict:
     pairs = set((r.entity_type, str(r.entity_id)) for r in rows)
     for etype, eid in pairs:
         try:
+            # Sonderfall: Zeiteinträge sind keine Stammdaten-Records.
+            # Sprechender Name: Projekt + Notiz bzw. Datum.
+            if etype == "zeiterfassung":
+                from app.models.zeiterfassung import TimeEntry
+                te = db.query(TimeEntry).filter(TimeEntry.id == eid).first()
+                if te:
+                    parts = []
+                    if te.project_name:
+                        parts.append(te.project_name)
+                    if te.note:
+                        parts.append(te.note[:40])
+                    elif te.started_at:
+                        parts.append(te.started_at.strftime("%d.%m.%Y"))
+                    if parts:
+                        label_map[(etype, eid)] = " – ".join(parts)
+                continue
+
+            # Sonderfall: Projektaufgaben -> Aufgabentitel (ggf. mit Projekt).
+            if etype == "planning_task":
+                from app.models.projektplan import Task, PlanningProject
+                task = db.query(Task).filter(Task.id == eid).first()
+                if task:
+                    label = task.title or ""
+                    proj = db.query(PlanningProject).filter(
+                        PlanningProject.id == task.project_id
+                    ).first()
+                    if proj and proj.name:
+                        label = f"{proj.name} – {label}" if label else proj.name
+                    if label:
+                        label_map[(etype, eid)] = label
+                continue
+
             et = db.query(EntityType).filter(EntityType.slug == etype).first()
             if et:
                 rec = db.query(EntityRecord).filter(
@@ -318,6 +405,7 @@ def _render_msg_preview(raw: bytes) -> str:
 async def list_all_attachments(
     entity_type: Optional[str] = Query(None),
     entity_id:   Optional[str] = Query(None),
+    contact_id:  Optional[str] = Query(None),
     db:          Session = Depends(get_db),
     _:           User = Depends(get_current_user),
 ):
@@ -326,6 +414,11 @@ async def list_all_attachments(
         q = q.filter(Attachment.entity_type == entity_type)
     if entity_id:
         q = q.filter(Attachment.entity_id == entity_id)
+    if contact_id:
+        if contact_id == "__none__":
+            q = q.filter(Attachment.contact_id.is_(None))
+        else:
+            q = q.filter(Attachment.contact_id == contact_id)
     rows = q.order_by(Attachment.created_at.desc()).all()
     label_map = _build_entity_label_map(db, rows)
     return {"attachments": [_to_response_with_label(r, label_map) for r in rows]}
@@ -371,11 +464,13 @@ async def add_link(
 ):
     if body.link_provider not in LINK_PROVIDERS:
         body.link_provider = "custom"
+    contact_id, contact_name = resolve_contact(db, body.entity_type, body.entity_id)
     attachment = Attachment(
         entity_type=body.entity_type, entity_id=body.entity_id,
         type="link", link_url=body.link_url, link_provider=body.link_provider,
         display_name=body.display_name, description=body.description,
         uploaded_by=current.id,
+        contact_id=contact_id, contact_name=contact_name,
     )
     db.add(attachment)
     db.commit()
@@ -556,16 +651,39 @@ async def upload_file(
     except Exception as exc:
         raise HTTPException(500, f"Speicher-Fehler: {exc}")
 
+    contact_id, contact_name = resolve_contact(db, entity_type, entity_id)
+
     attachment = Attachment(
         entity_type=entity_type, entity_id=entity_id,
         type="file", storage_key=storage_key,
         filename=filename, filesize=len(data), mimetype=mimetype,
         display_name=filename, uploaded_by=current.id,
+        contact_id=contact_id, contact_name=contact_name,
     )
     db.add(attachment)
     db.commit()
     db.refresh(attachment)
     return _to_response(attachment)
+
+
+# ── 4b. Kontakt einer Datei nachträglich setzen/ändern ───────────────────────
+
+@router.patch("/{attachment_id}/contact")
+async def update_attachment_contact(
+    attachment_id: str,
+    body:          ContactUpdate,
+    db:            Session = Depends(get_db),
+    _:             User = Depends(get_current_user),
+):
+    att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
+    if not att:
+        raise HTTPException(404, "Anhang nicht gefunden")
+    # Leerer contact_id => Kontakt entfernen ("Ohne Kontakt")
+    att.contact_id = body.contact_id or None
+    att.contact_name = body.contact_name if body.contact_id else None
+    db.commit()
+    db.refresh(att)
+    return _to_response(att)
 
 
 # ── 5. Anhang löschen ─────────────────────────────────────────────────────────

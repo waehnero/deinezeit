@@ -3,9 +3,10 @@ import {
   HardDrive, FolderOpen, Folder, File, FileText, FileImage, FileVideo,
   FileArchive, Link2, Upload, Search, Download, Trash2, Share2, Eye,
   ChevronRight, ChevronDown, Loader2, X, ExternalLink, Copy, Check,
-  RefreshCw, Info, Clock, Ban, CalendarClock
+  RefreshCw, Info, Clock, Ban, CalendarClock, User
 } from 'lucide-react'
 import { datacenterApi } from '../services/api'
+import ContactSearch from '../components/ContactSearch'
 import toast from 'react-hot-toast'
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ const ENTITY_LABELS = {
   zeiterfassung: 'Zeiterfassung',
   kontakte:      'Kontakte',
   projekte:      'Projekte',
+  planning_task: 'Projekte',
   aufgaben:      'Aufgaben',
 }
 function entityLabel(slug) {
@@ -344,7 +346,7 @@ function PreviewModal({ attachment, onClose }) {
 
 // ── Ordnerbaum ───────────────────────────────────────────────────────────────
 
-function FolderTree({ folders, selected, onSelect }) {
+function FolderTree({ folders, selected, onSelect, viewMode, onViewModeChange }) {
   const [expanded, setExpanded] = useState({})
 
   const toggle = (key) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
@@ -353,6 +355,26 @@ function FolderTree({ folders, selected, onSelect }) {
 
   return (
     <nav className="space-y-0.5">
+      {/* Ansicht umschalten: Nach Modul / Nach Kontakt */}
+      <div className="flex gap-1 p-1 mb-2 bg-gray-100 rounded-lg">
+        <button
+          onClick={() => onViewModeChange('module')}
+          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition ${
+            viewMode === 'module' ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Nach Modul
+        </button>
+        <button
+          onClick={() => onViewModeChange('contact')}
+          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition ${
+            viewMode === 'contact' ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Nach Kontakt
+        </button>
+      </div>
+
       {/* Alle Dateien */}
       <button
         onClick={() => onSelect(null)}
@@ -379,8 +401,27 @@ function FolderTree({ folders, selected, onSelect }) {
         )}
       </button>
 
-      {/* Entity-Typen */}
-      {folders.types?.map(type => {
+      {/* Kontakt-Sicht: flache Liste der Kontakte */}
+      {viewMode === 'contact' && folders.contacts?.map(contact => {
+        const isContactSelected = selected?.contactId !== undefined && selected.contactId === contact.id
+        const isNone = contact.id === '__none__'
+        return (
+          <button
+            key={contact.id}
+            onClick={() => onSelect({ contactId: contact.id })}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
+              isContactSelected ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <Folder size={15} className={isContactSelected ? 'text-primary-600' : (isNone ? 'text-gray-300' : 'text-amber-500')} />
+            <span className={`truncate ${isNone ? 'italic text-gray-400' : ''}`}>{contact.label}</span>
+            <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{contact.count}</span>
+          </button>
+        )
+      })}
+
+      {/* Modul-Sicht: Entity-Typen */}
+      {viewMode === 'module' && folders.types?.map(type => {
         const isExpanded = expanded[type.slug]
         const isTypeSelected = selected?.type === type.slug && !selected?.entityId
         return (
@@ -435,7 +476,7 @@ function FolderTree({ folders, selected, onSelect }) {
 
 // ── Datei-Zeile ──────────────────────────────────────────────────────────────
 
-function FileRow({ attachment, onPreview, onDownload, onShare, onDelete }) {
+function FileRow({ attachment, onPreview, onDownload, onShare, onDelete, onEditContact }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const _fn = (attachment.filename || '').toLowerCase()
   const canPreview = attachment.type === 'file' && (
@@ -465,9 +506,16 @@ function FileRow({ attachment, onPreview, onDownload, onShare, onDelete }) {
         </div>
       </td>
       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap hidden md:table-cell">
-        <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-          {entityLabel(attachment.entity_type)}
-        </span>
+        <div className="flex flex-col gap-1 items-start">
+          <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+            {entityLabel(attachment.entity_type)}
+          </span>
+          {attachment.contact_name && (
+            <span className="text-[11px] text-gray-400 truncate max-w-[140px]" title={attachment.contact_name}>
+              👤 {attachment.contact_name}
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap hidden lg:table-cell">
         {attachment.type === 'file' ? formatBytes(attachment.filesize) : (
@@ -506,6 +554,10 @@ function FileRow({ attachment, onPreview, onDownload, onShare, onDelete }) {
               <Share2 size={14} />
             </button>
           )}
+          <button onClick={() => onEditContact(attachment)} title="Kontakt zuordnen"
+            className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+            <User size={14} />
+          </button>
           <button
             onClick={() => { if (confirmDelete) onDelete(attachment); else setConfirmDelete(true) }}
             onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
@@ -558,12 +610,76 @@ function UploadZone({ onUpload, disabled }) {
   )
 }
 
+// ── Kontakt-Editor-Dialog ─────────────────────────────────────────────────────
+
+function ContactEditDialog({ attachment, onClose, onSaved }) {
+  const [contactId, setContactId]     = useState(attachment.contact_id || null)
+  const [contactName, setContactName] = useState(attachment.contact_name || '')
+  const [saving, setSaving]           = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await datacenterApi.updateContact(attachment.id, contactId, contactName)
+      toast.success('Kontakt aktualisiert')
+      onSaved?.()
+      onClose()
+    } catch {
+      toast.error('Kontakt konnte nicht gespeichert werden')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Kontakt der Datei</h3>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mb-3 truncate">
+          {attachment.display_name || attachment.filename}
+        </p>
+        <ContactSearch
+          contactId={contactId}
+          contactName={contactName}
+          onChange={(id, name) => { setContactId(id); setContactName(name || '') }}
+          placeholder="Kontakt suchen…"
+        />
+        <div className="flex justify-between gap-3 mt-6">
+          <button
+            onClick={() => { setContactId(null); setContactName('') }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-red-600 transition">
+            Kontakt entfernen
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 text-sm font-medium transition">
+              Abbrechen
+            </button>
+            <button onClick={save} disabled={saving}
+              className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white rounded-xl text-sm font-medium transition flex items-center gap-2">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              Speichern
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 
 export default function DatacenterPage() {
   const [folders, setFolders]         = useState({ total: 0, types: [] })
   const [foldersLoading, setFoldersLoading] = useState(true)
-  const [selected, setSelected]       = useState(null)   // null = alle, { type, entityId? }
+  const [viewMode, setViewMode]       = useState('module')  // 'module' | 'contact'
+  const [selected, setSelected]       = useState(null)   // null = alle, { type, entityId? } oder { contactId }
   const [attachments, setAttachments] = useState([])
   const [listLoading, setListLoading] = useState(false)
   const [search, setSearch]           = useState('')
@@ -572,6 +688,7 @@ export default function DatacenterPage() {
   const [previewItem, setPreviewItem] = useState(null)
   const [shareItem, setShareItem]     = useState(null)
   const [extendItem, setExtendItem]   = useState(null)
+  const [contactEditItem, setContactEditItem] = useState(null)
   const [mobileFoldersOpen, setMobileFoldersOpen] = useState(false)
 
   // Ordnerbaum laden
@@ -603,8 +720,28 @@ export default function DatacenterPage() {
         entities: Object.values(t.entityMap)
       }))
 
+      // Kontakt-Gruppierung (für Ansicht "Nach Kontakt")
+      const contactMap = {}
+      all.forEach(a => {
+        const cid = a.contact_id || '__none__'
+        if (!contactMap[cid]) {
+          contactMap[cid] = {
+            id: cid,
+            label: a.contact_id ? (a.contact_name || a.contact_id) : 'Ohne Kontakt',
+            count: 0,
+          }
+        }
+        contactMap[cid].count++
+      })
+      // "Ohne Kontakt" ans Ende sortieren, sonst alphabetisch
+      const contacts = Object.values(contactMap).sort((x, y) => {
+        if (x.id === '__none__') return 1
+        if (y.id === '__none__') return -1
+        return x.label.localeCompare(y.label)
+      })
+
       const sharedCount = all.filter(a => a.has_share_link).length
-      setFolders({ total: all.length, types, sharedCount })
+      setFolders({ total: all.length, types, contacts, sharedCount })
     } catch {
       toast.error('Ordnerstruktur konnte nicht geladen werden')
     } finally {
@@ -616,9 +753,15 @@ export default function DatacenterPage() {
   const loadAttachments = useCallback(async () => {
     setListLoading(true)
     try {
-      const entityType = (selected && selected !== 'shared') ? selected.type : null
-      const entityId   = (selected && selected !== 'shared') ? selected.entityId : null
-      const res = await datacenterApi.listAll(entityType, entityId)
+      let res
+      if (selected && selected !== 'shared' && selected.contactId !== undefined) {
+        // Kontakt-Sicht: nach contact_id filtern
+        res = await datacenterApi.listAll(null, null, selected.contactId)
+      } else {
+        const entityType = (selected && selected !== 'shared') ? selected.type : null
+        const entityId   = (selected && selected !== 'shared') ? selected.entityId : null
+        res = await datacenterApi.listAll(entityType, entityId)
+      }
       let items = res.data.attachments || []
       if (selected === 'shared') {
         items = items.filter(a => a.has_share_link)
@@ -718,13 +861,19 @@ export default function DatacenterPage() {
       || selected.entityId
     : null
 
+  const currentContactLabel = (selected?.contactId !== undefined)
+    ? folders.contacts?.find(c => c.id === selected.contactId)?.label || selected.contactId
+    : null
+
   const currentTitle = selected === null
     ? 'Alle Dateien'
     : selected === 'shared'
       ? 'Freigaben'
-      : selected.entityId
-        ? `${entityLabel(selected.type)} / ${currentEntityLabel}`
-        : entityLabel(selected.type)
+      : selected.contactId !== undefined
+        ? currentContactLabel
+        : selected.entityId
+          ? `${entityLabel(selected.type)} / ${currentEntityLabel}`
+          : entityLabel(selected.type)
 
   const sidebarContent = (
     <>
@@ -747,7 +896,10 @@ export default function DatacenterPage() {
             <Loader2 size={20} className="animate-spin text-gray-300" />
           </div>
         ) : (
-          <FolderTree folders={folders} selected={selected} onSelect={(s) => { setSelected(s); setMobileFoldersOpen(false) }} />
+          <FolderTree folders={folders} selected={selected}
+            viewMode={viewMode}
+            onViewModeChange={(m) => { setViewMode(m); setSelected(null) }}
+            onSelect={(s) => { setSelected(s); setMobileFoldersOpen(false) }} />
         )}
       </div>
 
@@ -889,6 +1041,7 @@ export default function DatacenterPage() {
                       onDownload={handleDownload}
                       onShare={setShareItem}
                       onDelete={handleDelete}
+                      onEditContact={setContactEditItem}
                     />
                   ))}
                 </tbody>
@@ -906,6 +1059,13 @@ export default function DatacenterPage() {
           attachment={extendItem}
           onClose={() => setExtendItem(null)}
           onExtended={() => { loadFolders(); loadAttachments() }}
+        />
+      )}
+      {contactEditItem && (
+        <ContactEditDialog
+          attachment={contactEditItem}
+          onClose={() => setContactEditItem(null)}
+          onSaved={() => { loadFolders(); loadAttachments() }}
         />
       )}
     </div>
