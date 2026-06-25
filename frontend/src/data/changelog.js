@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.12',
+    day: '25',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Benutzer-Verwaltung in die Einstellungen integriert und separater Menüpunkt entfernt',
+    ],
+  },
+  {
     version: '1.12.11',
     day: '25',
     month: 'Juni',

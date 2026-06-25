@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.12] – 2026-06-25 – Benutzer-Verwaltung überarbeitet
+
+### Aktualisierungen
+- Benutzer-Verwaltung in die Einstellungen integriert und separater Menüpunkt entfernt
+
+---
+
 ## [1.12.11] – 2026-06-25 – Datacenter-Reorganisation mit Vererbung
 
 ### Neu
