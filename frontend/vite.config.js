@@ -38,12 +38,20 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Alten Service Worker beim Update sofort ablösen und alte Caches löschen,
+        // damit kein veralteter SW mehr API-Requests abfängt.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
-        // App-Shell + Assets fürs Offline-Caching, API-Aufrufe bewusst ausnehmen
+        // App-Shell + Assets fürs Offline-Caching, API-Aufrufe NIE cachen.
+        // navigateFallbackDenylist verhindert, dass /api-Pfade die index.html bekommen.
         navigateFallbackDenylist: [/^\/api/],
+        // GET-API-Aufrufe immer direkt ans Netzwerk. Nicht-GET (POST/PUT/DELETE/PATCH)
+        // werden von Workbox ohnehin nicht abgefangen – Uploads laufen damit direkt durch.
         runtimeCaching: [
           {
-            urlPattern: /^\/api\//,
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
             handler: 'NetworkOnly',
           },
         ],

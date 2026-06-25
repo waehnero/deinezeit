@@ -5,7 +5,7 @@ import AttachmentExplorer from './AttachmentExplorer'
 
 // Kompakte Anzeige im Datensatz-Dialog:
 // Zeigt nur Badge mit Anzahl + Button zum Öffnen des Explorers
-export default function AttachmentPanel({ entityType, entityId }) {
+export default function AttachmentPanel({ entityType, entityId, refreshTrigger = 0 }) {
   const [count, setCount]       = useState(null)   // null = noch nicht geladen
   const [loading, setLoading]   = useState(true)
   const [showExplorer, setShowExplorer] = useState(false)
@@ -21,7 +21,8 @@ export default function AttachmentPanel({ entityType, entityId }) {
     }
   }, [entityType, entityId])
 
-  useEffect(() => { load() }, [load])
+  // Bei Mount UND bei jeder Erhöhung von refreshTrigger (z.B. nach Upload) neu laden
+  useEffect(() => { load() }, [load, refreshTrigger])
 
   return (
     <>

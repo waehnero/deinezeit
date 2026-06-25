@@ -593,7 +593,8 @@ function EntryModal({ entry, onClose, onSaved }) {
         {/* Anhänge – Dateiliste bei bestehenden oder bereits gespeicherten Einträgen */}
         {(isEdit || createdEntry) && (
           <div className="px-5 pb-5 border-t border-gray-100">
-            <AttachmentPanel key={attachmentsRefresh} entityType="zeiterfassung" entityId={(entry || createdEntry).id} />
+            <AttachmentPanel entityType="zeiterfassung" entityId={(entry || createdEntry).id}
+              refreshTrigger={attachmentsRefresh} />
           </div>
         )}
       </div>

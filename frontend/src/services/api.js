@@ -112,13 +112,13 @@ export const settingsApi = {
   uploadLogo: (file) => {
     const form = new FormData()
     form.append('file', file)
-    return api.post('/settings/logo', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return api.post('/settings/logo', form, { headers: { 'Content-Type': undefined } })
   },
   deleteLogo: () => api.delete('/settings/logo'),
   uploadFavicon: (file) => {
     const form = new FormData()
     form.append('file', file)
-    return api.post('/settings/favicon', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return api.post('/settings/favicon', form, { headers: { 'Content-Type': undefined } })
   },
   getCompanyContact: () => api.get('/settings/company-contact'),
   getContactOptions: () => api.get('/settings/contact-options'),
@@ -141,8 +141,11 @@ export const datacenterApi = {
   upload:          (entityType, entityId, file, onProgress) => {
     const form = new FormData()
     form.append('file', file)
+    // WICHTIG: Content-Type NICHT fest auf 'multipart/form-data' setzen.
+    // Dann fehlt die boundary und der Server kann den Body nicht parsen.
+    // Mit null/undefined ergänzt der Browser den korrekten Header inkl. boundary.
     return api.post(`/datacenter/${entityType}/${entityId}/upload`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': undefined },
       onUploadProgress: onProgress,
     })
   },
@@ -275,8 +278,10 @@ export const projektplanApi = {
 export const attachmentApi = {
   list:     (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),
   upload:   (entityType, entityId, formData) =>
+    // Content-Type bewusst auf undefined: Browser setzt multipart/form-data
+    // inkl. boundary selbst. Fest gesetzt fehlt die boundary -> Server-Fehler.
     api.post(`/datacenter/${entityType}/${entityId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': undefined },
     }),
   remove:   (attachmentId) => api.delete(`/datacenter/${attachmentId}`),
   previewUrl:  (attachmentId) => `/api/datacenter/${attachmentId}/preview`,
@@ -284,4 +289,3 @@ export const attachmentApi = {
 }
 
 export default api
- 

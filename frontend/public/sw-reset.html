@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeineZeit – Cache zurücksetzen</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px;
+           margin: 60px auto; padding: 0 20px; color: #1f2937; line-height: 1.6; }
+    h1 { color: #f97316; }
+    #log { background: #f3f4f6; border-radius: 10px; padding: 16px 20px;
+           font-family: ui-monospace, monospace; font-size: 14px; white-space: pre-wrap; }
+    .ok { color: #16a34a; font-weight: 600; }
+    a.btn { display: inline-block; margin-top: 24px; background: #f97316; color: #fff;
+            text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>DeineZeit – Cache zurücksetzen</h1>
+  <p>Diese Seite entfernt den alten Service Worker und löscht alle zwischengespeicherten
+     Dateien. Danach funktionieren Uploads und Updates wieder zuverlässig.</p>
+  <div id="log">Starte …</div>
+  <a class="btn" href="/">Zur App zurück</a>
+
+  <script>
+    const log = document.getElementById('log');
+    const line = (t, ok) => { log.innerHTML += '\n' + (ok ? '<span class="ok">✓ </span>' : '• ') + t; };
+
+    (async () => {
+      log.textContent = 'Starte Bereinigung …';
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          if (regs.length === 0) line('Kein Service Worker registriert.');
+          for (const reg of regs) { await reg.unregister(); line('Service Worker entfernt.', true); }
+        } else {
+          line('Service Worker wird vom Browser nicht unterstützt.');
+        }
+
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          if (keys.length === 0) line('Keine Caches vorhanden.');
+          for (const k of keys) { await caches.delete(k); line('Cache gelöscht: ' + k, true); }
+        }
+
+        line('');
+        line('Fertig! Bitte die App jetzt mit Strg+Shift+R neu laden.', true);
+      } catch (e) {
+        line('Fehler: ' + e.message);
+      }
+    })();
+  </script>
+</body>
+</html>
