@@ -28,14 +28,33 @@ export default function AttachmentQuickBar({ entityType, entityId, onEnsureEntit
 
   const handleUpload = async (files) => {
     if (!files || files.length === 0) return
+    const fileList = Array.from(files)
+
+    // Fall A: Es gibt noch keinen gespeicherten Datensatz (entityId == null) und
+    // ein onEnsureEntity ist gesetzt (z.B. Start-Formular). In diesem Fall wird
+    // beim Anlegen die Komponente oft neu gerendert/unmounted (Timer startet).
+    // Damit der Upload das Unmount überlebt, übernimmt die ELTERN-Komponente
+    // das Hochladen über onEnsureEntity, das hier die Dateien direkt erhält.
+    if (!entityId && onEnsureEntity) {
+      setUploading(true)
+      try {
+        const ok = await onEnsureEntity(fileList)   // Eltern legt an + lädt hoch
+        if (ok === false) return
+      } finally {
+        setUploading(false)
+      }
+      return
+    }
+
+    // Fall B: entityId ist bekannt -> direkt hochladen (stabile Komponente).
     const id = await ensureId()
     if (!id) return
     setUploading(true)
     try {
-      for (const file of Array.from(files)) {
+      for (const file of fileList) {
         await datacenterApi.upload(entityType, id, file)
       }
-      toast.success(files.length > 1 ? 'Dateien hochgeladen' : 'Datei hochgeladen')
+      toast.success(fileList.length > 1 ? 'Dateien hochgeladen' : 'Datei hochgeladen')
       onUploaded?.(id)
     } catch {
       toast.error('Fehler beim Hochladen')

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { zeiterfassungApi, masterdataApi, usersApi } from '../services/api'
+import { zeiterfassungApi, masterdataApi, usersApi, datacenterApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Play, Square, Plus, Trash2, Search, ChevronLeft, ChevronRight,
@@ -304,17 +304,20 @@ function StartTimerCard({ onStart }) {
     }
   }
 
-  // Für Anhänge ohne laufenden Timer: Aufgabe ist Pflicht, dann sofort starten
-  const ensureEntity = async () => {
+  // Für Anhänge ohne laufenden Timer: Aufgabe ist Pflicht, dann sofort starten.
+  // Optional werden Dateien mitgegeben (Upload-Button): Diese werden NACH dem
+  // Start in der stabilen Elternseite hochgeladen, damit das Re-Render (Timer
+  // startet, Karte wird ausgetauscht) den Upload nicht abbricht.
+  const ensureEntity = async (files = null) => {
     if (!project.projectId) {
       toast.error('Bitte zuerst eine Aufgabe wählen')
-      return null
+      return files ? false : null
     }
     try {
-      const created = await onStart({ project, note, billable })
-      return created?.id || null
+      const created = await onStart({ project, note, billable }, files)
+      return files ? true : (created?.id || null)
     } catch {
-      return null
+      return files ? false : null
     }
   }
 
@@ -462,27 +465,44 @@ function EntryModal({ entry, onClose, onSaved }) {
   })
 
   // Für Anhänge ohne gespeicherten Eintrag: Projekt + Startzeit sind Pflicht,
-  // dann sofort speichern, um eine entityId zu erhalten
-  const ensureEntity = async () => {
-    if (createdEntry) return createdEntry.id
-    if (isEdit) return entry.id
+  // dann sofort speichern, um eine entityId zu erhalten.
+  // Wenn `files` übergeben werden (Upload-Button), wird direkt hochgeladen und
+  // true/false zurückgegeben (das Modal bleibt offen, kein Unmount).
+  const ensureEntity = async (files = null) => {
+    const uploadTo = async (id) => {
+      if (!files || !files.length) return true
+      try {
+        for (const file of Array.from(files)) {
+          await datacenterApi.upload('zeiterfassung', id, file)
+        }
+        toast.success(files.length > 1 ? 'Dateien hochgeladen' : 'Datei hochgeladen')
+        setAttachmentsRefresh(n => n + 1)
+        return true
+      } catch {
+        toast.error('Datei konnte nicht hochgeladen werden')
+        return false
+      }
+    }
+
+    if (createdEntry) return files ? await uploadTo(createdEntry.id) : createdEntry.id
+    if (isEdit)       return files ? await uploadTo(entry.id)        : entry.id
     if (!project.projectId) {
       toast.error('Bitte zuerst ein Projekt wählen')
-      return null
+      return files ? false : null
     }
     if (!startedAt) {
       toast.error('Bitte Startzeit angeben')
-      return null
+      return files ? false : null
     }
     setLoading(true)
     try {
       const res = await zeiterfassungApi.createEntry(buildPayload())
       setCreatedEntry(res.data)
       toast.success('Zeiteintrag gespeichert')
-      return res.data.id
+      return files ? await uploadTo(res.data.id) : res.data.id
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Fehler beim Speichern')
-      return null
+      return files ? false : null
     } finally {
       setLoading(false)
     }
@@ -568,16 +588,13 @@ function EntryModal({ entry, onClose, onSaved }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 p-5 border-t border-gray-100">
-          {/* Quick-Upload nur beim Nachtragen (kein gespeicherter Eintrag).
-              Beim Bearbeiten erfolgt der Upload zuverlässig über den
-              "Öffnen"-Bereich (Anhänge & Dateien) weiter unten. */}
-          {!isEdit && (
-            <AttachmentQuickBar entityType="zeiterfassung"
-              entityId={createdEntry?.id || null}
-              onEnsureEntity={ensureEntity}
-              onUploaded={() => setAttachmentsRefresh(n => n + 1)}
-              className="mr-auto" />
-          )}
+          {/* Quick-Upload: beim Bearbeiten direkt an entry.id (stabil),
+              beim Nachtragen via onEnsureEntity (legt Eintrag an). */}
+          <AttachmentQuickBar entityType="zeiterfassung"
+            entityId={isEdit ? entry.id : createdEntry?.id || null}
+            onEnsureEntity={ensureEntity}
+            onUploaded={() => setAttachmentsRefresh(n => n + 1)}
+            className="mr-auto" />
           {!isEdit && !createdEntry && (
             <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
               <input type="checkbox" checked={createAnother} onChange={(e) => setCreateAnother(e.target.checked)}
@@ -705,7 +722,7 @@ export default function ZeiterfassungPage() {
   useEffect(() => { loadAll() }, [loadAll])
   useEffect(() => { usersApi.list().then(r => setUsers(r.data)).catch(() => {}) }, [])
 
-  const handleStart = async ({ project, note, billable }) => {
+  const handleStart = async ({ project, note, billable }, files = null) => {
     try {
       const res = await zeiterfassungApi.startTimer({
         project_id: project.projectId || null,
@@ -719,6 +736,20 @@ export default function ZeiterfassungPage() {
       })
       setRunning(res.data)
       toast.success('Timer gestartet')
+
+      // Optional: Dateien, die beim Start mitgegeben wurden, jetzt hochladen.
+      // Läuft in der stabilen Seite -> kein Abbruch durch Re-Render.
+      if (files && files.length && res.data?.id) {
+        try {
+          for (const file of Array.from(files)) {
+            await datacenterApi.upload('zeiterfassung', res.data.id, file)
+          }
+          toast.success(files.length > 1 ? 'Dateien hochgeladen' : 'Datei hochgeladen')
+        } catch {
+          toast.error('Datei konnte nicht hochgeladen werden')
+        }
+      }
+
       loadAll()
       return res.data
     } catch (err) {
