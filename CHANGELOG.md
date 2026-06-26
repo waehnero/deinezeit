@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.14] – 2026-06-26 – Zeiterfassung Datei-Upload repariert
+
+### Aktualisierungen
+- Race-Condition beim Datei-Upload in der Zeiterfassung behoben
+
+---
+
 ## [1.12.13] – 2026-06-25 – Kompaktere Sidebar für mehr Platz
 
 ### Neu

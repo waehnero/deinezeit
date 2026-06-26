@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.14',
+    day: '26',
+    month: 'Juni',
+    year: '2026',
+    features: [],
+    updates: [
+      'Race-Condition beim Datei-Upload in der Zeiterfassung behoben',
+    ],
+  },
+  {
     version: '1.12.13',
     day: '25',
     month: 'Juni',
