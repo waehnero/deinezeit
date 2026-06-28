@@ -40,8 +40,17 @@ app.add_middleware(
 )
 
 # ── Statische Dateien ─────────────────────────────────────────────────────────
-STATIC_DIR = "/app/static"
-os.makedirs(STATIC_DIR, exist_ok=True)
+# Pfad per Env überschreibbar (Default = /app/static wie im Docker-Container).
+# In Umgebungen ohne Schreibrechte auf /app (z.B. CI/Tests) auf ein temporäres
+# Verzeichnis ausweichen, statt beim Import abzustürzen.
+STATIC_DIR = os.environ.get("STATIC_DIR", "/app/static")
+try:
+    os.makedirs(STATIC_DIR, exist_ok=True)
+except OSError as e:
+    import tempfile
+    STATIC_DIR = os.path.join(tempfile.gettempdir(), "deinezeit_static")
+    os.makedirs(STATIC_DIR, exist_ok=True)
+    print(f"[WARN] STATIC_DIR nicht beschreibbar ({e}); nutze {STATIC_DIR}")
 app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ── API-Router ────────────────────────────────────────────────────────────────

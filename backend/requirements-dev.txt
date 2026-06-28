@@ -1,0 +1,5 @@
+# Test-/Entwicklungs-Abhängigkeiten (nicht im Produktiv-Image nötig)
+# Installation:  pip install -r requirements.txt -r requirements-dev.txt
+
+pytest==8.2.2
+# httpx ist bereits in requirements.txt (0.27.0) – wird vom FastAPI-TestClient genutzt
