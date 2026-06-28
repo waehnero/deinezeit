@@ -31,7 +31,7 @@ jobs:
         run: pip install pip-audit bandit -r backend/requirements.txt
 
       - name: "Sicherheitslücken in Paketen prüfen (pip-audit)"
-        run: pip-audit -r backend/requirements.txt --format=text
+        run: pip-audit -r backend/requirements.txt --format=columns
 
       - name: "Sicherheitsprobleme im Code prüfen (bandit)"
         run: bandit -r backend/app/ -ll -q
