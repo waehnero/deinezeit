@@ -34,6 +34,13 @@ PWA-Installation.
   aktivieren, sodass Merge grüne Tests verlangt. Anleitung: `BRANCH-SCHUTZ.md`.
   Hinweis: `deploy.yml` deployt aktuell noch bei jedem Push auf `main` ohne
   Test-Kopplung – optionaler Folgepunkt.
+- **Abhängigkeits-Updates (offen, Folgeschritt):** pip-audit meldet bekannte
+  Schwachstellen in `pillow`, `python-dotenv`, `requests`, `weasyprint`,
+  `jinja2`, `starlette`. Bereits erledigt: `python-jose` 3.3.0→3.5.0,
+  `python-multipart` 0.0.9→0.0.32. Der pip-audit-CI-Schritt ist vorerst
+  **nicht blockierend** (warnt, blockiert Merge nicht). Restliche Updates
+  kontrolliert einzeln nachziehen (Achtung: `starlette`/FastAPI-Kopplung,
+  `weasyprint` betrifft Rechnungs-PDFs) – jeweils mit den Tests absichern.
 - **Schritt 3/4 (offen):** Tests je bestehendem Modul; danach Frontend (Vitest).
 
 ### Bekannte Probleme / Risiken
