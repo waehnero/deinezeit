@@ -77,7 +77,7 @@ jobs:
           echo "Warte 15 Sekunden auf Start..."
           sleep 15
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://${{ secrets.SSH_HOST }}/api/health || echo "000")
+            https://${{ vars.DOMAIN || secrets.SSH_HOST }}/api/health || echo "000")
           if [ "$STATUS" = "200" ]; then
             echo "✓ App läuft (HTTP $STATUS)"
           else

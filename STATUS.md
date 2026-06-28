@@ -24,16 +24,19 @@ PWA-Installation.
 
 ### Laufende Baustellen / offene Punkte
 
-- **Testumgebung (Schritt 1 ✓, lokal grün):** pytest-Fundament im Backend
-  (`backend/tests/`): `conftest.py` mit Test-DB/Client/Auth-Fixtures,
-  `test_health.py`, `test_auth.py` (Vorlage). Lokaler Lauf via `./test.sh` –
-  alle Tests grün bestätigt. Strategie: `TESTSTRATEGIE.md`.
-- **Testumgebung (Schritt 2, Code ✓ / GitHub-Klick offen):** `ci.yml` hat einen
-  Job „Backend: Tests (pytest)" (Postgres-Service) – läuft bei jedem Push/PR.
-  **Offen (nur Oliver, in GitHub-Settings):** Branch-Schutz für `main`
-  aktivieren, sodass Merge grüne Tests verlangt. Anleitung: `BRANCH-SCHUTZ.md`.
-  Hinweis: `deploy.yml` deployt aktuell noch bei jedem Push auf `main` ohne
-  Test-Kopplung – optionaler Folgepunkt.
+- **CI/CD-Pipeline steht und funktioniert (✓):** Kompletter Ablauf scharf:
+  lokal `./test.sh` → Feature-Branch + PR → CI-Tests „Backend: Tests (pytest)"
+  müssen grün sein (Branch-Schutz-Regel „Schutz main - Tests erforderlich",
+  aktiv, Pflicht-Check) → Merge nach `main` → **automatisches Deployment** auf
+  den Hetzner-Server (dz.wwinterface.online) via `deploy.yml`. Deploy-Secrets
+  (`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`) sind hinterlegt;
+  erstes erfolgreiches Auto-Deployment am 28.06.2026 (Run #130, Commit 28685a8).
+- **Kleinere offene Punkte CI/CD:**
+  - `deploy.yml`-Healthcheck zeigt noch auf Platzhalter `https://deine-domain.at`
+    statt `dz.wwinterface.online` → Healthcheck prüft falsche Adresse (Deploy
+    selbst läuft, nur die Abschlussprüfung greift ins Leere). Korrigieren.
+  - Warnung „Node.js 20 deprecated" in den Actions (`webfactory/ssh-agent`,
+    `actions/checkout`) – unkritisch, bei Gelegenheit Action-Versionen anheben.
 - **Abhängigkeits-Updates (offen, Folgeschritt):** pip-audit meldet bekannte
   Schwachstellen in `pillow`, `python-dotenv`, `requests`, `weasyprint`,
   `jinja2`, `starlette`. Bereits erledigt: `python-jose` 3.3.0→3.5.0,
@@ -45,7 +48,6 @@ PWA-Installation.
 
 ### Bekannte Probleme / Risiken
 
-- **Keine automatisierten Tests** — Qualität hängt an manuellem lokalem Test.
 - **Doku ist Windows-zentriert** (`.bat`/`.ps1`, „Doppelklick", Pfad
   `C:\Projekte\deinezeit`); Mac-Workflow ist in [CLAUDE.md](CLAUDE.md) ergänzt,
   aber die Endnutzer-Anleitungen (`LOKAL-TESTEN.md`, `MIGRATION-…`, Handoffs)
