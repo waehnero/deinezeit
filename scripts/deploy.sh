@@ -7,10 +7,57 @@
 # automatisch aufgerufen wenn du auf main pushst.
 # ============================================================
 
-set -euo pipefail
+# Bewusst KEIN 'set -u': im CI-/SSH-Kontext sind manche Variablen leer, das
+# soll den Deploy nicht vorzeitig (und unbemerkt) abbrechen.
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
+
+# ── CI-Modus ────────────────────────────────────────────────────────────────
+# Wird der Deploy aus GitHub Actions per SSH aufgerufen (Env GIT_SHA gesetzt),
+# läuft ein schlanker, robuster Pfad: kein git pull (rsync hat den Code schon
+# übertragen), No-Cache-Build mit GIT_SHA-Cache-Buster, erzwungenes Recreate
+# und eine Verifikation, dass die Container wirklich neu sind. Schlägt etwas
+# fehl, endet das Skript mit Exit != 0 -> der GitHub-Step wird ROT.
+if [ -n "${GIT_SHA:-}" ]; then
+  DEPLOY_PATH="${DEPLOY_PATH:-$INSTALL_DIR}"
+  cd "$DEPLOY_PATH"
+  export GIT_SHA
+
+  echo "▶ Neue Images bauen (Cache-Buster GIT_SHA=$GIT_SHA)..."
+  docker compose build --no-cache --build-arg GIT_SHA="$GIT_SHA"
+
+  echo "▶ Datenbank-Migrationen..."
+  docker compose run --rm backend alembic upgrade head
+
+  echo "▶ Dienste neu erstellen (aus neuen Images)..."
+  docker compose up -d --force-recreate --remove-orphans
+
+  echo "▶ Alte Images aufräumen..."
+  docker image prune -f || true
+
+  echo "▶ Prüfe, dass Container wirklich neu erstellt wurden..."
+  for svc in frontend backend; do
+    cid="$(docker compose ps -q "$svc")"
+    if [ -z "$cid" ]; then
+      echo "✗ $svc: kein Container gefunden - Deploy fehlgeschlagen."
+      exit 1
+    fi
+    started="$(docker inspect -f '{{.State.StartedAt}}' "$cid")"
+    started_ts="$(date -d "$started" +%s 2>/dev/null || echo 0)"
+    age=$(( "$(date +%s)" - started_ts ))
+    echo "   $svc: vor ${age}s gestartet"
+    if [ "$age" -gt 300 ]; then
+      echo "✗ $svc wurde NICHT neu erstellt (zu alt) - Deploy fehlgeschlagen."
+      exit 1
+    fi
+  done
+
+  echo "✓ Deployment abgeschlossen!"
+  exit 0
+fi
+# ── Ende CI-Modus ─────────────────────────────────────────────────────────────
 
 # Farben
 GREEN='\033[0;32m'
