@@ -151,6 +151,32 @@ Secrets committen — die CI bricht sonst ab.
 
 ## Git-Workflow & Versionierung
 
+### 🧭 Merkzettel: So entwickle ich ein Modul/Feature weiter
+
+> **Pro Modul/Feature eine eigene Unterhaltung** im Projekt „deinezeit" starten
+> (Kontext bleibt erhalten, jede Unterhaltung bleibt fokussiert). Einstieg z. B.:
+> „Wir arbeiten am Modul X, leg einen Feature-Branch an."
+
+1. **Sauberen Stand holen:** `./start-arbeit.sh`
+2. **Feature-Branch anlegen** (nicht direkt auf `main`):
+   `git checkout -b feature/kurzname`
+3. **Entwickeln + lokal testen:**
+   - `docker compose -f docker-compose.local.yml up -d --build` → http://localhost
+   - `./test.sh` (müssen grün sein)
+   - **Regel: neues/geändertes Modul ⇒ neuer Test** (`backend/tests/test_<modul>.py`,
+     Schema wie `test_auth.py`).
+4. **Hochladen** (GitHub Desktop: „Publish branch" / ⌘P) → **Pull Request öffnen**.
+5. **Mergen** — geht erst, wenn die Pflicht-Tests grün sind (Branch-Schutz
+   blockiert sonst). **Nach dem Merge deployt es automatisch** auf
+   dz.wwinterface.online (`deploy.yml`).
+
+> `main` ist geschützt: direktes Pushen ist gesperrt, Merge nur über PR mit
+> grünem Check „Backend: Tests (pytest)". Deploy-Ziel-Domain steckt in der
+> GitHub-Variable `DOMAIN` (umstellbar ohne Code-Änderung). Der Sicherheits-Job
+> (pip-audit/bandit) **warnt nur** und blockiert den Merge nicht.
+
+---
+
 1. **Vor der Arbeit:** `./start-arbeit.sh` (holt sauberen Stand).
 2. Entwickeln → **lokal testen** (`docker compose -f docker-compose.local.yml up -d --build`).
 3. **Erst nach Olivers Freigabe** committen/pushen. Claude pusht nie ungefragt.
