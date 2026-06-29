@@ -58,7 +58,12 @@ services:
       start_period: 30s
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Cache-Buster: wird vom Deploy mit dem aktuellen Git-SHA gesetzt, damit
+        # der Frontend-Build den neuen Quellcode garantiert neu kompiliert.
+        GIT_SHA: ${GIT_SHA:-dev}
     container_name: deinezeit_frontend
     restart: always
     networks:
