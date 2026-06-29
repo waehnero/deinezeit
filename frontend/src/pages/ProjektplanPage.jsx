@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, GanttChartSquare, Loader2, Archive, X, Settings2, MoreVertical,
@@ -264,6 +264,8 @@ export default function ProjektplanPage() {
 /** Eine Projektzeile – Desktop als Tabellengrid, Mobile als Karte */
 function ProjectRow({ p, flat, statusLabel, statusColor, onOpen, menuOpen, onMenu, onCloseMenu, onEdit, onDuplicate, onDelete }) {
   const cols = flat ? '1.4fr 1.1fr 110px 80px 80px 40px' : '1.6fr 110px 90px 90px 40px'
+  const menuBtnDesktop = useRef(null)
+  const menuBtnMobile = useRef(null)
   return (
     <div className={`border-b border-gray-100 last:border-0 ${p.is_archived ? 'opacity-60' : 'hover:bg-gray-50'}`}>
       {/* Desktop */}
@@ -280,8 +282,8 @@ function ProjectRow({ p, flat, statusLabel, statusColor, onOpen, menuOpen, onMen
         <span className="text-center text-gray-500">{p.task_count}</span>
         <span className="text-right text-gray-500">{p.progress_percent}%</span>
         <span className="relative flex justify-end">
-          <button onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={16} /></button>
-          {menuOpen && (<><div className="fixed inset-0 z-10" onClick={onCloseMenu} /><ProjectActionsMenu onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} /></>)}
+          <button ref={menuBtnDesktop} onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={16} /></button>
+          {menuOpen && (<><div className="fixed inset-0 z-[65]" onClick={onCloseMenu} /><ProjectActionsMenu anchorRef={menuBtnDesktop} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} /></>)}
         </span>
       </div>
 
@@ -300,8 +302,8 @@ function ProjectRow({ p, flat, statusLabel, statusColor, onOpen, menuOpen, onMen
           </div>
         </button>
         <div className="relative shrink-0">
-          <button onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={18} /></button>
-          {menuOpen && (<><div className="fixed inset-0 z-10" onClick={onCloseMenu} /><ProjectActionsMenu onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} /></>)}
+          <button ref={menuBtnMobile} onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={18} /></button>
+          {menuOpen && (<><div className="fixed inset-0 z-[65]" onClick={onCloseMenu} /><ProjectActionsMenu anchorRef={menuBtnMobile} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} /></>)}
         </div>
       </div>
     </div>
