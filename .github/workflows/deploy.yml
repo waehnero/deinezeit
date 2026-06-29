@@ -52,53 +52,15 @@ jobs:
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
       - name: "Docker-Images bauen & Dienste neu starten"
-        # -o pipefail + expliziter SSH-Aufruf: Der Exit-Code des Remote-Skripts
-        # wird so zuverlässig an den GitHub-Step durchgereicht. Schlägt das
-        # Deploy-Skript fehl, wird der Step ROT (vorher blieb er fälschlich grün).
+        # Ruft das versionierte scripts/deploy.sh per SSH auf (CI-Modus via
+        # GIT_SHA). Das Skript liegt als DATEI am Server (von rsync übertragen),
+        # daher kommt sein Exit-Code zuverlässig zurück: schlägt der Deploy fehl,
+        # wird dieser Step ROT (vorher verschluckte das Inline-Heredoc den Fehler).
         shell: bash
         run: |
-          set -euo pipefail
-          # GIT_SHA als Cache-Buster an den Build übergeben (siehe frontend/Dockerfile)
-          GIT_SHA="${{ github.sha }}"
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "GIT_SHA='$GIT_SHA' DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' bash -se" << 'ENDSSH'
-            set -euo pipefail
-            cd "$DEPLOY_PATH"
-
-            echo "▶ Neue Images bauen (Cache-Buster GIT_SHA=$GIT_SHA)..."
-            # --no-cache UND GIT_SHA-Build-Arg: doppelt abgesichert, dass der
-            # Frontend-Build den neuen Quellcode wirklich kompiliert.
-            GIT_SHA="$GIT_SHA" docker compose build --no-cache --build-arg GIT_SHA="$GIT_SHA"
-
-            echo "▶ Datenbank-Migrationen..."
-            docker compose run --rm backend alembic upgrade head
-
-            # --force-recreate: erzwingt das Neuerstellen ALLER Container aus den
-            # frisch gebauten Images. Ohne dieses Flag lässt 'up -d' einen
-            # laufenden Container stehen, wenn Compose keine Änderung erkennt.
-            echo "▶ Dienste neu erstellen (aus neuen Images)..."
-            docker compose up -d --force-recreate --remove-orphans
-
-            echo "▶ Alte Images aufräumen..."
-            docker image prune -f
-
-            # Verifikation: Container müssen JÜNGER als 5 Minuten sein, sonst
-            # wurden sie nicht erneuert -> Deploy als fehlgeschlagen werten.
-            echo "▶ Prüfe, dass Container wirklich neu erstellt wurden..."
-            for svc in frontend backend; do
-              cid=$(docker compose ps -q "$svc")
-              started=$(docker inspect -f '{{.State.StartedAt}}' "$cid")
-              started_ts=$(date -d "$started" +%s 2>/dev/null || echo 0)
-              now_ts=$(date +%s)
-              age=$(( now_ts - started_ts ))
-              echo "   $svc: vor ${age}s gestartet"
-              if [ "$age" -gt 300 ]; then
-                echo "✗ $svc wurde NICHT neu erstellt (zu alt) - Deploy fehlgeschlagen."
-                exit 1
-              fi
-            done
-
-            echo "✓ Deployment abgeschlossen!"
-          ENDSSH
+          set -eo pipefail
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "GIT_SHA='${{ github.sha }}' DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy.sh'"
 
       - name: "Healthcheck"
         run: |
