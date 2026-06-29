@@ -1,10 +1,26 @@
 name: Auto-Version
 
-# Wird bei jedem Push auf main ausgelöst —
-# außer wenn der Commit selbst ein Versions-Bump ist (verhindert Endlosschleife)
+# ── DEAKTIVIERT (Stand 29.06.2026) ───────────────────────────────────────────
+# Dieser Workflow pushte den Versions-Bump direkt nach main. Da main per
+# Ruleset geschützt ist ("Changes must be made through a pull request"), wurde
+# der Push abgelehnt (GH013) und der Lauf schlug bei JEDEM Merge fehl. Ein
+# gezielter Bypass für GitHub Actions ist in diesem Repo nicht verfügbar.
+#
+# Daher ist der automatische Trigger abgeschaltet. Der Job-Code bleibt erhalten
+# und ist weiterhin MANUELL über "Run workflow" (workflow_dispatch) startbar –
+# der finale Push auf main scheitert dann aber weiterhin am Schutz.
+#
+# Version stattdessen bei Releases MANUELL bumpen (siehe CLAUDE.md):
+#   bump-version.ps1  bzw.  python scripts/auto_version.py  auf einem
+#   Feature-Branch ausführen und per Pull Request mergen.
+#
+# Reaktivieren: den 'push:'-Trigger unten wieder einkommentieren – sobald
+# ein Bypass für den Bot eingerichtet ist.
+# ─────────────────────────────────────────────────────────────────────────────
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:      # nur noch manuell startbar
+  # push:                 # DEAKTIVIERT – siehe Kommentar oben
+  #   branches: [main]
 
 jobs:
   bump-version:
