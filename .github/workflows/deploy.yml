@@ -63,11 +63,31 @@ jobs:
             echo "▶ Datenbank-Migrationen..."
             docker compose run --rm backend alembic upgrade head
 
-            echo "▶ Dienste neu starten (Zero-Downtime)..."
-            docker compose up -d --remove-orphans
+            # --force-recreate: erzwingt das Neuerstellen ALLER Container aus den
+            # frisch gebauten Images. Ohne dieses Flag lässt 'up -d' einen
+            # laufenden Container stehen, wenn Compose keine Änderung erkennt –
+            # so lief zuletzt ein 46h altes Frontend trotz "grünem" Deploy weiter.
+            echo "▶ Dienste neu erstellen (aus neuen Images)..."
+            docker compose up -d --force-recreate --remove-orphans
 
             echo "▶ Alte Images aufräumen..."
             docker image prune -f
+
+            # Verifikation: Container müssen JÜNGER als 5 Minuten sein, sonst
+            # wurden sie nicht erneuert -> Deploy als fehlgeschlagen werten.
+            echo "▶ Prüfe, dass Container wirklich neu erstellt wurden..."
+            for svc in frontend backend; do
+              cid=$(docker compose ps -q "$svc")
+              started=$(docker inspect -f '{{.State.StartedAt}}' "$cid")
+              started_ts=$(date -d "$started" +%s 2>/dev/null || echo 0)
+              now_ts=$(date +%s)
+              age=$(( now_ts - started_ts ))
+              echo "   $svc: vor ${age}s gestartet"
+              if [ "$age" -gt 300 ]; then
+                echo "✗ $svc wurde NICHT neu erstellt (zu alt) – Deploy fehlgeschlagen."
+                exit 1
+              fi
+            done
 
             echo "✓ Deployment abgeschlossen!"
           ENDSSH
