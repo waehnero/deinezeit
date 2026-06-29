@@ -264,6 +264,10 @@ export function ProjectActionsMenu({ onEdit, onDuplicate, onDelete, align = 'rig
     if (!anchorRef?.current) return
     const place = () => {
       const r = anchorRef.current.getBoundingClientRect()
+      // Anchor unsichtbar (z.B. der per CSS ausgeblendete Mobile-/Desktop-Button
+      // der jeweils anderen Ansicht) → rect ist 0/0/0/0. Dann NICHT positionieren,
+      // sonst erscheint eine zweite Menü-Kopie oben links im Eck.
+      if (r.width === 0 && r.height === 0) { setPos(null); return }
       const menuH = menuRef.current?.offsetHeight || 120
       const gap = 4
       // Nach unten, sonst nach oben klappen, wenn unten kein Platz ist
@@ -306,11 +310,15 @@ export function ProjectActionsMenu({ onEdit, onDuplicate, onDelete, align = 'rig
     )
   }
 
+  // Erst rendern, wenn die Position berechnet ist – sonst würde kurzzeitig
+  // eine zweite, fehlplatzierte Menü-Kopie (oben links) erscheinen.
+  if (!pos) return null
+
   return createPortal(
     <div
       ref={menuRef}
       className="fixed z-[70] bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-44"
-      style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, visibility: pos ? 'visible' : 'hidden' }}
+      style={{ top: pos.top, left: pos.left }}
     >
       {items}
     </div>,
