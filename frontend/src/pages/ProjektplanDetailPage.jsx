@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Loader2, CheckCircle2, Circle, Clock, User as UserIcon,
@@ -140,6 +140,7 @@ export default function ProjektplanDetailPage() {
 
   // Projekt-Aktionen
   const [headerMenu, setHeaderMenu] = useState(false)
+  const headerMenuBtn = useRef(null)
   const [editProj, setEditProj] = useState(null)
   const [dupProj, setDupProj] = useState(null)
   const [delProj, setDelProj] = useState(null)
@@ -232,13 +233,14 @@ export default function ProjektplanDetailPage() {
         )}
         <h1 className="text-xl font-medium text-gray-900 flex-1 truncate">{project.name}</h1>
         <div className="relative shrink-0">
-          <button onClick={() => setHeaderMenu(v => !v)} className="text-gray-400 hover:text-gray-700 p-1" title="Aktionen">
+          <button ref={headerMenuBtn} onClick={() => setHeaderMenu(v => !v)} className="text-gray-400 hover:text-gray-700 p-1" title="Aktionen">
             <MoreVertical size={20} />
           </button>
           {headerMenu && (
             <>
-              <div className="fixed inset-0 z-10" onClick={() => setHeaderMenu(false)} />
+              <div className="fixed inset-0 z-[65]" onClick={() => setHeaderMenu(false)} />
               <ProjectActionsMenu
+                anchorRef={headerMenuBtn}
                 onEdit={() => { setEditProj(project); setHeaderMenu(false) }}
                 onDuplicate={() => { setDupProj(project); setHeaderMenu(false) }}
                 onDelete={() => { setDelProj(project); setHeaderMenu(false) }}

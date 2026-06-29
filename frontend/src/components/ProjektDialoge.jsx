@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Copy, Trash2, Archive, Save, AlertTriangle, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 import errMsg from '../utils/errMsg'
@@ -241,10 +242,49 @@ export function DeleteProjectDialog({ project, onClose, onArchived, onDeleted })
   )
 }
 
-/** Drei-Punkte-Aktionsmenü (Dropdown) */
-export function ProjectActionsMenu({ onEdit, onDuplicate, onDelete, align = 'right' }) {
-  return (
-    <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-44`}>
+/**
+ * Drei-Punkte-Aktionsmenü (Dropdown).
+ *
+ * Wird per Portal an document.body gerendert und mit `fixed` an der Position
+ * des auslösenden Buttons (`anchorRef`) platziert. Dadurch wird es nie vom
+ * `overflow-hidden` der Tabellen-/Karten-Container abgeschnitten und kann
+ * frei über die Liste hinausragen. Klappt automatisch nach oben auf, wenn
+ * nach unten zu wenig Platz ist.
+ *
+ * `anchorRef` ist die ref des Auslöse-Buttons (bzw. dessen Wrapper).
+ * Ohne `anchorRef` fällt die Komponente auf das alte absolute Verhalten zurück
+ * (Abwärtskompatibilität).
+ */
+export function ProjectActionsMenu({ onEdit, onDuplicate, onDelete, align = 'right', anchorRef }) {
+  const menuRef = useRef(null)
+  const [pos, setPos] = useState(null)
+  const MENU_W = 176 // entspricht w-44 (11rem)
+
+  useLayoutEffect(() => {
+    if (!anchorRef?.current) return
+    const place = () => {
+      const r = anchorRef.current.getBoundingClientRect()
+      const menuH = menuRef.current?.offsetHeight || 120
+      const gap = 4
+      // Nach unten, sonst nach oben klappen, wenn unten kein Platz ist
+      const openUp = r.bottom + gap + menuH > window.innerHeight && r.top - gap - menuH > 0
+      const top = openUp ? r.top - gap - menuH : r.bottom + gap
+      // Rechtsbündig zum Button, am Viewport-Rand clampen
+      let left = align === 'right' ? r.right - MENU_W : r.left
+      left = Math.max(8, Math.min(left, window.innerWidth - MENU_W - 8))
+      setPos({ top, left })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [anchorRef, align])
+
+  const items = (
+    <>
       <button onClick={onEdit} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
         <Save size={15} className="text-gray-400" /> Bearbeiten
       </button>
@@ -254,6 +294,26 @@ export function ProjectActionsMenu({ onEdit, onDuplicate, onDelete, align = 'rig
       <button onClick={onDelete} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600">
         <Trash2 size={15} /> Archivieren / Löschen
       </button>
-    </div>
+    </>
+  )
+
+  // Fallback: altes absolutes Verhalten, wenn kein anchorRef übergeben wurde
+  if (!anchorRef) {
+    return (
+      <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-44`}>
+        {items}
+      </div>
+    )
+  }
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      className="fixed z-[70] bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-44"
+      style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, visibility: pos ? 'visible' : 'hidden' }}
+    >
+      {items}
+    </div>,
+    document.body
   )
 }
