@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.15] – 2026-07-02 – Projekte-Menü & stabileres Deployment
+
+### Aktualisierungen
+- Projekte: Aktionsmenü (drei Punkte) wird wieder korrekt angezeigt und nicht mehr doppelt dargestellt
+- Automatisches Server-Deployment robuster (Frontend-Update und nginx zuverlässiger)
+
+---
+
 ## [1.12.14] – 2026-06-26 – Zeiterfassung Datei-Upload repariert
 
 ### Aktualisierungen
