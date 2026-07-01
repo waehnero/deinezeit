@@ -25,8 +25,38 @@ if [ -n "${GIT_SHA:-}" ]; then
   cd "$DEPLOY_PATH"
   export GIT_SHA
 
+  # ── nginx-Domain in die Config einsetzen ────────────────────────────────────
+  # Der rsync überschreibt nginx/conf.d/app.conf bei JEDEM Deploy mit der
+  # Repo-Version, in der die Domain nur ein Platzhalter (deine-domain.at) ist.
+  # Ohne die echte Domain findet nginx sein SSL-Zertifikat nicht und crasht
+  # (genau das hat die Seite schon einmal lahmgelegt). Quelle der echten Domain:
+  # bevorzugt die GitHub-Variable DOMAIN, sonst aus dem vorhandenen Let's-Encrypt-
+  # Zertifikat abgeleitet (Ordnername unter live/ = Domain) -> auch ohne Variable
+  # robust.
+  if [ -z "${DOMAIN:-}" ] || [ "${DOMAIN:-}" = "deine-domain.at" ]; then
+    DOMAIN="$(docker compose run --rm --entrypoint sh certbot -c \
+      'ls /etc/letsencrypt/live 2>/dev/null | grep -v README | head -1' \
+      2>/dev/null | tr -d '[:space:]')"
+  fi
+  if [ -n "$DOMAIN" ]; then
+    echo "▶ nginx-Domain setzen: $DOMAIN"
+    sed -i "s/deine-domain\.at/$DOMAIN/g" nginx/conf.d/app.conf
+  fi
+  if grep -q 'deine-domain\.at' nginx/conf.d/app.conf; then
+    echo "✗ nginx-Config enthält noch den Platzhalter 'deine-domain.at'."
+    echo "  DOMAIN-Variable setzen oder gültiges Zertifikat prüfen. Deploy abgebrochen"
+    echo "  (der laufende nginx bleibt unangetastet, die Seite bleibt online)."
+    exit 1
+  fi
+
   echo "▶ Neue Images bauen (Cache-Buster GIT_SHA=$GIT_SHA)..."
   docker compose build --no-cache --build-arg GIT_SHA="$GIT_SHA"
+
+  # nginx-Config VOR dem Neustart validieren. Schlägt der Test fehl (z.B. Domain/
+  # Zertifikat passen nicht), bricht der Deploy hier ab - der laufende nginx wird
+  # NICHT ersetzt und die Seite bleibt online.
+  echo "▶ nginx-Konfiguration testen (nginx -t)..."
+  docker compose run --rm --entrypoint nginx nginx -t
 
   echo "▶ Datenbank-Migrationen..."
   docker compose run --rm backend alembic upgrade head
@@ -53,6 +83,17 @@ if [ -n "${GIT_SHA:-}" ]; then
       exit 1
     fi
   done
+
+  # nginx muss nach dem Recreate wirklich laufen (nicht crash-loopen).
+  echo "▶ Prüfe nginx-Status..."
+  sleep 3
+  nginx_state="$(docker inspect -f '{{.State.Status}}' "$(docker compose ps -q nginx)" 2>/dev/null || echo unknown)"
+  echo "   nginx: $nginx_state"
+  if [ "$nginx_state" != "running" ]; then
+    echo "✗ nginx läuft nicht (Status: $nginx_state) - Deploy fehlgeschlagen."
+    docker compose logs --tail=20 nginx || true
+    exit 1
+  fi
 
   echo "✓ Deployment abgeschlossen!"
   exit 0
