@@ -60,7 +60,7 @@ jobs:
         run: |
           set -eo pipefail
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "GIT_SHA='${{ github.sha }}' DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy.sh'"
+            "GIT_SHA='${{ github.sha }}' DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' DOMAIN='${{ vars.DOMAIN }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy.sh'"
 
       - name: "Healthcheck"
         run: |
