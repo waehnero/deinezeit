@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.12.15',
+    day: '02',
+    month: 'Juli',
+    year: '2026',
+    features: [],
+    updates: [
+      'Projekte: Aktionsmenü (drei Punkte) wird wieder korrekt angezeigt und nicht mehr doppelt dargestellt',
+      'Automatisches Server-Deployment robuster (Frontend-Update und nginx zuverlässiger)',
+    ],
+  },
+  {
     version: '1.12.14',
     day: '26',
     month: 'Juni',
