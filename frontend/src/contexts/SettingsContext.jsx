@@ -15,16 +15,31 @@ function applyTheme(theme) {
   }
 }
 
+// MIME-Typ anhand der Dateiendung bestimmen (Favicon kann PNG, ICO, SVG oder JPG sein)
+const FAVICON_TYPES = {
+  svg:  'image/svg+xml',
+  png:  'image/png',
+  ico:  'image/x-icon',
+  jpg:  'image/jpeg',
+  jpeg: 'image/jpeg',
+}
+
 function applyFavicon(faviconUrl) {
-  if (!faviconUrl) return
-  let link = document.querySelector("link[rel~='icon']")
-  if (!link) {
-    link = document.createElement('link')
-    link.rel = 'icon'
-    document.head.appendChild(link)
-  }
+  // Ohne eigenes Favicon auf den Standard zurückfallen (wichtig nach "Entfernen")
+  const url = faviconUrl || '/favicon.svg'
+  // Bestehende Favicon-Links komplett entfernen: index.html liefert
+  // <link rel="icon" type="image/svg+xml" href="/favicon.svg"> — würde man nur
+  // das href umschreiben, bliebe der falsche type stehen und der Browser
+  // ignoriert das hochgeladene PNG/ICO-Favicon.
+  document.querySelectorAll("link[rel~='icon']").forEach((el) => el.remove())
+
+  const link = document.createElement('link')
+  link.rel = 'icon'
+  const ext = url.split('?')[0].split('.').pop().toLowerCase()
+  if (FAVICON_TYPES[ext]) link.type = FAVICON_TYPES[ext]
   // Cache-Buster damit der Browser das neue Favicon sofort lädt
-  link.href = `${faviconUrl}?v=${Date.now()}`
+  link.href = `${url}?v=${Date.now()}`
+  document.head.appendChild(link)
 }
 
 export function SettingsProvider({ children }) {
