@@ -82,6 +82,21 @@ function TabAllgemein({ settings, onSaved }) {
   const logoUrl        = settings.logo_url        || null
   const logoHeaderUrl  = settings.logo_header_url  || null
   const logoFaviconUrl = settings.logo_favicon_url || null
+  const sidebarLogoSource = settings.sidebar_logo_source === 'favicon' ? 'favicon' : 'logo'
+
+  // Schieber: Sidebar zeigt Logo oder Favicon — sofort anwenden und speichern
+  const handleSidebarSourceChange = async (source) => {
+    updateSettings({ sidebar_logo_source: source })  // Sidebar aktualisiert sich sofort
+    try {
+      await settingsApi.update({ sidebar_logo_source: source })
+      toast.success(source === 'favicon'
+        ? 'Sidebar zeigt jetzt das Favicon'
+        : 'Sidebar zeigt jetzt das Logo')
+    } catch {
+      toast.error('Fehler beim Speichern')
+      updateSettings({ sidebar_logo_source: source === 'favicon' ? 'logo' : 'favicon' })
+    }
+  }
 
   // Kontaktoptionen laden
   useEffect(() => {
@@ -273,6 +288,32 @@ function TabAllgemein({ settings, onSaved }) {
             <p className="text-xs text-gray-400">32 × 32 px · Automatisch generiert</p>
           </div>
 
+        </div>
+
+        {/* Schieber: Sidebar-Logo-Quelle (Logo oder Favicon) */}
+        <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
+          <div className="min-w-0 pr-4">
+            <p className="text-sm font-medium text-gray-700">Sidebar-Logo</p>
+            <p className="text-xs text-gray-400">Wähle, ob die Sidebar das Original-Logo oder das Favicon anzeigt</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`text-xs font-medium ${sidebarLogoSource === 'logo' ? 'text-gray-800' : 'text-gray-400'}`}>Logo</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={sidebarLogoSource === 'favicon'}
+              onClick={() => handleSidebarSourceChange(sidebarLogoSource === 'favicon' ? 'logo' : 'favicon')}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                sidebarLogoSource === 'favicon' ? 'bg-primary-600' : 'bg-gray-300'
+              }`}
+              title="Sidebar-Logo umschalten"
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                sidebarLogoSource === 'favicon' ? 'translate-x-5' : ''
+              }`} />
+            </button>
+            <span className={`text-xs font-medium ${sidebarLogoSource === 'favicon' ? 'text-gray-800' : 'text-gray-400'}`}>Favicon</span>
+          </div>
         </div>
       </div>
 

@@ -9,6 +9,7 @@ class SettingsResponse(BaseModel):
     logo_url:               str = ''        # Original-Logo (Sidebar)
     logo_header_url:        str = ''        # 600×120 für Berichtskopf
     logo_favicon_url:       str = ''        # 32×32 für Browser-Tab
+    sidebar_logo_source:    str = 'logo'    # 'logo' | 'favicon' — was die Sidebar zeigt
     # E-Mail (gemeinsam)
     email_provider:         str = 'smtp'    # 'smtp' oder 'graph'
     smtp_from_name:         str = ''
@@ -52,6 +53,7 @@ class SettingsUpdate(BaseModel):
     company_name:           Optional[str] = None
     app_subtitle:           Optional[str] = None
     color_theme:            Optional[str] = None
+    sidebar_logo_source:    Optional[str] = None
     # E-Mail (gemeinsam)
     email_provider:         Optional[str] = None
     smtp_from_name:         Optional[str] = None
