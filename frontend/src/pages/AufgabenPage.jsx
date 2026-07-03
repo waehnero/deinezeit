@@ -2,9 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Plus, ListTodo, Loader2, X, Search, CheckCircle2, Circle,
   CalendarDays, User as UserIcon, Link2, Trash2, GanttChartSquare, Database,
+  Columns, List,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { aufgabenApi, usersApi, projektplanApi, masterdataApi } from '../services/api'
+import AufgabenKanban from '../components/AufgabenKanban'
+import AufgabenKalender from '../components/AufgabenKalender'
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Aufgabenmodul – Etappe 1: Listenansicht
@@ -115,8 +118,20 @@ function RecordSearch({ recordId, recordName, recordTypeSlug, onChange }) {
 }
 
 // ── Anlegen/Bearbeiten-Dialog ─────────────────────────────────────────────────
+// Aufgabenbaum des Projektplans flach machen (inkl. Teilaufgaben)
+function flacheTasks(tasks, out = [], tiefe = 0) {
+  for (const t of tasks || []) {
+    out.push({ ...t, tiefe })
+    if (t.children?.length) flacheTasks(t.children, out, tiefe + 1)
+  }
+  return out
+}
+
 function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted }) {
   const isNew = !todo?.id
+  // Eingeblendete Projektplan-Aufgabe: Quelle bleibt das Projektmodul,
+  // daher nur die dort vorhandenen Felder anbieten.
+  const istProjektplan = todo?.source === 'projektplan'
   const [form, setForm] = useState({
     title: todo?.title || '',
     description: todo?.description || '',
@@ -144,11 +159,11 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
     projektplanApi.listProjects().then(r => setProjects(r.data || [])).catch(() => {})
   }, [])
 
-  // Aufgaben des gewählten Planungsprojekts nachladen
+  // Aufgaben des gewählten Planungsprojekts nachladen (Baum -> flache Liste)
   useEffect(() => {
     if (!form.planning_project_id) { setProjectTasks([]); return }
     projektplanApi.getProject(form.planning_project_id)
-      .then(r => setProjectTasks(r.data.tasks || []))
+      .then(r => setProjectTasks(flacheTasks(r.data.tasks)))
       .catch(() => setProjectTasks([]))
   }, [form.planning_project_id])
 
@@ -203,9 +218,17 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
-          <h2 className="font-semibold text-neutral-900">
-            {isNew ? 'Neue Aufgabe' : 'Aufgabe bearbeiten'}
-          </h2>
+          <div>
+            <h2 className="font-semibold text-neutral-900">
+              {isNew ? 'Neue Aufgabe' : 'Aufgabe bearbeiten'}
+            </h2>
+            {istProjektplan && (
+              <p className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
+                <GanttChartSquare size={12} />
+                Aus dem Projekt „{todo.planning_project_name}" — Änderungen wirken dort
+              </p>
+            )}
+          </div>
           <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
         </div>
 
@@ -237,7 +260,7 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${istProjektplan ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <div>
               <label className="block text-xs font-medium text-neutral-500 mb-1">Start</label>
               <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} className={inputCls} />
@@ -246,10 +269,12 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
               <label className="block text-xs font-medium text-neutral-500 mb-1">Fällig am</label>
               <input type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} className={inputCls} />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-neutral-500 mb-1">Uhrzeit</label>
-              <input type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} className={inputCls} />
-            </div>
+            {!istProjektplan && (
+              <div>
+                <label className="block text-xs font-medium text-neutral-500 mb-1">Uhrzeit</label>
+                <input type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} className={inputCls} />
+              </div>
+            )}
           </div>
 
           <div>
@@ -260,7 +285,8 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
             </select>
           </div>
 
-          {/* Verknüpfungen */}
+          {/* Verknüpfungen (bei Projektplan-Aufgaben verwaltet das Projektmodul) */}
+          {!istProjektplan && (
           <div className="border-t border-neutral-100 pt-3 space-y-3">
             <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider flex items-center gap-1">
               <Link2 size={13} /> Verknüpfungen
@@ -280,7 +306,9 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
                 <select value={form.planning_task_id} onChange={e => set('planning_task_id', e.target.value)}
                   disabled={!form.planning_project_id} className={`${inputCls} disabled:bg-neutral-50 disabled:text-neutral-400`}>
                   <option value="">— keine —</option>
-                  {projectTasks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                  {projectTasks.map(t => (
+                    <option key={t.id} value={t.id}>{' '.repeat(t.tiefe * 2)}{t.title}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -296,10 +324,11 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
               />
             </div>
           </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-neutral-100">
-          {!isNew ? (
+          {!isNew && !istProjektplan ? (
             <button onClick={loeschen}
               className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700">
               <Trash2 size={15} /> Löschen
@@ -336,6 +365,15 @@ export default function AufgabenPage() {
   const [prioFilter, setPrioFilter] = useState('')
   const [nurMeine, setNurMeine] = useState(false)
   const [erledigteZeigen, setErledigteZeigen] = useState(false)
+
+  // Ansicht: liste | kanban | kalender (Wahl wird gemerkt)
+  const [ansicht, setAnsicht] = useState(() => {
+    try { return localStorage.getItem('aufgaben_ansicht') || 'liste' } catch { return 'liste' }
+  })
+  const wechsleAnsicht = (a) => {
+    setAnsicht(a)
+    try { localStorage.setItem('aufgaben_ansicht', a) } catch {}
+  }
 
   const [dialogTodo, setDialogTodo] = useState(null)  // null=zu, {}=neu, {…}=bearbeiten
 
@@ -379,7 +417,8 @@ export default function AufgabenPage() {
   const gefiltert = useMemo(() => {
     const s = search.trim().toLowerCase()
     return todos.filter(t => {
-      if (!erledigteZeigen && t.status === doneStatus) return false
+      // Kanban hat eine eigene Erledigt-Spalte -> Filter dort nicht anwenden
+      if (ansicht !== 'kanban' && !erledigteZeigen && t.status === doneStatus) return false
       if (statusFilter && t.status !== statusFilter) return false
       if (prioFilter && t.priority !== prioFilter) return false
       if (s) {
@@ -388,7 +427,7 @@ export default function AufgabenPage() {
       }
       return true
     })
-  }, [todos, search, statusFilter, prioFilter, erledigteZeigen, doneStatus])
+  }, [todos, search, statusFilter, prioFilter, erledigteZeigen, doneStatus, ansicht])
 
   const gruppen = useMemo(() => {
     const map = {}
@@ -408,6 +447,20 @@ export default function AufgabenPage() {
       <div className="flex items-center gap-3 mb-1">
         <ListTodo className="text-primary-600" size={26} />
         <h1 className="text-xl font-semibold text-neutral-900">Aufgaben</h1>
+        {/* Ansichts-Umschalter */}
+        <div className="flex rounded-lg border border-gray-300 overflow-hidden ml-auto">
+          {[
+            { id: 'liste',    label: 'Liste',    Icon: List },
+            { id: 'kanban',   label: 'Kanban',   Icon: Columns },
+            { id: 'kalender', label: 'Kalender', Icon: CalendarDays },
+          ].map(({ id, label, Icon }) => (
+            <button key={id} onClick={() => wechsleAnsicht(id)} title={label}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm ${ansicht === id
+                ? 'bg-primary-600 text-white' : 'bg-white text-neutral-600 hover:bg-neutral-50'}`}>
+              <Icon size={15} /> <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <p className="text-sm text-neutral-500 mb-5">{offen} offene Aufgabe{offen === 1 ? '' : 'n'}</p>
 
@@ -442,11 +495,27 @@ export default function AufgabenPage() {
         </button>
       </div>
 
-      {/* Liste */}
+      {/* Inhalt je Ansicht */}
       {loading ? (
         <div className="flex items-center justify-center h-40">
           <Loader2 size={26} className="animate-spin text-primary-400" />
         </div>
+      ) : ansicht === 'kanban' ? (
+        <AufgabenKanban
+          todos={gefiltert}
+          statuses={statuses}
+          priorities={priorities}
+          onOpen={t => setDialogTodo(t)}
+          onChanged={load}
+        />
+      ) : ansicht === 'kalender' ? (
+        <AufgabenKalender
+          todos={gefiltert}
+          statuses={statuses}
+          doneStatus={doneStatus}
+          onOpen={t => setDialogTodo(t)}
+          onCreate={iso => setDialogTodo({ due_date: iso })}
+        />
       ) : gefiltert.length === 0 ? (
         <div className="text-center py-16 text-neutral-400">
           <ListTodo size={36} className="mx-auto mb-3 opacity-40" />
@@ -531,7 +600,7 @@ export default function AufgabenPage() {
       {/* Dialog */}
       {dialogTodo !== null && (
         <TodoDialog
-          todo={dialogTodo.id ? dialogTodo : null}
+          todo={dialogTodo}
           statuses={statuses}
           priorities={priorities}
           onClose={() => setDialogTodo(null)}

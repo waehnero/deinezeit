@@ -135,6 +135,57 @@ def _apply_done_status(db: Session, todo: Todo):
         todo.completed_at = None
 
 
+# ── Projektplan-Aufgaben einblenden ───────────────────────────────────────────
+# Aufgaben vom Typ "aufgabe" aus dem Projektmodul erscheinen automatisch mit
+# in der To-do-Liste (source="projektplan") — OHNE Datenduplizierung: Quelle
+# bleibt planning_tasks, Änderungen schreiben direkt dorthin zurück.
+
+def _ist_normale_aufgabe(task: Task) -> bool:
+    """Nur echte Aufgaben (kein Meilenstein, kein anderer Typ)."""
+    if task.is_milestone:
+        return False
+    task_type = (task.data or {}).get("task_type") or "aufgabe"
+    return task_type == "aufgabe"
+
+
+def _task_to_response(task: Task, project_name: Optional[str]) -> TodoResponse:
+    """Mappt eine Projektplan-Aufgabe auf das TodoResponse-Schema."""
+    return TodoResponse(
+        id=task.id,
+        title=task.title,
+        description=task.description,
+        status=task.status,
+        priority=task.priority,
+        start_date=task.start_date,
+        due_date=task.due_date,
+        due_time=None,
+        completed_at=None,
+        assignee_id=task.assignee_id,
+        assignee_name=task.assignee_name,
+        planning_project_id=task.project_id,
+        planning_project_name=project_name,
+        planning_task_id=None,
+        planning_task_title=None,
+        time_entry_id=None,
+        record_id=task.contact_id,
+        record_name=task.contact_name,
+        record_type_slug=None,
+        source="projektplan",
+        source_meta=None,
+        sort_order=task.sort_order or 0,
+        data=task.data or {},
+        is_archived=False,
+        created_by=task.created_by,
+        created_by_name=None,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )
+
+
+def _get_planning_task(db: Session, task_id: UUID) -> Optional[Task]:
+    return db.query(Task).filter(Task.id == task_id).first()
+
+
 # ── Aufgaben CRUD ─────────────────────────────────────────────────────────────
 @router.get("/", response_model=List[TodoResponse])
 def list_todos(
@@ -149,6 +200,7 @@ def list_todos(
     planning_task_id: Optional[UUID] = None,
     record_id: Optional[UUID] = None,
     include_archived: bool = False,
+    include_projektplan: bool = Query(True, description="Projektplan-Aufgaben mit einblenden"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -180,7 +232,49 @@ def list_todos(
 
     rows = query.order_by(Todo.sort_order, Todo.due_date.nullslast(),
                           Todo.created_at.desc()).all()
-    return rows
+    result = [TodoResponse.model_validate(r) for r in rows]
+
+    # ── Projektplan-Aufgaben einmischen (nur Typ "aufgabe", Projekt aktiv) ────
+    # Nicht sinnvoll bei Filtern, die es dort nicht gibt (Verknüpfung auf
+    # eine Projektplan-Aufgabe oder einen Zeiterfassungs-/Stammdaten-Bezug
+    # über planning_task_id).
+    if include_projektplan and not planning_task_id:
+        status_set = set(s.strip() for s in status.split(",") if s.strip()) if status else None
+        prio_set = set(p.strip() for p in priority.split(",") if p.strip()) if priority else None
+        s_lower = q.lower() if q else None
+
+        ptasks = (
+            db.query(Task, PlanningProject.name)
+            .join(PlanningProject, Task.project_id == PlanningProject.id)
+            .filter(PlanningProject.is_archived.is_(False))
+            .all()
+        )
+        for task, proj_name in ptasks:
+            if not _ist_normale_aufgabe(task):
+                continue
+            if status_set and task.status not in status_set:
+                continue
+            if prio_set and task.priority not in prio_set:
+                continue
+            if assignee_id and task.assignee_id != assignee_id:
+                continue
+            if mine and task.assignee_id != current_user.id and task.created_by != current_user.id:
+                continue
+            if due_from and (not task.due_date or task.due_date < due_from):
+                continue
+            if due_to and (not task.due_date or task.due_date > due_to):
+                continue
+            if s_lower and s_lower not in f"{task.title} {task.description or ''}".lower():
+                continue
+            if planning_project_id and task.project_id != planning_project_id:
+                continue
+            if record_id and task.contact_id != record_id:
+                continue
+            result.append(_task_to_response(task, proj_name))
+
+    # Einheitliche Reihung: Fälligkeit (ohne Termin zuletzt), dann Titel
+    result.sort(key=lambda r: (r.due_date is None, str(r.due_date or ""), (r.title or "").lower()))
+    return result
 
 
 @router.post("/", response_model=TodoResponse, status_code=201)
@@ -233,9 +327,14 @@ def get_todo(
     current_user: User = Depends(get_current_user),
 ):
     todo = db.query(Todo).filter(Todo.id == todo_id).first()
-    if not todo:
-        raise HTTPException(404, "Aufgabe nicht gefunden")
-    return todo
+    if todo:
+        return todo
+    # Fallback: eingeblendete Projektplan-Aufgabe
+    task = _get_planning_task(db, todo_id)
+    if task:
+        proj = db.query(PlanningProject).filter(PlanningProject.id == task.project_id).first()
+        return _task_to_response(task, proj.name if proj else None)
+    raise HTTPException(404, "Aufgabe nicht gefunden")
 
 
 @router.put("/{todo_id}", response_model=TodoResponse)
@@ -246,10 +345,35 @@ def update_todo(
     current_user: User = Depends(get_current_user),
 ):
     todo = db.query(Todo).filter(Todo.id == todo_id).first()
-    if not todo:
-        raise HTTPException(404, "Aufgabe nicht gefunden")
-
     payload = body.model_dump(exclude_unset=True)
+
+    if not todo:
+        # Fallback: eingeblendete Projektplan-Aufgabe — erlaubte Felder
+        # direkt auf planning_tasks zurückschreiben.
+        task = _get_planning_task(db, todo_id)
+        if not task:
+            raise HTTPException(404, "Aufgabe nicht gefunden")
+        erlaubt = {"title", "description", "status", "priority",
+                   "start_date", "due_date", "assignee_id"}
+        for key, value in payload.items():
+            if key in erlaubt:
+                setattr(task, key, value)
+        if "assignee_id" in payload:
+            if task.assignee_id:
+                user = db.query(User).filter(User.id == task.assignee_id).first()
+                if not user:
+                    raise HTTPException(404, "Zugewiesener Benutzer nicht gefunden")
+                task.assignee_name = user.full_name
+            else:
+                task.assignee_name = None
+        if payload.get("status") == "erledigt":
+            task.progress = 100
+        task.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(task)
+        proj = db.query(PlanningProject).filter(PlanningProject.id == task.project_id).first()
+        return _task_to_response(task, proj.name if proj else None)
+
     for key, value in payload.items():
         setattr(todo, key, value)
     _resolve_links(db, todo, set(payload.keys()))
@@ -269,6 +393,9 @@ def delete_todo(
 ):
     todo = db.query(Todo).filter(Todo.id == todo_id).first()
     if not todo:
+        if _get_planning_task(db, todo_id):
+            raise HTTPException(
+                400, "Projektplan-Aufgaben bitte im Modul Projekte löschen")
         raise HTTPException(404, "Aufgabe nicht gefunden")
     db.delete(todo)
     db.commit()

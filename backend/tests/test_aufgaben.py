@@ -151,6 +151,71 @@ def test_verknuepfung_unbekannte_planungsaufgabe_404(auth_client):
     assert resp.status_code == 404
 
 
+# ── Eingeblendete Projektplan-Aufgaben ────────────────────────────────────────
+def _planungsaufgabe(auth_client, projekt_name="Projekt Y", **task_overrides):
+    resp = auth_client.post("/api/projektplan/projects", json={"name": projekt_name})
+    assert resp.status_code in (200, 201), resp.text
+    project_id = resp.json()["id"]
+    resp = auth_client.post(f"/api/projektplan/projects/{project_id}/tasks",
+                            json={"title": "Projektvorgang", **task_overrides})
+    assert resp.status_code in (200, 201), resp.text
+    return project_id, resp.json()["id"]
+
+
+def test_projektplan_aufgabe_erscheint_in_liste(auth_client):
+    project_id, task_id = _planungsaufgabe(auth_client)
+    resp = auth_client.get("/api/aufgaben/")
+    assert resp.status_code == 200
+    eintraege = {t["id"]: t for t in resp.json()}
+    assert task_id in eintraege
+    t = eintraege[task_id]
+    assert t["source"] == "projektplan"
+    assert t["title"] == "Projektvorgang"
+    assert t["planning_project_id"] == project_id
+
+
+def test_projektplan_meilenstein_nicht_in_liste(auth_client):
+    _, task_id = _planungsaufgabe(auth_client, projekt_name="Projekt M",
+                                  is_milestone=True)
+    resp = auth_client.get("/api/aufgaben/")
+    assert task_id not in [t["id"] for t in resp.json()]
+
+
+def test_projektplan_ausblendbar(auth_client):
+    _, task_id = _planungsaufgabe(auth_client)
+    resp = auth_client.get("/api/aufgaben/", params={"include_projektplan": False})
+    assert task_id not in [t["id"] for t in resp.json()]
+
+
+def test_projektplan_aufgabe_status_aendern(auth_client):
+    project_id, task_id = _planungsaufgabe(auth_client)
+    # Über die Aufgaben-API auf erledigt setzen …
+    resp = auth_client.put(f"/api/aufgaben/{task_id}", json={"status": "erledigt"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "erledigt"
+    # … und im Projektplan prüfen (inkl. Fortschritt 100)
+    resp = auth_client.get(f"/api/projektplan/projects/{project_id}")
+    tasks = resp.json()["tasks"]
+    def _finde(liste):
+        for t in liste:
+            if t["id"] == task_id:
+                return t
+            sub = _finde(t.get("children") or [])
+            if sub:
+                return sub
+        return None
+    task = _finde(tasks)
+    assert task is not None
+    assert task["status"] == "erledigt"
+    assert task["progress"] == 100
+
+
+def test_projektplan_aufgabe_loeschen_abgelehnt(auth_client):
+    _, task_id = _planungsaufgabe(auth_client)
+    resp = auth_client.delete(f"/api/aufgaben/{task_id}")
+    assert resp.status_code == 400
+
+
 # ── Einstellungen ─────────────────────────────────────────────────────────────
 def test_einstellungen_defaults(auth_client):
     resp = auth_client.get("/api/aufgaben/einstellungen")
