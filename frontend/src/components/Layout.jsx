@@ -46,7 +46,10 @@ export default function Layout({ children }) {
     navigate('/login')
   }
 
-  const logoUrl = settings.logo_url || null
+  // Sidebar-Logo: wahlweise das Original-Logo oder das Favicon (Einstellungen → Allgemein)
+  const logoUrl = (settings.sidebar_logo_source === 'favicon' && settings.logo_favicon_url)
+    ? settings.logo_favicon_url
+    : (settings.logo_url || null)
 
   const companyName = settings.company_name || 'DeineZeit'
 

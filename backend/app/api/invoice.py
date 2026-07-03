@@ -309,6 +309,98 @@ async def update_number_sequence(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Belegeinstellungen (Key-Value-Store: Bankdaten, Vorlagen, Texte, Steuersätze)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/settings/all")
+async def get_invoice_settings(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Gibt alle Belegeinstellungen als Dict {key: value} zurück."""
+    return {r.key: r.value for r in db.query(InvoiceSettings).all()}
+
+
+@router.put("/settings/{key}")
+async def update_invoice_setting(
+    key: str,
+    body: InvoiceSettingsUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Speichert eine einzelne Belegeinstellung (Upsert). Wert ist beliebiges JSON."""
+    setting = db.query(InvoiceSettings).filter_by(key=key).first()
+    if setting:
+        setting.value = body.value
+    else:
+        setting = InvoiceSettings(key=key, value=body.value)
+        db.add(setting)
+    db.commit()
+    return {"key": key, "value": setting.value}
+
+
+@router.get("/template-preview/{template_id}")
+async def template_preview(
+    template_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """HTML-Vorschau einer PDF-Vorlage mit Beispieldaten (Einstellungen → Belegeinstellungen)."""
+    from types import SimpleNamespace
+    from decimal import Decimal
+    from datetime import timedelta
+
+    if template_id not in (1, 2, 3, 4, 5):
+        raise HTTPException(404, "Unbekannte Vorlage")
+
+    settings     = {r.key: r.value for r in db.query(Setting).all()}
+    inv_settings = {r.key: r.value for r in db.query(InvoiceSettings).all()}
+
+    # Eigener Firmen-Kontakt als Absender (falls verknüpft)
+    sender_contact = None
+    cid = settings.get("company_contact_id")
+    if cid:
+        try:
+            sender_contact = db.query(EntityRecord).filter(EntityRecord.id == UUID(cid)).first()
+        except Exception:
+            pass
+
+    # Beispiel-Empfänger und -Positionen, damit die Vorschau realistisch aussieht
+    recipient = SimpleNamespace(
+        display_name="Musterfirma GmbH",
+        data={"ansprechperson": "Max Mustermann", "adresse": "Musterstraße 1",
+              "plz": "1010", "ort": "Wien", "land": "Österreich", "uid": "ATU12345678"},
+    )
+    positions = [
+        SimpleNamespace(pos_type="item", description="Beratung & Konzeption",
+                        detail="Workshop inkl. Vor- und Nachbereitung",
+                        quantity=Decimal("8"), unit="Std.", unit_price=Decimal("120"),
+                        discount_pct=None, tax_rate=Decimal("20"), line_total=Decimal("960.00")),
+        SimpleNamespace(pos_type="item", description="Entwicklung Webanwendung",
+                        detail=None, quantity=Decimal("24"), unit="Std.", unit_price=Decimal("95"),
+                        discount_pct=Decimal("10"), tax_rate=Decimal("20"), line_total=Decimal("2052.00")),
+        SimpleNamespace(pos_type="item", description="Hosting-Pauschale",
+                        detail=None, quantity=Decimal("1"), unit="Pausch.", unit_price=Decimal("49.90"),
+                        discount_pct=None, tax_rate=Decimal("20"), line_total=Decimal("49.90")),
+    ]
+    subtotal  = sum((p.line_total for p in positions), Decimal("0"))
+    tax_total = (subtotal * Decimal("0.20")).quantize(Decimal("0.01"))
+    today = date.today()
+    demo_invoice = SimpleNamespace(
+        doc_type="rechnung", status="offen", tax_mode="normal",
+        number="RE-2026-042", date=today, due_date=today + timedelta(days=30),
+        delivery_date=None, reference="Beispiel-Projekt",
+        intro_text="Vielen Dank für Ihren Auftrag! Wir stellen folgende Leistungen in Rechnung:",
+        outro_text="Zahlbar innerhalb von 30 Tagen ohne Abzug.",
+        subtotal=subtotal, tax_total=tax_total, total=subtotal + tax_total,
+    )
+
+    html = generate_html_preview(demo_invoice, positions, settings, inv_settings,
+                                 sender_contact, recipient, template_id=template_id)
+    return Response(content=html, media_type="text/html")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Belegbuch
 # ─────────────────────────────────────────────────────────────────────────────
 
