@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Database, Users, User, LogOut, Menu, X,
   ChevronRight, Clock, Settings2, HardDrive, Receipt, GanttChartSquare,
-  PanelLeftClose, PanelLeftOpen
+  PanelLeftClose, PanelLeftOpen, ListTodo
 } from 'lucide-react'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -14,6 +14,7 @@ import UpdateBanner from './UpdateBanner'
 const NAV_ITEMS = [
   { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/zeiterfassung',icon: Clock,           label: 'Zeiterfassung' },
+  { to: '/aufgaben',     icon: ListTodo,        label: 'Aufgaben' },
   { to: '/projekte',     icon: GanttChartSquare, label: 'Projekte' },
   { to: '/invoices',     icon: Receipt,         label: 'Belege' },
   { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },

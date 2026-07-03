@@ -277,6 +277,17 @@ export const projektplanApi = {
   assignChecklist: (itemId, data) => api.post(`/projektplan/checklist/item/${itemId}/assign`, data),
 }
 
+// ── Aufgabenmodul (zentrale To-do-Liste) ─────────────────────────────────────
+export const aufgabenApi = {
+  list:   (params)     => api.get('/aufgaben/', { params }),
+  get:    (id)         => api.get(`/aufgaben/${id}`),
+  create: (data)       => api.post('/aufgaben/', data),
+  update: (id, data)   => api.put(`/aufgaben/${id}`, data),
+  remove: (id)         => api.delete(`/aufgaben/${id}`),
+  getSettings:    ()     => api.get('/aufgaben/einstellungen'),
+  updateSettings: (data) => api.put('/aufgaben/einstellungen', data),
+}
+
 // ── Anlagen (Datacenter-API, generisch über entity_type/entity_id) ────────────
 export const attachmentApi = {
   list:     (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),

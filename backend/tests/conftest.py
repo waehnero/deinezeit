@@ -63,8 +63,17 @@ def client(db_session):
             pass  # Session wird in db_session-Fixture geschlossen
 
     app.dependency_overrides[get_db] = _override_get_db
+    # Rate-Limiting in Tests deaktivieren: alle Requests kommen vom selben
+    # TestClient ("testclient"), dadurch würde z.B. das Login-Limit (10/min)
+    # bei Modulen mit vielen auth_client-Tests fälschlich zuschlagen.
+    # Achtung: auth.py nutzt eine EIGENE Limiter-Instanz -> beide abschalten.
+    from app.api.auth import limiter as auth_limiter
+    app.state.limiter.enabled = False
+    auth_limiter.enabled = False
     with TestClient(app) as test_client:
         yield test_client
+    app.state.limiter.enabled = True
+    auth_limiter.enabled = True
     app.dependency_overrides.clear()
 
 
