@@ -25,6 +25,7 @@ import InvoiceBookPage from './pages/InvoiceBookPage'
 import ProjektplanPage from './pages/ProjektplanPage'
 import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
 import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
+import AufgabenPage from './pages/AufgabenPage'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }) {
@@ -64,6 +65,7 @@ function App() {
                       <Route path="/profile"              element={<ProfilePage />} />
                       <Route path="/users"                element={<UserManagementPage />} />
                       <Route path="/zeiterfassung"        element={<ZeiterfassungPage />} />
+                      <Route path="/aufgaben"             element={<AufgabenPage />} />
                       <Route path="/projekte"             element={<ProjektplanPage />} />
                       <Route path="/projekte/einstellungen" element={<AdminRoute><ProjekteEinstellungen /></AdminRoute>} />
                       <Route path="/projekte/:id"         element={<ProjektplanDetailPage />} />
