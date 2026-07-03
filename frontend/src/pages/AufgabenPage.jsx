@@ -2,13 +2,14 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Plus, ListTodo, Loader2, X, Search, CheckCircle2, Circle,
   CalendarDays, User as UserIcon, Link2, Trash2, GanttChartSquare, Database,
-  Columns, List,
+  Columns, List, Printer,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { aufgabenApi, usersApi, projektplanApi, masterdataApi } from '../services/api'
 import AufgabenKanban from '../components/AufgabenKanban'
 import AufgabenKalender from '../components/AufgabenKalender'
 import MailVorschlaege from '../components/MailVorschlaege'
+import AttachmentPanel from '../components/AttachmentPanel'
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Aufgabenmodul – Etappe 1: Listenansicht
@@ -212,6 +213,20 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
     }
   }
 
+  const [printing, setPrinting] = useState(false)
+  const drucken = async () => {
+    setPrinting(true)
+    try {
+      const res = await aufgabenApi.printPdf(todo.id)
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      window.open(url, '_blank')
+    } catch {
+      toast.error('PDF konnte nicht erstellt werden')
+    } finally {
+      setPrinting(false)
+    }
+  }
+
   const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400'
 
   return (
@@ -326,15 +341,36 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
             </div>
           </div>
           )}
+
+          {/* Anhänge (Datacenter, wie bei Projekt-Aufgaben). Erst nach dem
+              Anlegen verfügbar — vorher gibt es noch keine Aufgaben-ID. */}
+          {!isNew && (
+            <div className="border-t border-neutral-100 pt-3">
+              <AttachmentPanel
+                entityType={istProjektplan ? 'planning_task' : 'todo'}
+                entityId={todo.id}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-neutral-100">
-          {!isNew && !istProjektplan ? (
-            <button onClick={loeschen}
-              className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700">
-              <Trash2 size={15} /> Löschen
-            </button>
-          ) : <span />}
+          <div className="flex items-center gap-4">
+            {!isNew && !istProjektplan && (
+              <button onClick={loeschen}
+                className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700">
+                <Trash2 size={15} /> Löschen
+              </button>
+            )}
+            {!isNew && (
+              <button onClick={drucken} disabled={printing}
+                title="Laufzettel drucken (A5-Infos + Notizraster + QR-Code)"
+                className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-primary-600 disabled:opacity-50">
+                {printing ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
+                Drucken
+              </button>
+            )}
+          </div>
           <div className="flex gap-2">
             <button onClick={onClose}
               className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-neutral-700 hover:bg-neutral-50">

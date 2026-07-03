@@ -46,6 +46,7 @@ const ENTITY_LABELS = {
   projekte:      'Projekte',
   planning_task: 'Projekte',
   aufgaben:      'Aufgaben',
+  todo:          'Aufgaben',
 }
 function entityLabel(slug) {
   return ENTITY_LABELS[slug] || slug.charAt(0).toUpperCase() + slug.slice(1)
