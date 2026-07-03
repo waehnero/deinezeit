@@ -19,9 +19,11 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
+
+from app.core.config import settings as app_settings
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
@@ -335,6 +337,59 @@ def get_todo(
         proj = db.query(PlanningProject).filter(PlanningProject.id == task.project_id).first()
         return _task_to_response(task, proj.name if proj else None)
     raise HTTPException(404, "Aufgabe nicht gefunden")
+
+
+@router.get("/{todo_id}/print")
+def print_todo(
+    todo_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Laufzettel-PDF (A4 hoch): obere Hälfte Aufgabeninfos + QR-Code,
+    untere Hälfte 5-mm-Notizraster. Funktioniert auch für eingeblendete
+    Projektplan-Aufgaben. Der QR-Code enthält die Aufgaben-URL (mit ID) —
+    ein künftiges Belegmodul kann Scans darüber automatisch zuordnen.
+    """
+    from app.services.aufgaben_pdf import generate_todo_pdf
+    from app.models.attachment import Attachment
+
+    todo = db.query(Todo).filter(Todo.id == todo_id).first()
+    if todo:
+        data = TodoResponse.model_validate(todo)
+        attachment_entity = "todo"
+    else:
+        task = _get_planning_task(db, todo_id)
+        if not task:
+            raise HTTPException(404, "Aufgabe nicht gefunden")
+        proj = db.query(PlanningProject).filter(PlanningProject.id == task.project_id).first()
+        data = _task_to_response(task, proj.name if proj else None)
+        attachment_entity = "planning_task"
+
+    # Firmenname aus Einstellungen -> Allgemein
+    firma = db.query(Setting).filter(Setting.key == "company_name").first()
+    company_name = (firma.value if firma and firma.value else "DeineZeit")
+
+    # Anzahl der Anhänge (Datacenter, generisch über entity_type/entity_id)
+    anhaenge = (db.query(Attachment)
+                .filter(Attachment.entity_type == attachment_entity,
+                        Attachment.entity_id == todo_id).count())
+
+    einstellungen = _load_settings(db)
+    qr_payload = f"{app_settings.FRONTEND_URL.rstrip('/')}/aufgaben?id={todo_id}"
+    pdf = generate_todo_pdf(
+        data.model_dump(),
+        qr_payload,
+        [s.model_dump() for s in einstellungen.statuses],
+        [p.model_dump() for p in einstellungen.priorities],
+        company_name=company_name,
+        anhaenge=anhaenge,
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="aufgabe-{str(todo_id)[:8]}.pdf"'},
+    )
 
 
 @router.put("/{todo_id}", response_model=TodoResponse)

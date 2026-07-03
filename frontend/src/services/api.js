@@ -284,6 +284,7 @@ export const aufgabenApi = {
   create: (data)       => api.post('/aufgaben/', data),
   update: (id, data)   => api.put(`/aufgaben/${id}`, data),
   remove: (id)         => api.delete(`/aufgaben/${id}`),
+  printPdf: (id)       => api.get(`/aufgaben/${id}/print`, { responseType: 'blob' }),
   getSettings:    ()     => api.get('/aufgaben/einstellungen'),
   updateSettings: (data) => api.put('/aufgaben/einstellungen', data),
 }

@@ -61,6 +61,17 @@ def resolve_contact(db: Session, entity_type: str, entity_id: str):
                 if proj and getattr(proj, "contact_id", None):
                     return proj.contact_id, proj.contact_name
 
+        elif entity_type == "todo":
+            # Aufgabe (Aufgabenmodul): verknüpfter Stammdaten-Kontakt,
+            # sonst Kontakt der verknüpften Projektplan-Aufgabe/des Projekts.
+            from app.models.aufgaben import Todo
+            todo = db.query(Todo).filter(Todo.id == entity_id).first()
+            if todo:
+                if todo.record_id and (todo.record_type_slug or "") in ("kontakte", "kontakt"):
+                    return todo.record_id, todo.record_name
+                if todo.planning_task_id:
+                    return resolve_contact(db, "planning_task", todo.planning_task_id)
+
         else:
             # Stammdaten-Datensatz: ist er selbst ein Kontakt, verweist er auf sich.
             rec = db.query(EntityRecord).filter(EntityRecord.id == entity_id).first()
@@ -209,6 +220,14 @@ def _build_entity_label_map(db: Session, rows) -> dict:
                         label = f"{proj.name} – {label}" if label else proj.name
                     if label:
                         label_map[(etype, eid)] = label
+                continue
+
+            # Sonderfall: Aufgaben (Aufgabenmodul) -> Aufgabentitel.
+            if etype == "todo":
+                from app.models.aufgaben import Todo
+                todo = db.query(Todo).filter(Todo.id == eid).first()
+                if todo and todo.title:
+                    label_map[(etype, eid)] = todo.title
                 continue
 
             et = db.query(EntityType).filter(EntityType.slug == etype).first()

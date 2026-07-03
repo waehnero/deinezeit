@@ -216,6 +216,28 @@ def test_projektplan_aufgabe_loeschen_abgelehnt(auth_client):
     assert resp.status_code == 400
 
 
+# ── Laufzettel-PDF ────────────────────────────────────────────────────────────
+def test_druck_liefert_pdf(auth_client, test_user):
+    created = _neue_aufgabe(auth_client, description="Details",
+                            due_date="2026-07-15", assignee_id=str(test_user.id))
+    resp = auth_client.get(f"/api/aufgaben/{created['id']}/print")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content[:5] == b"%PDF-"
+
+
+def test_druck_projektplan_aufgabe(auth_client):
+    _, task_id = _planungsaufgabe(auth_client, projekt_name="Projekt Druck")
+    resp = auth_client.get(f"/api/aufgaben/{task_id}/print")
+    assert resp.status_code == 200
+    assert resp.content[:5] == b"%PDF-"
+
+
+def test_druck_unbekannte_aufgabe_404(auth_client):
+    resp = auth_client.get("/api/aufgaben/00000000-0000-0000-0000-000000000000/print")
+    assert resp.status_code == 404
+
+
 # ── Einstellungen ─────────────────────────────────────────────────────────────
 def test_einstellungen_defaults(auth_client):
     resp = auth_client.get("/api/aufgaben/einstellungen")
