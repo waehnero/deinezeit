@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { aufgabenApi, usersApi, projektplanApi, masterdataApi } from '../services/api'
 import AufgabenKanban from '../components/AufgabenKanban'
 import AufgabenKalender from '../components/AufgabenKalender'
+import MailVorschlaege from '../components/MailVorschlaege'
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Aufgabenmodul – Etappe 1: Listenansicht
@@ -463,6 +464,9 @@ export default function AufgabenPage() {
         </div>
       </div>
       <p className="text-sm text-neutral-500 mb-5">{offen} offene Aufgabe{offen === 1 ? '' : 'n'}</p>
+
+      {/* KI-Vorschläge aus E-Mails (nur sichtbar, wenn offene existieren) */}
+      <MailVorschlaege onAccepted={load} />
 
       {/* Filterzeile */}
       <div className="flex flex-wrap items-center gap-2 mb-5">

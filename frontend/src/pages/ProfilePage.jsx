@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { authApi, usersApi } from '../services/api'
+import MailKonten from '../components/MailImportVerwaltung'
 import toast from 'react-hot-toast'
 import {
   User, Globe, Shield, Fingerprint, Key,
@@ -299,6 +300,11 @@ export default function ProfilePage() {
           <p className="text-xs text-gray-400 mt-2">
             Unterstützt Face ID (iPhone), Touch ID (Mac), Windows Hello und Android-Fingerabdruck.
           </p>
+        </div>
+
+        {/* ── Mail-Import (persönliche Konten, Aufgabenmodul) ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <MailKonten />
         </div>
 
       </div>
