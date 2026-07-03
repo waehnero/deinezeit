@@ -17,6 +17,7 @@ Alle Vorlagen:
 """
 import io
 import os
+import re
 import base64
 import json
 from decimal import Decimal
@@ -85,6 +86,62 @@ def _recipient_lines(contact_record) -> list[str]:
     return lines
 
 
+def _footer_html(sender_contact, bank_settings: dict) -> str:
+    """
+    Gemeinsame Fußzeile für alle Vorlagen.
+    Datenquelle ist primär der verknüpfte Firmen-Kontakt (Stammdaten-Felder werden
+    über den Feldnamen erkannt), Fallback für die Bankdaten sind die Belegeinstellungen:
+      - IBAN / BIC (SWIFT) / Bank*      → "Bankverbindung: …, IBAN …, BIC …"
+      - UID* / Firmenbuch*              → "UID-Nr.: …, Firmenbuch-Nr.: …"
+      - *gericht* (z.B. Handelsgericht, Gerichtsstand) → "Handelsgericht Salzburg, …"
+      - Fußzeile* / Footer*             → freier Text (z.B. Eigentumsvorbehalt)
+    """
+    d = (sender_contact.data or {}) if sender_contact is not None else {}
+    items = [(k.lower(), str(v).strip()) for k, v in d.items() if str(v or "").strip()]
+
+    def _first(pred):
+        return next((v for k, v in items if pred(k)), "")
+
+    # Bankverbindung: bevorzugt aus dem Kontakt, sonst Belegeinstellungen
+    iban = _first(lambda k: "iban" in k)
+    bic  = _first(lambda k: "bic" in k or "swift" in k)
+    bank = _first(lambda k: "bank" in k and "iban" not in k and "bic" not in k)
+    if not iban:
+        iban = str(bank_settings.get("iban", "") or "").strip()
+        bic  = bic  or str(bank_settings.get("bic", "") or "").strip()
+        bank = bank or str(bank_settings.get("bank", "") or "").strip()
+
+    lines = []
+    if iban:
+        seg = [f"Bankverbindung: {bank}" if bank else "Bankverbindung"]
+        seg.append(f"IBAN {iban}")
+        if bic:
+            seg.append(f"BIC {bic}")
+        lines.append(", ".join(seg))
+
+    legal = []
+    uid = _first(lambda k: "uid" in k)
+    if uid:
+        legal.append(f"UID-Nr.: {uid}")
+    firmenbuch = _first(lambda k: "firmenbuch" in k)
+    if firmenbuch:
+        legal.append(f"Firmenbuch-Nr.: {firmenbuch}")
+    if legal:
+        lines.append(", ".join(legal))
+
+    # Gerichts-Angaben: Feldname wird als Label mit ausgegeben ("handelsgericht" → "Handelsgericht Salzburg")
+    gericht = [f"{k.replace('_', ' ').title()} {v}" for k, v in items if "gericht" in k]
+    if gericht:
+        lines.append(", ".join(gericht))
+
+    # Freie Fußzeilen-Texte (z.B. Eigentumsvorbehalt)
+    lines += [v for k, v in items if "fusszeile" in k or "fussnote" in k or "footer" in k]
+
+    if not lines:
+        return ""
+    return '<div class="page-footer">' + "<br>".join(lines) + "</div>"
+
+
 def _fmt_date(d) -> str:
     if not d:
         return "—"
@@ -99,6 +156,30 @@ def _fmt_date(d) -> str:
 def _fmt_euro(n) -> str:
     try:
         return f"{float(n):,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "—"
+
+
+_MONATE = ["Jänner", "Februar", "März", "April", "Mai", "Juni",
+           "Juli", "August", "September", "Oktober", "November", "Dezember"]
+
+
+def _fmt_date_long(d) -> str:
+    """'2026-06-26' → '26. Juni 2026' (österreichische Langform)."""
+    if not d:
+        return "—"
+    if isinstance(d, str):
+        try:
+            d = date.fromisoformat(d)
+        except Exception:
+            return d
+    return f"{d.day}. {_MONATE[d.month - 1]} {d.year}"
+
+
+def _fmt_amount(n, currency: str = "EUR") -> str:
+    """'2350' → '2.350,00 EUR' (Betrag mit Währungs-Kürzel statt Symbol)."""
+    try:
+        return f"{float(n):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + f" {currency}"
     except Exception:
         return "—"
 
@@ -217,6 +298,10 @@ table.totals .label { color: #555; text-align: right; width: 70%; }
 table.totals .amount { text-align: right; font-weight: 500; white-space: nowrap; }
 table.totals .grand-total td { font-size: 11pt; font-weight: 700; border-top: 1.5px solid #333; padding-top: 6px; }
 .bank-box { margin-top: 0.6cm; font-size: 8pt; color: #555; border-top: 1px solid #ddd; padding-top: 0.3cm; }
+.page-footer {
+  margin-top: 1.2cm; padding-top: 0.25cm; border-top: 0.5pt solid #ccc;
+  font-size: 6.8pt; color: #999; line-height: 1.6;
+}
 .notes-box { margin-top: 0.5cm; font-size: 8pt; color: #777; font-style: italic; }
 .tax-note { margin-top: 0.3cm; font-size: 8pt; color: #777; }
 .footer-text { margin-top: 0.4cm; font-size: 8pt; color: #555; }
@@ -249,20 +334,13 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     breakdown  = _tax_breakdown(positions, tax_mode)
     pos_html   = _positions_html(positions, tax_mode)
 
-    # Bankdaten
+    # Fußzeile (alle Vorlagen): Bankverbindung, UID, Firmenbuch, Gericht etc.
+    # primär aus dem verknüpften Firmen-Kontakt, Bank-Fallback aus Belegeinstellungen
     bank       = inv_settings.get("bank", {})
     if isinstance(bank, str):
         try: bank = json.loads(bank)
         except Exception: bank = {}
-    bank_html  = ""
-    if bank.get("iban"):
-        bank_html = f"""
-        <div class="bank-box">
-          <strong>Bankverbindung:</strong> &nbsp;
-          {bank.get('bank','')} &nbsp;|&nbsp;
-          IBAN: {bank['iban']} &nbsp;|&nbsp;
-          BIC: {bank.get('bic','')}
-        </div>"""
+    footer_html = _footer_html(sender_contact, bank)
 
     # MwSt.-Hinweise
     tax_notes = ""
@@ -325,11 +403,19 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
         pos_header=pos_header,
         totals_html=totals_html,
         tax_notes=tax_notes,
-        bank_html=bank_html,
+        footer_html=footer_html,
         outro=outro,
         watermark=watermark,
         settings=settings,
         custom_css=custom_css,
+        # Rohdaten für Vorlagen mit eigenem Layout (z.B. Klassisch)
+        invoice=invoice,
+        positions=positions,
+        breakdown=breakdown,
+        tax_mode=tax_mode,
+        bank=bank,
+        sender_contact=sender_contact,
+        recipient_contact=recipient_contact,
     )
 
 
@@ -347,36 +433,179 @@ def _totals_html(invoice, breakdown, tax_mode: str) -> str:
 # Vorlage 1 — Klassisch
 # ─────────────────────────────────────────────────────────────────────────────
 def _t1(**kw) -> str:
+    """Klassisch — nachgebaut nach dem WWInterface-Briefpapier:
+    oranger Kopfbalken, Logo rechts, Rücksendezeile, Kontaktblock rechts,
+    Ort/Datum, Titel, Meta-Block, Tabelle mit EUR-Beträgen, Fußzeile."""
+    settings  = kw["settings"]
+    invoice   = kw["invoice"]
+    positions = kw["positions"]
+    breakdown = kw["breakdown"]
+    tax_mode  = kw["tax_mode"]
+    primary   = settings.get("primary_color") or "#ef7d00"
+    currency  = getattr(invoice, "currency", "EUR") or "EUR"
+
+    sd = (kw.get("sender_contact").data or {}) if kw.get("sender_contact") is not None else {}
+    rc = kw.get("recipient_contact")
+
+    # Rücksendezeile: Name – Straße – PLZ Ort (aus den Absenderzeilen, ohne HTML)
+    plain_sender = [re.sub(r"<[^>]+>", "", l) for l in kw["sender"]]
+    ruecksende   = " – ".join([p for p in plain_sender[:3] if p])
+
+    recip_html = "<br>".join(kw["recipient"])
     sender_html = "<br>".join(kw["sender"])
-    recip_html  = "<br>".join(kw["recipient"])
+
+    # Ort, Datum (Langform)
+    ort       = sd.get("ort", "")
+    datum     = _fmt_date_long(invoice.date)
+    ort_datum = f"{ort}, {datum}" if ort else datum
+
+    # Titel: "Rechnung – <Belegtitel>"
+    label_cap = kw["doc_label"].capitalize()
+    title     = f"{label_cap} – {invoice.title}" if getattr(invoice, "title", None) else label_cap
+
+    # Meta-Block mit fetten Labels
+    nr_labels = {"rechnung": "Rechnungs-Nr.:", "angebot": "Angebots-Nr.:",
+                 "gutschrift": "Gutschrift-Nr.:", "lieferschein": "Lieferschein-Nr.:",
+                 "auftragsbestaetigung": "Auftrags-Nr.:"}
+    meta_rows = [(nr_labels.get(invoice.doc_type, "Beleg-Nr.:"), invoice.number or "")]
+    if getattr(invoice, "reference", None):
+        meta_rows.append(("Referenz:", invoice.reference))
+    if rc is not None and (rc.display_name or ""):
+        meta_rows.append(("Kunde:", rc.display_name))
+        rc_uid = (rc.data or {}).get("uid", "")
+        if rc_uid:
+            meta_rows.append(("USt.-ID:", rc_uid))
+    meta_rows.append(("Leistungsdatum:", _fmt_date_long(getattr(invoice, "delivery_date", None) or invoice.date)))
+    if getattr(invoice, "due_date", None):
+        meta_rows.append(("Zahlungsziel:", _fmt_date_long(invoice.due_date)))
+    meta_html = "".join(
+        f'<tr><td class="m-label">{k}</td><td class="m-value">{v}</td></tr>'
+        for k, v in meta_rows
+    )
+
+    # Positionen: BEZEICHNUNG | ANZAHL | EINZELPREIS | [MWST.] | PREIS
+    # MwSt.-Spalte nur wenn gemischte Steuersätze (sonst reicht die Summenzeile)
+    item_rates = {p.tax_rate for p in positions if getattr(p, "pos_type", "item") != "text"}
+    show_tax   = tax_mode != "kleinunternehmer" and len(item_rates) > 1
+    ncols      = 5 if show_tax else 4
+    rows = ""
+    for p in positions:
+        if getattr(p, "pos_type", "item") == "text":
+            rows += f'<tr class="grp"><td colspan="{ncols}">{p.description}</td></tr>'
+            continue
+        qty    = float(p.quantity or 0)
+        anzahl = f"{qty:g} {p.unit or ''}".strip()
+        disc   = f'<br><small class="disc">- {float(p.discount_pct):.0f}% Rabatt</small>' if p.discount_pct else ""
+        tax_td = ""
+        if show_tax:
+            r = p.tax_rate
+            tax_td = f'<td class="num">{"RC" if r is None else f"{int(r) if r == int(r) else r} %"}</td>'
+        rows += f"""
+        <tr class="item">
+          <td>{p.description}{disc}</td>
+          <td class="num">{anzahl}</td>
+          <td class="num">{_fmt_amount(p.unit_price, currency)}</td>
+          {tax_td}
+          <td class="num total">{_fmt_amount(p.line_total, currency)}</td>
+        </tr>"""
+        if getattr(p, "detail", None):
+            rows += f'<tr class="detail"><td colspan="{ncols}">{p.detail}</td></tr>'
+
+    tax_th = '<th class="num">MWST.</th>' if show_tax else ""
+    positions_html = f"""
+    <table class="pos-k">
+      <thead><tr>
+        <th style="text-align:left;">BEZEICHNUNG</th>
+        <th class="num">ANZAHL</th>
+        <th class="num">EINZELPREIS</th>
+        {tax_th}
+        <th class="num">PREIS</th>
+      </tr></thead>
+      <tbody>
+        {rows}
+        <tr class="zwischensumme">
+          <td colspan="{ncols - 1}" style="font-weight:600;">Zwischensumme</td>
+          <td class="num" style="font-weight:600;">{_fmt_amount(invoice.subtotal, currency)}</td>
+        </tr>
+      </tbody>
+    </table>"""
+
+    # Summenblock: Nettosumme / MwSt. je Satz / Gesamtsumme
+    sum_rows = f'<tr><td class="s-label">Nettosumme</td><td class="s-val">{_fmt_amount(invoice.subtotal, currency)}</td></tr>'
+    if tax_mode != "kleinunternehmer":
+        for b in breakdown:
+            lbl = b["label"]
+            m = re.match(r"MwSt\. (\S+) %", lbl)
+            if m:
+                lbl = f"{float(m.group(1)):.2f}".replace(".", ",") + " % MwSt."
+            sum_rows += f'<tr><td class="s-label">{lbl}</td><td class="s-val">{_fmt_amount(b["tax"], currency)}</td></tr>'
+    sum_rows += f'<tr class="grand"><td class="s-label">Gesamtsumme</td><td class="s-val">{_fmt_amount(invoice.total, currency)}</td></tr>'
+    totals_html = f'<table class="sum-k"><tbody>{sum_rows}</tbody></table>'
+
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
 {BASE_CSS}
+@page {{
+  @bottom-center {{ content: none; }}
+  @bottom-right {{
+    content: "Seite " counter(page) " von " counter(pages);
+    font-size: 7.5pt; color: #999;
+  }}
+}}
+.top-band {{ background: {primary}; height: 1.1cm; margin: -1.8cm -1.6cm 0 -1.8cm; }}
+.logo-row {{ text-align: right; margin: 0.6cm 0 0.9cm 0; }}
+.logo-row .logo {{ max-height: 65px; max-width: 240px; }}
+.addr-row {{ display: flex; justify-content: space-between; margin-bottom: 0.2cm; }}
+.ruecksende {{ font-size: 6.8pt; color: #777; text-decoration: underline; margin-bottom: 0.35cm; }}
+.recipient {{ font-size: 9.5pt; line-height: 1.5; }}
+.contact-block {{ font-size: 8pt; color: #666; line-height: 1.55; max-width: 6cm; }}
+.contact-block strong {{ color: #333; }}
+.ort-datum {{ text-align: right; font-weight: 700; font-size: 9.5pt; margin: 0.5cm 0 0.5cm 0; }}
+.doc-title {{ font-size: 14pt; font-weight: 700; margin-bottom: 0.7cm; }}
+.meta-k {{ font-size: 9pt; margin-bottom: 0.9cm; border-collapse: collapse; }}
+.meta-k .m-label {{ font-weight: 700; padding: 1.5px 1cm 1.5px 0; white-space: nowrap; }}
+.meta-k .m-value {{ font-weight: 600; }}
+table.pos-k {{ width: 100%; border-collapse: collapse; margin: 0.4cm 0 0.2cm 0; }}
+table.pos-k th {{
+  font-size: 8pt; font-weight: 700; letter-spacing: 0.04em;
+  padding: 6px 6px; border-bottom: 1.5px solid #333;
+}}
+table.pos-k td {{ padding: 6px 6px; vertical-align: top; }}
+table.pos-k .num {{ text-align: right; white-space: nowrap; }}
+table.pos-k .total {{ font-weight: 600; }}
+table.pos-k tr.grp td {{ font-weight: 700; padding-top: 10px; }}
+table.pos-k tr.detail td {{ font-size: 7pt; color: #888; letter-spacing: 0.03em; padding-top: 0; padding-bottom: 8px; }}
+table.pos-k .disc {{ color: #888; font-weight: 400; }}
+table.pos-k tr.zwischensumme td {{ border-top: 1px solid #333; border-bottom: 1px solid #333; padding: 6px; }}
+table.sum-k {{ width: 45%; margin-left: auto; margin-top: 0.9cm; border-collapse: collapse; font-size: 9.5pt; }}
+table.sum-k td {{ padding: 3.5px 6px; }}
+table.sum-k .s-label {{ text-align: left; }}
+table.sum-k .s-val {{ text-align: right; white-space: nowrap; }}
+table.sum-k tr.grand td {{ font-weight: 700; border-top: 1.5px solid #333; border-bottom: 3px double #333; }}
+.pay-text {{ margin-top: 0.8cm; font-size: 9pt; }}
+.pay-text .footer-text {{ font-size: 9pt; color: #222; margin-top: 0.2cm; }}
 {kw["custom_css"]}
-.header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.8cm; }}
-.sender-block {{ font-size: 8pt; color: #555; text-align: right; }}
-.doc-title {{ margin: 0.5cm 0 0.3cm 0; }}
-.address-block {{ display: flex; justify-content: space-between; margin-bottom: 0.6cm; }}
-.recipient-box {{ font-size: 9pt; }}
-.meta-table {{ font-size: 8.5pt; }}
 </style>
 </head><body>
 {"<div class='watermark'>" + kw['watermark'] + "</div>" if kw['watermark'] else ""}
-<div class="header">
-  <div>{kw["logo_html"]}</div>
-  <div class="sender-block">{sender_html}</div>
+<div class="top-band"></div>
+<div class="logo-row">{kw["logo_html"]}</div>
+<div class="addr-row">
+  <div>
+    <div class="ruecksende">{ruecksende}</div>
+    <div class="recipient">{recip_html}</div>
+  </div>
+  <div class="contact-block">{sender_html}</div>
 </div>
-<h1 class="doc-title">{kw["doc_label"]}</h1>
-<div class="address-block">
-  <div class="recipient-box">{recip_html}</div>
-  <table class="meta-table"><tbody>{kw["meta_html"]}</tbody></table>
-</div>
+<div class="ort-datum">{ort_datum}</div>
+<h1 class="doc-title">{title}</h1>
+<table class="meta-k"><tbody>{meta_html}</tbody></table>
 {kw["intro"]}
-{kw["pos_header"]}
-{kw["totals_html"]}
+{positions_html}
+{totals_html}
 {kw["tax_notes"]}
-{kw["bank_html"]}
-{kw["outro"]}
+<div class="pay-text">{kw["outro"]}</div>
+{kw["footer_html"]}
 </body></html>"""
 
 
@@ -416,8 +645,8 @@ def _t2(**kw) -> str:
 {kw["pos_header"]}
 {kw["totals_html"]}
 {kw["tax_notes"]}
-{kw["bank_html"]}
 {kw["outro"]}
+{kw["footer_html"]}
 </body></html>"""
 
 
@@ -451,8 +680,8 @@ body {{ font-size: 8.5pt; }}
 {kw["pos_header"]}
 {kw["totals_html"]}
 {kw["tax_notes"]}
-{kw["bank_html"]}
 {kw["outro"]}
+{kw["footer_html"]}
 </body></html>"""
 
 
@@ -489,8 +718,8 @@ table.positions th, table.positions td {{ font-family: 'Helvetica Neue', Helveti
 {kw["pos_header"]}
 {kw["totals_html"]}
 {kw["tax_notes"]}
-{kw["bank_html"]}
 {kw["outro"]}
+{kw["footer_html"]}
 </body></html>"""
 
 
@@ -541,8 +770,8 @@ table.totals .grand-total td {{ color: var(--primary); }}
 {kw["pos_header"]}
 {kw["totals_html"]}
 {kw["tax_notes"]}
-{kw["bank_html"]}
 {kw["outro"]}
+{kw["footer_html"]}
 </body></html>"""
 
 
@@ -573,13 +802,16 @@ def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
 
 
 def generate_html_preview(invoice, positions, settings: dict, inv_settings: dict,
-                           sender_contact=None, recipient_contact=None) -> str:
-    """Gibt HTML-String zurück (für Vorschau im Browser)."""
-    default_tpl = inv_settings.get("default_template", 1)
-    try: default_tpl = int(default_tpl)
-    except Exception: default_tpl = 1
-    template_id = default_tpl or getattr(invoice, "template_id", 1) or 1
-    return _build_html(
+                           sender_contact=None, recipient_contact=None,
+                           template_id: Optional[int] = None) -> str:
+    """Gibt HTML-String zurück (für Vorschau im Browser).
+    template_id: optionaler Override — sonst globale Einstellung / Rechnung / Fallback 1."""
+    if template_id is None:
+        default_tpl = inv_settings.get("default_template", 1)
+        try: default_tpl = int(default_tpl)
+        except Exception: default_tpl = 1
+        template_id = default_tpl or getattr(invoice, "template_id", 1) or 1
+    html = _build_html(
         invoice=invoice,
         positions=positions,
         settings=settings,
@@ -588,3 +820,18 @@ def generate_html_preview(invoice, positions, settings: dict, inv_settings: dict
         recipient_contact=recipient_contact,
         template_id=template_id,
     )
+    # Browser-Vorschau: Die @page-Ränder gelten nur beim PDF-Druck (WeasyPrint).
+    # Für die Anzeige im Browser wird ein A4-Blatt mit denselben Rändern simuliert.
+    preview_css = """
+<style>
+  html { background: #ebebeb; }
+  body {
+    width: 21cm; min-height: 29.7cm;
+    margin: 0.8cm auto;
+    padding: 1.8cm 1.6cm 2cm 1.8cm;
+    background: #fff;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.18);
+  }
+</style>
+"""
+    return html.replace("</head>", preview_css + "</head>", 1)
