@@ -94,3 +94,46 @@ def test_template_preview_unbekannte_vorlage(auth_client):
     """Unbekannte Vorlagen-Nummern geben 404."""
     resp = auth_client.get("/api/invoices/template-preview/9")
     assert resp.status_code == 404
+
+
+# ── Beleg-PDF & Beleg-Vorschau ────────────────────────────────────────────────
+
+def _create_test_invoice(auth_client) -> str:
+    """Legt eine minimale Rechnung mit einer Position an, gibt die ID zurück."""
+    resp = auth_client.post("/api/invoices", json={
+        "doc_type": "rechnung",
+        "date": "2026-07-03",
+        "title": "Testrechnung",
+        "positions": [{
+            "pos_type": "item", "description": "Testposition",
+            "quantity": 2, "unit": "Std.", "unit_price": 100, "tax_rate": 20,
+        }],
+    })
+    assert resp.status_code in (200, 201), f"Rechnung anlegen fehlgeschlagen: {resp.text}"
+    return resp.json()["id"]
+
+
+def test_invoice_pdf_download(auth_client):
+    """GET /invoices/{id}/pdf liefert ein PDF des Belegs."""
+    invoice_id = _create_test_invoice(auth_client)
+    resp = auth_client.get(f"/api/invoices/{invoice_id}/pdf")
+    assert resp.status_code == 200, resp.text[:300]
+    assert resp.headers["content-type"].startswith("application/pdf")
+    assert resp.content[:5] == b"%PDF-"
+    assert ".pdf" in resp.headers.get("content-disposition", "")
+
+
+def test_invoice_html_preview(auth_client):
+    """GET /invoices/{id}/preview liefert die HTML-Vorschau des Belegs."""
+    invoice_id = _create_test_invoice(auth_client)
+    resp = auth_client.get(f"/api/invoices/{invoice_id}/preview")
+    assert resp.status_code == 200, resp.text[:300]
+    assert "text/html" in resp.headers["content-type"]
+    assert "Testposition" in resp.text
+    assert "rechnung" in resp.text.lower()
+
+
+def test_invoice_pdf_unbekannter_beleg(auth_client):
+    """PDF für nicht existierenden Beleg gibt 404."""
+    resp = auth_client.get("/api/invoices/00000000-0000-0000-0000-000000000000/pdf")
+    assert resp.status_code == 404
