@@ -288,6 +288,21 @@ export const aufgabenApi = {
   updateSettings: (data) => api.put('/aufgaben/einstellungen', data),
 }
 
+// ── Mail-Import (Aufgabenmodul: KI-Vorschläge aus E-Mails) ───────────────────
+export const mailImportApi = {
+  listAccounts:  ()          => api.get('/mail-import/accounts'),
+  createAccount: (data)      => api.post('/mail-import/accounts', data),
+  updateAccount: (id, data)  => api.put(`/mail-import/accounts/${id}`, data),
+  deleteAccount: (id)        => api.delete(`/mail-import/accounts/${id}`),
+  listFolders:   (id)        => api.get(`/mail-import/accounts/${id}/folders`),
+  scan:          (id)        => api.post(`/mail-import/accounts/${id}/scan`),
+  listSuggestions: (status = 'offen') => api.get('/mail-import/suggestions', { params: { status } }),
+  acceptSuggestion:  (id, data) => api.post(`/mail-import/suggestions/${id}/accept`, data || {}),
+  dismissSuggestion: (id)       => api.post(`/mail-import/suggestions/${id}/dismiss`),
+  getKiSettings:    ()     => api.get('/mail-import/ki-settings'),
+  updateKiSettings: (data) => api.put('/mail-import/ki-settings', data),
+}
+
 // ── Anlagen (Datacenter-API, generisch über entity_type/entity_id) ────────────
 export const attachmentApi = {
   list:     (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),

@@ -4,6 +4,7 @@ import { settingsApi, systemApi, invoiceApi, accountingApi } from '../services/a
 import toast from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
 import UserManagementPage from './UserManagementPage'
+import MailKonten, { KiEinstellungen } from '../components/MailImportVerwaltung'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
   Save, Upload, Trash2, Download, Send, Loader2,
@@ -1813,6 +1814,7 @@ function TabSystemWrapper({ settings, onSaved }) {
     { id: 'system',   label: 'System' },
     { id: 'backup',   label: 'Backup' },
     { id: 'email',    label: 'E-Mail' },
+    { id: 'ki',       label: 'KI & Mail-Import' },
     { id: 'speicher', label: 'Speicher' },
   ]
   return (
@@ -1828,6 +1830,14 @@ function TabSystemWrapper({ settings, onSaved }) {
       {sub === 'system'   && <TabSystem />}
       {sub === 'backup'   && <TabBackup   settings={settings} onSaved={onSaved} />}
       {sub === 'email'    && <TabEmail    settings={settings} onSaved={onSaved} />}
+      {sub === 'ki' && (
+        <div className="space-y-8">
+          <KiEinstellungen />
+          <div className="border-t border-neutral-100 pt-6">
+            <MailKonten global />
+          </div>
+        </div>
+      )}
       {sub === 'speicher' && <TabSpeicher settings={settings} onSaved={onSaved} />}
     </div>
   )
