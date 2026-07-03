@@ -616,6 +616,49 @@ async def get_invoice(
     return inv
 
 
+@router.get("/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Beleg als PDF herunterladen (Vorlage + Fußzeile wie in den Einstellungen)."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
+    try:
+        pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
+                                 sender_contact, recipient_contact)
+    except Exception as e:
+        raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {str(e)}")
+
+    filename = f"{(inv.number or 'beleg').replace('/', '-')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{invoice_id}/preview")
+async def preview_invoice_html(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """HTML-Vorschau eines Belegs (für das Vorschau-Popup im Beleg-Formular)."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
+    html = generate_html_preview(inv, inv.positions, settings_d, inv_settings_d,
+                                 sender_contact, recipient_contact)
+    return Response(content=html, media_type="text/html")
+
+
 @router.put("/{invoice_id}", response_model=InvoiceResponse)
 async def update_invoice(
     invoice_id: UUID,
