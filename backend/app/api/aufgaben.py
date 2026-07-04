@@ -34,6 +34,7 @@ from app.models.masterdata import EntityRecord
 from app.models.settings import Setting
 from app.schemas.aufgaben import (
     TodoCreate, TodoUpdate, TodoResponse, AufgabenSettings,
+    AufgabenStats, AufgabenStatItem,
 )
 from app.schemas.projektplan import StatusOption
 
@@ -277,6 +278,70 @@ def list_todos(
     # Einheitliche Reihung: Fälligkeit (ohne Termin zuletzt), dann Titel
     result.sort(key=lambda r: (r.due_date is None, str(r.due_date or ""), (r.title or "").lower()))
     return result
+
+
+@router.get("/stats", response_model=AufgabenStats)
+def get_stats(
+    mine: bool = Query(False, description="Nur mir zugewiesene oder von mir erstellte"),
+    limit: int = Query(5, ge=1, le=20, description="Anzahl der nächsten Aufgaben"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dashboard-Statistik: offene Aufgaben, heute fällig, überfällig + nächste Aufgaben.
+
+    Zählt Todos und eingeblendete Projektplan-Aufgaben (Typ "aufgabe",
+    Projekt aktiv) — konsistent zur Listenansicht.
+    """
+    done_status = _load_settings(db).done_status
+    heute = date.today()
+
+    # ── Todos ────────────────────────────────────────────────────────────────
+    query = db.query(Todo).filter(
+        Todo.is_archived.is_(False),
+        Todo.status != done_status,
+    )
+    if mine:
+        query = query.filter(or_(Todo.assignee_id == current_user.id,
+                                 Todo.created_by == current_user.id))
+    offene = [
+        {"id": t.id, "title": t.title, "due_date": t.due_date,
+         "status": t.status, "priority": t.priority}
+        for t in query.all()
+    ]
+
+    # ── Projektplan-Aufgaben einmischen ──────────────────────────────────────
+    ptasks = (
+        db.query(Task)
+        .join(PlanningProject, Task.project_id == PlanningProject.id)
+        .filter(PlanningProject.is_archived.is_(False))
+        .all()
+    )
+    for task in ptasks:
+        if not _ist_normale_aufgabe(task):
+            continue
+        if task.status == done_status:
+            continue
+        if mine and task.assignee_id != current_user.id and task.created_by != current_user.id:
+            continue
+        offene.append({"id": task.id, "title": task.title, "due_date": task.due_date,
+                       "status": task.status, "priority": task.priority or "mittel"})
+
+    ueberfaellige = [a for a in offene if a["due_date"] and a["due_date"] < heute]
+    heute_faellige = [a for a in offene if a["due_date"] == heute]
+
+    # Nächste Aufgaben: überfällige zuerst, dann nach Fälligkeit (ohne Termin zuletzt)
+    sortiert = sorted(offene, key=lambda a: (a["due_date"] is None, str(a["due_date"] or "")))
+    naechste = [
+        AufgabenStatItem(**a, ueberfaellig=bool(a["due_date"] and a["due_date"] < heute))
+        for a in sortiert[:limit]
+    ]
+
+    return AufgabenStats(
+        offen_gesamt=len(offene),
+        heute_faellig=len(heute_faellige),
+        ueberfaellig=len(ueberfaellige),
+        naechste=naechste,
+    )
 
 
 @router.post("/", response_model=TodoResponse, status_code=201)

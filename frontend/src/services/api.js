@@ -46,6 +46,9 @@ export const usersApi = {
   updateMe: (data) => api.put('/users/me', data),
   updateByAdmin: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
+  // Persönliche Dashboard-Konfiguration (serverseitig, je Benutzer)
+  getDashboard: () => api.get('/users/me/dashboard'),
+  saveDashboard: (config) => api.put('/users/me/dashboard', { config }),
 }
 
 export const masterdataApi = {
@@ -129,6 +132,8 @@ export const settingsApi = {
 }
 
 export const datacenterApi = {
+  // Dashboard-Widget: Gesamtanzahl, Neuzugänge, neueste Dateien
+  stats:           (limit = 3) => api.get('/datacenter/stats', { params: { limit } }),
   // Alle Anhänge laden (optional gefiltert nach entityType und/oder entityId)
   listAll:         (entityType, entityId, contactId) => {
     const params = {}
@@ -287,6 +292,8 @@ export const aufgabenApi = {
   printPdf: (id)       => api.get(`/aufgaben/${id}/print`, { responseType: 'blob' }),
   getSettings:    ()     => api.get('/aufgaben/einstellungen'),
   updateSettings: (data) => api.put('/aufgaben/einstellungen', data),
+  // Dashboard-Widget: offene/fällige/überfällige Aufgaben + nächste Aufgaben
+  stats: (params) => api.get('/aufgaben/stats', { params }),
 }
 
 // ── Mail-Import (Aufgabenmodul: KI-Vorschläge aus E-Mails) ───────────────────

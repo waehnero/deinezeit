@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from app.db.base import get_db
-from app.schemas.user import UserCreate, UserResponse, UserUpdate, AdminUserUpdate
+from app.schemas.user import (
+    UserCreate, UserResponse, UserUpdate, AdminUserUpdate, DashboardConfigPayload,
+)
 from app.services.auth_service import auth_service
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User
@@ -50,6 +52,30 @@ async def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.get("/me/dashboard", response_model=DashboardConfigPayload)
+async def get_my_dashboard(
+    current_user: User = Depends(get_current_user),
+):
+    """Persönliche Dashboard-Konfiguration abrufen (None = Standard)."""
+    return DashboardConfigPayload(config=current_user.dashboard_config)
+
+
+@router.put("/me/dashboard", response_model=DashboardConfigPayload)
+async def save_my_dashboard(
+    body: DashboardConfigPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Persönliche Dashboard-Konfiguration speichern.
+
+    config = None setzt auf das Standard-Dashboard zurück.
+    """
+    current_user.dashboard_config = body.config
+    db.commit()
+    db.refresh(current_user)
+    return DashboardConfigPayload(config=current_user.dashboard_config)
 
 
 @router.put("/{user_id}", response_model=UserResponse)

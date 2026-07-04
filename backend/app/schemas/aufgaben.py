@@ -91,3 +91,22 @@ class AufgabenSettings(BaseModel):
     priorities: List[StatusOption] = Field(default_factory=list)
     # Welcher Status-Wert gilt als "erledigt" (steuert completed_at + Filter)
     done_status: str = "erledigt"
+
+
+# ── Dashboard-Statistik ───────────────────────────────────────────────────────
+class AufgabenStatItem(BaseModel):
+    """Kompakte Aufgabe für das Dashboard-Widget."""
+    id: UUID
+    title: str
+    due_date: Optional[date] = None
+    status: str
+    priority: str
+    ueberfaellig: bool = False
+
+
+class AufgabenStats(BaseModel):
+    """Zähler + nächste fällige Aufgaben für das Dashboard."""
+    offen_gesamt: int
+    heute_faellig: int
+    ueberfaellig: int
+    naechste: List[AufgabenStatItem] = Field(default_factory=list)
