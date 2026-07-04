@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Plus, ListTodo, Loader2, X, Search, CheckCircle2, Circle,
   CalendarDays, User as UserIcon, Link2, Trash2, GanttChartSquare, Database,
-  Columns, List, Printer,
+  Columns, List, Printer, Mail, RefreshCw, AlertCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { aufgabenApi, usersApi, projektplanApi, masterdataApi } from '../services/api'
+import { aufgabenApi, usersApi, projektplanApi, masterdataApi, mailImportApi } from '../services/api'
 import AufgabenKanban from '../components/AufgabenKanban'
 import AufgabenKalender from '../components/AufgabenKalender'
 import MailVorschlaege from '../components/MailVorschlaege'
@@ -388,6 +388,86 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
   )
 }
 
+// ── Mail-Scan-Popup: angebundene Konten + manueller Scan ─────────────────────
+function MailScanPopup({ onClose, onScanned }) {
+  const [konten, setKonten] = useState(null)   // null = lädt
+  const [scanning, setScanning] = useState({})
+
+  const load = () => {
+    mailImportApi.listAccounts()
+      .then(r => setKonten(r.data.filter(k => k.is_active)))
+      .catch(() => { setKonten([]); toast.error('Mail-Konten konnten nicht geladen werden') })
+  }
+  useEffect(() => { load() }, [])
+
+  const scannen = async (konto) => {
+    setScanning(s => ({ ...s, [konto.id]: true }))
+    try {
+      const { data } = await mailImportApi.scan(konto.id)
+      toast.success(data.neue_vorschlaege > 0
+        ? `${data.neue_vorschlaege} neue Aufgabenvorschläge`
+        : 'Keine neuen Aufgabenvorschläge')
+      load()
+      onScanned?.()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Scan fehlgeschlagen')
+    } finally {
+      setScanning(s => ({ ...s, [konto.id]: false }))
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
+          <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
+            <Mail size={17} className="text-primary-600" /> Mail-Import
+          </h2>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4">
+          {konten === null ? (
+            <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-primary-400" /></div>
+          ) : konten.length === 0 ? (
+            <p className="text-sm text-neutral-400 py-2">
+              Keine Mail-Konten angebunden (Einstellungen → System → KI &amp; Mail-Import bzw. Profil).
+            </p>
+          ) : (
+            <div className="border border-neutral-200 rounded-xl divide-y divide-neutral-100">
+              {konten.map(k => (
+                <div key={k.id} className="flex items-center gap-3 px-4 py-3">
+                  <Mail size={16} className="text-neutral-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-neutral-900 truncate">
+                      {k.name}
+                      {!k.owner_user_id && <span className="ml-2 text-xs font-normal text-neutral-400">global</span>}
+                    </p>
+                    <p className="text-xs text-neutral-400 truncate">
+                      Ordner: {k.folder}
+                      {k.last_scan_at && ` · zuletzt: ${new Date(k.last_scan_at).toLocaleString('de-AT')}`}
+                    </p>
+                    {k.last_error && (
+                      <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5">
+                        <AlertCircle size={12} /> {k.last_error.slice(0, 120)}
+                      </p>
+                    )}
+                  </div>
+                  <button onClick={() => scannen(k)} disabled={scanning[k.id]}
+                    title="Jetzt scannen"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">
+                    {scanning[k.id] ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    Scannen
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function AufgabenPage() {
   const [todos, setTodos] = useState([])
@@ -413,6 +493,8 @@ export default function AufgabenPage() {
   }
 
   const [dialogTodo, setDialogTodo] = useState(null)  // null=zu, {}=neu, {…}=bearbeiten
+  const [mailPopup, setMailPopup] = useState(false)
+  const [mailRefresh, setMailRefresh] = useState(0)   // remountet MailVorschlaege nach Scan
 
   const statusLabel = v => statuses.find(s => s.value === v)?.label || v
   const statusColor = v => statuses.find(s => s.value === v)?.color || '#6b7280'
@@ -498,11 +580,16 @@ export default function AufgabenPage() {
             </button>
           ))}
         </div>
+        {/* Mail-Import: Konten anzeigen + manuell scannen */}
+        <button onClick={() => setMailPopup(true)} title="Mail-Import (Konten scannen)"
+          className="flex items-center px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-neutral-600 hover:bg-neutral-50">
+          <Mail size={15} />
+        </button>
       </div>
       <p className="text-sm text-neutral-500 mb-5">{offen} offene Aufgabe{offen === 1 ? '' : 'n'}</p>
 
       {/* KI-Vorschläge aus E-Mails (nur sichtbar, wenn offene existieren) */}
-      <MailVorschlaege onAccepted={load} />
+      <MailVorschlaege key={mailRefresh} onAccepted={load} />
 
       {/* Filterzeile */}
       <div className="flex flex-wrap items-center gap-2 mb-5">
@@ -635,6 +722,14 @@ export default function AufgabenPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Mail-Scan-Popup */}
+      {mailPopup && (
+        <MailScanPopup
+          onClose={() => setMailPopup(false)}
+          onScanned={() => setMailRefresh(n => n + 1)}
+        />
       )}
 
       {/* Dialog */}

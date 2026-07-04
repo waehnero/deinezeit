@@ -287,7 +287,22 @@ def accept_suggestion(
     s.decided_by = current_user.id
     db.commit()
     db.refresh(s)
-    return SuggestionResponse.model_validate(s)
+    resp = SuggestionResponse.model_validate(s)
+
+    # Ursprungs-Mail in Outlook als erledigt kennzeichnen (nur Graph-Konten
+    # mit aktivierter Option; best-effort — Fehler blockieren die Übernahme
+    # nicht, werden aber am Konto vermerkt und dem Frontend gemeldet).
+    acc = db.query(MailAccount).filter(MailAccount.id == s.account_id).first()
+    if acc and acc.protocol == "graph" and acc.flag_erledigt:
+        try:
+            mail_ingest.graph_set_flag(db, acc, s.message_id, "complete")
+            resp.mail_flagged = True
+        except Exception as e:
+            resp.mail_flagged = False
+            acc.last_error = f"Erledigt-Flag fehlgeschlagen: {str(e)[:500]}"
+            db.commit()
+
+    return resp
 
 
 @router.post("/suggestions/{suggestion_id}/dismiss", response_model=SuggestionResponse)

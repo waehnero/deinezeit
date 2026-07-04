@@ -259,6 +259,100 @@ def test_mail_ohne_aufgabe_wird_gemerkt(auth_client, monkeypatch):
     assert resp.json()["neue_vorschlaege"] == 0
 
 
+# ── Erledigt-Flag in Outlook (Graph) ──────────────────────────────────────────
+def _graph_konto(auth_client, **overrides):
+    payload = {
+        "name": "Outlook", "protocol": "graph",
+        "graph_tenant_id": "t", "graph_client_id": "c",
+        "graph_mailbox": "o@x.at", "secret": "s",
+        "folder": "inbox", **overrides,
+    }
+    resp = auth_client.post("/api/mail-import/accounts", json=payload)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def test_scan_setzt_rote_flagge_und_uebernahme_erledigt(auth_client, monkeypatch):
+    konto = _graph_konto(auth_client, flag_erledigt=True)
+    mails = [{"message_id": "graph-abc", "subject": "Bitte prüfen",
+              "sender": "k@x.at", "received_at": None, "body": "Prüfen bitte"}]
+    _mock_scan(monkeypatch, mails, {
+        "graph-abc": [{"title": "Prüfen", "description": None,
+                       "due_date": None, "priority": "mittel"}],
+    })
+    geflaggt = []
+    monkeypatch.setattr(mail_ingest, "graph_set_flag",
+                        lambda db, acc, mid, status="complete": geflaggt.append((mid, status)))
+
+    # Scan: Vorschlag erkannt -> rote Flagge
+    auth_client.post(f"/api/mail-import/accounts/{konto['id']}/scan")
+    assert geflaggt == [("graph-abc", "flagged")]
+
+    # Übernahme -> Erledigt-Hakerl
+    vorschlag = auth_client.get("/api/mail-import/suggestions").json()[0]
+    resp = auth_client.post(f"/api/mail-import/suggestions/{vorschlag['id']}/accept", json={})
+    assert resp.status_code == 200
+    assert resp.json()["mail_flagged"] is True
+    assert geflaggt == [("graph-abc", "flagged"), ("graph-abc", "complete")]
+
+
+def test_ablehnung_laesst_rote_flagge_stehen(auth_client, monkeypatch):
+    konto = _graph_konto(auth_client, flag_erledigt=True)
+    mails = [{"message_id": "graph-dis", "subject": "x",
+              "sender": "k@x.at", "received_at": None, "body": "y"}]
+    _mock_scan(monkeypatch, mails, {
+        "graph-dis": [{"title": "T", "description": None,
+                       "due_date": None, "priority": "mittel"}],
+    })
+    geflaggt = []
+    monkeypatch.setattr(mail_ingest, "graph_set_flag",
+                        lambda db, acc, mid, status="complete": geflaggt.append((mid, status)))
+    auth_client.post(f"/api/mail-import/accounts/{konto['id']}/scan")
+    vorschlag = auth_client.get("/api/mail-import/suggestions").json()[0]
+    auth_client.post(f"/api/mail-import/suggestions/{vorschlag['id']}/dismiss")
+    # Nur die rote Flagge vom Scan — kein complete beim Verwerfen
+    assert geflaggt == [("graph-dis", "flagged")]
+
+
+def test_uebernahme_flag_fehler_blockiert_nicht(auth_client, monkeypatch):
+    konto = _graph_konto(auth_client, flag_erledigt=True)
+    mails = [{"message_id": "graph-err", "subject": "x",
+              "sender": "k@x.at", "received_at": None, "body": "y"}]
+    _mock_scan(monkeypatch, mails, {
+        "graph-err": [{"title": "T", "description": None,
+                       "due_date": None, "priority": "mittel"}],
+    })
+    def _fehler(db, acc, mid, status="complete"):
+        raise RuntimeError("403 Forbidden")
+    monkeypatch.setattr(mail_ingest, "graph_set_flag", _fehler)
+
+    auth_client.post(f"/api/mail-import/accounts/{konto['id']}/scan")
+    vorschlag = auth_client.get("/api/mail-import/suggestions").json()[0]
+    resp = auth_client.post(f"/api/mail-import/suggestions/{vorschlag['id']}/accept", json={})
+    # Übernahme klappt trotzdem, Flag-Fehler wird gemeldet
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "uebernommen"
+    assert resp.json()["mail_flagged"] is False
+
+
+def test_flag_aus_kein_versuch(auth_client, monkeypatch):
+    konto = _graph_konto(auth_client, flag_erledigt=False)
+    mails = [{"message_id": "graph-off", "subject": "x",
+              "sender": "k@x.at", "received_at": None, "body": "y"}]
+    _mock_scan(monkeypatch, mails, {
+        "graph-off": [{"title": "T", "description": None,
+                       "due_date": None, "priority": "mittel"}],
+    })
+    aufrufe = []
+    monkeypatch.setattr(mail_ingest, "graph_set_flag",
+                        lambda db, acc, mid, status="complete": aufrufe.append(mid))
+    auth_client.post(f"/api/mail-import/accounts/{konto['id']}/scan")
+    vorschlag = auth_client.get("/api/mail-import/suggestions").json()[0]
+    resp = auth_client.post(f"/api/mail-import/suggestions/{vorschlag['id']}/accept", json={})
+    assert resp.json()["mail_flagged"] is None
+    assert aufrufe == []
+
+
 # ── KI-Antwort-Parser ─────────────────────────────────────────────────────────
 def test_ki_json_parser_tolerant():
     text = 'Hier die Aufgaben:\n```json\n[{"title": "Test", "description": "d", "due_date": "2026-08-01", "priority": "hoch"}]\n```'

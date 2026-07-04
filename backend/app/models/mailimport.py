@@ -65,6 +65,10 @@ class MailAccount(Base):
     # Zu scannender Ordner (IMAP-Ordnername bzw. Graph-Ordnername/-ID)
     folder = Column(String(300), nullable=False, default="INBOX")
 
+    # Nur Graph: Ursprungs-Mail nach Übernahme eines Vorschlags in Outlook
+    # als erledigt kennzeichnen (flagStatus=complete; braucht Mail.ReadWrite)
+    flag_erledigt = Column(Boolean, default=False, nullable=False)
+
     # ── Auto-Scan ─────────────────────────────────────────────────────────────
     auto_scan = Column(Boolean, default=False, nullable=False)
     scan_interval_minutes = Column(Integer, default=15, nullable=False)

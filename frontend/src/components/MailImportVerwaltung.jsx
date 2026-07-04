@@ -105,6 +105,7 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
     graph_mailbox: konto?.graph_mailbox || '',
     folder: konto?.folder || 'INBOX',
     use_central_credentials: konto?.use_central_credentials ?? false,
+    flag_erledigt: konto?.flag_erledigt ?? false,
     auto_scan: konto?.auto_scan ?? false,
     scan_interval_minutes: konto?.scan_interval_minutes || 15,
     secret: '',
@@ -139,6 +140,7 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
       graph_mailbox: form.graph_mailbox || null,
       folder: form.folder || 'INBOX',
       use_central_credentials: form.use_central_credentials,
+      flag_erledigt: form.flag_erledigt,
       auto_scan: form.auto_scan,
       scan_interval_minutes: Number(form.scan_interval_minutes) || 15,
       secret: form.secret || null,
@@ -283,8 +285,21 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
                   </div>
                 )}
               </div>
+              <label className="flex items-start gap-2 text-sm text-neutral-700 cursor-pointer select-none">
+                <input type="checkbox" checked={form.flag_erledigt}
+                  onChange={e => set('flag_erledigt', e.target.checked)}
+                  className="rounded border-gray-300 mt-0.5" />
+                <span>
+                  Outlook-Flagge an der Ursprungs-Mail pflegen
+                  <span className="block text-xs text-neutral-400">
+                    Vorschlag erkannt → rote Flagge · als Aufgabe übernommen → Erledigt-Hakerl ·
+                    verworfen → Flagge bleibt rot (benötigt „Mail.ReadWrite")
+                  </span>
+                </span>
+              </label>
               <p className="text-xs text-neutral-400">
-                Benötigt eine Azure-App-Registrierung mit Applikationsberechtigung „Mail.Read"
+                Benötigt eine Azure-App-Registrierung mit Applikationsberechtigung
+                „{form.flag_erledigt ? 'Mail.ReadWrite' : 'Mail.Read'}"
                 {zentral && ' (zusätzlich zu „Mail.Send" der zentralen App)'}.
               </p>
             </>

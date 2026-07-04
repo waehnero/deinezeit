@@ -300,6 +300,27 @@ def graph_fetch_messages(db: Session, account: MailAccount,
     return out
 
 
+def graph_set_flag(db: Session, account: MailAccount, message_id: str,
+                   flag_status: str = "complete"):
+    """
+    Setzt die Outlook-Flagge einer Nachricht.
+      flag_status "flagged"  -> rote Flagge (Vorschlag erkannt, zu bearbeiten)
+      flag_status "complete" -> Erledigt-Hakerl (Aufgabe wurde übernommen)
+    Benötigt die Applikationsberechtigung Mail.ReadWrite.
+    """
+    token, mailbox = _graph_token(db, account)
+    resp = httpx.patch(
+        f"{GRAPH_BASE}/users/{mailbox}/messages/{message_id}",
+        headers={"Authorization": f"Bearer {token}",
+                 "Content-Type": "application/json"},
+        json={"flag": {"flagStatus": flag_status}},
+        timeout=20,
+    )
+    if resp.status_code >= 400:
+        # Detaillierte Fehlermeldung (z.B. fehlende Mail.ReadWrite-Berechtigung)
+        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:300]}")
+
+
 def fetch_messages(db: Session, account: MailAccount,
                    limit: int = MAX_MESSAGES_PER_SCAN) -> List[dict]:
     if account.protocol == "imap":
@@ -470,6 +491,7 @@ def scan_account(db: Session, account: MailAccount) -> int:
         neue = [m for m in messages if m["message_id"] not in bekannte]
 
         anzahl = 0
+        flag_fehler = None
         for mail in neue:
             vorschlaege = extract_tasks(ki, mail)
             preview = (mail.get("body") or "")[:800]
@@ -503,8 +525,19 @@ def scan_account(db: Session, account: MailAccount) -> int:
                 ))
                 anzahl += 1
 
+            # Vorschlag erkannt -> rote Flagge in Outlook (best-effort).
+            # Bei Übernahme wird sie zum Erledigt-Hakerl, bei Ablehnung
+            # bleibt sie bewusst rot stehen.
+            if account.protocol == "graph" and account.flag_erledigt:
+                try:
+                    graph_set_flag(db, account, mail["message_id"], "flagged")
+                except Exception as e:
+                    flag_fehler = str(e)[:500]
+
         account.last_scan_at = datetime.now(timezone.utc)
-        account.last_error = None
+        # Flag-Fehler sichtbar am Konto vermerken (Scan selbst war erfolgreich)
+        account.last_error = (f"Outlook-Flagge fehlgeschlagen: {flag_fehler}"
+                              if flag_fehler else None)
         db.commit()
         return anzahl
     except Exception as e:

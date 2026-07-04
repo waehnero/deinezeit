@@ -29,8 +29,15 @@ export default function MailVorschlaege({ onAccepted }) {
   const uebernehmen = async (v) => {
     setBusy(b => ({ ...b, [v.id]: true }))
     try {
-      await mailImportApi.acceptSuggestion(v.id)
-      toast.success('Als Aufgabe übernommen')
+      const { data } = await mailImportApi.acceptSuggestion(v.id)
+      if (data.mail_flagged === true) {
+        toast.success('Als Aufgabe übernommen — E-Mail in Outlook als erledigt markiert')
+      } else if (data.mail_flagged === false) {
+        toast.success('Als Aufgabe übernommen')
+        toast.error('E-Mail konnte in Outlook nicht als erledigt markiert werden (Mail.ReadWrite-Berechtigung prüfen)')
+      } else {
+        toast.success('Als Aufgabe übernommen')
+      }
       setVorschlaege(list => list.filter(x => x.id !== v.id))
       onAccepted?.()
     } catch (err) {
