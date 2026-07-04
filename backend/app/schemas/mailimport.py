@@ -23,6 +23,8 @@ class MailAccountBase(BaseModel):
     folder: str = "INBOX"
     # Zugangsdaten aus Einstellungen -> System -> E-Mail verwenden
     use_central_credentials: bool = False
+    # Nur Graph: Mail nach Übernahme in Outlook als erledigt kennzeichnen
+    flag_erledigt: bool = False
     auto_scan: bool = False
     scan_interval_minutes: int = Field(default=15, ge=5, le=1440)
     is_active: bool = True
@@ -46,6 +48,7 @@ class MailAccountUpdate(BaseModel):
     graph_mailbox: Optional[str] = None
     folder: Optional[str] = None
     use_central_credentials: Optional[bool] = None
+    flag_erledigt: Optional[bool] = None
     auto_scan: Optional[bool] = None
     scan_interval_minutes: Optional[int] = Field(default=None, ge=5, le=1440)
     is_active: Optional[bool] = None
@@ -68,6 +71,7 @@ class MailAccountResponse(BaseModel):
     graph_mailbox: Optional[str] = None
     folder: str
     use_central_credentials: bool = False
+    flag_erledigt: bool = False
     auto_scan: bool
     scan_interval_minutes: int
     last_scan_at: Optional[datetime] = None
@@ -94,6 +98,9 @@ class SuggestionResponse(BaseModel):
     status: str
     todo_id: Optional[UUID] = None
     created_at: Optional[datetime] = None
+    # Nur in der accept-Antwort gesetzt: wurde die Ursprungs-Mail in Outlook
+    # als erledigt gekennzeichnet? (None = nicht versucht)
+    mail_flagged: Optional[bool] = None
 
 
 class SuggestionAccept(BaseModel):
