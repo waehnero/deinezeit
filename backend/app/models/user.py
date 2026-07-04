@@ -21,6 +21,8 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.employee)
     language = Column(String(10), nullable=False, default="de")
+    # Persönliche Dashboard-Konfiguration (Widgets, Reihenfolge, Größen); NULL = Standard
+    dashboard_config = Column(JSONB, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

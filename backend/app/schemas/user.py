@@ -32,6 +32,16 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
+class DashboardConfigPayload(BaseModel):
+    """Persönliche Dashboard-Konfiguration (Widget-Liste als freies JSON).
+
+    config = None bedeutet: Standard-Dashboard verwenden.
+    Beispiel: {"widgets": [{"id": "widget_zeit", "type": "zeiterfassung",
+                            "size": 2, "hidden": false}, ...]}
+    """
+    config: Optional[dict] = None
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str

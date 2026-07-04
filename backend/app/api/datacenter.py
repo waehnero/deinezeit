@@ -443,6 +443,40 @@ async def list_all_attachments(
     return {"attachments": [_to_response_with_label(r, label_map) for r in rows]}
 
 
+# ── 1a2. Dashboard-Statistik ─────────────────────────────────────────────────
+
+@router.get("/stats")
+async def get_datacenter_stats(
+    limit: int = Query(3, ge=1, le=10, description="Anzahl der neuesten Dateien"),
+    db:    Session = Depends(get_db),
+    _:     User = Depends(get_current_user),
+):
+    """Kompakte Zahlen für das Dashboard-Widget: Gesamtanzahl, Neuzugänge
+    der letzten 7 Tage und die zuletzt hochgeladenen Dateien."""
+    gesamt = db.query(Attachment).count()
+    vor_7_tagen = datetime.now(timezone.utc) - timedelta(days=7)
+    neu_7_tage = db.query(Attachment).filter(Attachment.created_at >= vor_7_tagen).count()
+    neueste = (
+        db.query(Attachment)
+        .order_by(Attachment.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "gesamt": gesamt,
+        "neu_7_tage": neu_7_tage,
+        "neueste": [
+            {
+                "id": str(a.id),
+                "display_name": a.display_name,
+                "type": a.type,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in neueste
+        ],
+    }
+
+
 # ── 1b. Link-Anbieter ────────────────────────────────────────────────────────
 
 @router.get("/providers")
