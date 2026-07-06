@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.16] – 2026-07-06 – Auto version bump
+
+### Aktualisierungen
+- Auto version bump
+
+---
+
 ## [1.12.15] – 2026-07-02 – Projekte-Menü & stabileres Deployment
 
 ### Aktualisierungen
