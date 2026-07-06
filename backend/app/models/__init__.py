@@ -7,3 +7,4 @@ from app.models.accounting import AccountingAccount
 from app.models.projektplan import PlanningProject, Task, TaskDependency, Milestone, ProjectTaskField, ChecklistItem
 from app.models.aufgaben import Todo
 from app.models.mailimport import MailAccount, MailTaskSuggestion
+from app.models.gdpr import GdprDeletionLog

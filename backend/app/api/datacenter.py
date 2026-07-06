@@ -230,6 +230,14 @@ def _build_entity_label_map(db: Session, rows) -> dict:
                     label_map[(etype, eid)] = todo.title
                 continue
 
+            # Sonderfall: DSGVO-Löschprotokolle -> "Löschvorgang <Datum>".
+            if etype == "dsgvo":
+                from app.models.gdpr import GdprDeletionLog
+                log = db.query(GdprDeletionLog).filter(GdprDeletionLog.id == eid).first()
+                if log and log.executed_at:
+                    label_map[(etype, eid)] = f"Löschvorgang {log.executed_at.strftime('%d.%m.%Y')}"
+                continue
+
             et = db.query(EntityType).filter(EntityType.slug == etype).first()
             if et:
                 rec = db.query(EntityRecord).filter(

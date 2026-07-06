@@ -33,6 +33,8 @@ class SettingsResponse(BaseModel):
     # Firmenkontakt
     company_contact_id:     str = ''
     company_contact_type:   str = ''
+    # Datenschutz (DSGVO): Aufbewahrungsfrist in Jahren (AT: 7, DE: 10)
+    gdpr_retention_years:   str = '7'
     # Speicher / Storage
     storage_backend:        str = 'minio'   # 'minio' | 'webdav'
     webdav_url:             str = ''
@@ -75,6 +77,8 @@ class SettingsUpdate(BaseModel):
     # Firmenkontakt
     company_contact_id:     Optional[str] = None
     company_contact_type:   Optional[str] = None
+    # Datenschutz (DSGVO)
+    gdpr_retention_years:   Optional[str] = None
     # Speicher / Storage
     storage_backend:        Optional[str] = None
     webdav_url:             Optional[str] = None

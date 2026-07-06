@@ -17,6 +17,8 @@ from app.models.settings import Setting
 from app.models.email_template import EmailTemplate
 from app.models.masterdata import EntityRecord
 from app.services.invoice_pdf import generate_pdf, generate_html_preview
+from app.services.invoice_snapshot import (ensure_recipient_snapshot,
+                                           snapshot_as_contact)
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -672,10 +674,16 @@ async def update_invoice(
     if inv.status == "storniert":
         raise HTTPException(400, "Stornierte Rechnungen können nicht bearbeitet werden")
 
+    old_contact_id = inv.contact_id
     update_data = body.model_dump(exclude={"positions"})
     for k, v in update_data.items():
         setattr(inv, k, v)
     inv.updated_by = current_user.email
+
+    # Finalisierter Beleg: Kontakt getauscht → Snapshot neu einfrieren;
+    # fehlender Snapshot (Altbestand) → nachziehen
+    if inv.status != "entwurf":
+        ensure_recipient_snapshot(db, inv, force=(inv.contact_id != old_contact_id))
 
     # Positionen ersetzen
     db.query(InvoicePosition).filter(InvoicePosition.invoice_id == invoice_id).delete()
@@ -726,6 +734,7 @@ async def cancel_invoice(
     if inv.doc_type != "rechnung":
         raise HTTPException(400, "Nur Rechnungen können storniert werden")
 
+    ensure_recipient_snapshot(db, inv)
     inv.status = "storniert"
     inv.cancel_mode = body.cancel_mode
     inv.updated_by = current_user.email
@@ -751,8 +760,12 @@ async def cancel_invoice(
             created_by=current_user.email,
             updated_by=current_user.email,
         )
+        # Gutschrift entsteht direkt als 'offen' → Empfänger sofort einfrieren
+        # (Snapshot der Originalrechnung übernehmen, sonst frisch aufbauen)
+        credit_note.recipient_snapshot = inv.recipient_snapshot
         db.add(credit_note)
         db.flush()
+        ensure_recipient_snapshot(db, credit_note)
 
         for orig_pos in inv.positions:
             pos = InvoicePosition(
@@ -788,6 +801,7 @@ async def mark_paid(
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
         raise HTTPException(404, "Rechnung nicht gefunden")
+    ensure_recipient_snapshot(db, inv)
     inv.status = "bezahlt"
     inv.paid_at = body.paid_at
     inv.paid_amount = body.paid_amount or inv.total
@@ -830,6 +844,10 @@ async def set_status(
     }
     if new_status not in allowed.get(inv.status, []):
         raise HTTPException(400, f"Statuswechsel von '{inv.status}' nach '{new_status}' nicht erlaubt")
+
+    # Beim Finalisieren (Entwurf wird verlassen) Empfängerdaten einfrieren
+    if inv.status == "entwurf" and new_status != "entwurf":
+        ensure_recipient_snapshot(db, inv)
 
     inv.status = new_status
     inv.updated_by = current_user.email
@@ -882,6 +900,7 @@ async def convert_to_ab(
             unit_price=orig_pos.unit_price, discount_pct=orig_pos.discount_pct,
             tax_rate=orig_pos.tax_rate,
         ))
+    ensure_recipient_snapshot(db, offer)  # verlässt 'entwurf' → einfrieren
     offer.status = "angenommen"
     db.flush()
     db.refresh(ab)
@@ -944,6 +963,7 @@ async def convert_to_invoice(
         )
         db.add(pos)
 
+    ensure_recipient_snapshot(db, offer)  # verlässt 'entwurf' → einfrieren
     offer.status = "angenommen"
     db.flush()
     db.refresh(invoice)
@@ -981,8 +1001,10 @@ def _load_pdf_context(db: Session, invoice: Invoice):
         except Exception:
             pass
 
-    recipient_contact = None
-    if invoice.contact_id:
+    # Empfänger: finalisierte Belege rendern aus dem eingefrorenen Snapshot
+    # (Belegaufbewahrung / DSGVO) — nur Entwürfe lesen live aus den Stammdaten.
+    recipient_contact = snapshot_as_contact(invoice.recipient_snapshot)
+    if recipient_contact is None and invoice.contact_id:
         recipient_contact = db.query(EntityRecord).filter(EntityRecord.id == invoice.contact_id).first()
 
     return settings, inv_settings, sender_contact, recipient_contact
@@ -1089,6 +1111,7 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
 
     # Status auf "gesendet" setzen (außer bereits bezahlt/storniert/angenommen/abgelehnt)
     if inv.status not in ("bezahlt", "storniert", "angenommen", "abgelehnt"):
+        ensure_recipient_snapshot(db, inv)
         inv.status = "gesendet"
         inv.updated_by = current_user_email
         db.add(inv)
@@ -1115,6 +1138,11 @@ async def send_invoice_email(
     cc_email         = body.get("cc_email", "") or None
     custom_subject   = body.get("subject") or None
     custom_body_html = body.get("body_html") or None
+    if not to_email and inv.contact_id:
+        # Bevorzugt LIVE aus dem Kontakt (Snapshot-E-Mail könnte veraltet sein)
+        live = db.query(EntityRecord).filter(EntityRecord.id == inv.contact_id).first()
+        if live:
+            to_email = (live.data or {}).get("email", "")
     if not to_email and recipient_contact:
         to_email = (recipient_contact.data or {}).get("email", "")
     if not to_email:
@@ -1160,7 +1188,13 @@ async def bulk_send_email(
 
         settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
 
-        to_email = (recipient_contact.data or {}).get("email", "") if recipient_contact else ""
+        to_email = ""
+        if inv.contact_id:
+            live = db.query(EntityRecord).filter(EntityRecord.id == inv.contact_id).first()
+            if live:
+                to_email = (live.data or {}).get("email", "")
+        if not to_email and recipient_contact:
+            to_email = (recipient_contact.data or {}).get("email", "")
         if not to_email:
             results.append({"id": str(inv_id), "number": inv.number, "ok": False,
                              "error": "Keine E-Mail-Adresse im Kontakt"})

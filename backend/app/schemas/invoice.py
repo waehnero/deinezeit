@@ -98,6 +98,7 @@ class InvoiceResponse(BaseModel):
     contact_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     related_invoice_id: Optional[UUID] = None
+    recipient_snapshot: Optional[dict] = None
     title: Optional[str] = None
     date: date
     due_date: Optional[date] = None

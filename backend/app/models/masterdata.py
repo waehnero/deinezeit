@@ -99,4 +99,9 @@ class EntityRecord(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))
 
+    # DSGVO-Löschung: gesetzt, wenn der Datensatz anonymisiert wurde (Tombstone).
+    # Die Zeile bleibt erhalten, damit keine Verweise verwaisen — aber ohne
+    # Personenbezug (data geleert, display_name = "Gelöschter Kontakt").
+    anonymized_at = Column(DateTime(timezone=True), nullable=True)
+
     entity_type = relationship("EntityType", back_populates="records")

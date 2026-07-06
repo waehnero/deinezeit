@@ -47,6 +47,7 @@ const ENTITY_LABELS = {
   planning_task: 'Projekte',
   aufgaben:      'Aufgaben',
   todo:          'Aufgaben',
+  dsgvo:         'DSGVO-Protokolle',
 }
 function entityLabel(slug) {
   return ENTITY_LABELS[slug] || slug.charAt(0).toUpperCase() + slug.slice(1)

@@ -5,13 +5,14 @@ import toast from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
 import UserManagementPage from './UserManagementPage'
 import MailKonten, { KiEinstellungen } from '../components/MailImportVerwaltung'
+import DatenschutzEinstellungen from './DatenschutzEinstellungen'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
   Save, Upload, Trash2, Download, Send, Loader2,
   CheckCircle, Eye, EyeOff, RefreshCw, Cloud,
   ImageIcon, Link2, Monitor, Cpu, ArrowUpCircle,
   Users, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp,
-  Receipt, FileText, BookOpen, Plus, Star
+  Receipt, FileText, BookOpen, Plus, Star, ShieldCheck
 } from 'lucide-react'
 
 // ── Farbthemen ────────────────────────────────────────────────────────────────
@@ -2261,10 +2262,11 @@ export default function SettingsPage() {
   }
 
   const tabs = [
-    { id: 'allgemein',  label: 'Allgemein',  icon: Building2 },
-    { id: 'parameter',  label: 'Parameter',  icon: BookOpen  },
-    { id: 'benutzer',   label: 'Benutzer',   icon: Users     },
-    { id: 'system',     label: 'System',     icon: Cpu       },
+    { id: 'allgemein',   label: 'Allgemein',   icon: Building2   },
+    { id: 'parameter',   label: 'Parameter',   icon: BookOpen    },
+    { id: 'benutzer',    label: 'Benutzer',    icon: Users       },
+    { id: 'datenschutz', label: 'Datenschutz', icon: ShieldCheck },
+    { id: 'system',      label: 'System',      icon: Cpu         },
   ]
 
   if (loading) return (
@@ -2292,6 +2294,7 @@ export default function SettingsPage() {
         {activeTab === 'allgemein'  && <TabAllgemeinWrapper settings={settings} onSaved={loadSettings} />}
         {activeTab === 'parameter'  && <TabParameter />}
         {activeTab === 'benutzer'   && <UserManagementPage />}
+        {activeTab === 'datenschutz' && <DatenschutzEinstellungen settings={settings} onSaved={loadSettings} />}
         {activeTab === 'system'     && <TabSystemWrapper settings={settings} onSaved={loadSettings} />}
       </div>
     </div>
