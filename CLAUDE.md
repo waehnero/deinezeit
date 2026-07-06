@@ -181,19 +181,30 @@ Secrets committen — die CI bricht sonst ab.
 2. Entwickeln → **lokal testen** (`docker compose -f docker-compose.local.yml up -d --build`).
 3. **Erst nach Olivers Freigabe** committen/pushen. Claude pusht nie ungefragt.
 
-**Versionierung läuft automatisch.** Nach jedem Push auf `main` erhöht die
-GitHub Action `auto-version.yml` (→ `scripts/auto_version.py`) die Version und
-pflegt das Changelog. **Daher nicht selbst manuell bumpen** — sonst entstehen
-doppelte Bumps. (`bump-version.ps1` / manuelles Hochzählen nur in Ausnahmefällen
-und nur auf ausdrücklichen Wunsch.)
+**Versionierung läuft automatisch beim Committen** (per pre-commit-Hook). Auf
+einem Feature-Branch hebt der Hook `.githooks/pre-commit` beim **ersten** Commit
+die Patch-Version **einmal pro Branch** an (`scripts/bump_version.py`) und nimmt
+alle 6 Versions-Dateien in den Commit auf — inkl. Changelog-Eintrag. So bleibt
+die im Login-Fenster angezeigte Version/Changelog-Liste automatisch aktuell,
+ohne direkten Push auf das geschützte `main`. Der Bump landet über den PR in
+`main`; danach deployt es und die neue Version ist live.
 
-Ein **pre-commit-Hook** (`.githooks/pre-commit`) prüft, dass die Version in
-`frontend/package.json`, `backend/app/core/config.py`, `docker-compose.yml` und
-`frontend/src/data/changelog.js` übereinstimmt. Einmalig aktivieren:
+**Einmalig aktivieren** (Hook einschalten — sonst passiert nichts):
 
 ```bash
 git config core.hooksPath .githooks
 ```
+
+- Titel/Changelog-Text werden aus dem Branch-Namen abgeleitet; bei Bedarf
+  vorher gezielt setzen: `python3 scripts/bump_version.py --title "…" --update "…"`.
+- Änderungen an changelog.js/CHANGELOG.md im selben Branch verfeinern den Text
+  (es wird pro Branch nur **einmal** hochgezählt).
+- Bump ausnahmsweise überspringen: `git commit --no-verify`.
+
+> **Hinweis:** Die alte GitHub-Action `auto-version.yml` (Post-Push-Bump auf
+> `main`) ist **deaktiviert** — sie scheiterte am Branch-Schutz (direkter Push
+> auf `main` gesperrt). Nicht reaktivieren, solange kein Bot-Bypass existiert.
+> `bump-version.ps1` ist das Windows-Pendant zu `bump_version.py`.
 
 > Hinweis: GitHub Desktop u. ä. hinterlassen manchmal eine verwaiste
 > `.git/index.lock`. `check.sh` räumt sie auf, wenn kein git-Prozess läuft.
@@ -205,8 +216,8 @@ git config core.hooksPath .githooks
 - **`ci.yml`** — bei jedem Push/PR: Backend-Sicherheit (pip-audit, bandit),
   **Backend-Tests (pytest gegen Postgres-Service)**, Docker-Images bauen,
   `.env.example`-Vollständigkeit & Secret-/nginx-Header-Checks.
-- **`auto-version.yml`** — bei Push auf `main`: automatischer Versions-Bump
-  (übersprungen, wenn der Commit selbst schon `chore: Version …` ist).
+- **`auto-version.yml`** — **deaktiviert** (scheiterte am Branch-Schutz). Der
+  Versions-Bump passiert jetzt lokal beim Committen per pre-commit-Hook (s. o.).
 - **`deploy.yml`** — bei Push auf `main`: per SSH/rsync auf den Server,
   `docker compose build` + `alembic upgrade head` + Neustart + Healthcheck.
   Nötige Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`.
@@ -251,7 +262,8 @@ Fixtures in `backend/tests/conftest.py` (Test-DB, Client, `auth_client`);
 ## Was Claude NICHT tut
 
 - Nicht ungefragt committen oder nach `origin/main` pushen (löst Deploy aus!).
-- Nicht manuell die Version bumpen (Automatik übernimmt das).
+- Version nicht von Hand in den Dateien ändern — der pre-commit-Hook bumpt
+  automatisch (einmal pro Branch). Bei Bedarf `scripts/bump_version.py` nutzen.
 - Keine Secrets / `.env`-Inhalte committen.
 - Migrationen nicht umnummerieren oder bestehende verändern.
 - Keine destruktiven Aktionen am Server/an der DB ohne ausdrückliche Freigabe.
