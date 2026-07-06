@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.17] – 2026-07-06 – Einstellungen
+
+### Aktualisierungen
+- Einstellungen
+
+---
+
 ## [1.12.16] – 2026-07-06 – Auto version bump
 
 ### Aktualisierungen

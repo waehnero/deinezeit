@@ -28,6 +28,12 @@ class Invoice(Base):
     project_id = Column(UUID(as_uuid=True), nullable=True)          # entity_records.id
     related_invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=True)
 
+    # Eingefrorene Empfängerdaten (DSGVO / Belegaufbewahrung):
+    # {"display_name": ..., "data": {...}, "frozen_at": ..., "source": ...}
+    # Wird beim Finalisieren gesetzt (Status verlässt 'entwurf'). PDF/Vorschau
+    # rendern ab dann aus dem Snapshot statt live aus den Stammdaten.
+    recipient_snapshot = Column(JSONB, nullable=True)
+
     # Inhalte
     title = Column(String(300), nullable=True)
     date = Column(Date, nullable=False)
