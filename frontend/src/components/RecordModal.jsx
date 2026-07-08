@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { masterdataApi } from '../services/api'
+import { masterdataApi, zeiterfassungApi } from '../services/api'
 import toast from 'react-hot-toast'
 import DynamicForm from './DynamicForm'
 import AttachmentPanel from './AttachmentPanel'
@@ -15,8 +15,12 @@ import { X, Loader2, Database } from 'lucide-react'
  */
 export default function RecordModal({ entityType, record, onClose, onSaved, initialValues = null }) {
   const isEdit = !!record
+  const isProjektzeit = entityType.slug === 'projektzeiten'
   const [values, setValues] = useState(record?.data || initialValues || {})
   const [loading, setLoading] = useState(false)
+  // Beim Neuanlegen einer Projektzeit: hier erfasste Stundenkonten werden
+  // nach dem Anlegen des Datensatzes gespeichert (brauchen die Datensatz-ID).
+  const [pendingKonten, setPendingKonten] = useState([])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -28,6 +32,19 @@ export default function RecordModal({ entityType, record, onClose, onSaved, init
         toast.success('Datensatz aktualisiert')
       } else {
         res = await masterdataApi.createRecord(entityType.slug, values)
+        // Vorerfasste Stundenkonten jetzt zur neuen Projektzeit speichern
+        let kontenFehler = 0
+        for (const k of pendingKonten) {
+          try {
+            await zeiterfassungApi.createStundenkonto(res.data.id, {
+              bezeichnung: k.bezeichnung, stunden: k.stunden,
+              preis: k.preis, erworben_am: k.erworben_am,
+            })
+          } catch { kontenFehler += 1 }
+        }
+        if (kontenFehler > 0) {
+          toast.error(`${kontenFehler} Stundenkonto/-konten konnten nicht gespeichert werden`)
+        }
         toast.success('Datensatz angelegt')
       }
       onSaved(res.data)
@@ -83,10 +100,16 @@ export default function RecordModal({ entityType, record, onClose, onSaved, init
           </div>
         </form>
 
-        {/* Stundenkonten (Budget) – nur bei bestehenden Projektzeiten */}
-        {isEdit && entityType.slug === 'projektzeiten' && (
+        {/* Stundenkonten (Budget) – bei Projektzeiten in beiden Modi:
+            beim Bearbeiten direkt über die API, beim Neuanlegen lokal
+            gesammelt und mit dem Datensatz gespeichert. */}
+        {isProjektzeit && (
           <div className="px-5 pb-2 border-t border-gray-100">
-            <StundenkontenPanel projectId={record.id} />
+            {isEdit ? (
+              <StundenkontenPanel projectId={record.id} />
+            ) : (
+              <StundenkontenPanel pending={pendingKonten} onPendingChange={setPendingKonten} />
+            )}
           </div>
         )}
 

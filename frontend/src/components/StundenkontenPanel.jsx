@@ -20,11 +20,20 @@ export function fmtBudgetMinutes(min) {
  * Das Budget der Projektzeit = Summe der Konten; verbraucht wird es
  * durch verrechenbare Zeiteinträge. Ist es aufgebraucht, wird darauf
  * hingewiesen, dem Kunden ein neues Stundenkonto anzubieten.
+ *
+ * Zwei Betriebsarten:
+ * - projectId gesetzt (Bearbeiten): Konten werden direkt über die API
+ *   gespeichert/gelöscht.
+ * - projectId null (Neuanlegen): Konten werden lokal in `pending` /
+ *   `onPendingChange` gesammelt und vom Aufrufer (RecordModal) nach dem
+ *   Anlegen des Datensatzes gespeichert — der Dialog ist damit beim
+ *   Anlegen und Bearbeiten gleich aufgebaut.
  */
-export default function StundenkontenPanel({ projectId }) {
+export default function StundenkontenPanel({ projectId = null, pending = [], onPendingChange = null }) {
+  const isLocal = !projectId
   const [konten, setKonten] = useState([])
   const [budget, setBudget] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!isLocal)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -32,6 +41,7 @@ export default function StundenkontenPanel({ projectId }) {
   const [form, setForm] = useState({ bezeichnung: '', stunden: '', preis: '', erworben_am: today })
 
   const load = useCallback(async () => {
+    if (isLocal) return
     try {
       const [kontenRes, budgetRes] = await Promise.all([
         zeiterfassungApi.listStundenkonten(projectId),
@@ -44,22 +54,41 @@ export default function StundenkontenPanel({ projectId }) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, isLocal])
 
   useEffect(() => { load() }, [load])
+
+  // Beim Neuanlegen: lokale Liste + lokal berechnetes Budget (noch kein Verbrauch)
+  const items = isLocal ? pending : konten
+  const localBudgetMinutes = pending.reduce((sum, k) => sum + Math.round(Number(k.stunden) * 60), 0)
+  const shownBudget = isLocal
+    ? (pending.length
+        ? { has_budget: true, budget_minutes: localBudgetMinutes, consumed_minutes: 0,
+            remaining_minutes: localBudgetMinutes, exhausted: false }
+        : null)
+    : budget
 
   const handleAdd = async () => {
     const stunden = parseFloat(String(form.stunden).replace(',', '.'))
     if (!stunden || stunden <= 0) return toast.error('Bitte gültige Stundenanzahl angeben')
     if (!form.erworben_am) return toast.error('Bitte Kaufdatum angeben')
+    const payload = {
+      bezeichnung: form.bezeichnung || null,
+      stunden,
+      preis: form.preis ? parseFloat(String(form.preis).replace(',', '.')) : null,
+      erworben_am: form.erworben_am,
+    }
+
+    if (isLocal) {
+      onPendingChange?.([...pending, { ...payload, id: `tmp-${Date.now()}` }])
+      setForm({ bezeichnung: '', stunden: '', preis: '', erworben_am: today })
+      setShowForm(false)
+      return
+    }
+
     setSaving(true)
     try {
-      await zeiterfassungApi.createStundenkonto(projectId, {
-        bezeichnung: form.bezeichnung || null,
-        stunden,
-        preis: form.preis ? parseFloat(String(form.preis).replace(',', '.')) : null,
-        erworben_am: form.erworben_am,
-      })
+      await zeiterfassungApi.createStundenkonto(projectId, payload)
       toast.success('Stundenkonto erfasst')
       setForm({ bezeichnung: '', stunden: '', preis: '', erworben_am: today })
       setShowForm(false)
@@ -72,6 +101,10 @@ export default function StundenkontenPanel({ projectId }) {
   }
 
   const handleDelete = async (konto) => {
+    if (isLocal) {
+      onPendingChange?.(pending.filter(k => k.id !== konto.id))
+      return
+    }
     try {
       await zeiterfassungApi.deleteStundenkonto(konto.id)
       toast.success('Stundenkonto gelöscht')
@@ -105,13 +138,13 @@ export default function StundenkontenPanel({ projectId }) {
       </div>
 
       {/* Budget-Übersicht */}
-      {budget?.has_budget && (
+      {shownBudget?.has_budget && (
         <div className={`flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-3 rounded-xl mb-3 text-sm ${
-          budget.exhausted ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-200'}`}>
-          <span className="text-gray-500">Budget <b className="text-gray-800">{fmtBudgetMinutes(budget.budget_minutes)} h</b></span>
-          <span className="text-gray-500">Verbraucht <b className="text-gray-800">{fmtBudgetMinutes(budget.consumed_minutes)} h</b></span>
-          <span className="text-gray-500">Rest <b className={budget.exhausted ? 'text-red-600' : 'text-green-700'}>{fmtBudgetMinutes(budget.remaining_minutes)} h</b></span>
-          {budget.exhausted && (
+          shownBudget.exhausted ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-200'}`}>
+          <span className="text-gray-500">Budget <b className="text-gray-800">{fmtBudgetMinutes(shownBudget.budget_minutes)} h</b></span>
+          <span className="text-gray-500">Verbraucht <b className="text-gray-800">{fmtBudgetMinutes(shownBudget.consumed_minutes)} h</b></span>
+          <span className="text-gray-500">Rest <b className={shownBudget.exhausted ? 'text-red-600' : 'text-green-700'}>{fmtBudgetMinutes(shownBudget.remaining_minutes)} h</b></span>
+          {shownBudget.exhausted && (
             <span className="flex items-center gap-1.5 text-red-600 font-medium">
               <AlertTriangle size={13} /> Budget verbraucht – dem Kunden ein neues Stundenkonto anbieten
             </span>
@@ -156,13 +189,13 @@ export default function StundenkontenPanel({ projectId }) {
       )}
 
       {/* Liste der Konten */}
-      {konten.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-sm text-gray-400 py-2">
           Noch keine Stundenkonten erfasst. Ohne Stundenkonto wird für diese Projektzeit kein Budget geführt.
         </p>
       ) : (
         <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
-          {konten.map(k => (
+          {items.map(k => (
             <li key={k.id} className="flex items-center gap-3 px-4 py-2.5 text-sm bg-white">
               <div className="flex-1 min-w-0">
                 <span className="font-medium text-gray-800">{k.bezeichnung || 'Stundenkonto'}</span>
