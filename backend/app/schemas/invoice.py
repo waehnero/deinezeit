@@ -146,6 +146,8 @@ class InvoiceListItem(BaseModel):
     currency: str
     status: str
     created_at: datetime
+    is_recurring_template: bool = False
+    recurring_source_id: Optional[UUID] = None    # gesetzt = automatisch aus Vorlage erzeugt
 
     class Config:
         from_attributes = True
@@ -163,6 +165,13 @@ class InvoiceMarkPaidRequest(BaseModel):
 class InvoiceConvertRequest(BaseModel):
     """Angebot → Rechnung umwandeln"""
     pass
+
+class InvoiceDuplicateRequest(BaseModel):
+    """Steuert, welche Bestandteile beim Duplizieren übernommen werden."""
+    positions: bool = True          # Positionszeilen
+    texts: bool = True              # Einleitungs-/Schlusstext + Notizen
+    contact: bool = True            # Kontakt, Projekt, Titel, Referenz
+    attachments: bool = False       # Datei-Anhänge
 
 
 # ── Rechnungsbuch ─────────────────────────────────────────────────────────────

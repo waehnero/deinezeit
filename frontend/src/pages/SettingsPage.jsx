@@ -1414,6 +1414,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
   const [paymentDays, setPaymentDays] = useState(30)
   const [kleinunternehmerText, setKleinunternehmerText] = useState('')
   const [contactHint, setContactHint] = useState('')  // Info ob Bankdaten aus Kontakt kamen
+  const [archiveTriggers, setArchiveTriggers] = useState(['email'])  // PDF-Archivierung ins Datacenter
 
   // Bankfelder aus Kontakt-Daten erkennen (sucht nach IBAN/BIC/Bank in allen Feldern)
   function extractBankFromContact(data) {
@@ -1447,6 +1448,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
       setDefaultTaxRate(s.default_tax_rate || 20)
       setPaymentDays(s.default_payment_days || 30)
       setKleinunternehmerText(typeof s.kleinunternehmer_text === 'string' ? s.kleinunternehmer_text.replace(/^"|"$/g, '') : '')
+      if (Array.isArray(s.archive_triggers)) setArchiveTriggers(s.archive_triggers)
       const contact = contactRes.data?.contact
       if (contact?.data) {
         const fc = extractBankFromContact(contact.data)
@@ -1467,6 +1469,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         invoiceApi.updateSetting('default_tax_rate', Number(defaultTaxRate)),
         invoiceApi.updateSetting('default_payment_days', Number(paymentDays)),
         invoiceApi.updateSetting('kleinunternehmer_text', kleinunternehmerText),
+        invoiceApi.updateSetting('archive_triggers', archiveTriggers),
         showCustomEditor && invoiceApi.updateSetting('custom_template_css', customCss),
       ].filter(Boolean))
       toast.success('Verkaufseinstellungen gespeichert')
@@ -1507,6 +1510,31 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         </div>
         <div className="mt-3"><label className="block text-xs font-medium text-neutral-600 mb-1">Kleinunternehmer-Hinweistext</label>
           <textarea value={kleinunternehmerText} onChange={e => setKleinunternehmerText(e.target.value)} rows={2} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" /></div>
+      </div>
+      <hr className="border-gray-100" />
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Automatische Archivierung</h3>
+        <p className="text-xs text-neutral-500 mb-4">
+          Bei den gewählten Ereignissen wird automatisch ein PDF des Belegs erzeugt und im Datacenter
+          unter dem Kontakt in einem Unterordner je Belegart abgelegt (Dateiname mit Datum &amp; Uhrzeit).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {[
+            { key: 'email',      label: 'Bei E-Mail-Versand' },
+            { key: 'gesendet',   label: 'Status „Gesendet“' },
+            { key: 'angenommen', label: 'Status „Angenommen“' },
+            { key: 'abgelehnt',  label: 'Status „Abgelehnt“' },
+            { key: 'bezahlt',    label: 'Status „Bezahlt“' },
+            { key: 'storniert',  label: 'Status „Storniert“' },
+          ].map(t => (
+            <label key={t.key} className="flex items-center gap-2 p-2.5 border border-neutral-200 rounded-lg cursor-pointer hover:bg-neutral-50 text-sm">
+              <input type="checkbox" checked={archiveTriggers.includes(t.key)}
+                onChange={() => setArchiveTriggers(a => a.includes(t.key) ? a.filter(x => x !== t.key) : [...a, t.key])}
+                className="w-4 h-4 rounded" />
+              <span className="text-neutral-700">{t.label}</span>
+            </label>
+          ))}
+        </div>
       </div>
       <hr className="border-gray-100" />
       <div>

@@ -180,6 +180,7 @@ def _to_response(a: Attachment) -> dict:
         "created_at":    a.created_at.isoformat() if a.created_at else "",
         "contact_id":    str(a.contact_id) if a.contact_id else None,
         "contact_name":  a.contact_name,
+        "folder":        a.folder,
     }
 
 

@@ -4,7 +4,7 @@ import { invoiceApi, masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search,
-  RefreshCw, FileText, Clock, Download, Eye
+  RefreshCw, FileText, Clock, Download, Eye, Repeat, Paperclip, X as XIcon
 } from 'lucide-react'
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -219,6 +219,14 @@ export default function InvoiceFormPage() {
   const [nextNumber, setNextNumber] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
+  // Wiederkehrende Rechnung (nur doc_type=rechnung)
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurringInterval, setRecurringInterval] = useState('monthly')
+  const [recurringNext, setRecurringNext] = useState(today())
+  const [recurringEnd, setRecurringEnd] = useState('')
+  const [contracts, setContracts] = useState([])   // [{id, filename}, …] bereits hinterlegt
+  const [contractUploading, setContractUploading] = useState(false)
+  const MAX_CONTRACTS = 10
 
   useEffect(() => {
     invoiceApi.getSettings().then(res => {
@@ -252,6 +260,13 @@ export default function InvoiceFormPage() {
       setDate(inv.date); setDueDate(inv.due_date || ''); setReference(inv.reference || '')
       setIntroText(inv.intro_text || ''); setOutroText(inv.outro_text || ''); setNotes(inv.notes || '')
       setTaxMode(inv.tax_mode)
+      setIsRecurring(!!inv.is_recurring_template)
+      if (inv.recurring_interval) setRecurringInterval(inv.recurring_interval)
+      if (inv.recurring_next) setRecurringNext(inv.recurring_next)
+      setRecurringEnd(inv.recurring_end || '')
+      setContracts((inv.attachments || [])
+        .filter(a => a.attach_type === 'contract')
+        .map(a => ({ id: a.id, filename: a.filename })))
       setPositions(inv.positions.length > 0 ? inv.positions.map(p => ({
         ...p, quantity: String(p.quantity), unit_price: String(p.unit_price),
         discount_pct: p.discount_pct != null ? String(p.discount_pct) : '',
@@ -278,6 +293,12 @@ export default function InvoiceFormPage() {
         date, due_date: dueDate || null, reference: reference || null,
         intro_text: introText || null, outro_text: outroText || null, notes: notes || null,
         tax_mode: taxMode, template_id: 1,
+        // Wiederkehrend nur bei Rechnung
+        is_recurring_template: docType === 'rechnung' ? isRecurring : false,
+        recurring_interval: (docType === 'rechnung' && isRecurring) ? recurringInterval : null,
+        recurring_next: (docType === 'rechnung' && isRecurring) ? (recurringNext || date) : null,
+        recurring_end: (docType === 'rechnung' && isRecurring && recurringEnd) ? recurringEnd : null,
+        recurring_action: (docType === 'rechnung' && isRecurring) ? 'create' : null,
         positions: positions.map((p, i) => ({
           sort_order: i, pos_type: p.pos_type, description: p.description, detail: p.detail || null,
           quantity: parseFloat(p.quantity) || 1, unit: p.unit || null, unit_price: parseFloat(p.unit_price) || 0,
@@ -292,6 +313,39 @@ export default function InvoiceFormPage() {
       navigate('/invoices/' + res.data.id)
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler beim Speichern') }
     finally { setSaving(false) }
+  }
+
+  async function handleContractUpload(e) {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    const frei = MAX_CONTRACTS - contracts.length
+    if (frei <= 0) { toast.error(`Maximal ${MAX_CONTRACTS} Verträge je Beleg`); e.target.value = ''; return }
+    const toUpload = files.slice(0, frei)
+    setContractUploading(true)
+    try {
+      for (const file of toUpload) {
+        const res = await invoiceApi.uploadContract(id, file)
+        setContracts(list => [...list, { id: res.data.id, filename: res.data.filename }])
+      }
+      toast.success(toUpload.length > 1 ? `${toUpload.length} Verträge hinterlegt` : 'Vertrag hinterlegt')
+      if (files.length > frei) toast.error(`Nur ${frei} von ${files.length} übernommen (max. ${MAX_CONTRACTS})`)
+    } catch (err) { toast.error(err.response?.data?.detail || 'Upload fehlgeschlagen') }
+    finally { setContractUploading(false); e.target.value = '' }
+  }
+  async function handleContractDelete(attId) {
+    try { await invoiceApi.deleteContract(attId); setContracts(list => list.filter(c => c.id !== attId)); toast.success('Vertrag entfernt') }
+    catch { toast.error('Fehler') }
+  }
+  async function handleContractOpen(attId) {
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch('/api/invoices/contract/' + attId + '/download', { headers: { Authorization: 'Bearer ' + token } })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch { toast.error('Vertrag konnte nicht geöffnet werden') }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw size={24} className="animate-spin text-neutral-400" /></div>
@@ -398,6 +452,65 @@ export default function InvoiceFormPage() {
             </div>
           </div>
         </div>
+
+        {docType === 'rechnung' && (
+          <div className="bg-white border border-neutral-200 rounded-xl p-5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} className="w-4 h-4 rounded" />
+              <Repeat size={16} className="text-primary-600" />
+              <span className="text-sm font-semibold text-neutral-700">Wiederkehrende Rechnung</span>
+            </label>
+            {isRecurring && (
+              <>
+                <p className="text-xs text-neutral-500 mt-2 mb-4">
+                  Diese Rechnung dient als Vorlage. Gemäß Intervall werden automatisch neue Rechnungen als <strong>Entwurf</strong> erzeugt (kein automatischer Versand).
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Intervall</label>
+                    <select value={recurringInterval} onChange={e => setRecurringInterval(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+                      <option value="weekly">Wöchentlich</option>
+                      <option value="monthly">Monatlich</option>
+                      <option value="quarterly">Quartalsweise</option>
+                      <option value="yearly">Jährlich</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Nächste Ausführung</label>
+                    <input type="date" value={recurringNext} onChange={e => setRecurringNext(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Laufzeit bis <span className="text-neutral-400 font-normal">(optional)</span></label>
+                    <input type="date" value={recurringEnd} onChange={e => setRecurringEnd(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Verträge <span className="text-neutral-400 font-normal">(optional, bis {MAX_CONTRACTS})</span></label>
+                  {isNew ? (
+                    <p className="text-xs text-neutral-500">Bitte zuerst speichern, danach können Verträge hochgeladen werden.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {contracts.map(c => (
+                        <div key={c.id} className="flex items-center gap-2 text-sm bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 w-fit">
+                          <Paperclip size={14} className="text-neutral-500" />
+                          <button type="button" onClick={() => handleContractOpen(c.id)} className="text-primary-700 hover:underline" title="Vertrag öffnen">{c.filename}</button>
+                          <button type="button" onClick={() => handleContractOpen(c.id)} className="text-neutral-400 hover:text-primary-600" title="Vertrag öffnen"><Eye size={14} /></button>
+                          <button type="button" onClick={() => handleContractDelete(c.id)} className="text-neutral-400 hover:text-red-500" title="Vertrag entfernen"><XIcon size={14} /></button>
+                        </div>
+                      ))}
+                      {contracts.length < MAX_CONTRACTS && (
+                        <label className="inline-flex items-center gap-2 text-sm px-3 py-2 border border-neutral-200 rounded-lg cursor-pointer hover:bg-neutral-50 w-fit">
+                          <Paperclip size={14} /> {contractUploading ? 'Lädt…' : (contracts.length === 0 ? 'Vertrag hochladen' : 'Weiteren Vertrag hochladen')}
+                          <input type="file" multiple className="hidden" onChange={handleContractUpload} disabled={contractUploading} />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="bg-white border border-neutral-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">

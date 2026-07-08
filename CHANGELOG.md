@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.20] – 2026-07-08 – Verkauf: Duplizieren, wiederkehrende Rechnungen, erweiterte Suche & Beleg-Archiv
+
+### Neu
+- Belege duplizieren: Über das Kontextmenü lässt sich jeder Beleg als neuer Entwurf duplizieren – im Dialog wählbar, welche Teile übernommen werden (Positionen, Texte, Kontakt/Referenz, Anhänge).
+- Wiederkehrende Rechnungen: Rechnungen als Serie mit Intervall und Laufzeit anlegen; fällige Rechnungen entstehen automatisch als Entwurf und sind farblich markiert.
+- Erweiterte Suche im Verkauf: Belege lassen sich jetzt auch nach Kontakt, Artikel und Projekt durchsuchen.
+- Automatisches Beleg-Archiv: Bei frei wählbaren Ereignissen wird ein PDF des Belegs automatisch im Datacenter unter dem Kunden – je Belegart in eigenem Unterordner – abgelegt.
+
+### Aktualisierungen
+- Verträge zu wiederkehrenden Rechnungen: mehrere Verträge je Beleg möglich, im Datacenter unter dem Kunden im Ordner „Verträge“ mit Belegnummer, direkt im Formular öffnen und entfernen.
+- Wiederkehrende Vorlagen erscheinen nun auch in der Gesamtliste (violett markiert).
+
+---
+
 ## [1.12.19] – 2026-07-08 – Aussagekräftigere Release-Notes
 
 ### Aktualisierungen

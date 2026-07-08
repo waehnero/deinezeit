@@ -204,6 +204,13 @@ export const invoiceApi = {
   bulkSendEmail:    (invoice_ids) => api.post('/invoices/bulk-send-email', { invoice_ids }),
   markPaid:       (id, data) => api.post(`/invoices/${id}/mark-paid`, data),
   convertToInvoice: (id) => api.post(`/invoices/${id}/convert-to-invoice`),
+  duplicate:        (id, opts) => api.post(`/invoices/${id}/duplicate`, opts || {}),
+  uploadContract:   (id, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/invoices/${id}/contract`, form, { headers: { 'Content-Type': undefined } })
+  },
+  deleteContract:   (attachmentId) => api.delete(`/invoices/contract/${attachmentId}`),
 
   // Zeiteinträge
   unbilledEntries: (params) => api.get('/invoices/time-entries/unbilled', { params }),

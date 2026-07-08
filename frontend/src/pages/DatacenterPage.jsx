@@ -403,22 +403,50 @@ function FolderTree({ folders, selected, onSelect, viewMode, onViewModeChange })
         )}
       </button>
 
-      {/* Kontakt-Sicht: flache Liste der Kontakte */}
+      {/* Kontakt-Sicht: Kontakte mit optionalen Unterordnern (je Belegart) */}
       {viewMode === 'contact' && folders.contacts?.map(contact => {
-        const isContactSelected = selected?.contactId !== undefined && selected.contactId === contact.id
+        const isContactSelected = selected?.contactId !== undefined && selected.contactId === contact.id && !selected?.folder
         const isNone = contact.id === '__none__'
+        const hasFolders = contact.folders && contact.folders.length > 0
+        const isExpanded = expanded[contact.id]
         return (
-          <button
-            key={contact.id}
-            onClick={() => onSelect({ contactId: contact.id })}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
-              isContactSelected ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            <Folder size={15} className={isContactSelected ? 'text-primary-600' : (isNone ? 'text-gray-300' : 'text-amber-500')} />
-            <span className={`truncate ${isNone ? 'italic text-gray-400' : ''}`}>{contact.label}</span>
-            <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{contact.count}</span>
-          </button>
+          <div key={contact.id}>
+            <button
+              onClick={() => { if (hasFolders) toggle(contact.id); onSelect({ contactId: contact.id }) }}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
+                isContactSelected ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              {hasFolders
+                ? (isExpanded
+                    ? <ChevronDown size={13} className="text-gray-400 flex-shrink-0" />
+                    : <ChevronRight size={13} className="text-gray-400 flex-shrink-0" />)
+                : <span className="w-[13px] flex-shrink-0" />}
+              <Folder size={15} className={isContactSelected ? 'text-primary-600' : (isNone ? 'text-gray-300' : 'text-amber-500')} />
+              <span className={`truncate ${isNone ? 'italic text-gray-400' : ''}`}>{contact.label}</span>
+              <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{contact.count}</span>
+            </button>
+            {hasFolders && isExpanded && (
+              <div className="ml-4 space-y-0.5 border-l border-gray-100 pl-2 mt-0.5 mb-1">
+                {contact.folders.map(f => {
+                  const isFolderSelected = selected?.contactId === contact.id && selected?.folder === f.name
+                  return (
+                    <button
+                      key={f.name}
+                      onClick={() => onSelect({ contactId: contact.id, folder: f.name })}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition ${
+                        isFolderSelected ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Folder size={13} className={isFolderSelected ? 'text-primary-500' : 'text-gray-300'} />
+                      <span className="truncate">{f.name}</span>
+                      <span className="ml-auto text-xs text-gray-400 flex-shrink-0">{f.count}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         )
       })}
 
@@ -722,7 +750,7 @@ export default function DatacenterPage() {
         entities: Object.values(t.entityMap)
       }))
 
-      // Kontakt-Gruppierung (für Ansicht "Nach Kontakt")
+      // Kontakt-Gruppierung (für Ansicht "Nach Kontakt"), inkl. Unterordner je Belegart
       const contactMap = {}
       all.forEach(a => {
         const cid = a.contact_id || '__none__'
@@ -731,12 +759,21 @@ export default function DatacenterPage() {
             id: cid,
             label: a.contact_id ? (a.contact_name || a.contact_id) : 'Ohne Kontakt',
             count: 0,
+            folderMap: {},
           }
         }
         contactMap[cid].count++
+        if (a.folder) {
+          contactMap[cid].folderMap[a.folder] = (contactMap[cid].folderMap[a.folder] || 0) + 1
+        }
       })
       // "Ohne Kontakt" ans Ende sortieren, sonst alphabetisch
-      const contacts = Object.values(contactMap).sort((x, y) => {
+      const contacts = Object.values(contactMap).map(c => ({
+        ...c,
+        folders: Object.entries(c.folderMap)
+          .map(([name, count]) => ({ name, count }))
+          .sort((x, y) => x.name.localeCompare(y.name)),
+      })).sort((x, y) => {
         if (x.id === '__none__') return 1
         if (y.id === '__none__') return -1
         return x.label.localeCompare(y.label)
@@ -767,6 +804,9 @@ export default function DatacenterPage() {
       let items = res.data.attachments || []
       if (selected === 'shared') {
         items = items.filter(a => a.has_share_link)
+      }
+      if (selected && selected.folder) {
+        items = items.filter(a => a.folder === selected.folder)
       }
       if (search) {
         const q = search.toLowerCase()

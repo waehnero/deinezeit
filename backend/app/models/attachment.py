@@ -32,6 +32,10 @@ class Attachment(Base):
     contact_id    = Column(UUID(as_uuid=True), nullable=True)
     contact_name  = Column(String(300), nullable=True)
 
+    # Optionaler Unterordner innerhalb des Kontakt-Ordners (z.B. Belegart
+    # "Rechnungen" für automatisch archivierte Verkaufsbelege).
+    folder        = Column(String(100), nullable=True)
+
     # Share-Link
     share_token      = Column(String(64),  nullable=True, unique=True)
     share_expires_at = Column(DateTime(timezone=True), nullable=True)

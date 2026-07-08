@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, extract
 from typing import List, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import date, datetime, timezone
 import io
 import json
@@ -19,11 +19,13 @@ from app.models.masterdata import EntityRecord
 from app.services.invoice_pdf import generate_pdf, generate_html_preview
 from app.services.invoice_snapshot import (ensure_recipient_snapshot,
                                            snapshot_as_contact)
+from app.services.invoice_archive import archive_invoice_pdf
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
     InvoiceBookFilter, InvoiceSettingsUpdate, NextNumberResponse,
     InvoicePositionResponse, InvoiceAttachmentResponse,
+    InvoiceDuplicateRequest,
 )
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
@@ -104,7 +106,9 @@ async def list_invoices(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    q = db.query(Invoice).filter(Invoice.is_recurring_template == False)
+    # Wiederkehrende Vorlagen laufen bewusst in der Hauptliste mit (violett
+    # markiert); der eigene Tab "Wiederkehrend" zeigt sie zusätzlich gefiltert.
+    q = db.query(Invoice)
     if doc_type:
         q = q.filter(Invoice.doc_type == doc_type)
     if status:
@@ -117,10 +121,20 @@ async def list_invoices(
         q = q.filter(Invoice.date <= date_to)
     if search:
         like = f"%{search}%"
+        # Kontakt- und Projekt-Datensätze (beide EntityRecord) mit passendem Namen
+        entity_subq = db.query(EntityRecord.id).filter(EntityRecord.display_name.ilike(like))
+        # Belege mit passendem Positions-/Artikeltext
+        pos_subq = db.query(InvoicePosition.invoice_id).filter(or_(
+            InvoicePosition.description.ilike(like),
+            InvoicePosition.detail.ilike(like),
+        ))
         q = q.filter(or_(
             Invoice.number.ilike(like),
             Invoice.title.ilike(like),
             Invoice.reference.ilike(like),
+            Invoice.contact_id.in_(entity_subq),   # Suche nach Kontakt
+            Invoice.project_id.in_(entity_subq),    # Suche nach Projekt
+            Invoice.id.in_(pos_subq),               # Suche nach Artikel/Positionstext
         ))
     invoices = q.order_by(Invoice.date.desc(), Invoice.number.desc()).offset(skip).limit(limit).all()
 
@@ -147,6 +161,8 @@ async def list_invoices(
             "currency": inv.currency,
             "status": inv.status,
             "created_at": inv.created_at,
+            "is_recurring_template": inv.is_recurring_template,
+            "recurring_source_id": inv.recurring_source_id,
         })
     return result
 
@@ -786,6 +802,8 @@ async def cancel_invoice(
         db.refresh(credit_note)
         _calc_totals(credit_note)
 
+    db.flush()
+    archive_invoice_pdf(db, inv, "storniert")   # ggf. PDF ins Datacenter archivieren
     db.commit()
     db.refresh(inv)
     return inv
@@ -806,6 +824,8 @@ async def mark_paid(
     inv.paid_at = body.paid_at
     inv.paid_amount = body.paid_amount or inv.total
     inv.updated_by = current_user.email
+    db.flush()
+    archive_invoice_pdf(db, inv, "bezahlt")   # ggf. PDF ins Datacenter archivieren
     db.commit()
     db.refresh(inv)
     return inv
@@ -851,6 +871,10 @@ async def set_status(
 
     inv.status = new_status
     inv.updated_by = current_user.email
+    db.flush()
+    # Archivierung nur für die statusbezogenen Auslöser
+    if new_status in ("gesendet", "angenommen", "abgelehnt"):
+        archive_invoice_pdf(db, inv, new_status)
     db.commit()
     db.refresh(inv)
     return inv
@@ -971,6 +995,209 @@ async def convert_to_invoice(
     db.commit()
     db.refresh(invoice)
     return invoice
+
+
+@router.post("/{invoice_id}/duplicate", response_model=InvoiceResponse)
+async def duplicate_invoice(
+    invoice_id: UUID,
+    body: InvoiceDuplicateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Dupliziert einen Beleg als neuen Entwurf gleicher Belegart.
+    Die zu übernehmenden Bestandteile werden über die Flags im Request gesteuert
+    (Positionen, Texte, Kontakt/Referenz, Anhänge). Nummer wird neu vergeben.
+    """
+    src = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not src:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    year = datetime.now().date().year
+    sequence, number = _next_number(db, src.doc_type, year)
+
+    dup = Invoice(
+        doc_type=src.doc_type,
+        number=number, year=year, sequence=sequence,
+        date=datetime.now().date(),
+        tax_mode=src.tax_mode,
+        currency=src.currency,
+        template_id=src.template_id,
+        status="entwurf",
+        # Kontakt & Referenz optional
+        contact_id=src.contact_id if body.contact else None,
+        project_id=src.project_id if body.contact else None,
+        title=src.title if body.contact else None,
+        reference=src.reference if body.contact else None,
+        # Texte optional
+        intro_text=src.intro_text if body.texts else None,
+        outro_text=src.outro_text if body.texts else None,
+        notes=src.notes if body.texts else None,
+        created_by=current_user.email,
+        updated_by=current_user.email,
+    )
+    db.add(dup)
+    db.flush()
+
+    if body.positions:
+        for p in src.positions:
+            db.add(InvoicePosition(
+                invoice_id=dup.id, sort_order=p.sort_order,
+                pos_type=p.pos_type, description=p.description, detail=p.detail,
+                quantity=p.quantity, unit=p.unit, unit_price=p.unit_price,
+                discount_pct=p.discount_pct, tax_rate=p.tax_rate,
+                article_id=p.article_id, time_entry_id=p.time_entry_id,
+            ))
+
+    if body.attachments:
+        for a in src.attachments:
+            db.add(InvoiceAttachment(
+                invoice_id=dup.id, attach_type=a.attach_type,
+                filename=a.filename, file_path=a.file_path,
+                datacenter_id=a.datacenter_id, url=a.url,
+                mime_type=a.mime_type, file_size=a.file_size,
+            ))
+
+    db.flush()
+    db.refresh(dup)
+    _calc_totals(dup)
+    db.commit()
+    db.refresh(dup)
+    return dup
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Vertrag zu wiederkehrender Rechnung (Nachweis/Referenz zur Serie)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/{invoice_id}/contract", response_model=InvoiceAttachmentResponse)
+async def upload_contract(
+    invoice_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Hinterlegt ein Vertrags-Dokument an einem (wiederkehrenden) Beleg.
+
+    Der Vertrag wird zusätzlich im Datacenter unter dem Kunden im Ordner
+    "Verträge" abgelegt (Dateiname inkl. Belegnummer für den Kontext) und über
+    ``datacenter_id`` mit dem Beleg verknüpft.
+    """
+    from app.services import storage_service
+    from app.models.attachment import Attachment
+    from app.models.masterdata import EntityRecord
+
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    if not inv.contact_id:
+        raise HTTPException(400, "Kein Kontakt am Beleg – der Vertrag kann nicht "
+                                 "unter dem Kunden abgelegt werden. Bitte zuerst einen Kontakt wählen.")
+
+    # Obergrenze für hinterlegte Verträge
+    MAX_CONTRACTS = 10
+    vorhanden = (db.query(InvoiceAttachment)
+                 .filter(InvoiceAttachment.invoice_id == inv.id,
+                         InvoiceAttachment.attach_type == "contract").count())
+    if vorhanden >= MAX_CONTRACTS:
+        raise HTTPException(400, f"Maximal {MAX_CONTRACTS} Verträge je Beleg möglich.")
+
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(400, "Datei zu groß (max. 25 MB)")
+    orig = file.filename or "vertrag.pdf"
+    mimetype = file.content_type or "application/octet-stream"
+    safe_num = (inv.number or "beleg").replace("/", "-")
+
+    # Storage-Key unter Kontakt → Verträge; Belegnummer im Namen für Kontext.
+    # Kurzer Zufalls-Präfix im Storage-Pfad verhindert Überschreiben bei
+    # gleichnamigen Verträgen (Anzeigename bleibt sauber).
+    def _safe(s: str) -> str:
+        return "".join(c for c in s if c.isalnum() or c in "._- ").strip() or "datei"
+    stored_name = f"{safe_num}_{orig}"
+    unique = uuid4().hex[:6]
+    storage_key = f"kontakte/{inv.contact_id}/Vertraege/{unique}_{_safe(stored_name)}"
+    try:
+        storage_service.upload_file(storage_key, data, mimetype, db=db)
+    except Exception as exc:
+        raise HTTPException(500, f"Speicher-Fehler: {exc}")
+
+    rec = db.query(EntityRecord).filter(EntityRecord.id == inv.contact_id).first()
+    contact_name = rec.display_name if rec else None
+
+    # 1) Datacenter-Eintrag unter dem Kunden, Ordner "Verträge"
+    dc = Attachment(
+        entity_type="kontakte", entity_id=inv.contact_id,
+        type="file", storage_key=storage_key,
+        filename=stored_name, filesize=len(data), mimetype=mimetype,
+        display_name=f"Vertrag {inv.number} – {orig}",
+        contact_id=inv.contact_id, contact_name=contact_name,
+        folder="Verträge",
+    )
+    db.add(dc)
+    db.flush()
+
+    # 2) Verknüpfung am Beleg (für Anzeige/Download im Formular)
+    att = InvoiceAttachment(
+        invoice_id=inv.id, attach_type="contract",
+        filename=orig, file_path=storage_key, datacenter_id=dc.id,
+        mime_type=mimetype, file_size=len(data),
+    )
+    db.add(att)
+    db.commit()
+    db.refresh(att)
+    return att
+
+
+@router.get("/contract/{attachment_id}/download")
+async def download_contract(
+    attachment_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Lädt ein bestimmtes hinterlegtes Vertrags-Dokument herunter."""
+    from app.services import storage_service
+    att = db.query(InvoiceAttachment).filter(
+        InvoiceAttachment.id == attachment_id,
+        InvoiceAttachment.attach_type == "contract").first()
+    if not att or not att.file_path:
+        raise HTTPException(404, "Vertrag nicht gefunden")
+    data, mime = storage_service.download_file(att.file_path)
+    return Response(content=data, media_type=mime or att.mime_type or "application/octet-stream",
+                    headers={"Content-Disposition": f'inline; filename="{att.filename or "vertrag"}"'})
+
+
+@router.delete("/contract/{attachment_id}", status_code=204)
+async def delete_contract(
+    attachment_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Entfernt ein hinterlegtes Vertrags-Dokument (Beleg-Verknüpfung + Datacenter)."""
+    from app.services import storage_service
+    from app.models.attachment import Attachment
+    att = db.query(InvoiceAttachment).filter(
+        InvoiceAttachment.id == attachment_id,
+        InvoiceAttachment.attach_type == "contract").first()
+    if not att:
+        raise HTTPException(404, "Vertrag nicht gefunden")
+
+    # Verknüpften Datacenter-Eintrag entfernen
+    if att.datacenter_id:
+        dc = db.query(Attachment).filter(Attachment.id == att.datacenter_id).first()
+        if dc:
+            db.delete(dc)
+
+    # Physische Datei einmal löschen
+    if att.file_path:
+        try:
+            storage_service.delete_file(att.file_path, db=db)
+        except Exception:
+            pass
+    db.delete(att)
+    db.commit()
+    return Response(status_code=204)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1115,6 +1342,10 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
         inv.status = "gesendet"
         inv.updated_by = current_user_email
         db.add(inv)
+
+    # Bei aktiviertem Auslöser PDF ins Datacenter archivieren (E-Mail-Versand)
+    db.flush()
+    archive_invoice_pdf(db, inv, "email")
 
 
 @router.post("/{invoice_id}/send-email")

@@ -8,7 +8,7 @@ import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
   MoreHorizontal, Book, RotateCcw, Mail, MailCheck, MailX,
-  Paperclip, X as XIcon, HardDrive, Upload
+  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat
 } from 'lucide-react'
 
 function fmtDate(d) {
@@ -20,6 +20,8 @@ function fmtEuro(n) {
   return Number(n).toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
+const RECURRING_TAB = '__recurring__'
+
 const DOC_TYPES = [
   { key: '',                     label: 'Alle' },
   { key: 'rechnung',             label: 'Rechnungen' },
@@ -27,6 +29,7 @@ const DOC_TYPES = [
   { key: 'auftragsbestaetigung', label: 'Auftragsbestätigungen' },
   { key: 'gutschrift',           label: 'Gutschriften' },
   { key: 'lieferschein',         label: 'Lieferscheine' },
+  { key: RECURRING_TAB,          label: 'Wiederkehrend' },
 ]
 
 const STATUS_BADGE = {
@@ -61,17 +64,24 @@ export default function InvoicePage() {
   const [cancelDialog, setCancelDialog] = useState(null)
   const [paidDialog, setPaidDialog] = useState(null)
   const [sendDialog, setSendDialog] = useState(null)
+  const [duplicateDialog, setDuplicateDialog] = useState(null)
   const [selected, setSelected] = useState(new Set())
   const [sentStatus, setSentStatus] = useState({}) // id → 'ok' | 'error'
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = {}
-      if (activeTab) params.doc_type = activeTab
-      if (search) params.search = search
-      if (statusFilter) params.status = statusFilter
-      const res = await invoiceApi.list(params)
+      let res
+      if (activeTab === RECURRING_TAB) {
+        // Wiederkehrende Vorlagen (aus Hauptliste ausgeblendet)
+        res = await invoiceApi.listTemplates()
+      } else {
+        const params = {}
+        if (activeTab) params.doc_type = activeTab
+        if (search) params.search = search
+        if (statusFilter) params.status = statusFilter
+        res = await invoiceApi.list(params)
+      }
       setInvoices(res.data)
     } catch { toast.error('Fehler beim Laden') }
     finally { setLoading(false) }
@@ -126,6 +136,15 @@ export default function InvoicePage() {
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
 
+  async function handleDuplicate(invoice, opts) {
+    try {
+      const res = await invoiceApi.duplicate(invoice.id, opts)
+      toast.success(`Dupliziert als ${res.data.number}`)
+      setDuplicateDialog(null)
+      navigate(`/invoices/${res.data.id}/edit`)
+    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
+  }
+
   function toggleSelect(id) {
     setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
@@ -172,7 +191,7 @@ export default function InvoicePage() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
         <div className="relative flex-1 sm:max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nummer, Titel, Referenz…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nummer, Titel, Kontakt, Artikel, Projekt…"
             className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300" />
         </div>
         <div className="flex items-center gap-3">
@@ -221,13 +240,19 @@ export default function InvoicePage() {
             <tbody className="divide-y divide-neutral-50">
               {invoices.map(inv => (
                 <tr key={inv.id}
-                  className={`hover:bg-neutral-50 cursor-pointer ${selected.has(inv.id) ? 'bg-blue-50' : ''}`}
+                  className={`hover:bg-neutral-50 cursor-pointer ${selected.has(inv.id) ? 'bg-blue-50' : ((inv.recurring_source_id || inv.is_recurring_template) ? 'bg-violet-50' : '')}`}
                   onClick={() => navigate(`/invoices/${inv.id}`)}>
                   <td className="px-3 py-3" onClick={e => { e.stopPropagation(); toggleSelect(inv.id) }}>
                     <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggleSelect(inv.id)} className="w-4 h-4 rounded cursor-pointer" />
                   </td>
                   <td className="px-4 py-3"><DocTypeBadge type={inv.doc_type} /></td>
-                  <td className="px-4 py-3 font-mono font-medium text-neutral-800 whitespace-nowrap">{inv.number}</td>
+                  <td className="px-4 py-3 font-mono font-medium text-neutral-800 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      {inv.recurring_source_id && <Repeat size={13} className="text-violet-500 shrink-0" title="Automatisch aus wiederkehrender Vorlage erzeugt" />}
+                      {inv.is_recurring_template && <Repeat size={13} className="text-violet-600 shrink-0" title="Wiederkehrende Vorlage" />}
+                      {inv.number}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-neutral-600 hidden md:table-cell whitespace-nowrap">{fmtDate(inv.date)}</td>
                   <td className="px-4 py-3 text-neutral-600 hidden md:table-cell whitespace-nowrap">
                     {inv.due_date ? (
@@ -271,6 +296,7 @@ export default function InvoicePage() {
                           onSend={() => { setActionMenu(null); setSendDialog({ invoices: [inv], mode: 'single' }) }}
                           onCancel={() => { setActionMenu(null); setCancelDialog(inv) }}
                           onPaid={() => { setActionMenu(null); setPaidDialog(inv) }}
+                          onDuplicate={() => { setActionMenu(null); setDuplicateDialog(inv) }}
                           onDelete={() => { setActionMenu(null); handleDelete(inv) }}
                           onEdit={() => navigate(`/invoices/${inv.id}/edit`)} />
                       )}
@@ -303,11 +329,15 @@ export default function InvoicePage() {
         <PaidDialog invoice={paidDialog} onClose={() => setPaidDialog(null)}
           onConfirm={paidAt => handleMarkPaid(paidDialog, paidAt)} />
       )}
+      {duplicateDialog && (
+        <DuplicateDialog invoice={duplicateDialog} onClose={() => setDuplicateDialog(null)}
+          onConfirm={opts => handleDuplicate(duplicateDialog, opts)} />
+      )}
     </div>
   )
 }
 
-function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, onConvertToInvoice, onSend, onCancel, onPaid, onDelete, onEdit }) {
+function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, onConvertToInvoice, onSend, onCancel, onPaid, onDuplicate, onDelete, onEdit }) {
   const menuRef = useRef(null)
   const MENU_WIDTH = 224 // w-56 = 14rem = 224px
 
@@ -342,6 +372,9 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
     <div ref={menuRef} style={style} className="bg-white border border-neutral-200 rounded-lg shadow-lg py-1">
       <button onClick={onEdit} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
         <Eye size={14} /> Öffnen / Bearbeiten
+      </button>
+      <button onClick={onDuplicate} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
+        <Copy size={14} /> Duplizieren
       </button>
       <div className="border-t border-neutral-100 my-1" />
 
@@ -454,6 +487,39 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
           <button onClick={() => onConfirm(paidAt)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Speichern</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DuplicateDialog({ invoice, onClose, onConfirm }) {
+  const [opts, setOpts] = useState({ positions: true, texts: true, contact: true, attachments: false })
+  const toggle = k => setOpts(o => ({ ...o, [k]: !o[k] }))
+  const rows = [
+    { key: 'positions',   label: 'Positionen',                desc: 'Alle Positionszeilen übernehmen' },
+    { key: 'texts',       label: 'Einleitungs-/Schlusstext',  desc: 'Einleitung, Schlusstext und Notizen' },
+    { key: 'contact',     label: 'Kontakt & Referenz',        desc: 'Empfänger, Projekt, Titel und Referenz' },
+    { key: 'attachments', label: 'Anhänge',                   desc: 'Datei-Anhänge des Belegs mitkopieren' },
+  ]
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+        <h2 className="text-base font-semibold mb-1">Beleg duplizieren</h2>
+        <p className="text-sm text-neutral-500 mb-4">{invoice.number} — es entsteht ein neuer Entwurf mit eigener Nummer.</p>
+        <div className="space-y-2 mb-6">
+          {rows.map(r => (
+            <label key={r.key} className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-neutral-50">
+              <input type="checkbox" checked={opts[r.key]} onChange={() => toggle(r.key)} className="mt-0.5 w-4 h-4 rounded" />
+              <div><p className="text-sm font-medium">{r.label}</p><p className="text-xs text-neutral-500">{r.desc}</p></div>
+            </label>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
+          <button onClick={() => onConfirm(opts)} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-1.5">
+            <Copy size={15} /> Duplizieren
+          </button>
         </div>
       </div>
     </div>

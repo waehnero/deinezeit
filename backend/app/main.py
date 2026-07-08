@@ -99,6 +99,12 @@ async def startup_event():
         start_background_scanner()
     except Exception as e:
         print(f"[WARN] Mail-Scanner konnte nicht gestartet werden: {e}")
+    # Wiederkehrende Rechnungen automatisch als Entwurf erzeugen; in Tests deaktiviert
+    try:
+        from app.services.recurring_service import start_recurring_worker
+        start_recurring_worker()
+    except Exception as e:
+        print(f"[WARN] Wiederkehr-Worker konnte nicht gestartet werden: {e}")
 
 
 @app.get("/api/health")
