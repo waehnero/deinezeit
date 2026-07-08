@@ -137,7 +137,7 @@ export default function InvoicePage() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Belege</h1>
+          <h1 className="text-xl font-semibold text-neutral-900">Verkauf</h1>
           <p className="text-sm text-neutral-500 mt-0.5">Rechnungen · Angebote · Auftragsbestätigungen · Gutschriften · Lieferscheine</p>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -150,7 +150,7 @@ export default function InvoicePage() {
           <div className="flex items-center gap-2">
             <button onClick={() => navigate('/invoices/book')}
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-              <Book size={15} /> Belegbuch
+              <Book size={15} /> Verkaufsbuch
             </button>
             <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">

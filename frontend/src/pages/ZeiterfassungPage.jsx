@@ -5,11 +5,13 @@ import toast from 'react-hot-toast'
 import {
   Play, Square, Plus, Trash2, Search, ChevronLeft, ChevronRight,
   Clock, Loader2, X, Check, Settings2, Timer, Euro,
-  PauseCircle, RefreshCw, FileText
+  PauseCircle, RefreshCw, FileText, AlertTriangle
 } from 'lucide-react'
 import BerichtDialog from '../components/BerichtDialog'
 import AttachmentPanel from '../components/AttachmentPanel'
 import AttachmentQuickBar from '../components/AttachmentQuickBar'
+import RecordModal from '../components/RecordModal'
+import { fmtBudgetMinutes } from '../components/StundenkontenPanel'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 function fmtMinutes(min) {
@@ -55,12 +57,38 @@ function calcDuration(startedAt, endedAt, pauseMin) {
   return Math.max(0, Math.round(delta) - (pauseMin || 0))
 }
 
-// ── Projekt-Suche ─────────────────────────────────────────────────────────────
-function ProjectSearch({ value, onChange, disabled, placeholder = 'Projekt suchen…' }) {
+// ── Budget-Badge (Restwert der Budget-Stunden) ────────────────────────────────
+function BudgetBadge({ budget }) {
+  if (!budget || !budget.has_budget) return null
+  if (budget.exhausted) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600 border border-red-200 whitespace-nowrap"
+        title="Budget verbraucht – dem Kunden ein neues Stundenkonto anbieten">
+        <AlertTriangle size={10} />
+        Rest {fmtBudgetMinutes(budget.remaining_minutes)} h
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 whitespace-nowrap">
+      Rest {fmtBudgetMinutes(budget.remaining_minutes)} h
+    </span>
+  )
+}
+
+// ── Projektzeit-Suche ─────────────────────────────────────────────────────────
+// Sucht in den Stammdaten-Projektzeiten. Wird der eingegebene Name nicht
+// gefunden, kann die Projektzeit direkt über den Stammdaten-Anlegedialog
+// angelegt werden – danach ist sie sofort ausgewählt.
+function ProjectSearch({ value, onChange, disabled, placeholder = 'Projektzeitname suchen…' }) {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState([])
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [budgets, setBudgets] = useState({})          // { [projectId]: ProjectBudget }
+  const [selectedBudget, setSelectedBudget] = useState(null)
+  const [createType, setCreateType] = useState(null)  // EntityType 'projektzeiten' für den Anlegedialog
+  const [createName, setCreateName] = useState('')
   const ref = useRef(null)
 
   useEffect(() => {
@@ -75,36 +103,107 @@ function ProjectSearch({ value, onChange, disabled, placeholder = 'Projekt suche
       setLoading(true)
       try {
         const res = await masterdataApi.listRecords('projektzeiten', { search: search || undefined, page_size: 20 })
-        setResults(res.data.items.map(r => ({
+        const items = res.data.items.map(r => ({
           id: r.id,
           name: r.display_name,
           contactName: r.data?.kontakt?.display_name || r.data?.kunde?.display_name || '',
-        })))
+        }))
+        setResults(items)
+        // Rest-Budgets für die Vorschläge nachladen (Zusatzinfo, nicht blockierend)
+        if (items.length) {
+          zeiterfassungApi.getBudgets(items.map(i => i.id))
+            .then(b => setBudgets(Object.fromEntries(b.data.map(x => [x.project_id, x]))))
+            .catch(() => {})
+        }
       } catch { setResults([]) }
       finally { setLoading(false) }
     }, 200)
     return () => clearTimeout(t)
   }, [search, isOpen])
 
+  // Budget-Stand des ausgewählten Projekts laden
+  useEffect(() => {
+    if (!value?.projectId) { setSelectedBudget(null); return }
+    zeiterfassungApi.getBudgets([value.projectId])
+      .then(b => setSelectedBudget(b.data[0] || null))
+      .catch(() => setSelectedBudget(null))
+  }, [value?.projectId])
+
   const handleSelect = (item) => {
     onChange({ projectId: item.id, projectName: item.name, contactName: item.contactName })
     setIsOpen(false); setSearch('')
   }
 
+  // Anlegedialog der Stammdaten-Projektzeiten öffnen (mit vorbefülltem Namen)
+  const openCreate = async () => {
+    try {
+      const res = await masterdataApi.getType('projektzeiten')
+      setCreateName(search.trim())
+      setCreateType(res.data)
+      setIsOpen(false)
+    } catch {
+      toast.error('Stammdaten-Typ „Projektzeiten" nicht gefunden')
+    }
+  }
+
+  // Vorbefüllung: eingegebener Name ins erste Textfeld des Typs
+  const createInitialValues = () => {
+    if (!createType || !createName) return null
+    const firstText = [...createType.fields]
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .find(f => f.field_type === 'text')
+    return firstText ? { [firstText.key]: createName } : null
+  }
+
+  const handleCreated = (record) => {
+    onChange({
+      projectId: record.id,
+      projectName: record.display_name || createName,
+      contactName: record.data?.kontakt?.display_name || record.data?.kunde?.display_name || '',
+    })
+    setCreateType(null)
+    setSearch('')
+  }
+
   const base = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition disabled:bg-gray-50"
+
+  // Exakter Treffer vorhanden? Sonst Anlegen anbieten
+  const term = search.trim()
+  const hasExactMatch = results.some(r => (r.name || '').toLowerCase() === term.toLowerCase())
+
+  const createOption = term && !loading && !hasExactMatch && (
+    <div className="border-t border-gray-100 px-3 py-2.5 bg-gray-50">
+      <p className="text-xs text-gray-500 mb-1.5">
+        „{term}" ist in den Stammdaten-Projektzeiten nicht angelegt. Jetzt anlegen?
+      </p>
+      <button type="button" onClick={openCreate}
+        className="flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 transition">
+        <Plus size={13} /> „{term}" als Projektzeit anlegen
+      </button>
+    </div>
+  )
 
   if (value?.projectId) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-primary-50 border-primary-200">
-        <span className="text-sm text-primary-800 flex-1">
-          {value.contactName && <span className="text-primary-400">{value.contactName} / </span>}
-          <span className="font-medium">{value.projectName}</span>
-        </span>
-        {!disabled && (
-          <button type="button" onClick={() => onChange({ projectId: null, projectName: '', contactName: '' })}
-            className="text-primary-400 hover:text-red-500 transition">
-            <X size={13} />
-          </button>
+      <div>
+        <div className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-primary-50 border-primary-200">
+          <span className="text-sm text-primary-800 flex-1 min-w-0 truncate">
+            {value.contactName && <span className="text-primary-400">{value.contactName} / </span>}
+            <span className="font-medium">{value.projectName}</span>
+          </span>
+          <BudgetBadge budget={selectedBudget} />
+          {!disabled && (
+            <button type="button" onClick={() => onChange({ projectId: null, projectName: '', contactName: '' })}
+              className="text-primary-400 hover:text-red-500 transition">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        {selectedBudget?.exhausted && (
+          <p className="flex items-center gap-1.5 text-xs text-red-600 mt-1">
+            <AlertTriangle size={12} className="flex-shrink-0" />
+            Budget verbraucht – dem Kunden ein neues Stundenkonto anbieten.
+          </p>
         )}
       </div>
     )
@@ -123,23 +222,43 @@ function ProjectSearch({ value, onChange, disabled, placeholder = 'Projekt suche
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 overflow-hidden">
           {results.length > 0 ? (
-            <ul className="max-h-52 overflow-y-auto">
-              {results.map(item => (
-                <li key={item.id}>
-                  <button type="button" onClick={() => handleSelect(item)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition flex flex-col">
-                    <span className="font-medium text-gray-800">{item.name}</span>
-                    {item.contactName && <span className="text-xs text-gray-400">{item.contactName}</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="max-h-52 overflow-y-auto">
+                {results.map(item => (
+                  <li key={item.id}>
+                    <button type="button" onClick={() => handleSelect(item)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition flex items-center gap-2">
+                      <span className="flex flex-col flex-1 min-w-0">
+                        <span className="font-medium text-gray-800 truncate">{item.name}</span>
+                        {item.contactName && <span className="text-xs text-gray-400 truncate">{item.contactName}</span>}
+                      </span>
+                      <BudgetBadge budget={budgets[item.id]} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {createOption}
+            </>
           ) : (
-            <div className="px-4 py-3 text-sm text-gray-400 text-center">
-              {loading ? 'Suche…' : search ? 'Keine Projekte gefunden' : 'Projektnamen eingeben…'}
-            </div>
+            <>
+              <div className="px-4 py-3 text-sm text-gray-400 text-center">
+                {loading ? 'Suche…' : term ? 'Keine Projektzeit gefunden' : 'Projektzeitnamen eingeben…'}
+              </div>
+              {createOption}
+            </>
           )}
         </div>
+      )}
+
+      {/* Anlegedialog aus den Stammdaten (Projektzeiten) */}
+      {createType && (
+        <RecordModal
+          entityType={createType}
+          record={null}
+          initialValues={createInitialValues()}
+          onClose={() => setCreateType(null)}
+          onSaved={handleCreated}
+        />
       )}
     </div>
   )
@@ -185,10 +304,10 @@ function RunningTimerCard({ entry, onStop, onPause, onSwitch, onDelete, onUpdate
             </div>
           </div>
 
-          {/* Linke Spalte: Aufgabe + Notiz */}
+          {/* Linke Spalte: Projektzeitname + Notiz */}
           <div className="flex-1 min-w-0 grid grid-cols-1 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Aufgabe</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Projektzeitname</label>
               <ProjectSearch value={project} onChange={setProject} />
             </div>
             <div>
@@ -304,13 +423,13 @@ function StartTimerCard({ onStart }) {
     }
   }
 
-  // Für Anhänge ohne laufenden Timer: Aufgabe ist Pflicht, dann sofort starten.
+  // Für Anhänge ohne laufenden Timer: Projektzeit ist Pflicht, dann sofort starten.
   // Optional werden Dateien mitgegeben (Upload-Button): Diese werden NACH dem
   // Start in der stabilen Elternseite hochgeladen, damit das Re-Render (Timer
   // startet, Karte wird ausgetauscht) den Upload nicht abbricht.
   const ensureEntity = async (files = null) => {
     if (!project.projectId) {
-      toast.error('Bitte zuerst eine Aufgabe wählen')
+      toast.error('Bitte zuerst eine Projektzeit wählen')
       return files ? false : null
     }
     try {
@@ -334,7 +453,7 @@ function StartTimerCard({ onStart }) {
 
           <div className="flex-1 min-w-0 grid grid-cols-1 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Aufgabe</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Projektzeitname</label>
               <ProjectSearch value={project} onChange={setProject} />
             </div>
             <div>
@@ -487,7 +606,7 @@ function EntryModal({ entry, onClose, onSaved }) {
     if (createdEntry) return files ? await uploadTo(createdEntry.id) : createdEntry.id
     if (isEdit)       return files ? await uploadTo(entry.id)        : entry.id
     if (!project.projectId) {
-      toast.error('Bitte zuerst ein Projekt wählen')
+      toast.error('Bitte zuerst eine Projektzeit wählen')
       return files ? false : null
     }
     if (!startedAt) {
@@ -543,7 +662,7 @@ function EntryModal({ entry, onClose, onSaved }) {
         </div>
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Projekt</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Projektzeitname</label>
             <ProjectSearch value={project} onChange={setProject} />
           </div>
           <div className="sm:col-span-2">

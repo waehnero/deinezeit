@@ -8,12 +8,14 @@ from datetime import datetime, timezone, timedelta
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User
-from app.models.zeiterfassung import TimeEntry, TimeEntryField
+from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
+from app.models.masterdata import EntityRecord
 from app.schemas.zeiterfassung import (
     TimeEntryFieldCreate, TimeEntryFieldUpdate, TimeEntryFieldResponse,
     UpdateTimeEntryFieldSortOrders,
     TimeEntryCreate, TimeEntryUpdate, TimeEntryStop,
     TimeEntryResponse, TimeEntryListResponse, TimeStats,
+    StundenkontoCreate, StundenkontoUpdate, StundenkontoResponse, ProjectBudget,
 )
 
 router = APIRouter(prefix="/zeiterfassung", tags=["Zeiterfassung"])
@@ -288,6 +290,140 @@ async def delete_entry(
     db.delete(entry)
     db.commit()
     return {"message": "Zeiteintrag gelöscht"}
+
+
+# ── Stundenkonten / Projekt-Budget ────────────────────────────────────────────
+
+def _compute_budget(db: Session, project_id: UUID) -> ProjectBudget:
+    """Budget-Stand einer Projektzeit berechnen.
+
+    Budget   = Summe aller Stundenkonten (vom Kunden vorab erworben).
+    Verbrauch = verrechenbare, abgeschlossene Zeiteinträge auf dem Projekt.
+    """
+    total_stunden, konten_count = db.query(
+        func.coalesce(func.sum(Stundenkonto.stunden), 0),
+        func.count(Stundenkonto.id),
+    ).filter(Stundenkonto.project_id == project_id).one()
+
+    budget_minutes = int(round(float(total_stunden) * 60))
+
+    consumed = 0
+    entries = db.query(TimeEntry).filter(
+        TimeEntry.project_id == project_id,
+        TimeEntry.billable == True,
+        TimeEntry.ended_at.isnot(None),
+    ).all()
+    for e in entries:
+        delta = (e.ended_at - e.started_at).total_seconds() / 60
+        consumed += max(0, int(delta) - e.pause_minutes)
+
+    has_budget = konten_count > 0
+    remaining = budget_minutes - consumed
+    return ProjectBudget(
+        project_id=project_id,
+        has_budget=has_budget,
+        budget_minutes=budget_minutes,
+        consumed_minutes=consumed,
+        remaining_minutes=remaining if has_budget else 0,
+        exhausted=has_budget and remaining <= 0,
+        konten_count=konten_count,
+    )
+
+
+@router.get("/projekte/{project_id}/stundenkonten", response_model=List[StundenkontoResponse])
+async def list_stundenkonten(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Alle Stundenkonten (erworbene Stundenpakete) einer Projektzeit."""
+    return (
+        db.query(Stundenkonto)
+        .filter(Stundenkonto.project_id == project_id)
+        .order_by(Stundenkonto.erworben_am.desc(), Stundenkonto.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/projekte/{project_id}/stundenkonten", response_model=StundenkontoResponse)
+async def create_stundenkonto(
+    project_id: UUID,
+    body: StundenkontoCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Neues Stundenkonto für eine Projektzeit erfassen (Kunde hat Stunden erworben)."""
+    record = db.query(EntityRecord).filter(EntityRecord.id == project_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Projektzeit nicht gefunden")
+
+    konto = Stundenkonto(
+        project_id=project_id,
+        created_by=current_user.id,
+        **body.model_dump(),
+    )
+    db.add(konto)
+    db.commit()
+    db.refresh(konto)
+    return konto
+
+
+@router.put("/stundenkonten/{konto_id}", response_model=StundenkontoResponse)
+async def update_stundenkonto(
+    konto_id: UUID,
+    body: StundenkontoUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    konto = db.query(Stundenkonto).filter(Stundenkonto.id == konto_id).first()
+    if not konto:
+        raise HTTPException(status_code=404, detail="Stundenkonto nicht gefunden")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(konto, k, v)
+    konto.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(konto)
+    return konto
+
+
+@router.delete("/stundenkonten/{konto_id}")
+async def delete_stundenkonto(
+    konto_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    konto = db.query(Stundenkonto).filter(Stundenkonto.id == konto_id).first()
+    if not konto:
+        raise HTTPException(status_code=404, detail="Stundenkonto nicht gefunden")
+    db.delete(konto)
+    db.commit()
+    return {"message": "Stundenkonto gelöscht"}
+
+
+@router.get("/budgets", response_model=List[ProjectBudget])
+async def get_budgets(
+    project_ids: str = Query(..., description="Komma-getrennte Projektzeit-IDs"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Budget-Stand (Budget / Verbrauch / Rest) für eine oder mehrere Projektzeiten.
+
+    Verbraucht wird das Budget nur durch verrechenbare Zeiteinträge.
+    exhausted=True bedeutet: Budget aufgebraucht → dem Kunden ein neues
+    Stundenkonto anbieten.
+    """
+    ids: List[UUID] = []
+    for part in project_ids.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            ids.append(UUID(part))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Ungültige Projekt-ID: {part}")
+    if len(ids) > 200:
+        raise HTTPException(status_code=400, detail="Maximal 200 Projekt-IDs pro Abfrage")
+    return [_compute_budget(db, pid) for pid in ids]
 
 
 # ── Statistik ─────────────────────────────────────────────────────────────────

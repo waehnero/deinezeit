@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { to: '/zeiterfassung',icon: Clock,           label: 'Zeiterfassung' },
   { to: '/aufgaben',     icon: ListTodo,        label: 'Aufgaben' },
   { to: '/projekte',     icon: GanttChartSquare, label: 'Projekte' },
-  { to: '/invoices',     icon: Receipt,         label: 'Belege' },
+  { to: '/invoices',     icon: Receipt,         label: 'Verkauf' },
   { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },
   { to: '/datacenter',   icon: HardDrive,       label: 'Datacenter' },
 ]

@@ -98,6 +98,13 @@ export const zeiterfassungApi = {
 
   // Statistik
   getStats: (userId) => api.get('/zeiterfassung/stats', { params: userId ? { user_id: userId } : {} }),
+
+  // Stundenkonten / Projekt-Budgets
+  listStundenkonten: (projectId) => api.get(`/zeiterfassung/projekte/${projectId}/stundenkonten`),
+  createStundenkonto: (projectId, data) => api.post(`/zeiterfassung/projekte/${projectId}/stundenkonten`, data),
+  updateStundenkonto: (id, data) => api.put(`/zeiterfassung/stundenkonten/${id}`, data),
+  deleteStundenkonto: (id) => api.delete(`/zeiterfassung/stundenkonten/${id}`),
+  getBudgets: (projectIds) => api.get('/zeiterfassung/budgets', { params: { project_ids: projectIds.join(',') } }),
 }
 
 export const reportsApi = {

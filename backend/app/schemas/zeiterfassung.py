@@ -1,7 +1,8 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Any, Dict
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 
 
 # ── Custom-Felder ─────────────────────────────────────────────────────────────
@@ -124,3 +125,46 @@ class TimeStats(BaseModel):
     today_target_minutes: int    # Soll-Stunden (Standard: 8h)
     week_target_minutes: int     # Soll-Stunden (Standard: 40h)
     month_target_minutes: int    # Soll-Stunden (Standard: 160h)
+
+
+# ── Stundenkonten / Projekt-Budget ────────────────────────────────────────────
+
+class StundenkontoCreate(BaseModel):
+    bezeichnung: Optional[str] = None
+    stunden: Decimal = Field(gt=0)          # erworbene Stunden
+    preis: Optional[Decimal] = None         # optionaler Kaufpreis (netto)
+    erworben_am: date
+    notiz: Optional[str] = None
+
+
+class StundenkontoUpdate(BaseModel):
+    bezeichnung: Optional[str] = None
+    stunden: Optional[Decimal] = Field(default=None, gt=0)
+    preis: Optional[Decimal] = None
+    erworben_am: Optional[date] = None
+    notiz: Optional[str] = None
+
+
+class StundenkontoResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    project_id: UUID
+    bezeichnung: Optional[str] = None
+    stunden: Decimal
+    preis: Optional[Decimal] = None
+    erworben_am: date
+    notiz: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProjectBudget(BaseModel):
+    """Budget-Stand einer Projektzeit (Budget = Summe der Stundenkonten,
+    Verbrauch = verrechenbare Zeiteinträge)."""
+    project_id: UUID
+    has_budget: bool                 # False = keine Stundenkonten erfasst
+    budget_minutes: int              # Summe erworbener Stunden in Minuten
+    consumed_minutes: int            # verbraucht (nur verrechenbar, abgeschlossene Einträge)
+    remaining_minutes: int           # Rest (kann negativ werden)
+    exhausted: bool                  # True = Budget aufgebraucht → neues Stundenkonto anbieten
+    konten_count: int

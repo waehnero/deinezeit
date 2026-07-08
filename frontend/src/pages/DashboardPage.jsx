@@ -388,7 +388,7 @@ const QUICK_LINKS = [
   { key: 'zeiterfassung', label: 'Zeiterfassung',        sub: 'Zeiten erfassen und auswerten',  path: '/zeiterfassung', icon: Clock },
   { key: 'aufgaben',      label: 'Aufgaben',             sub: 'Zentrale To-do-Liste',           path: '/aufgaben',      icon: CheckSquare },
   { key: 'projekte',      label: 'Projekte',             sub: 'Projektplanung und Aufgaben',    path: '/projekte',      icon: GanttChartSquare },
-  { key: 'invoices',      label: 'Belege',               sub: 'Rechnungen, Angebote, Belege',   path: '/invoices',      icon: FileText },
+  { key: 'invoices',      label: 'Verkauf',              sub: 'Rechnungen, Angebote, Belege',   path: '/invoices',      icon: FileText },
   { key: 'masterdata',    label: 'Stammdaten verwalten', sub: 'Typen und Felder konfigurieren', path: '/masterdata',    icon: Database },
   { key: 'datacenter',    label: 'Datacenter',           sub: 'Dateien und Anhänge',            path: '/datacenter',    icon: FolderOpen },
   { key: 'users',         label: 'Benutzer',             sub: 'Benutzer verwalten',             path: '/users',         icon: Database },

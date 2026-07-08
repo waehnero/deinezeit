@@ -1469,7 +1469,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         invoiceApi.updateSetting('kleinunternehmer_text', kleinunternehmerText),
         showCustomEditor && invoiceApi.updateSetting('custom_template_css', customCss),
       ].filter(Boolean))
-      toast.success('Belegeinstellungen gespeichert')
+      toast.success('Verkaufseinstellungen gespeichert')
     } catch { toast.error('Fehler beim Speichern') }
     finally { setSaving(false) }
   }
@@ -1826,7 +1826,7 @@ function TabAllgemeinWrapper({ settings, onSaved }) {
 function TabParameter() {
   const [sub, setSub] = useState('belege')
   const subTabs = [
-    { id: 'belege',        label: 'Belegeinstellungen' },
+    { id: 'belege',        label: 'Verkaufseinstellungen' },
     { id: 'nummern',       label: 'Belegnummern'       },
     { id: 'konten',        label: 'Kontenplan (EKR)'   },
     { id: 'emailvorlagen', label: 'E-Mail-Vorlagen'    },
