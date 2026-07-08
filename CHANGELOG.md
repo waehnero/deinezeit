@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.18] – 2026-07-08 – Zeiterfassung
+
+### Aktualisierungen
+- Zeiterfassung
+
+---
+
 ## [1.12.17] – 2026-07-06 – Einstellungen
 
 ### Aktualisierungen

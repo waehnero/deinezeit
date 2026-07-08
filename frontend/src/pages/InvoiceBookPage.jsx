@@ -114,7 +114,7 @@ export default function InvoiceBookPage() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-neutral-900">Belegbuch</h1>
+            <h1 className="text-xl font-semibold text-neutral-900">Verkaufsbuch</h1>
             <p className="text-sm text-neutral-500 mt-0.5">Übersicht aller Belege nach Zeitraum</p>
           </div>
         </div>

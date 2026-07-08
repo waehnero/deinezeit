@@ -1,102 +1,39 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { masterdataApi } from '../services/api'
+import { masterdataApi, zeiterfassungApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import GridFieldBuilder from '../components/GridFieldBuilder'
-import DynamicForm from '../components/DynamicForm'
-import AttachmentPanel from '../components/AttachmentPanel'
+import RecordModal from '../components/RecordModal'
+import { fmtBudgetMinutes } from '../components/StundenkontenPanel'
 import {
-  Plus, Search, ArrowLeft, Trash2, Pencil, X,
+  Plus, Search, ArrowLeft, Trash2, Pencil,
   Loader2, Database, ChevronLeft, ChevronRight,
-  SlidersHorizontal
+  AlertTriangle
 } from 'lucide-react'
 import { CsvExportButton, CsvImportButton } from '../components/CsvImportExport'
 
-// ── Datensatz-Formular Modal ───────────────────────────────────────────────────
-function RecordModal({ entityType, record, onClose, onSaved }) {
-  const isEdit = !!record
-  const [values, setValues] = useState(record?.data || {})
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    try {
-      let res
-      if (isEdit) {
-        res = await masterdataApi.updateRecord(entityType.slug, record.id, values)
-        toast.success('Datensatz aktualisiert')
-      } else {
-        res = await masterdataApi.createRecord(entityType.slug, values)
-        toast.success('Datensatz angelegt')
-      }
-      onSaved(res.data)
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Fehler beim Speichern')
-    } finally {
-      setLoading(false)
-    }
+// ── Rest-Budget-Zelle (nur Projektzeiten) ─────────────────────────────────────
+function BudgetCell({ budget }) {
+  if (!budget || !budget.has_budget) return <span className="text-gray-300">—</span>
+  if (budget.exhausted) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 border border-red-200"
+        title="Budget verbraucht – dem Kunden ein neues Stundenkonto anbieten">
+        <AlertTriangle size={11} />
+        {fmtBudgetMinutes(budget.remaining_minutes)} h
+      </span>
+    )
   }
-
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">
-            {isEdit ? 'Datensatz bearbeiten' : `Neuen ${entityType.name.replace(/en$/, '').replace(/s$/, '')} anlegen`}
-          </h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Formular */}
-        <form onSubmit={handleSubmit}>
-          <div className="p-5">
-            {entityType.fields.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <Database size={32} className="mx-auto mb-2 text-gray-200" />
-                <p className="text-sm">Noch keine Felder definiert.</p>
-                <p className="text-sm">Klicken Sie auf „Felder verwalten" um Felder hinzuzufügen.</p>
-              </div>
-            ) : (
-              <DynamicForm
-                fields={entityType.fields}
-                tabs={entityType.tabs || []}
-                values={values}
-                onChange={setValues}
-              />
-            )}
-          </div>
-
-          <div className="flex gap-3 p-5 border-t border-gray-100">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium transition">
-              Abbrechen
-            </button>
-            <button type="submit" disabled={loading || entityType.fields.length === 0}
-              className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition flex items-center justify-center gap-2">
-              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-              {isEdit ? 'Speichern' : 'Anlegen'}
-            </button>
-          </div>
-        </form>
-
-        {/* Anhänge – nur bei bestehenden Datensätzen */}
-        {isEdit && (
-          <div className="px-5 pb-5 border-t border-gray-100">
-            <AttachmentPanel entityType={entityType.slug} entityId={record.id} />
-          </div>
-        )}
-      </div>
-    </div>
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+      {fmtBudgetMinutes(budget.remaining_minutes)} h
+    </span>
   )
 }
 
 // ── Datensatz-Zeile in der Tabelle ────────────────────────────────────────────
-function RecordRow({ record, fields, onEdit, onDelete }) {
+function RecordRow({ record, fields, onEdit, onDelete, budget = undefined, showBudget = false }) {
   const listFields = fields.filter(f => f.show_in_list).slice(0, 5)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -127,6 +64,11 @@ function RecordRow({ record, fields, onEdit, onDelete }) {
           {formatValue(field, record.data[field.key])}
         </td>
       ))}
+      {showBudget && (
+        <td className="px-4 py-3 whitespace-nowrap">
+          <BudgetCell budget={budget} />
+        </td>
+      )}
       <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
         {new Date(record.updated_at).toLocaleDateString('de-AT')}
       </td>
@@ -167,6 +109,18 @@ export default function MasterDataDetail() {
 
   const [modalRecord, setModalRecord] = useState(undefined) // undefined=geschlossen, null=neu, obj=bearbeiten
   const [typFilter, setTypFilter] = useState('') // nur bei slug === 'kontakte' genutzt
+  const [budgets, setBudgets] = useState({}) // nur bei slug === 'projektzeiten': { [recordId]: ProjectBudget }
+
+  const isProjektzeiten = slug === 'projektzeiten'
+
+  // Rest-Budgets für die sichtbaren Projektzeiten laden
+  const loadBudgets = useCallback(async (items) => {
+    if (!isProjektzeiten || !items?.length) return
+    try {
+      const res = await zeiterfassungApi.getBudgets(items.map(r => r.id))
+      setBudgets(Object.fromEntries(res.data.map(b => [b.project_id, b])))
+    } catch { /* Budgets sind Zusatzinfo – Fehler nicht blockierend */ }
+  }, [isProjektzeiten])
 
   const loadType = useCallback(async () => {
     try {
@@ -189,6 +143,7 @@ export default function MasterDataDetail() {
       })
       setRecords(res.data.items)
       setTotal(res.data.total)
+      loadBudgets(res.data.items)
     } catch {
       toast.error('Datensätze konnten nicht geladen werden')
     } finally {
@@ -207,6 +162,8 @@ export default function MasterDataDetail() {
       setTotal(total + 1)
     }
     setModalRecord(undefined)
+    // Budgets können sich durch Stundenkonto-Änderungen im Modal geändert haben
+    if (isProjektzeiten) loadBudgets(modalRecord ? records : [saved, ...records])
   }
 
   const handleDelete = async (record) => {
@@ -340,6 +297,11 @@ export default function MasterDataDetail() {
                       {f.name}
                     </th>
                   ))}
+                  {isProjektzeiten && (
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Stundenkonto
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Geändert
                   </th>
@@ -354,6 +316,8 @@ export default function MasterDataDetail() {
                     fields={entityType.fields}
                     onEdit={(r) => setModalRecord(r)}
                     onDelete={handleDelete}
+                    showBudget={isProjektzeiten}
+                    budget={budgets[record.id]}
                   />
                 ))}
               </tbody>
@@ -386,7 +350,11 @@ export default function MasterDataDetail() {
         <RecordModal
           entityType={entityType}
           record={modalRecord}
-          onClose={() => setModalRecord(undefined)}
+          onClose={() => {
+            setModalRecord(undefined)
+            // Stundenkonten könnten im Modal geändert worden sein → Restwerte aktualisieren
+            if (isProjektzeiten) loadBudgets(records)
+          }}
           onSaved={handleSaved}
         />
       )}

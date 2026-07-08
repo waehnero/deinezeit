@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, Text, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Numeric, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -82,3 +82,34 @@ class TimeEntry(Base):
             return 0
         delta = self.ended_at - self.started_at
         return max(0, int(delta.total_seconds() / 60) - self.pause_minutes)
+
+
+class Stundenkonto(Base):
+    """
+    Vom Kunden im Voraus erworbenes Stundenpaket für eine Projektzeit
+    (EntityRecord vom Typ 'projektzeiten').
+
+    Das verfügbare Budget einer Projektzeit ergibt sich aus der Summe
+    aller ihrer Stundenkonten. Verbraucht wird das Budget durch
+    verrechenbare Zeiteinträge auf diesem Projekt. Ist es aufgebraucht,
+    soll dem Kunden ein neues Stundenkonto angeboten werden.
+    """
+    __tablename__ = "stundenkonten"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Projektzeit (EntityRecord aus Stammdaten)
+    project_id = Column(UUID(as_uuid=True),
+                        ForeignKey("entity_records.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+
+    bezeichnung = Column(String(300), nullable=True)    # z.B. "Stundenpaket 10h"
+    stunden = Column(Numeric(8, 2), nullable=False)     # erworbene Stunden
+    preis = Column(Numeric(12, 2), nullable=True)       # optionaler Kaufpreis (netto)
+    erworben_am = Column(Date, nullable=False)          # Kaufdatum
+    notiz = Column(Text, nullable=True)
+
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))
