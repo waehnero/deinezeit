@@ -1,23 +1,33 @@
 # Changelog
 
-## [1.12.18] – 2026-07-08 – Zeiterfassung
+## [1.12.19] – 2026-07-08 – Aussagekräftigere Release-Notes
 
 ### Aktualisierungen
-- Zeiterfassung
+- Die Änderungsliste auf der Anmeldeseite zeigt jetzt aussagekräftigere Release-Notes
 
 ---
 
-## [1.12.17] – 2026-07-06 – Einstellungen
+## [1.12.18] – 2026-07-08 – Zeiterfassung & Verkauf
+
+### Neu
+- Zeiterfassung um ein Stundenkonto erweitert
 
 ### Aktualisierungen
-- Einstellungen
+- Das Beleg-Modul heißt in der Oberfläche jetzt durchgängig „Verkauf"
 
 ---
 
-## [1.12.16] – 2026-07-06 – Auto version bump
+## [1.12.17] – 2026-07-06 – Datenschutz
+
+### Neu
+- DSGVO-konforme Datenlöschung unter Einstellungen → Datenschutz
+
+---
+
+## [1.12.16] – 2026-07-06 – Automatische Versionierung
 
 ### Aktualisierungen
-- Auto version bump
+- Versionsnummer und Änderungsliste werden automatisch aktuell gehalten
 
 ---
 

@@ -100,10 +100,17 @@ def main() -> int:
 
     branch = branch_name()
     titel = args.title or title_from_branch(branch)
-    # Ohne explizite Einträge: den Titel als eine Aktualisierung eintragen,
-    # damit die Timeline auf der Anmeldeseite einen sichtbaren Punkt bekommt.
-    updates = args.update or ([titel] if not args.feature else [])
-    features = args.feature
+    if args.update or args.feature:
+        updates = args.update
+        features = args.feature
+    else:
+        # Vom Hook ohne Argumente aufgerufen: nur ein Platzhalter. Die echten,
+        # kundentauglichen Release-Notes schreibt Claude/Oliver beim Entwickeln
+        # des Features gezielt mit:
+        #   python3 scripts/bump_version.py --title "…" --feature "…" --update "…"
+        # oder direkt in changelog.js / CHANGELOG.md.
+        updates = ["(Release-Notes ergänzen)"]
+        features = []
 
     print(f"  Version: {old} -> {new}   (Titel: {titel})")
     update_package_json(new)

@@ -195,10 +195,20 @@ ohne direkten Push auf das geschützte `main`. Der Bump landet über den PR in
 git config core.hooksPath .githooks
 ```
 
-- Titel/Changelog-Text werden aus dem Branch-Namen abgeleitet; bei Bedarf
-  vorher gezielt setzen: `python3 scripts/bump_version.py --title "…" --update "…"`.
-- Änderungen an changelog.js/CHANGELOG.md im selben Branch verfeinern den Text
-  (es wird pro Branch nur **einmal** hochgezählt).
+- Der Hook setzt für den Changelog-Text nur einen **Platzhalter**
+  (`(Release-Notes ergänzen)`). Die richtigen, **kundentauglichen Release-Notes**
+  schreibt Claude/Oliver **bewusst beim Entwickeln des Features** — auf der
+  Anmeldeseite sind sie kundensichtbar, daher zählt die Qualität. Am saubersten
+  gleich beim Bump gezielt setzen:
+
+  ```bash
+  python3 scripts/bump_version.py --title "…" --feature "…" --update "…"
+  ```
+
+  (aktualisiert alle 6 Dateien + Changelog). Danach überspringt der Hook den
+  Bump, weil die Version schon erhöht ist. Alternativ changelog.js/CHANGELOG.md
+  im selben Branch direkt bearbeiten.
+- Es wird pro Branch nur **einmal** hochgezählt.
 - Bump ausnahmsweise überspringen: `git commit --no-verify`.
 
 > **Hinweis:** Die alte GitHub-Action `auto-version.yml` (Post-Push-Bump auf
@@ -217,7 +227,8 @@ git config core.hooksPath .githooks
   **Backend-Tests (pytest gegen Postgres-Service)**, Docker-Images bauen,
   `.env.example`-Vollständigkeit & Secret-/nginx-Header-Checks.
 - **`auto-version.yml`** — **deaktiviert** (scheiterte am Branch-Schutz). Der
-  Versions-Bump passiert jetzt lokal beim Committen per pre-commit-Hook (s. o.).
+  Versions-Bump passiert jetzt lokal beim Committen per pre-commit-Hook (s. o.);
+  den Changelog-Text schreibt Claude/Oliver beim Entwickeln.
 - **`deploy.yml`** — bei Push auf `main`: per SSH/rsync auf den Server,
   `docker compose build` + `alembic upgrade head` + Neustart + Healthcheck.
   Nötige Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`.

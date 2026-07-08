@@ -4,13 +4,25 @@
  */
 export const changelog = [
   {
-    version: '1.12.18',
+    version: '1.12.19',
     day: '08',
     month: 'Juli',
     year: '2026',
     features: [],
     updates: [
-      'Zeiterfassung',
+      'Die Änderungsliste auf der Anmeldeseite zeigt jetzt aussagekräftigere Release-Notes',
+    ],
+  },
+  {
+    version: '1.12.18',
+    day: '08',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Zeiterfassung um ein Stundenkonto erweitert',
+    ],
+    updates: [
+      'Das Beleg-Modul heißt in der Oberfläche jetzt durchgängig „Verkauf"',
     ],
   },
   {
@@ -18,10 +30,10 @@ export const changelog = [
     day: '06',
     month: 'Juli',
     year: '2026',
-    features: [],
-    updates: [
-      'Einstellungen',
+    features: [
+      'DSGVO-konforme Datenlöschung unter Einstellungen → Datenschutz',
     ],
+    updates: [],
   },
   {
     version: '1.12.16',
@@ -30,7 +42,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      'Auto version bump',
+      'Versionsnummer und Änderungsliste werden automatisch aktuell gehalten',
     ],
   },
   {
