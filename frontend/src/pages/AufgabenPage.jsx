@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Plus, ListTodo, Loader2, X, Search, CheckCircle2, Circle,
   CalendarDays, User as UserIcon, Link2, Trash2, GanttChartSquare, Database,
-  Columns, List, Printer, Mail, RefreshCw, AlertCircle,
+  Columns, List, Printer, Mail, RefreshCw, AlertCircle, Archive, AlertTriangle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { aufgabenApi, usersApi, projektplanApi, masterdataApi, mailImportApi } from '../services/api'
@@ -202,15 +202,33 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
     }
   }
 
+  // Entfernen-Dialog: Archivieren (wiederherstellbar) oder endgültig löschen
+  const [removeDialog, setRemoveDialog] = useState(false)
+  const [removing, setRemoving] = useState(false)
+
+  const archivieren = async () => {
+    setRemoving(true)
+    try {
+      await aufgabenApi.update(todo.id, { is_archived: true })
+      toast.success('Aufgabe archiviert')
+      setRemoveDialog(false)
+      onDeleted()
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Fehler beim Archivieren')
+    } finally { setRemoving(false) }
+  }
+
   const loeschen = async () => {
-    if (!window.confirm('Aufgabe wirklich löschen?')) return
+    setRemoving(true)
     try {
       await aufgabenApi.remove(todo.id)
       toast.success('Aufgabe gelöscht')
+      setRemoveDialog(false)
       onDeleted()
-    } catch {
-      toast.error('Fehler beim Löschen')
-    }
+    } catch (err) {
+      // 409 = mit Zeiteintrag verknüpft, 403 = keine Berechtigung
+      toast.error(err.response?.data?.detail || 'Fehler beim Löschen', { duration: 6000 })
+    } finally { setRemoving(false) }
   }
 
   const [printing, setPrinting] = useState(false)
@@ -357,9 +375,9 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
         <div className="flex items-center justify-between px-5 py-4 border-t border-neutral-100">
           <div className="flex items-center gap-4">
             {!isNew && !istProjektplan && (
-              <button onClick={loeschen}
+              <button onClick={() => setRemoveDialog(true)}
                 className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700">
-                <Trash2 size={15} /> Löschen
+                <Trash2 size={15} /> Entfernen
               </button>
             )}
             {!isNew && (
@@ -383,6 +401,36 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
             </button>
           </div>
         </div>
+
+        {/* Entfernen-Dialog: Archivieren oder endgültig löschen */}
+        {removeDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setRemoveDialog(false)}>
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-4 border-b border-neutral-100 font-semibold text-neutral-800">
+                Aufgabe entfernen
+              </div>
+              <div className="p-5">
+                <div className="flex gap-3 bg-amber-50 text-amber-800 rounded-lg p-3 mb-4">
+                  <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                  <p className="text-sm">
+                    „{todo?.title}“ entfernen. <strong>Archivieren</strong> blendet sie nur aus
+                    (wiederherstellbar). <strong>Löschen</strong> entfernt sie endgültig
+                    {todo?.time_entry_id ? ' — nicht möglich, da ein Zeiteintrag verknüpft ist' : ''}.
+                  </p>
+                </div>
+                <button onClick={archivieren} disabled={removing}
+                  className="w-full flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-lg font-medium mb-2 disabled:opacity-50">
+                  <Archive size={16} /> Archivieren (ausblenden)
+                </button>
+                <button onClick={loeschen} disabled={removing || !!todo?.time_entry_id}
+                  className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-medium disabled:opacity-50">
+                  <Trash2 size={16} /> Endgültig löschen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

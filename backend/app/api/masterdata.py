@@ -17,6 +17,7 @@ from app.schemas.masterdata import (
     EntityRecordListResponse, UpdateFieldSortOrders
 )
 from app.services.masterdata_service import masterdata_service
+from app.services import integrity
 
 router = APIRouter(prefix="/masterdata", tags=["Stammdaten"])
 
@@ -240,15 +241,20 @@ async def list_records(
     page_size: int = Query(50, ge=1, le=200),
     filter_field: Optional[str] = Query(None),
     filter_value: Optional[str] = Query(None),
+    archived: str = Query("active", pattern="^(active|only|all)$"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Alle Datensätze eines Stammdaten-Typs abrufen (mit Suche & Paginierung)."""
+    """Alle Datensätze eines Stammdaten-Typs abrufen (mit Suche & Paginierung).
+
+    archived: 'active' (Standard) = ohne archivierte, 'only' = nur Archiv, 'all' = beides.
+    """
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")
     total, items = masterdata_service.list_records(
-        db, et, search, page, page_size, filter_field, filter_value
+        db, et, search, page, page_size, filter_field, filter_value,
+        archived=archived,
     )
     return EntityRecordListResponse(total=total, page=page, page_size=page_size, items=items)
 
@@ -350,16 +356,93 @@ async def import_records_csv(
     return {"message": f"{created} Datensätze importiert", "count": created}
 
 
-@router.delete("/types/{slug}/records/{record_id}")
-async def delete_record(
+@router.get("/types/{slug}/records/{record_id}/references")
+async def get_record_references(
     slug: str,
     record_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Datensatz löschen."""
+    """Alle Verweise anderer Module auf diesen Datensatz (für den Lösch-Dialog)."""
     record = masterdata_service.get_record(db, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
+    refs = integrity.count_references(db, record.id)
+    return {
+        "references": refs,
+        "has_references": bool(refs),
+        "deletable": not refs,
+    }
+
+
+@router.post("/types/{slug}/records/{record_id}/archive",
+             response_model=EntityRecordResponse)
+async def archive_record(
+    slug: str,
+    record_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Datensatz archivieren (nur Admin).
+
+    Archivierte Datensätze verschwinden aus Listen und Auswahlfeldern,
+    bleiben aber für die Historie erhalten (Zeiten, Belege, Projekte
+    verweisen weiter darauf) und können wiederhergestellt werden.
+    """
+    record = masterdata_service.get_record(db, record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
+    if record.archived_at:
+        raise HTTPException(status_code=400, detail="Datensatz ist bereits archiviert")
+    return masterdata_service.archive_record(db, record, current_user.id)
+
+
+@router.post("/types/{slug}/records/{record_id}/restore",
+             response_model=EntityRecordResponse)
+async def restore_record(
+    slug: str,
+    record_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Archivierten Datensatz wiederherstellen (nur Admin)."""
+    record = masterdata_service.get_record(db, record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
+    if not record.archived_at:
+        raise HTTPException(status_code=400, detail="Datensatz ist nicht archiviert")
+    return masterdata_service.restore_record(db, record)
+
+
+@router.delete("/types/{slug}/records/{record_id}")
+async def delete_record(
+    slug: str,
+    record_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Datensatz endgültig löschen (nur Admin, nur ohne Verweise).
+
+    Sobald andere Module auf den Datensatz verweisen (Zeiten, Belege,
+    Projekte, Aufgaben, Dateien, …), ist Löschen gesperrt — stattdessen
+    archivieren. Kontakte mit Belegen: DSGVO-Löschung (Anonymisierung)
+    über die Einstellungen.
+    """
+    record = masterdata_service.get_record(db, record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
+
+    refs = integrity.count_references(db, record.id)
+    if refs:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": ("Löschen nicht möglich — der Datensatz wird noch "
+                            f"verwendet: {integrity.references_summary(refs)}. "
+                            "Bitte stattdessen archivieren."),
+                "references": refs,
+            },
+        )
+
     masterdata_service.delete_record(db, record)
     return {"message": "Datensatz gelöscht"}

@@ -5,8 +5,10 @@ import toast from 'react-hot-toast'
 import {
   Play, Square, Plus, Trash2, Search, ChevronLeft, ChevronRight,
   Clock, Loader2, X, Check, Settings2, Timer, Euro,
-  PauseCircle, RefreshCw, FileText, AlertTriangle
+  PauseCircle, RefreshCw, FileText, AlertTriangle,
+  Lock, LockOpen, CheckCircle2, Receipt
 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import BerichtDialog from '../components/BerichtDialog'
 import AttachmentPanel from '../components/AttachmentPanel'
 import AttachmentQuickBar from '../components/AttachmentQuickBar'
@@ -744,15 +746,80 @@ function EntryModal({ entry, onClose, onSaved }) {
 }
 
 // ── Zeiteintrag Zeile ─────────────────────────────────────────────────────────
-function EntryRow({ entry, onEdit, onDelete, onRepeat }) {
+// ── Abrechnungs-Status ────────────────────────────────────────────────────────
+// veraenderbar → gesperrt → freigegeben → abgerechnet (Wechsel: Admin;
+// Mitarbeiter dürfen eigene Einträge nur freigeben)
+const ENTRY_STATUS = {
+  veraenderbar: { label: 'Veränderbar', icon: LockOpen,     cls: 'text-gray-400 hover:text-gray-600',   badge: 'bg-gray-100 text-gray-500' },
+  gesperrt:     { label: 'Gesperrt',    icon: Lock,         cls: 'text-amber-500 hover:text-amber-600', badge: 'bg-amber-50 text-amber-600' },
+  freigegeben:  { label: 'Freigegeben', icon: CheckCircle2, cls: 'text-blue-500 hover:text-blue-600',   badge: 'bg-blue-50 text-blue-600' },
+  abgerechnet:  { label: 'Abgerechnet', icon: Receipt,      cls: 'text-green-600 hover:text-green-700', badge: 'bg-green-50 text-green-700' },
+}
+
+// Welche Statuswechsel darf der aktuelle Benutzer bei diesem Eintrag?
+function allowedStatusTargets(entry, isAdmin, currentUserId) {
+  const status = entry.status || 'veraenderbar'
+  if (isAdmin) return Object.keys(ENTRY_STATUS).filter(s => s !== status)
+  if (entry.user_id === currentUserId && status === 'veraenderbar') return ['freigegeben']
+  return []
+}
+
+function StatusMenu({ entry, isAdmin, currentUserId, onSetStatus }) {
+  const [open, setOpen] = useState(false)
+  const status = entry.status || 'veraenderbar'
+  const cfg = ENTRY_STATUS[status] || ENTRY_STATUS.veraenderbar
+  const Icon = cfg.icon
+  const targets = allowedStatusTargets(entry, isAdmin, currentUserId)
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => targets.length && setOpen(o => !o)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        className={`p-1.5 rounded-lg transition ${cfg.cls} ${targets.length ? '' : 'cursor-default'}`}
+        title={`Status: ${cfg.label}${targets.length ? ' — klicken zum Ändern' : ''}`}>
+        <Icon size={14} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 w-48">
+          <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100">
+            Status: {cfg.label}
+          </div>
+          {targets.map(t => {
+            const tCfg = ENTRY_STATUS[t]
+            const TIcon = tCfg.icon
+            return (
+              <button key={t}
+                onMouseDown={(e) => e.preventDefault() /* Blur nicht vor Click */}
+                onClick={() => { setOpen(false); onSetStatus(entry, t) }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition text-left">
+                <TIcon size={14} className="text-gray-400" />
+                Auf „{tCfg.label}“ setzen
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EntryRow({ entry, onEdit, onDelete, onRepeat, onSetStatus,
+                    isAdmin, currentUserId, selected, onToggleSelect }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const sameDay = entry.ended_at
     ? isoToDateLocal(entry.started_at) === isoToDateLocal(entry.ended_at) : true
+  const mutable = (entry.status || 'veraenderbar') === 'veraenderbar'
 
   return (
-    <tr className="hover:bg-gray-50 transition cursor-pointer group" onClick={() => onEdit(entry)}>
+    <tr className={`hover:bg-gray-50 transition cursor-pointer group ${selected ? 'bg-primary-50/40' : ''}`}
+      onClick={() => onEdit(entry)}>
       <td className="py-3 pl-0 pr-0 w-1">
         <div className={`w-1 h-full min-h-[48px] rounded-sm ${entry.billable ? 'bg-green-400' : 'bg-orange-400'}`} />
+      </td>
+      <td className="px-3 py-3 w-8" onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={selected} onChange={() => onToggleSelect(entry.id)}
+          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer" />
       </td>
       <td className="px-4 py-3">
         <div className="text-sm font-medium text-gray-800">{entry.project_name || '—'}</div>
@@ -777,21 +844,28 @@ function EntryRow({ entry, onEdit, onDelete, onRepeat }) {
         <span className="line-clamp-2">{entry.note || '—'}</span>
       </td>
       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition">
-          <button onClick={() => onRepeat(entry)} title="Erneut starten"
-            className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
-            <Play size={13} />
-          </button>
-          <span title={entry.billable ? 'Verrechenbar' : 'Nicht verrechenbar'}
-            className={`p-1.5 rounded-lg ${entry.billable ? 'text-green-500' : 'text-gray-300'}`}>
-            <Euro size={13} />
-          </span>
-          <button
-            onClick={() => { if (confirmDelete) onDelete(entry); else setConfirmDelete(true) }}
-            onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
-            className={`p-1.5 rounded-lg transition ${confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'}`}>
-            <Trash2 size={13} />
-          </button>
+        <div className="flex items-center gap-1 justify-end">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+            <button onClick={() => onRepeat(entry)} title="Erneut starten"
+              className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+              <Play size={13} />
+            </button>
+            <span title={entry.billable ? 'Verrechenbar' : 'Nicht verrechenbar'}
+              className={`p-1.5 rounded-lg ${entry.billable ? 'text-green-500' : 'text-gray-300'}`}>
+              <Euro size={13} />
+            </span>
+            {mutable && (
+              <button
+                onClick={() => { if (confirmDelete) onDelete(entry); else setConfirmDelete(true) }}
+                onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
+                className={`p-1.5 rounded-lg transition ${confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'}`}>
+                <Trash2 size={13} />
+              </button>
+            )}
+          </div>
+          {/* Status-Schloss: immer sichtbar */}
+          <StatusMenu entry={entry} isAdmin={isAdmin}
+            currentUserId={currentUserId} onSetStatus={onSetStatus} />
         </div>
       </td>
     </tr>
@@ -810,6 +884,8 @@ function RunningMin({ startedAt }) {
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function ZeiterfassungPage() {
   const navigate = useNavigate()
+  const { currentUser, isAdmin } = useAuth()
+  const [selectedIds, setSelectedIds] = useState(new Set())
   const [running, setRunning] = useState(null)
   const [stats, setStats] = useState(null)
   const [entries, setEntries] = useState([])
@@ -834,9 +910,48 @@ export default function ZeiterfassungPage() {
       setStats(statsRes.data)
       setEntries(entriesRes.data.items)
       setTotal(entriesRes.data.total)
+      setSelectedIds(new Set())   // Auswahl bei Neuladen zurücksetzen
     } catch { toast.error('Fehler beim Laden') }
     finally { setLoading(false) }
   }, [page, search, filterUserId])
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev =>
+      prev.size === entries.length ? new Set() : new Set(entries.map(e => e.id))
+    )
+  }
+
+  const handleSetStatus = async (entry, status) => {
+    try {
+      await zeiterfassungApi.setEntryStatus(entry.id, status)
+      toast.success(`Status auf „${ENTRY_STATUS[status]?.label || status}“ gesetzt`)
+      loadAll()
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Statuswechsel fehlgeschlagen', { duration: 6000 })
+    }
+  }
+
+  const handleBatchStatus = async (status) => {
+    try {
+      const res = await zeiterfassungApi.setEntriesStatusBatch([...selectedIds], status)
+      const { changed, skipped, message } = res.data
+      if (skipped?.length) toast(message, { icon: '⚠️', duration: 6000 })
+      else toast.success(message)
+      loadAll()
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Statuswechsel fehlgeschlagen')
+    }
+  }
 
   useEffect(() => { loadAll() }, [loadAll])
   useEffect(() => { usersApi.list().then(r => setUsers(r.data)).catch(() => {}) }, [])
@@ -924,7 +1039,11 @@ export default function ZeiterfassungPage() {
       await zeiterfassungApi.deleteEntry(entry.id)
       toast.success('Zeiteintrag gelöscht')
       loadAll()
-    } catch { toast.error('Löschen fehlgeschlagen') }
+    } catch (err) {
+      // 403 = fremder Eintrag, 409 = bereits abgerechnet — Meldung vom Backend zeigen
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Löschen fehlgeschlagen', { duration: 6000 })
+    }
   }
 
   const handleUpdate = async ({ note, billable, project, pause }) => {
@@ -1021,6 +1140,30 @@ export default function ZeiterfassungPage() {
         </select>
       </div>
 
+      {/* Batch-Statusleiste (bei Auswahl) */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-2.5">
+          <span className="text-sm font-medium text-primary-700">
+            {selectedIds.size} ausgewählt
+          </span>
+          <span className="text-xs text-gray-400 mr-1">Status setzen:</span>
+          {(isAdmin ? Object.keys(ENTRY_STATUS) : ['freigegeben']).map(s => {
+            const cfg = ENTRY_STATUS[s]
+            const Icon = cfg.icon
+            return (
+              <button key={s} onClick={() => handleBatchStatus(s)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-transparent transition ${cfg.badge} hover:brightness-95`}>
+                <Icon size={12} /> {cfg.label}
+              </button>
+            )
+          })}
+          <button onClick={() => setSelectedIds(new Set())}
+            className="ml-auto p-1.5 text-gray-400 hover:text-gray-600 rounded-lg" title="Auswahl aufheben">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Tabelle */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         {loading ? (
@@ -1043,6 +1186,13 @@ export default function ZeiterfassungPage() {
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="w-1 p-0" />
+                  <th className="px-3 py-3 w-8">
+                    <input type="checkbox"
+                      checked={entries.length > 0 && selectedIds.size === entries.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      title="Alle auf dieser Seite auswählen" />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Projekt</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Zeit</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pause</th>
@@ -1057,6 +1207,11 @@ export default function ZeiterfassungPage() {
                     onEdit={(e) => setModalEntry(e)}
                     onDelete={handleDelete}
                     onRepeat={handleRepeat}
+                    onSetStatus={handleSetStatus}
+                    isAdmin={isAdmin}
+                    currentUserId={currentUser?.id}
+                    selected={selectedIds.has(entry.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
               </tbody>

@@ -7,14 +7,16 @@ from datetime import datetime, timezone, timedelta
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
 from app.models.masterdata import EntityRecord
+from app.models.invoice import InvoicePosition
 from app.schemas.zeiterfassung import (
     TimeEntryFieldCreate, TimeEntryFieldUpdate, TimeEntryFieldResponse,
     UpdateTimeEntryFieldSortOrders,
     TimeEntryCreate, TimeEntryUpdate, TimeEntryStop,
     TimeEntryResponse, TimeEntryListResponse, TimeStats,
+    TimeEntryStatusUpdate, TimeEntryStatusBatch,
     StundenkontoCreate, StundenkontoUpdate, StundenkontoResponse, ProjectBudget,
 )
 
@@ -258,6 +260,90 @@ async def get_entry(
     return entry
 
 
+# Abrechnungs-Workflow: veraenderbar → gesperrt → freigegeben → abgerechnet
+ENTRY_STATUSES = ("veraenderbar", "gesperrt", "freigegeben", "abgerechnet")
+STATUS_LABELS = {
+    "veraenderbar": "Veränderbar",
+    "gesperrt": "Gesperrt",
+    "freigegeben": "Freigegeben",
+    "abgerechnet": "Abgerechnet",
+}
+
+
+def _is_billed(db: Session, entry_id: UUID) -> bool:
+    """True, wenn eine Belegposition auf den Zeiteintrag verweist (abgerechnet)."""
+    return db.query(InvoicePosition).filter(
+        InvoicePosition.time_entry_id == entry_id
+    ).count() > 0
+
+
+def _check_entry_ownership(entry: TimeEntry, current_user: User) -> None:
+    """Regel Zeiterfassung: alle dürfen sehen, ändern nur der Eigentümer (oder Admin)."""
+    if current_user.role != UserRole.admin and entry.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Nur eigene Zeiteinträge können bearbeitet oder gelöscht werden",
+        )
+
+
+def _check_entry_mutable(db: Session, entry: TimeEntry) -> None:
+    """Bearbeiten/Löschen nur bei Status 'veraenderbar' und ohne Belegposition."""
+    status = entry.status or "veraenderbar"
+    if status != "veraenderbar":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Zeiteintrag hat den Status "
+                   f"'{STATUS_LABELS.get(status, status)}' und kann nicht "
+                   "geändert oder gelöscht werden",
+        )
+    if _is_billed(db, entry.id):
+        raise HTTPException(
+            status_code=409,
+            detail="Zeiteintrag wurde bereits über einen Verkaufsbeleg "
+                   "abgerechnet und kann nicht geändert oder gelöscht werden "
+                   "(Nachvollziehbarkeit der Abrechnung)",
+        )
+
+
+def _apply_status_change(db: Session, entry: TimeEntry, new_status: str,
+                         current_user: User) -> None:
+    """Statuswechsel-Regeln:
+    - Admin: darf jeden Wechsel — außer 'abgerechnet' aufheben, wenn der
+      Eintrag über eine Belegposition abgerechnet ist (Beleg zuerst stornieren).
+    - Mitarbeiter: nur EIGENE Einträge und nur veraenderbar → freigegeben.
+    """
+    if new_status not in ENTRY_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ungültiger Status. Erlaubt: {', '.join(ENTRY_STATUSES)}",
+        )
+
+    if current_user.role != UserRole.admin:
+        if entry.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Nur eigene Zeiteinträge können freigegeben werden",
+            )
+        if not (entry.status == "veraenderbar" and new_status == "freigegeben"):
+            raise HTTPException(
+                status_code=403,
+                detail="Mitarbeiter dürfen nur veränderbare Einträge auf "
+                       "'Freigegeben' setzen — alle anderen Wechsel macht der Admin",
+            )
+
+    # Über Beleg abgerechnete Einträge bleiben abgerechnet (auch für Admin)
+    if entry.status == "abgerechnet" and new_status != "abgerechnet" \
+            and _is_billed(db, entry.id):
+        raise HTTPException(
+            status_code=409,
+            detail="Eintrag ist über einen Verkaufsbeleg abgerechnet — der "
+                   "Status kann erst nach Storno des Belegs geändert werden",
+        )
+
+    entry.status = new_status
+    entry.updated_at = datetime.now(timezone.utc)
+
+
 @router.put("/entries/{entry_id}", response_model=TimeEntryResponse)
 async def update_entry(
     entry_id: UUID,
@@ -265,10 +351,14 @@ async def update_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Zeiteintrag bearbeiten (inkl. Zeitwerte)."""
+    """Zeiteintrag bearbeiten (inkl. Zeitwerte). Nur eigene (Admin: alle);
+    nur bei Status 'veraenderbar' und ohne Belegposition."""
     entry = db.query(TimeEntry).filter(TimeEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Zeiteintrag nicht gefunden")
+
+    _check_entry_ownership(entry, current_user)
+    _check_entry_mutable(db, entry)
 
     for k, v in body.model_dump(exclude_none=True).items():
         setattr(entry, k, v)
@@ -284,12 +374,77 @@ async def delete_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Zeiteintrag löschen. Nur eigene (Admin: alle); nur bei Status
+    'veraenderbar' und ohne Belegposition."""
     entry = db.query(TimeEntry).filter(TimeEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Zeiteintrag nicht gefunden")
+
+    _check_entry_ownership(entry, current_user)
+    _check_entry_mutable(db, entry)
+
     db.delete(entry)
     db.commit()
     return {"message": "Zeiteintrag gelöscht"}
+
+
+# ── Abrechnungs-Status ────────────────────────────────────────────────────────
+
+@router.put("/entries/{entry_id}/status", response_model=TimeEntryResponse)
+async def set_entry_status(
+    entry_id: UUID,
+    body: TimeEntryStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Status eines Zeiteintrags setzen.
+
+    Mitarbeiter: nur eigene Einträge veraenderbar → freigegeben.
+    Admin: alle Wechsel (außer Beleg-abgerechnete zurücksetzen).
+    """
+    entry = db.query(TimeEntry).filter(TimeEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Zeiteintrag nicht gefunden")
+
+    _apply_status_change(db, entry, body.status, current_user)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+@router.post("/entries/status-batch")
+async def set_entries_status_batch(
+    body: TimeEntryStatusBatch,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Status für mehrere Zeiteinträge auf einmal setzen (gleiche Regeln
+    wie beim Einzelwechsel; fehlerhafte Einträge werden übersprungen)."""
+    if not body.entry_ids:
+        raise HTTPException(status_code=400, detail="Keine Einträge übergeben")
+    if body.status not in ENTRY_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ungültiger Status. Erlaubt: {', '.join(ENTRY_STATUSES)}",
+        )
+
+    entries = db.query(TimeEntry).filter(TimeEntry.id.in_(body.entry_ids)).all()
+    changed, skipped = 0, []
+    for entry in entries:
+        try:
+            _apply_status_change(db, entry, body.status, current_user)
+            changed += 1
+        except HTTPException as e:
+            skipped.append({"id": str(entry.id), "reason": e.detail})
+
+    db.commit()
+    return {
+        "changed": changed,
+        "skipped": skipped,
+        "message": f"{changed} Einträge auf "
+                   f"'{STATUS_LABELS.get(body.status, body.status)}' gesetzt"
+                   + (f", {len(skipped)} übersprungen" if skipped else ""),
+    }
 
 
 # ── Stundenkonten / Projekt-Budget ────────────────────────────────────────────
@@ -390,8 +545,9 @@ async def update_stundenkonto(
 async def delete_stundenkonto(
     konto_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_admin),
 ):
+    """Stundenkonto löschen (nur Admin — vom Kunden erworbene Pakete)."""
     konto = db.query(Stundenkonto).filter(Stundenkonto.id == konto_id).first()
     if not konto:
         raise HTTPException(status_code=404, detail="Stundenkonto nicht gefunden")

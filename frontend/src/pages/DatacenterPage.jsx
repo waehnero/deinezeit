@@ -3,7 +3,7 @@ import {
   HardDrive, FolderOpen, Folder, File, FileText, FileImage, FileVideo,
   FileArchive, Link2, Upload, Search, Download, Trash2, Share2, Eye,
   ChevronRight, ChevronDown, Loader2, X, ExternalLink, Copy, Check,
-  RefreshCw, Info, Clock, Ban, CalendarClock, User
+  RefreshCw, Info, Clock, Ban, CalendarClock, User, AlertTriangle
 } from 'lucide-react'
 import { datacenterApi } from '../services/api'
 import ContactSearch from '../components/ContactSearch'
@@ -535,7 +535,6 @@ function FolderTree({ folders, selected, onSelect, viewMode, onViewModeChange })
 // ── Datei-Zeile ──────────────────────────────────────────────────────────────
 
 function FileRow({ attachment, onPreview, onDownload, onShare, onDelete, onEditContact }) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const _fn = (attachment.filename || '').toLowerCase()
   const canPreview = attachment.type === 'file' && (
     attachment.mimetype?.startsWith('image/') ||
@@ -617,12 +616,9 @@ function FileRow({ attachment, onPreview, onDownload, onShare, onDelete, onEditC
             <User size={14} />
           </button>
           <button
-            onClick={() => { if (confirmDelete) onDelete(attachment); else setConfirmDelete(true) }}
-            onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
-            title={confirmDelete ? 'Nochmal klicken' : 'Löschen'}
-            className={`p-1.5 rounded-lg transition ${
-              confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-            }`}>
+            onClick={() => onDelete(attachment)}
+            title="Löschen"
+            className="p-1.5 rounded-lg transition text-gray-400 hover:text-red-500 hover:bg-red-50">
             <Trash2 size={14} />
           </button>
         </div>
@@ -892,13 +888,31 @@ export default function DatacenterPage() {
     }
   }
 
-  const handleDelete = async (attachment) => {
+  // Lösch-Dialog: erst bestätigen, dann löschen (Backend prüft Verknüpfungen
+  // zum Verkaufsmodul und geschützte Beleg-Archiv-Ordner)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // Ordner, die vom Verkaufsmodul automatisch befüllt werden (Anzeige-Warnung;
+  // verbindlich geprüft wird im Backend)
+  const GESCHUETZTE_ORDNER = ['Rechnungen', 'Angebote', 'Auftragsbestätigungen',
+    'Gutschriften', 'Lieferscheine', 'Belege', 'Verträge']
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      await datacenterApi.delete(attachment.id)
+      await datacenterApi.delete(deleteTarget.id)
       toast.success('Gelöscht')
+      setDeleteTarget(null)
       await Promise.all([loadFolders(), loadAttachments()])
-    } catch {
-      toast.error('Löschen fehlgeschlagen')
+    } catch (err) {
+      // 409 = mit Verkaufsbeleg verknüpft, 403 = Beleg-Archiv (nur Admin)
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Löschen fehlgeschlagen', { duration: 8000 })
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -1110,7 +1124,7 @@ export default function DatacenterPage() {
                       onPreview={setPreviewItem}
                       onDownload={handleDownload}
                       onShare={setShareItem}
-                      onDelete={handleDelete}
+                      onDelete={setDeleteTarget}
                       onEditContact={setContactEditItem}
                     />
                   ))}
@@ -1137,6 +1151,43 @@ export default function DatacenterPage() {
           onClose={() => setContactEditItem(null)}
           onSaved={() => { loadFolders(); loadAttachments() }}
         />
+      )}
+
+      {/* Lösch-Bestätigung */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setDeleteTarget(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 font-semibold text-gray-800">
+              Datei löschen
+            </div>
+            <div className="p-5">
+              <div className="flex gap-3 bg-amber-50 text-amber-800 rounded-lg p-3 mb-4">
+                <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                <p className="text-sm">
+                  „{deleteTarget.display_name || deleteTarget.filename || deleteTarget.link_url}“
+                  wird <strong>endgültig gelöscht</strong>.
+                  {GESCHUETZTE_ORDNER.includes(deleteTarget.folder) && (
+                    <> Diese Datei liegt im Ordner „{deleteTarget.folder}“ und gehört
+                    zum <strong>Beleg-Archiv des Verkaufsmoduls</strong> (Aufbewahrungspflicht) —
+                    bitte nur löschen, wenn du sicher bist.</>
+                  )}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setDeleteTarget(null)}
+                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-lg font-medium">
+                  Abbrechen
+                </button>
+                <button onClick={handleDelete} disabled={deleting}
+                  className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-medium disabled:opacity-50">
+                  {deleting && <Loader2 size={14} className="animate-spin" />}
+                  Endgültig löschen
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

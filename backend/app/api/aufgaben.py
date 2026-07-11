@@ -511,11 +511,31 @@ def delete_todo(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Aufgabe endgültig löschen.
+
+    Regeln (Bugfix Datenzusammenhänge):
+    - Nur Ersteller, Zugewiesener oder Admin.
+    - Aufgaben mit verknüpftem Zeiteintrag sind unlöschbar (der Zeiteintrag
+      verlöre seinen Aufgabenbezug) — stattdessen archivieren (is_archived).
+    """
     todo = db.query(Todo).filter(Todo.id == todo_id).first()
     if not todo:
         if _get_planning_task(db, todo_id):
             raise HTTPException(
                 400, "Projektplan-Aufgaben bitte im Modul Projekte löschen")
         raise HTTPException(404, "Aufgabe nicht gefunden")
+
+    from app.models.user import UserRole
+    if current_user.role != UserRole.admin and \
+            current_user.id not in (todo.created_by, todo.assignee_id):
+        raise HTTPException(
+            403, "Nur der Ersteller, der Zugewiesene oder ein Admin "
+                 "darf diese Aufgabe löschen")
+
+    if todo.time_entry_id:
+        raise HTTPException(
+            409, "Löschen nicht möglich — die Aufgabe ist mit einem "
+                 "Zeiteintrag verknüpft. Bitte stattdessen archivieren.")
+
     db.delete(todo)
     db.commit()

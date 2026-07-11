@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.12.23] – 2026-07-11 – Sichere Löschregeln & Archivierung
+
+### Neu
+- Stammdaten können jetzt archiviert und wiederhergestellt werden (Archiv-Ansicht) — verknüpfte Daten bleiben nachvollziehbar erhalten
+- Neue Verwendungs-Prüfung: Vor dem Löschen zeigt das System, wo ein Datensatz überall verwendet wird
+- Zeiterfassung: Neuer Abrechnungs-Status je Eintrag (Veränderbar → Gesperrt → Freigegeben → Abgerechnet) mit Schloss-Symbol, einzeln oder per Mehrfachauswahl umstellbar — auch manuell abgerechnete Zeiten sind damit geschützt
+
+### Aktualisierungen
+- Stammdaten mit Verknüpfungen (Zeiten, Belege, Projekte, Dateien) sind vor versehentlichem Löschen geschützt; endgültiges Löschen nur noch durch Admins
+- Bereits abgerechnete Zeiteinträge können nicht mehr geändert oder gelöscht werden; Zeiteinträge anderer Benutzer sind schreibgeschützt
+- Projekte und Aufgaben mit gebuchten Zeiten können nicht mehr gelöscht werden — stattdessen archivieren
+- Stundenkonten werden beim Löschen einer Projektzeit nicht mehr mitgelöscht
+- Aufgaben: Entfernen fragt jetzt nach (Archivieren oder endgültig löschen); Aufgaben mit verknüpftem Zeiteintrag sind unlöschbar, löschen dürfen nur Ersteller, Zugewiesener oder Admin
+- Datacenter: Löschen fragt jetzt immer nach; Dateien, die mit einem Verkaufsbeleg verknüpft sind (z.B. Verträge wiederkehrender Rechnungen), können nur über das Verkaufsmodul entfernt werden; automatisch archivierte Belege löscht nur der Admin
+
+---
+
 ## [1.12.22] – 2026-07-11 – Fehlerbehebungen Postecke & Mobil
 
 ### Aktualisierungen

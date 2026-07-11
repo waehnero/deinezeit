@@ -116,6 +116,8 @@ class EntityRecordResponse(BaseModel):
     updated_by: Optional[UUID]
     created_at: datetime
     updated_at: datetime
+    anonymized_at: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -62,6 +62,14 @@ class TimeEntry(Base):
     note = Column(Text, nullable=True)
     billable = Column(Boolean, default=True, nullable=False)
 
+    # Abrechnungs-Workflow (Beschluss 2026-07-11):
+    #   veraenderbar → gesperrt → freigegeben → abgerechnet
+    # Bearbeiten/Löschen nur bei 'veraenderbar'. Mitarbeiter dürfen eigene
+    # Einträge nur veraenderbar→freigegeben setzen, alle anderen Wechsel Admin.
+    # Unabhängig davon sperrt eine Belegposition (invoice_positions.time_entry_id)
+    # den Eintrag immer — zweite, nicht umgehbare Prüfung.
+    status = Column(String(20), nullable=False, default="veraenderbar", index=True)
+
     # Custom-Felder (erweiterbar)
     data = Column(JSONB, nullable=False, default=dict)
 
@@ -99,8 +107,10 @@ class Stundenkonto(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Projektzeit (EntityRecord aus Stammdaten)
+    # RESTRICT: eine Projektzeit mit Stundenkonten darf nicht gelöscht werden —
+    # sonst gingen vom Kunden erworbene Stundenpakete kommentarlos verloren.
     project_id = Column(UUID(as_uuid=True),
-                        ForeignKey("entity_records.id", ondelete="CASCADE"),
+                        ForeignKey("entity_records.id", ondelete="RESTRICT"),
                         nullable=False, index=True)
 
     bezeichnung = Column(String(300), nullable=True)    # z.B. "Stundenpaket 10h"

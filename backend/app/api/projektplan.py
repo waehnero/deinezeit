@@ -397,9 +397,29 @@ async def update_project(
 async def delete_project(
     project_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_admin),
 ):
+    """Planungsprojekt endgültig löschen (nur Admin).
+
+    Gesperrt, sobald Zeiteinträge auf Aufgaben des Projekts gebucht wurden —
+    sonst verlöre die Zeiterfassung ihren Aufgabenbezug (Nachkontrolle bei
+    Abrechnungsfragen). Stattdessen archivieren (is_archived).
+    """
     proj = _get_project_or_404(db, project_id)
+
+    task_ids = [t.id for t in db.query(Task.id).filter(
+        Task.project_id == proj.id).all()]
+    if task_ids:
+        booked = db.query(TimeEntry).filter(
+            TimeEntry.task_id.in_(task_ids)).count()
+        if booked:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Löschen nicht möglich — auf Aufgaben dieses Projekts "
+                       f"sind {booked} Zeiteinträge gebucht. "
+                       "Bitte das Projekt stattdessen archivieren.",
+            )
+
     db.delete(proj)
     db.commit()
     return {"status": "deleted"}
@@ -713,6 +733,25 @@ async def delete_task(
     _: User = Depends(get_current_user),
 ):
     task = _get_task_or_404(db, task_id)
+
+    # Aufgabe (inkl. aller Unteraufgaben, beliebig tief) mit gebuchten Zeiten
+    # darf nicht weg — sonst verlieren Zeiteinträge ihren Aufgabenbezug.
+    sub_ids = {task.id}
+    frontier = [task.id]
+    while frontier:
+        children = db.query(Task.id).filter(
+            Task.parent_task_id.in_(frontier)).all()
+        frontier = [c.id for c in children if c.id not in sub_ids]
+        sub_ids.update(frontier)
+    booked = db.query(TimeEntry).filter(
+        TimeEntry.task_id.in_(list(sub_ids))).count()
+    if booked:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Löschen nicht möglich — auf diese Aufgabe (oder ihre "
+                   f"Unteraufgaben) sind {booked} Zeiteinträge gebucht.",
+        )
+
     db.delete(task)  # Kinder via ondelete=CASCADE
     db.commit()
     return {"status": "deleted"}
