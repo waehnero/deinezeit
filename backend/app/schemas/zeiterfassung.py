@@ -104,8 +104,20 @@ class TimeEntryResponse(BaseModel):
     data: Dict[str, Any]
     is_running: bool
     duration_minutes: int
+    status: str = "veraenderbar"
     created_at: datetime
     updated_at: datetime
+
+
+class TimeEntryStatusUpdate(BaseModel):
+    """Statuswechsel eines Zeiteintrags (veraenderbar/gesperrt/freigegeben/abgerechnet)."""
+    status: str
+
+
+class TimeEntryStatusBatch(BaseModel):
+    """Statuswechsel für mehrere Zeiteinträge auf einmal."""
+    entry_ids: List[UUID]
+    status: str
 
 
 class TimeEntryListResponse(BaseModel):

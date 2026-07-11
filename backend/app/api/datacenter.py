@@ -751,15 +751,56 @@ async def update_attachment_contact(
 
 # ── 5. Anhang löschen ─────────────────────────────────────────────────────────
 
+# Ordner, die vom Verkaufsmodul automatisch befüllt werden (Beleg-Archiv,
+# Aufbewahrungspflicht § 132 BAO) — Löschen nur durch Admins.
+GESCHUETZTE_BELEG_ORDNER = {
+    "Rechnungen", "Angebote", "Auftragsbestätigungen",
+    "Gutschriften", "Lieferscheine", "Belege", "Verträge",
+}
+
+
+def _check_attachment_deletable(db: Session, att: Attachment,
+                                current_user: User) -> None:
+    """Lösch-Regeln für Datacenter-Anhänge (Bugfix Datenzusammenhänge)."""
+    from app.models.invoice import Invoice, InvoiceAttachment
+    from app.models.user import UserRole
+
+    # 1. Mit einem Verkaufsbeleg verknüpft (Vertrag / Beleganhang)?
+    #    Dann NIE hier löschen — nur über das Verkaufsmodul (dort wird
+    #    Beleg-Verknüpfung + Datei konsistent entfernt).
+    link = db.query(InvoiceAttachment).filter(
+        InvoiceAttachment.datacenter_id == att.id).first()
+    if link:
+        inv = db.query(Invoice).filter(Invoice.id == link.invoice_id).first()
+        art = "Vertrag" if link.attach_type == "contract" else "Anhang"
+        num = inv.number if inv else "?"
+        raise HTTPException(
+            409, f"Löschen nicht möglich — die Datei ist als {art} mit dem "
+                 f"Verkaufsbeleg {num} verknüpft. Bitte über das "
+                 "Verkaufsmodul (Beleg bearbeiten) entfernen.")
+
+    # 2. Automatisch archivierte Belege/Verträge (Aufbewahrungspflicht):
+    #    nur Admins dürfen löschen.
+    if att.folder in GESCHUETZTE_BELEG_ORDNER \
+            and current_user.role != UserRole.admin:
+        raise HTTPException(
+            403, f"Dateien im Ordner „{att.folder}“ gehören zum Beleg-Archiv "
+                 "(Aufbewahrungspflicht) und können nur von einem Admin "
+                 "gelöscht werden")
+
+
 @router.delete("/{attachment_id}")
 async def delete_attachment(
     attachment_id: str,
     db:            Session = Depends(get_db),
-    _:             User = Depends(get_current_user),
+    current_user:  User = Depends(get_current_user),
 ):
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not att:
         raise HTTPException(404, "Anhang nicht gefunden")
+
+    _check_attachment_deletable(db, att, current_user)
+
     if att.type == "file" and att.storage_key:
         storage_service.delete_file(att.storage_key)
     db.delete(att)

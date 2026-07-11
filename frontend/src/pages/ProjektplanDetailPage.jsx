@@ -207,8 +207,10 @@ export default function ProjektplanDetailPage() {
       await projektplanApi.deleteTask(task.id)
       setDetailTask(null)
       await load()
-    } catch {
-      toast.error('Aufgabe konnte nicht gelöscht werden')
+    } catch (err) {
+      // 409 = Zeiteinträge auf der Aufgabe gebucht — Meldung vom Backend zeigen
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Aufgabe konnte nicht gelöscht werden', { duration: 6000 })
     }
   }
 

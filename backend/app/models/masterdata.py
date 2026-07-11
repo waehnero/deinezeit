@@ -104,4 +104,12 @@ class EntityRecord(Base):
     # Personenbezug (data geleert, display_name = "Gelöschter Kontakt").
     anonymized_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Archivierung statt Löschung: Datensätze mit Verweisen aus anderen
+    # Modulen (Zeiten, Belege, Projekte, …) dürfen nicht hart gelöscht
+    # werden — sie werden archiviert. Archivierte Datensätze verschwinden
+    # aus Listen und Auswahlfeldern, bleiben aber für die Historie erhalten
+    # und können vom Admin wiederhergestellt werden.
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    archived_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
     entity_type = relationship("EntityType", back_populates="records")

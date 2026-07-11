@@ -93,13 +93,29 @@ def test_stundenkonto_ungueltige_stunden(auth_client, projektzeit):
     assert resp.status_code == 422  # stunden muss > 0 sein
 
 
-def test_stundenkonto_loeschen(auth_client, projektzeit):
+def test_stundenkonto_loeschen(auth_client, projektzeit, admin_user):
+    """Löschen ist Admin-Sache (vom Kunden erworbene Pakete) —
+    normale Benutzer bekommen 403 (Regel seit Bugfix Datenzusammenhänge)."""
+    from tests.conftest import TEST_USER_PASSWORD
+
     resp = auth_client.post(
         f"/api/zeiterfassung/projekte/{projektzeit.id}/stundenkonten",
         json={"stunden": 5, "erworben_am": "2026-07-01"},
     )
     konto_id = resp.json()["id"]
+
+    # Normaler Benutzer: verboten
     resp = auth_client.delete(f"/api/zeiterfassung/stundenkonten/{konto_id}")
+    assert resp.status_code == 403
+
+    # Admin: erlaubt
+    login = auth_client.post(
+        "/api/auth/login",
+        json={"email": admin_user.email, "password": TEST_USER_PASSWORD},
+    )
+    admin_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    resp = auth_client.delete(f"/api/zeiterfassung/stundenkonten/{konto_id}",
+                              headers=admin_headers)
     assert resp.status_code == 200
     resp = auth_client.get(f"/api/zeiterfassung/projekte/{projektzeit.id}/stundenkonten")
     assert resp.json() == []

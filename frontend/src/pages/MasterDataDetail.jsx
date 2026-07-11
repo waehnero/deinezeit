@@ -9,7 +9,7 @@ import { fmtBudgetMinutes } from '../components/StundenkontenPanel'
 import {
   Plus, Search, ArrowLeft, Trash2, Pencil,
   Loader2, Database, ChevronLeft, ChevronRight,
-  AlertTriangle
+  AlertTriangle, Archive, ArchiveRestore
 } from 'lucide-react'
 import { CsvExportButton, CsvImportButton } from '../components/CsvImportExport'
 
@@ -33,9 +33,12 @@ function BudgetCell({ budget }) {
 }
 
 // ── Datensatz-Zeile in der Tabelle ────────────────────────────────────────────
-function RecordRow({ record, fields, onEdit, onDelete, budget = undefined, showBudget = false }) {
+function RecordRow({ record, fields, onEdit, onDelete, onArchive, onRestore,
+                     isAdmin = false, archivedView = false,
+                     budget = undefined, showBudget = false }) {
   const listFields = fields.filter(f => f.show_in_list).slice(0, 5)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(false)
 
   const formatValue = (field, value) => {
     if (value === null || value === undefined || value === '') return '—'
@@ -78,15 +81,36 @@ function RecordRow({ record, fields, onEdit, onDelete, budget = undefined, showB
             className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
             <Pencil size={14} />
           </button>
-          <button
-            onClick={() => { if (confirmDelete) onDelete(record); else setConfirmDelete(true) }}
-            onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
-            className={`p-1.5 rounded-lg transition ${
-              confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-            }`}
-            title={confirmDelete ? 'Nochmal klicken um zu löschen' : 'Löschen'}>
-            <Trash2 size={14} />
-          </button>
+          {isAdmin && archivedView && (
+            <button
+              onClick={() => onRestore(record)}
+              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+              title="Wiederherstellen">
+              <ArchiveRestore size={14} />
+            </button>
+          )}
+          {isAdmin && !archivedView && (
+            <button
+              onClick={() => { if (confirmArchive) { onArchive(record); setConfirmArchive(false) } else setConfirmArchive(true) }}
+              onBlur={() => setTimeout(() => setConfirmArchive(false), 200)}
+              className={`p-1.5 rounded-lg transition ${
+                confirmArchive ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+              }`}
+              title={confirmArchive ? 'Nochmal klicken um zu archivieren' : 'Archivieren (aus Listen ausblenden, wiederherstellbar)'}>
+              <Archive size={14} />
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => { if (confirmDelete) onDelete(record); else setConfirmDelete(true) }}
+              onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
+              className={`p-1.5 rounded-lg transition ${
+                confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+              }`}
+              title={confirmDelete ? 'Nochmal klicken um endgültig zu löschen' : 'Endgültig löschen (nur ohne Verknüpfungen möglich)'}>
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -110,6 +134,7 @@ export default function MasterDataDetail() {
   const [modalRecord, setModalRecord] = useState(undefined) // undefined=geschlossen, null=neu, obj=bearbeiten
   const [typFilter, setTypFilter] = useState('') // nur bei slug === 'kontakte' genutzt
   const [budgets, setBudgets] = useState({}) // nur bei slug === 'projektzeiten': { [recordId]: ProjectBudget }
+  const [showArchived, setShowArchived] = useState(false) // Archiv-Ansicht (nur Admin relevant)
 
   const isProjektzeiten = slug === 'projektzeiten'
 
@@ -139,6 +164,7 @@ export default function MasterDataDetail() {
         search: search || undefined,
         page,
         page_size: PAGE_SIZE,
+        archived: showArchived ? 'only' : 'active',
         ...(typFilter ? { filter_field: 'typ', filter_value: typFilter } : {}),
       })
       setRecords(res.data.items)
@@ -149,7 +175,7 @@ export default function MasterDataDetail() {
     } finally {
       setLoading(false)
     }
-  }, [slug, entityType, search, page, typFilter])
+  }, [slug, entityType, search, page, typFilter, showArchived])
 
   useEffect(() => { loadType() }, [loadType])
   useEffect(() => { if (entityType) loadRecords() }, [loadRecords])
@@ -171,9 +197,36 @@ export default function MasterDataDetail() {
       await masterdataApi.deleteRecord(slug, record.id)
       setRecords(records.filter(r => r.id !== record.id))
       setTotal(total - 1)
-      toast.success('Datensatz gelöscht')
-    } catch {
-      toast.error('Löschen fehlgeschlagen')
+      toast.success('Datensatz endgültig gelöscht')
+    } catch (err) {
+      // 409 = Datensatz wird noch verwendet → Meldung mit Details vom Backend
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'object' ? detail?.message : detail
+      toast.error(msg || 'Löschen fehlgeschlagen', { duration: 8000 })
+    }
+  }
+
+  const handleArchive = async (record) => {
+    try {
+      await masterdataApi.archiveRecord(slug, record.id)
+      setRecords(records.filter(r => r.id !== record.id))
+      setTotal(total - 1)
+      toast.success('Datensatz archiviert — über die Archiv-Ansicht wiederherstellbar')
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Archivieren fehlgeschlagen')
+    }
+  }
+
+  const handleRestore = async (record) => {
+    try {
+      await masterdataApi.restoreRecord(slug, record.id)
+      setRecords(records.filter(r => r.id !== record.id))
+      setTotal(total - 1)
+      toast.success('Datensatz wiederhergestellt')
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Wiederherstellen fehlgeschlagen')
     }
   }
 
@@ -201,12 +254,32 @@ export default function MasterDataDetail() {
           <ArrowLeft size={16} /> Zurück
         </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">{entityType.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            {entityType.name}
+            {showArchived && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                <Archive size={11} /> Archiv
+              </span>
+            )}
+          </h1>
           <p className="text-gray-400 text-sm mt-0.5">
             {total} {total === 1 ? 'Eintrag' : 'Einträge'}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => { setShowArchived(v => !v); setPage(1) }}
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border transition ${
+                showArchived
+                  ? 'bg-amber-50 text-amber-700 border-amber-300'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-amber-400 hover:text-amber-600'
+              }`}
+              title="Archivierte Datensätze anzeigen/ausblenden">
+              <Archive size={16} />
+              {showArchived ? 'Zurück zu Aktiv' : 'Archiv'}
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <CsvExportButton slug={entityType.slug} entityName={entityType.name} />
             <CsvImportButton
@@ -215,13 +288,15 @@ export default function MasterDataDetail() {
               onImported={() => loadRecords()}
             />
           </div>
-          <button
-            onClick={() => setModalRecord(null)}
-            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
-          >
-            <Plus size={18} />
-            Neu anlegen
-          </button>
+          {!showArchived && (
+            <button
+              onClick={() => setModalRecord(null)}
+              className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
+            >
+              <Plus size={18} />
+              Neu anlegen
+            </button>
+          )}
         </div>
       </div>
 
@@ -278,9 +353,11 @@ export default function MasterDataDetail() {
           <div className="text-center py-16 text-gray-400">
             <Database size={40} className="mx-auto mb-3 text-gray-200" />
             <p className="font-medium">
-              {search ? 'Keine Ergebnisse gefunden' : 'Noch keine Einträge vorhanden'}
+              {search ? 'Keine Ergebnisse gefunden'
+                : showArchived ? 'Keine archivierten Einträge'
+                : 'Noch keine Einträge vorhanden'}
             </p>
-            {!search && (
+            {!search && !showArchived && (
               <button onClick={() => setModalRecord(null)}
                 className="mt-3 text-primary-600 hover:underline text-sm">
                 Ersten Eintrag anlegen
@@ -316,6 +393,10 @@ export default function MasterDataDetail() {
                     fields={entityType.fields}
                     onEdit={(r) => setModalRecord(r)}
                     onDelete={handleDelete}
+                    onArchive={handleArchive}
+                    onRestore={handleRestore}
+                    isAdmin={isAdmin}
+                    archivedView={showArchived}
                     showBudget={isProjektzeiten}
                     budget={budgets[record.id]}
                   />

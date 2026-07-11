@@ -73,11 +73,19 @@ export const masterdataApi = {
   createRecord: (slug, data) => api.post(`/masterdata/types/${slug}/records`, { data }),
   updateRecord: (slug, id, data) => api.put(`/masterdata/types/${slug}/records/${id}`, { data }),
   deleteRecord: (slug, id) => api.delete(`/masterdata/types/${slug}/records/${id}`),
+  getRecordReferences: (slug, id) => api.get(`/masterdata/types/${slug}/records/${id}/references`),
+  archiveRecord: (slug, id) => api.post(`/masterdata/types/${slug}/records/${id}/archive`),
+  restoreRecord: (slug, id) => api.post(`/masterdata/types/${slug}/records/${id}/restore`),
   exportCsv: (slug) => api.get(`/masterdata/types/${slug}/records/export/csv`, { responseType: 'text' }),
   importCsv: (slug, rows) => api.post(`/masterdata/types/${slug}/records/import/csv`, rows),
 }
 
 export const zeiterfassungApi = {
+  // Abrechnungs-Status
+  setEntryStatus: (id, status) => api.put(`/zeiterfassung/entries/${id}/status`, { status }),
+  setEntriesStatusBatch: (entryIds, status) =>
+    api.post('/zeiterfassung/entries/status-batch', { entry_ids: entryIds, status }),
+
   // Custom-Felder
   listFields: () => api.get('/zeiterfassung/fields'),
   createField: (data) => api.post('/zeiterfassung/fields', data),

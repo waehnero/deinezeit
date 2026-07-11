@@ -4,6 +4,25 @@
  */
 export const changelog = [
   {
+    version: '1.12.23',
+    day: '11',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Stammdaten können jetzt archiviert und wiederhergestellt werden (Archiv-Ansicht) — verknüpfte Daten bleiben nachvollziehbar erhalten',
+      'Neue Verwendungs-Prüfung: Vor dem Löschen zeigt das System, wo ein Datensatz überall verwendet wird',
+      'Zeiterfassung: Neuer Abrechnungs-Status je Eintrag (Veränderbar → Gesperrt → Freigegeben → Abgerechnet) mit Schloss-Symbol, einzeln oder per Mehrfachauswahl umstellbar — auch manuell abgerechnete Zeiten sind damit geschützt',
+    ],
+    updates: [
+      'Stammdaten mit Verknüpfungen (Zeiten, Belege, Projekte, Dateien) sind vor versehentlichem Löschen geschützt; endgültiges Löschen nur noch durch Admins',
+      'Bereits abgerechnete Zeiteinträge können nicht mehr geändert oder gelöscht werden; Zeiteinträge anderer Benutzer sind schreibgeschützt',
+      'Projekte und Aufgaben mit gebuchten Zeiten können nicht mehr gelöscht werden — stattdessen archivieren',
+      'Stundenkonten werden beim Löschen einer Projektzeit nicht mehr mitgelöscht',
+      'Aufgaben: Entfernen fragt jetzt nach (Archivieren oder endgültig löschen); Aufgaben mit verknüpftem Zeiteintrag sind unlöschbar',
+      'Datacenter: Löschen fragt jetzt immer nach; mit Verkaufsbelegen verknüpfte Dateien (z.B. Verträge) können nur über das Verkaufsmodul entfernt werden; archivierte Belege löscht nur der Admin',
+    ],
+  },
+  {
     version: '1.12.22',
     day: '11',
     month: 'Juli',

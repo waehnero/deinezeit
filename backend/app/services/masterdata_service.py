@@ -137,10 +137,18 @@ class MasterDataService:
                      search: str = None, page: int = 1,
                      page_size: int = 50,
                      filter_field: str = None,
-                     filter_value: str = None) -> Tuple[int, List[EntityRecord]]:
+                     filter_value: str = None,
+                     archived: str = "active") -> Tuple[int, List[EntityRecord]]:
+        """archived: 'active' (Standard) = nur nicht-archivierte,
+        'only' = nur archivierte, 'all' = beides."""
         q = db.query(EntityRecord).filter(
             EntityRecord.entity_type_id == entity_type.id
         )
+
+        if archived == "only":
+            q = q.filter(EntityRecord.archived_at.isnot(None))
+        elif archived != "all":
+            q = q.filter(EntityRecord.archived_at.is_(None))
 
         if search:
             # Volltextsuche im JSONB-Feld und display_name
@@ -195,6 +203,22 @@ class MasterDataService:
     def delete_record(self, db: Session, record: EntityRecord) -> None:
         db.delete(record)
         db.commit()
+
+    def archive_record(self, db: Session, record: EntityRecord,
+                       user_id: UUID = None) -> EntityRecord:
+        from datetime import datetime, timezone
+        record.archived_at = datetime.now(timezone.utc)
+        record.archived_by = user_id
+        db.commit()
+        db.refresh(record)
+        return record
+
+    def restore_record(self, db: Session, record: EntityRecord) -> EntityRecord:
+        record.archived_at = None
+        record.archived_by = None
+        db.commit()
+        db.refresh(record)
+        return record
 
     def _extract_display_name(self, entity_type: EntityType,
                                data: Dict[str, Any]) -> str:
