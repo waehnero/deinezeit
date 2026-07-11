@@ -14,8 +14,6 @@ Alle Funktionen sind synchron — FastAPI führt sync-Endpunkte im Threadpool au
 der Hintergrund-Scanner läuft in einem eigenen Daemon-Thread.
 """
 
-import base64
-import hashlib
 import imaplib
 import email
 import email.header
@@ -29,38 +27,25 @@ from datetime import datetime, timezone, timedelta, date
 from typing import List, Optional
 
 import httpx
-from cryptography.fernet import Fernet
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.mailimport import MailAccount, MailTaskSuggestion
 from app.models.settings import Setting
 
+# ── 1. Verschlüsselung & KI-Grundfunktionen ───────────────────────────────────
+# Seit dem Modul Postecke zentral in services/ki.py; die Re-Exporte hier halten
+# bestehende Aufrufer (api/mailimport.py, Tests) unverändert lauffähig.
+from app.services.ki import (  # noqa: F401
+    KI_SETTINGS_KEY, KI_DEFAULT_MODELS,
+    encrypt_secret, decrypt_secret,
+    load_ki_settings, save_ki_settings, call_ki,
+)
+
 # Wie viele Nachrichten pro Scan maximal betrachtet werden (neueste zuerst)
 MAX_MESSAGES_PER_SCAN = 25
 # Wie viel Mail-Text der KI übergeben wird (Kosten-/Kontextbegrenzung)
 MAX_BODY_CHARS = 6000
-
-KI_SETTINGS_KEY = "ki_settings"
-KI_DEFAULT_MODELS = {
-    "anthropic": "claude-sonnet-4-5",
-    "openai": "gpt-4o-mini",
-}
-
-
-# ── 1. Verschlüsselung ────────────────────────────────────────────────────────
-def _fernet() -> Fernet:
-    """Fernet-Schlüssel deterministisch aus SECRET_KEY ableiten."""
-    digest = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
-    return Fernet(base64.urlsafe_b64encode(digest))
-
-
-def encrypt_secret(plain: str) -> str:
-    return _fernet().encrypt(plain.encode()).decode()
-
-
-def decrypt_secret(enc: str) -> str:
-    return _fernet().decrypt(enc.encode()).decode()
 
 
 # ── Zentrale E-Mail-Konfiguration (Einstellungen -> System -> E-Mail) ────────
@@ -335,35 +320,7 @@ def list_folders(db: Session, account: MailAccount) -> List[str]:
 
 
 # ── 3. KI-Extraktion ──────────────────────────────────────────────────────────
-def load_ki_settings(db: Session) -> dict:
-    """{provider, api_key_enc, model} — api_key_enc bleibt verschlüsselt."""
-    row = db.query(Setting).filter(Setting.key == KI_SETTINGS_KEY).first()
-    if not row or not row.value:
-        return {"provider": "anthropic", "api_key_enc": None, "model": None}
-    try:
-        return json.loads(row.value)
-    except Exception:
-        return {"provider": "anthropic", "api_key_enc": None, "model": None}
-
-
-def save_ki_settings(db: Session, provider: str, api_key_plain: Optional[str],
-                     model: Optional[str]):
-    """Speichert die KI-Einstellungen; ohne neuen Key bleibt der alte erhalten."""
-    current = load_ki_settings(db)
-    value = {
-        "provider": provider,
-        "api_key_enc": encrypt_secret(api_key_plain) if api_key_plain else current.get("api_key_enc"),
-        "model": model or None,
-    }
-    row = db.query(Setting).filter(Setting.key == KI_SETTINGS_KEY).first()
-    if row:
-        row.value = json.dumps(value)
-        row.updated_at = datetime.now(timezone.utc)
-    else:
-        db.add(Setting(key=KI_SETTINGS_KEY, value=json.dumps(value),
-                       updated_at=datetime.now(timezone.utc)))
-    db.commit()
-
+# load_ki_settings/save_ki_settings kommen aus services/ki.py (s. Re-Export oben)
 
 _EXTRACT_PROMPT = """Du bist ein Assistent, der aus E-Mails konkrete Aufgaben (To-dos) extrahiert.
 
@@ -424,12 +381,6 @@ def _parse_ki_json(text: str) -> List[dict]:
 
 def extract_tasks(ki: dict, mail: dict) -> List[dict]:
     """Ruft den konfigurierten KI-Provider auf und liefert Aufgabenvorschläge."""
-    if not ki.get("api_key_enc"):
-        raise RuntimeError("Kein KI-API-Key konfiguriert (Einstellungen -> Mail-Import & KI)")
-    api_key = decrypt_secret(ki["api_key_enc"])
-    provider = ki.get("provider") or "anthropic"
-    model = ki.get("model") or KI_DEFAULT_MODELS.get(provider, KI_DEFAULT_MODELS["anthropic"])
-
     prompt = _EXTRACT_PROMPT.format(
         today=date.today().isoformat(),
         sender=mail.get("sender") or "-",
@@ -437,38 +388,7 @@ def extract_tasks(ki: dict, mail: dict) -> List[dict]:
         received=(mail.get("received_at").isoformat() if mail.get("received_at") else "-"),
         body=(mail.get("body") or "")[:MAX_BODY_CHARS],
     )
-
-    if provider == "anthropic":
-        resp = httpx.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": model,
-                "max_tokens": 1500,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        text = "".join(b.get("text", "") for b in resp.json().get("content", []))
-    else:  # openai
-        resp = httpx.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0,
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        text = resp.json()["choices"][0]["message"]["content"]
-
+    text = call_ki(ki, prompt, max_tokens=1500)
     return _parse_ki_json(text)
 
 

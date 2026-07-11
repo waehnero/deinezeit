@@ -285,15 +285,28 @@ function PreviewModal({ attachment, onClose }) {
   const [url, setUrl]         = useState(null)
   const [loading, setLoading] = useState(true)
   const [isEml, setIsEml]     = useState(false)
+  const [textInhalt, setTextInhalt] = useState(null)
+
+  const fnLower = (attachment.filename || '').toLowerCase()
+  const eml = attachment.mimetype === 'message/rfc822' ||
+              attachment.mimetype === 'text/rfc822' ||
+              attachment.mimetype === 'application/vnd.ms-outlook' ||
+              fnLower.endsWith('.eml') ||
+              fnLower.endsWith('.msg')
+  // Textdateien (text/plain, text/markdown …) direkt als Text darstellen —
+  // z.B. der Content aus dem Postecke-Postsarchiv.
+  const isText = !eml && (attachment.mimetype?.startsWith('text/') || fnLower.endsWith('.md'))
 
   useEffect(() => {
-    const fn = (attachment.filename || '').toLowerCase()
-    const eml = attachment.mimetype === 'message/rfc822' ||
-                attachment.mimetype === 'text/rfc822' ||
-                attachment.mimetype === 'application/vnd.ms-outlook' ||
-                fn.endsWith('.eml') ||
-                fn.endsWith('.msg')
     setIsEml(eml)
+
+    if (isText) {
+      datacenterApi.previewRaw(attachment.id, 'text')
+        .then(res => setTextInhalt(typeof res.data === 'string' ? res.data : String(res.data)))
+        .catch(() => toast.error('Vorschau nicht verfügbar'))
+        .finally(() => setLoading(false))
+      return
+    }
 
     // Für EML/MSG liefert das Backend fertig gerendertes HTML (text) zurück
     const responseType = eml ? 'text' : 'blob'
@@ -313,7 +326,14 @@ function PreviewModal({ attachment, onClose }) {
   const isPdf   = attachment.mimetype === 'application/pdf'
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[70] flex flex-col">
+    // 100dvh + Safe-Area-Insets: am iPhone (Notch/Home-Balken, PWA) bleibt der
+    // Schließen-Button erreichbar und die Ansicht ragt nicht über den Rand hinaus
+    <div className="fixed inset-x-0 top-0 bg-black/80 z-[70] flex flex-col"
+      style={{
+        height: '100dvh',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
       <div className="flex items-center justify-between px-5 py-3 bg-black/60 text-white">
         <span className="text-sm font-medium truncate">{attachment.display_name || attachment.filename}</span>
         <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition">
@@ -323,6 +343,14 @@ function PreviewModal({ attachment, onClose }) {
       <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
         {loading ? (
           <Loader2 size={32} className="animate-spin text-white" />
+        ) : isText ? (
+          textInhalt !== null ? (
+            <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-full overflow-auto">
+              <pre className="whitespace-pre-wrap p-6 text-sm text-gray-800 font-sans leading-relaxed">{textInhalt}</pre>
+            </div>
+          ) : (
+            <p className="text-white">Vorschau konnte nicht geladen werden.</p>
+          )
         ) : url ? (
           isImage ? (
             <img src={url} alt={attachment.filename} className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />

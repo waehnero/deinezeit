@@ -325,6 +325,39 @@ export const mailImportApi = {
   updateKiSettings: (data) => api.put('/mail-import/ki-settings', data),
 }
 
+// ── Postecke (Social-Media-Posts mit KI-Vorbereitung) ────────────────────────
+export const posteckeApi = {
+  // Profile (Social-Media-Konten inkl. Stil-Prompt)
+  listProfile:   ()          => api.get('/postecke/profile'),
+  createProfil:  (data)      => api.post('/postecke/profile', data),
+  updateProfil:  (id, data)  => api.put(`/postecke/profile/${id}`, data),
+  deleteProfil:  (id)        => api.delete(`/postecke/profile/${id}`),
+
+  // Posts
+  listPosts:  (status)     => api.get('/postecke/posts', { params: status ? { status } : {} }),
+  getPost:    (id)         => api.get(`/postecke/posts/${id}`),
+  createPost: (data)       => api.post('/postecke/posts', data),
+  updatePost: (id, data)   => api.put(`/postecke/posts/${id}`, data),
+  deletePost: (id)         => api.delete(`/postecke/posts/${id}`),
+  setStatus:  (id, status, geplantAm) =>
+    api.post(`/postecke/posts/${id}/status`, { status, geplant_am: geplantAm || null }),
+
+  // KI-Vorschlag (Fotos + Beschreibung + Profil-Stil)
+  generieren: (id, beschreibung) =>
+    api.post(`/postecke/posts/${id}/generieren`, { beschreibung: beschreibung || null }),
+
+  // Fotos
+  uploadFotos: (id, files) => {
+    const form = new FormData()
+    files.forEach(f => form.append('files', f))
+    // Content-Type bewusst undefined: Browser setzt multipart-boundary selbst
+    return api.post(`/postecke/posts/${id}/fotos`, form, { headers: { 'Content-Type': undefined } })
+  },
+  deleteFoto: (fotoId) => api.delete(`/postecke/fotos/${fotoId}`),
+  // Foto als Blob laden (Bearer-Token nötig, daher kein direktes <img src>)
+  getFoto:    (fotoId) => api.get(`/postecke/fotos/${fotoId}`, { responseType: 'blob' }),
+}
+
 // ── Anlagen (Datacenter-API, generisch über entity_type/entity_id) ────────────
 export const attachmentApi = {
   list:     (entityType, entityId) => api.get(`/datacenter/${entityType}/${entityId}`),

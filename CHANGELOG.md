@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.21] – 2026-07-10 – Neues Modul: Postecke – Social-Media-Posts mit KI vorbereiten
+
+### Neu
+- Postecke: Fotos hochladen, kurz beschreiben (auch per Diktat) – die KI erstellt Posttext, Hashtags, Ort und Gefühl im Stil des gewählten Kontos
+- Postecke: Profile je Social-Media-Konto (Facebook, Instagram, LinkedIn u. a.) mit eigenen Stil-Vorgaben für die KI
+- Postecke: Assistiertes Posten – am iPhone/iPad mit Fotos direkt über das Teilen-Menü, der Text liegt in der Zwischenablage
+- Postecke: Redaktionsplan mit drei Ansichten – Liste, Kanban-Board (Status per Drag & Drop) und Monatskalender, dazu Volltextsuche über alle Posts
+- Postecke: Posts können einem Kontakt zugeordnet und archiviert werden – das Archiv landet samt Text und Fotos im Datacenter beim Kontakt im Ordner „Postsarchiv" (ohne Kontakt global), inklusive Wiederherstellung
+
+### Aktualisierungen
+- KI-Anbindung zentralisiert: Postecke und Mail-Importer nutzen dieselben KI-Einstellungen, jetzt mit Foto-Erkennung
+- Datacenter: Textdateien (z. B. das Postsarchiv) werden in der Vorschau jetzt lesbar angezeigt; die Vorschau respektiert am iPhone den Bildschirmrand und lässt sich immer schließen
+
+---
+
 ## [1.12.20] – 2026-07-08 – Verkauf: Duplizieren, wiederkehrende Rechnungen, erweiterte Suche & Beleg-Archiv
 
 ### Neu
