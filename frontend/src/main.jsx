@@ -50,7 +50,9 @@ function App() {
     <BrowserRouter>
       <SettingsProvider>
         <AuthProvider>
-          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+          {/* Safe-Area-Abstand: am iPhone erscheinen Toasts sonst unter Notch/Kamera */}
+          <Toaster position="top-right" toastOptions={{ duration: 4000 }}
+            containerStyle={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }} />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />

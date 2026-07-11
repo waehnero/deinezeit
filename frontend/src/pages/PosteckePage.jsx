@@ -235,8 +235,18 @@ function PostEditor({ post, profile, onClose, onSaved }) {
       p = res.data
     }
     if (neueFotos.length > 0) {
-      const res = await posteckeApi.uploadFotos(p.id, neueFotos)
-      p = res.data
+      // Fotos EINZELN hochladen: bleibt unter dem nginx-Request-Limit und
+      // ein zu großes Einzelfoto bricht nicht den ganzen Stapel ab
+      for (const foto of neueFotos) {
+        try {
+          const res = await posteckeApi.uploadFotos(p.id, [foto])
+          p = res.data
+        } catch (e) {
+          const grund = e.response?.status === 413
+            ? 'zu groß für den Server' : (e.response?.data?.detail || 'Upload fehlgeschlagen')
+          throw new Error(`Foto „${foto.name}": ${grund}`)
+        }
+      }
       setNeueFotos([])
     }
     setAktuell(p)
@@ -262,7 +272,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
       setAktuell(neu.data)
       toast.success('Vorschlag erstellt — bitte kontrollieren')
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'KI-Vorschlag fehlgeschlagen')
+      toast.error(e.response?.data?.detail || e.message || 'KI-Vorschlag fehlgeschlagen')
     } finally { setLaufend(false) }
   }
 
@@ -274,7 +284,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
       onSaved()
       return p
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Speichern fehlgeschlagen')
+      toast.error(e.response?.data?.detail || e.message || 'Speichern fehlgeschlagen')
       return null
     } finally { setLaufend(false) }
   }
