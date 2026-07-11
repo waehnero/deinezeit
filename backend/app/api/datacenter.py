@@ -109,6 +109,7 @@ PREVIEW_MIMETYPES = [
     "image/",
     "application/pdf",
     "text/plain",
+    "text/markdown",             # z.B. Postecke-Postsarchiv
     "message/rfc822",            # .eml
     "text/rfc822",               # .eml (alternativ)
     "application/vnd.ms-outlook", # .msg

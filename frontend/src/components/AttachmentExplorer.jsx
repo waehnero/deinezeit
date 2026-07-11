@@ -207,8 +207,19 @@ export function AddLinkDialog({ entityType, entityId, providers, onClose, onAdde
 // ── Vorschau Modal ────────────────────────────────────────────────────────────
 function PreviewModal({ attachment, onClose }) {
   const [url, setUrl] = useState(null)
+  const [textInhalt, setTextInhalt] = useState(null)
+
+  // Textdateien (text/plain, text/markdown, …) direkt als Text anzeigen —
+  // ein iframe mit unbekanntem Texttyp bleibt in den meisten Browsern leer.
+  const istText = attachment.mimetype?.startsWith('text/')
 
   useEffect(() => {
+    if (istText) {
+      datacenterApi.previewRaw(attachment.id, 'text').then(r => {
+        setTextInhalt(typeof r.data === 'string' ? r.data : String(r.data))
+      }).catch(onClose)
+      return
+    }
     datacenterApi.preview(attachment.id).then(r => {
       setUrl(URL.createObjectURL(new Blob([r.data], { type: attachment.mimetype })))
     }).catch(onClose)
@@ -216,14 +227,27 @@ function PreviewModal({ attachment, onClose }) {
   }, [attachment.id])
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+    // Safe-Area-Insets: am iPhone bleibt der Schließen-Button erreichbar
+    <div className="fixed inset-x-0 top-0 bg-black/80 flex items-center justify-center z-[60] p-4"
+      style={{
+        height: '100dvh',
+        paddingTop: 'calc(1rem + env(safe-area-inset-top))',
+        paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))',
+      }}
+      onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-full overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-3 border-b border-gray-100">
           <span className="font-medium text-gray-800 text-sm">{attachment.display_name}</span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
-        <div className="overflow-auto" style={{ maxHeight: 'calc(90vh - 56px)' }}>
-          {!url ? (
+        <div className="overflow-auto" style={{ maxHeight: 'calc(100dvh - 140px)' }}>
+          {istText ? (
+            textInhalt === null ? (
+              <div className="flex items-center justify-center h-64"><Loader2 size={28} className="animate-spin text-primary-400" /></div>
+            ) : (
+              <pre className="whitespace-pre-wrap p-5 text-sm text-gray-800 font-sans leading-relaxed">{textInhalt}</pre>
+            )
+          ) : !url ? (
             <div className="flex items-center justify-center h-64"><Loader2 size={28} className="animate-spin text-primary-400" /></div>
           ) : attachment.mimetype?.startsWith('image/') ? (
             <img src={url} alt={attachment.display_name} className="max-w-full mx-auto block p-4" />

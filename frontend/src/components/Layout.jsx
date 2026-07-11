@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Database, Users, User, LogOut, Menu, X,
   ChevronRight, Clock, Settings2, HardDrive, Receipt, GanttChartSquare,
-  PanelLeftClose, PanelLeftOpen, ListTodo
+  PanelLeftClose, PanelLeftOpen, ListTodo, Megaphone
 } from 'lucide-react'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { to: '/aufgaben',     icon: ListTodo,        label: 'Aufgaben' },
   { to: '/projekte',     icon: GanttChartSquare, label: 'Projekte' },
   { to: '/invoices',     icon: Receipt,         label: 'Verkauf' },
+  { to: '/postecke',     icon: Megaphone,       label: 'Postecke' },
   { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },
   { to: '/datacenter',   icon: HardDrive,       label: 'Datacenter' },
 ]
