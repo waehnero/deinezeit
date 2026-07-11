@@ -1836,10 +1836,10 @@ function TabAllgemeinWrapper({ settings, onSaved }) {
   ]
   return (
     <div>
-      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit">
+      <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit max-w-full">
         {subTabs.map(t => (
           <button key={t.id} onClick={() => setSub(t.id)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-all ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
@@ -1861,10 +1861,10 @@ function TabParameter() {
   ]
   return (
     <div>
-      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit">
+      <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit max-w-full">
         {subTabs.map(t => (
           <button key={t.id} onClick={() => setSub(t.id)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-all ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
@@ -1889,10 +1889,10 @@ function TabSystemWrapper({ settings, onSaved }) {
   ]
   return (
     <div>
-      <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit">
+      <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit max-w-full">
         {subTabs.map(t => (
           <button key={t.id} onClick={() => setSub(t.id)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-all ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.22] – 2026-07-11 – Fehlerbehebungen Postecke & Mobil
+
+### Aktualisierungen
+- Postecke: Foto-Upload zuverlässig auch mit großen iPhone-Fotos (Fotos werden einzeln übertragen, Server-Limit erhöht, klare Fehlermeldung je Foto)
+- Postecke: KI-Vorschläge mit vielen Fotos brechen nicht mehr durch Server-Timeout ab
+- Einstellungen: Neues Logo/Favicon erscheint nach dem Hochladen sofort (kein veraltetes Bild aus dem Browser-Cache mehr)
+- iPhone: Hinweismeldungen erscheinen nicht mehr unter der Notch; Unter-Tabs in den Einstellungen laufen nicht mehr über den Bildschirmrand
+
+---
+
 ## [1.12.21] – 2026-07-10 – Neues Modul: Postecke – Social-Media-Posts mit KI vorbereiten
 
 ### Neu

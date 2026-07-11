@@ -140,7 +140,10 @@ async def upload_logo(
         with open(orig_path, "wb") as f:
             f.write(raw_bytes)
 
-        logo_url = f"/api/static/logo/logo_original{ext}"
+        # Cache-Buster: Dateiname bleibt gleich, daher würde der Browser sonst
+        # das alte gecachte Bild weiter anzeigen
+        v = int(datetime.now().timestamp())
+        logo_url = f"/api/static/logo/logo_original{ext}?v={v}"
         _save(db, "logo_url",        logo_url)
         _save(db, "logo_header_url", logo_url)
         _save(db, "logo_favicon_url", logo_url)
@@ -173,9 +176,12 @@ async def upload_logo(
     with open(favicon_path, "wb") as f:
         f.write(favicon_bytes)
 
-    logo_url        = f"/api/static/logo/logo_original{ext}"
-    logo_header_url = "/api/static/logo/logo_header.png"
-    logo_favicon_url = "/api/static/logo/logo_favicon.png"
+    # Cache-Buster: Dateinamen bleiben gleich, daher würde der Browser sonst
+    # die alten gecachten Bilder weiter anzeigen
+    v = int(datetime.now().timestamp())
+    logo_url        = f"/api/static/logo/logo_original{ext}?v={v}"
+    logo_header_url = f"/api/static/logo/logo_header.png?v={v}"
+    logo_favicon_url = f"/api/static/logo/logo_favicon.png?v={v}"
 
     _save(db, "logo_url",         logo_url)
     _save(db, "logo_header_url",  logo_header_url)
@@ -246,7 +252,7 @@ async def upload_favicon(
     with open(favicon_path, "wb") as f:
         f.write(raw_bytes)
 
-    favicon_url = f"/api/static/logo/logo_favicon{ext}"
+    favicon_url = f"/api/static/logo/logo_favicon{ext}?v={int(datetime.now().timestamp())}"
     _save(db, "logo_favicon_url", favicon_url)
     return {"logo_favicon_url": favicon_url}
 

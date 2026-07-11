@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.12.22',
+    day: '11',
+    month: 'Juli',
+    year: '2026',
+    features: [],
+    updates: [
+      'Postecke: Foto-Upload zuverlässig auch mit großen iPhone-Fotos (Fotos werden einzeln übertragen, Server-Limit erhöht, klare Fehlermeldung je Foto)',
+      'Postecke: KI-Vorschläge mit vielen Fotos brechen nicht mehr durch Server-Timeout ab',
+      'Einstellungen: Neues Logo/Favicon erscheint nach dem Hochladen sofort (kein veraltetes Bild aus dem Browser-Cache mehr)',
+      'iPhone: Hinweismeldungen erscheinen nicht mehr unter der Notch; Unter-Tabs in den Einstellungen laufen nicht mehr über den Bildschirmrand',
+    ],
+  },
+  {
     version: '1.12.21',
     day: '10',
     month: 'Juli',
