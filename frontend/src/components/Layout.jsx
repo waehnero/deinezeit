@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Database, Users, User, LogOut, Menu, X,
   ChevronRight, ChevronDown, Clock, Settings2, HardDrive, Receipt, GanttChartSquare,
-  PanelLeftClose, PanelLeftOpen, ListTodo, Megaphone
+  PanelLeftClose, PanelLeftOpen, ListTodo, Megaphone, Moon
 } from 'lucide-react'
+import { toggleDark } from '../utils/anzeige'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
 import { masterdataApi } from '../services/api'
@@ -71,6 +72,7 @@ export default function Layout({ children }) {
     ...mdTypes.map(t2 => ({ label: t2.name, icon: Database, to: `/masterdata/${t2.slug}`, group: 'Stammdaten' })),
     ...(isAdmin ? [{ label: 'Einstellungen', icon: Settings2, to: '/settings', group: 'Aktionen' }] : []),
     { label: 'Mein Profil', icon: User, to: '/profile', group: 'Aktionen' },
+    { label: 'Dunkelmodus umschalten', icon: Moon, action: () => toggleDark(), group: 'Aktionen' },
     { label: 'Abmelden', icon: LogOut, action: () => handleLogout(), group: 'Aktionen' },
   ]
 
