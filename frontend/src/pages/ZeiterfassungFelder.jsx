@@ -96,7 +96,7 @@ export default function ZeiterfassungFelder() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={() => navigate('/zeiterfassung')}
           className="flex items-center gap-1 text-gray-400 hover:text-gray-700 transition text-sm">

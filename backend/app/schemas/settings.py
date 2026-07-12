@@ -6,6 +6,12 @@ class SettingsResponse(BaseModel):
     company_name:           str = 'DeineZeit'
     app_subtitle:           str = 'Zeiterfassung & Stammdaten'
     color_theme:            str = 'orange'
+    # Layout-Redesign: Designvorlage + Whitelabel-Farbanpassung
+    design_template:        str = 'standard'  # standard|aurora|bento|business|kontor|nordic|midnight|kontrast
+    brand_color:            str = ''          # freie Markenfarbe als Hex (leer = color_theme)
+    custom_text_color:      str = ''          # Text-Override als Hex (leer = Vorlagenwert)
+    custom_bg_color:        str = ''          # Seitenhintergrund-Override als Hex
+    custom_surface_color:   str = ''          # Flächen/Karten-Override als Hex
     logo_url:               str = ''        # Original-Logo (Sidebar)
     logo_header_url:        str = ''        # 600×120 für Berichtskopf
     logo_favicon_url:       str = ''        # 32×32 für Browser-Tab
@@ -55,6 +61,12 @@ class SettingsUpdate(BaseModel):
     company_name:           Optional[str] = None
     app_subtitle:           Optional[str] = None
     color_theme:            Optional[str] = None
+    # Layout-Redesign: Designvorlage + Whitelabel-Farbanpassung
+    design_template:        Optional[str] = None
+    brand_color:            Optional[str] = None
+    custom_text_color:      Optional[str] = None
+    custom_bg_color:        Optional[str] = None
+    custom_surface_color:   Optional[str] = None
     sidebar_logo_source:    Optional[str] = None
     # E-Mail (gemeinsam)
     email_provider:         Optional[str] = None

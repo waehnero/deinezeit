@@ -5,6 +5,9 @@ const SettingsContext = createContext(null)
 
 const THEMES = ['orange', 'blue', 'green', 'purple', 'teal', 'red']
 
+// Designvorlagen (Layout-Redesign Etappe 2) — Token-Presets in index.css
+const DESIGNS = ['standard', 'aurora', 'bento', 'business', 'kontor', 'nordic', 'midnight', 'kontrast']
+
 function applyTheme(theme) {
   const root = document.documentElement
   // Standard-Thema (orange) ist in :root definiert, alle anderen über data-theme
@@ -12,6 +15,70 @@ function applyTheme(theme) {
     root.removeAttribute('data-theme')
   } else if (THEMES.includes(theme)) {
     root.setAttribute('data-theme', theme)
+  }
+}
+
+// Designvorlage per data-design am <html> setzen (Presets in index.css)
+function applyDesign(design) {
+  const root = document.documentElement
+  if (!design || design === 'standard' || !DESIGNS.includes(design)) {
+    root.removeAttribute('data-design')
+  } else {
+    root.setAttribute('data-design', design)
+  }
+}
+
+// ── Freie Markenfarbe (Whitelabel): aus einem Hex-Wert die --p-Skala rechnen ─
+function hexToRgb(hex) {
+  const h = (hex || '').replace('#', '')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+}
+
+// Mischt eine Farbe anteilig Richtung Weiß (Tint) bzw. Schwarz (Shade)
+function mix(rgb, target, anteil) {
+  return rgb.map((c, i) => Math.round(c + (target[i] - c) * anteil))
+}
+
+const WEISS = [255, 255, 255]
+const SCHWARZ = [0, 0, 0]
+
+// Stufen wie bei Tailwind-Paletten: 500 = Basiston
+const BRAND_STUFEN = [
+  [50, WEISS, 0.95], [100, WEISS, 0.90], [200, WEISS, 0.75], [300, WEISS, 0.60],
+  [400, WEISS, 0.30], [500, null, 0], [600, SCHWARZ, 0.10], [700, SCHWARZ, 0.25],
+  [800, SCHWARZ, 0.40], [900, SCHWARZ, 0.50],
+]
+
+function applyBrandColor(hex) {
+  const root = document.documentElement
+  const rgb = hexToRgb(hex)
+  for (const [stufe, target, anteil] of BRAND_STUFEN) {
+    if (!rgb) {
+      root.style.removeProperty(`--p-${stufe}`)
+    } else {
+      const [r, g, b] = target ? mix(rgb, target, anteil) : rgb
+      root.style.setProperty(`--p-${stufe}`, `${r} ${g} ${b}`)
+    }
+  }
+}
+
+// ── Farb-Overrides (Text / Hintergrund / Flächen) als Inline-Variablen ──────
+// Leerer Wert = Override entfernen, der Vorlagenwert gilt wieder.
+const OVERRIDE_VARS = {
+  custom_text_color:    ['--n-900'],
+  custom_bg_color:      ['--page-bg'],
+  custom_surface_color: ['--surface'],
+}
+
+function applyColorOverrides(settings) {
+  const root = document.documentElement
+  for (const [key, vars] of Object.entries(OVERRIDE_VARS)) {
+    const rgb = hexToRgb(settings[key])
+    for (const v of vars) {
+      if (rgb) root.style.setProperty(v, `${rgb[0]} ${rgb[1]} ${rgb[2]}`)
+      else root.style.removeProperty(v)
+    }
   }
 }
 
@@ -65,6 +132,9 @@ export function SettingsProvider({ children }) {
       const res = await settingsApi.get()
       setSettings(res.data)
       applyTheme(res.data.color_theme)
+      applyDesign(res.data.design_template)
+      applyBrandColor(res.data.brand_color)
+      applyColorOverrides(res.data)
       applyFavicon(res.data.logo_favicon_url)
     } catch {
       // Bei Fehler Standard-Werte behalten
@@ -81,6 +151,17 @@ export function SettingsProvider({ children }) {
   useEffect(() => {
     applyTheme(settings.color_theme)
   }, [settings.color_theme])
+
+  // Designvorlage sofort anwenden wenn sie sich ändert (Live-Vorschau)
+  useEffect(() => {
+    applyDesign(settings.design_template)
+  }, [settings.design_template])
+
+  // Freie Markenfarbe + Farb-Overrides sofort anwenden (Live-Vorschau)
+  useEffect(() => {
+    applyBrandColor(settings.brand_color)
+    applyColorOverrides(settings)
+  }, [settings.brand_color, settings.custom_text_color, settings.custom_bg_color, settings.custom_surface_color])
 
   // Favicon sofort aktualisieren wenn es sich ändert
   useEffect(() => {

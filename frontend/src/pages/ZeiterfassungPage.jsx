@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import PageHeader from '../components/PageHeader'
 import { useNavigate } from 'react-router-dom'
 import { zeiterfassungApi, masterdataApi, usersApi, datacenterApi } from '../services/api'
 import toast from 'react-hot-toast'
@@ -1075,15 +1076,9 @@ export default function ZeiterfassungPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-50 rounded-xl">
-            <Timer size={22} className="text-primary-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Projektzeit</h1>
-        </div>
+      <PageHeader icon={Clock} title="Zeiterfassung" subtitle="Projektzeiten erfassen und auswerten">
         <div className="flex items-center gap-2">
           <button onClick={() => navigate('/zeiterfassung/felder')} title="Custom-Felder"
             className="p-2.5 border border-gray-300 rounded-xl text-gray-500 hover:bg-gray-50 transition">
@@ -1100,7 +1095,7 @@ export default function ZeiterfassungPage() {
             <span className="hidden sm:inline">Projektzeit nachtragen</span>
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Timer-Bereich */}
       {running ? (

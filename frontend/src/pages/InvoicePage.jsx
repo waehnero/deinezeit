@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import PageHeader from '../components/PageHeader'
+import { Receipt } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
@@ -153,12 +155,8 @@ export default function InvoicePage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Verkauf</h1>
-          <p className="text-sm text-neutral-500 mt-0.5">Rechnungen · Angebote · Auftragsbestätigungen · Gutschriften · Lieferscheine</p>
-        </div>
+    <div className="">
+      <PageHeader icon={Receipt} title="Verkauf" subtitle="Rechnungen · Angebote · Auftragsbestätigungen · Gutschriften · Lieferscheine">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           {selected.size > 0 && (
             <button onClick={() => setSendDialog({ invoices: invoices.filter(i => selected.has(i.id)), mode: 'bulk' })}
@@ -177,7 +175,7 @@ export default function InvoicePage() {
             </button>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-4 overflow-x-auto flex-nowrap sm:flex-wrap sm:w-fit -mx-4 px-4 sm:mx-0 sm:px-1">
         {DOC_TYPES.map(t => (

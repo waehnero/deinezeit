@@ -12,6 +12,8 @@ import {
   AlertTriangle, Archive, ArchiveRestore
 } from 'lucide-react'
 import { CsvExportButton, CsvImportButton } from '../components/CsvImportExport'
+import PageHeader from '../components/PageHeader'
+import { ICONS } from './MasterDataOverview'
 
 // ── Rest-Budget-Zelle (nur Projektzeiten) ─────────────────────────────────────
 function BudgetCell({ budget }) {
@@ -246,27 +248,17 @@ export default function MasterDataDetail() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-        <button onClick={() => navigate('/masterdata')}
-          className="flex items-center gap-1 text-gray-400 hover:text-gray-700 transition text-sm">
-          <ArrowLeft size={16} /> Zurück
-        </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            {entityType.name}
-            {showArchived && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                <Archive size={11} /> Archiv
-              </span>
-            )}
-          </h1>
-          <p className="text-gray-400 text-sm mt-0.5">
-            {total} {total === 1 ? 'Eintrag' : 'Einträge'}
-          </p>
-        </div>
+    <div>
+      <PageHeader
+        icon={ICONS[entityType.icon] || Database}
+        title={entityType.name}
+        subtitle={`${total} ${total === 1 ? 'Eintrag' : 'Einträge'}${showArchived ? ' · Archiv' : ''}`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <button onClick={() => navigate('/masterdata')}
+            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border bg-surface text-gray-600 border-gray-300 hover:bg-neutral-50 transition">
+            <ArrowLeft size={16} /> Zurück
+          </button>
           {isAdmin && (
             <button
               onClick={() => { setShowArchived(v => !v); setPage(1) }}
@@ -298,7 +290,7 @@ export default function MasterDataDetail() {
             </button>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       {/* Grid Feld-Builder – nur für Admins */}
       {isAdmin && (

@@ -6,6 +6,7 @@ import RichTextEditor from '../components/RichTextEditor'
 import UserManagementPage from './UserManagementPage'
 import MailKonten, { KiEinstellungen } from '../components/MailImportVerwaltung'
 import DatenschutzEinstellungen from './DatenschutzEinstellungen'
+import { DESIGN_TEMPLATES } from '../data/designs'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
   Save, Upload, Trash2, Download, Send, Loader2,
@@ -427,16 +428,82 @@ function TabAllgemein({ settings, onSaved }) {
 }
 
 // ── Tab: Design ───────────────────────────────────────────────────────────────
+// Mini-Vorschau einer Designvorlage (stilisierte App-Ansicht aus Vorschaufarben)
+function DesignMiniVorschau({ p }) {
+  return (
+    <div className="w-full h-20 rounded-lg overflow-hidden border flex" style={{ background: p.page, borderColor: p.border }}>
+      <div className="w-1/4 h-full border-r" style={{ background: p.sidebar, borderColor: p.border }}>
+        <div className="mx-1.5 mt-1.5 h-1.5 rounded-sm opacity-70" style={{ background: p.sidebar === '#ffffff' ? p.border : 'rgba(255,255,255,0.55)' }} />
+        <div className="mx-1.5 mt-1 h-1 rounded-sm opacity-50" style={{ background: p.sidebar === '#ffffff' ? p.border : 'rgba(255,255,255,0.35)' }} />
+        <div className="mx-1.5 mt-1 h-1 rounded-sm opacity-50" style={{ background: p.sidebar === '#ffffff' ? p.border : 'rgba(255,255,255,0.35)' }} />
+      </div>
+      <div className="flex-1 p-1.5 space-y-1.5">
+        <div className="flex gap-1.5">
+          <div className="flex-1 h-6 border" style={{ background: p.surface, borderColor: p.border, borderRadius: p.radius }} />
+          <div className="flex-1 h-6 border" style={{ background: p.surface, borderColor: p.border, borderRadius: p.radius }} />
+        </div>
+        <div className="h-8 border p-1" style={{ background: p.surface, borderColor: p.border, borderRadius: p.radius }}>
+          <div className="h-1 w-3/4 rounded-sm" style={{ background: p.text, opacity: 0.65 }} />
+          <div className="h-1 w-1/2 rounded-sm mt-1" style={{ background: p.text, opacity: 0.3 }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Farbwähler mit „Vorlagenwert"-Zustand (leer = Vorlage bestimmt die Farbe)
+function OverrideFarbe({ label, value, onChange }) {
+  return (
+    <div className="flex items-center justify-between gap-3 p-3 border border-gray-200 rounded-xl">
+      <span className="text-sm text-gray-700">{label}</span>
+      <div className="flex items-center gap-2">
+        {value ? (
+          <button onClick={() => onChange('')} className="text-xs text-gray-400 hover:text-gray-600 underline">
+            zurücksetzen
+          </button>
+        ) : (
+          <span className="text-xs text-gray-400">Vorlagenwert</span>
+        )}
+        <input type="color" value={value || '#888888'}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-9 h-7 rounded border border-gray-200 cursor-pointer" />
+      </div>
+    </div>
+  )
+}
+
 function TabDesign({ settings, onSaved }) {
+  const [design, setDesign] = useState(settings.design_template || 'standard')
   const [theme, setTheme] = useState(settings.color_theme || 'orange')
+  const [brandColor, setBrandColor] = useState(settings.brand_color || '')
+  const [textColor, setTextColor] = useState(settings.custom_text_color || '')
+  const [bgColor, setBgColor] = useState(settings.custom_bg_color || '')
+  const [surfaceColor, setSurfaceColor] = useState(settings.custom_surface_color || '')
   const [saving, setSaving] = useState(false)
   const { updateSettings } = useSettings()
+
+  // Live-Vorschau: Änderungen sofort global anwenden (persistiert wird erst
+  // beim Speichern; ohne Speichern gilt nach dem nächsten Laden wieder der
+  // gespeicherte Stand)
+  const live = (partial) => updateSettings(partial)
+
+  const waehleDesign = (id) => { setDesign(id); live({ design_template: id }) }
+  const waehleTheme = (id) => { setTheme(id); setBrandColor(''); live({ color_theme: id, brand_color: '' }) }
+  const waehleBrand = (hex) => { setBrandColor(hex); live({ brand_color: hex }) }
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await settingsApi.update({ color_theme: theme })
-      updateSettings({ color_theme: theme })
+      const payload = {
+        design_template:      design,
+        color_theme:          theme,
+        brand_color:          brandColor,
+        custom_text_color:    textColor,
+        custom_bg_color:      bgColor,
+        custom_surface_color: surfaceColor,
+      }
+      await settingsApi.update(payload)
+      updateSettings(payload)
       toast.success('Design gespeichert')
       onSaved()
     } catch { toast.error('Fehler beim Speichern') }
@@ -444,41 +511,85 @@ function TabDesign({ settings, onSaved }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* ── Designvorlage ── */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">Farbthema</label>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-          {THEMES.map(t => (
-            <button key={t.id} onClick={() => setTheme(t.id)}
-              className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition
-                ${theme === t.id ? 'border-gray-800 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}
+        <label className="block text-sm font-medium text-gray-700 mb-1">Designvorlage</label>
+        <p className="text-xs text-gray-400 mb-3">
+          Bestimmt Formsprache, Flächen und Stimmung der gesamten App — auf allen Geräten.
+          Die Auswahl wird sofort als Vorschau angewendet.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {DESIGN_TEMPLATES.map(d => (
+            <button key={d.id} onClick={() => waehleDesign(d.id)}
+              className={`text-left p-3 rounded-2xl border-2 transition
+                ${design === d.id ? 'border-primary-500 bg-primary-50/40' : 'border-gray-200 hover:border-gray-300'}`}
             >
-              <div className="w-10 h-10 rounded-full shadow-inner" style={{ backgroundColor: t.color }} />
-              <span className="text-xs font-medium text-gray-700">{t.label}</span>
-              {theme === t.id && <CheckCircle size={14} className="text-gray-700" />}
+              <DesignMiniVorschau p={d.preview} />
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-800">{d.label}</span>
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">{d.stil}</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-gray-400">{d.desc}</p>
             </button>
           ))}
         </div>
-        <p className="mt-3 text-xs text-gray-400">
-          Das gewählte Farbthema wird sofort für alle Benutzer aktiv — ohne Neustart.
-        </p>
       </div>
 
-      {/* Vorschau */}
-      <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50">
-        <p className="text-xs font-medium text-gray-500 mb-3">Vorschau</p>
-        <div className="flex flex-wrap gap-2">
-          <button className="px-4 py-2 rounded-lg text-sm font-medium text-white" style={{ backgroundColor: THEMES.find(t=>t.id===theme)?.color }}>
-            Primär-Button
-          </button>
-          <button className="px-4 py-2 rounded-lg text-sm font-medium border" style={{ color: THEMES.find(t=>t.id===theme)?.color, borderColor: THEMES.find(t=>t.id===theme)?.color }}>
-            Outline-Button
-          </button>
-          <span className="px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: THEMES.find(t=>t.id===theme)?.color + '20', color: THEMES.find(t=>t.id===theme)?.color }}>
-            Badge
-          </span>
+      {/* ── Markenfarbe ── */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">Markenfarbe</label>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {THEMES.map(t => (
+            <button key={t.id} onClick={() => waehleTheme(t.id)}
+              className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition
+                ${theme === t.id && !brandColor ? 'border-gray-800 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}
+            >
+              <div className="w-10 h-10 rounded-full shadow-inner" style={{ backgroundColor: t.color }} />
+              <span className="text-xs font-medium text-gray-700">{t.label}</span>
+              {theme === t.id && !brandColor && <CheckCircle size={14} className="text-gray-700" />}
+            </button>
+          ))}
+        </div>
+        <div className={`mt-3 flex items-center justify-between gap-3 p-3 rounded-xl border-2 transition
+          ${brandColor ? 'border-gray-800 bg-gray-50' : 'border-gray-200'}`}>
+          <div>
+            <span className="text-sm font-medium text-gray-700">Eigene Markenfarbe (Whitelabel)</span>
+            <p className="text-xs text-gray-400">Beliebiger Farbton, z. B. die Firmenfarbe des Lizenznehmers — übersteuert die Auswahl oben.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {brandColor && (
+              <button onClick={() => waehleBrand('')} className="text-xs text-gray-400 hover:text-gray-600 underline">
+                zurücksetzen
+              </button>
+            )}
+            <input type="color" value={brandColor || '#f97316'}
+              onChange={(e) => waehleBrand(e.target.value)}
+              className="w-10 h-8 rounded border border-gray-200 cursor-pointer" />
+          </div>
         </div>
       </div>
+
+      {/* ── Feinanpassung ── */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Feinanpassung (optional)</label>
+        <p className="text-xs text-gray-400 mb-3">
+          Überschreibt einzelne Farben der gewählten Vorlage. Leer = Vorlage bestimmt die Farbe.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <OverrideFarbe label="Textfarbe" value={textColor}
+            onChange={(v) => { setTextColor(v); live({ custom_text_color: v }) }} />
+          <OverrideFarbe label="Hintergrund" value={bgColor}
+            onChange={(v) => { setBgColor(v); live({ custom_bg_color: v }) }} />
+          <OverrideFarbe label="Flächen / Karten" value={surfaceColor}
+            onChange={(v) => { setSurfaceColor(v); live({ custom_surface_color: v }) }} />
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-400">
+        Vorlage und Farben gelten sofort für alle Benutzer — ohne Neustart. Die Vorschau siehst du
+        bereits jetzt; endgültig übernommen wird erst beim Speichern.
+      </p>
 
       <div className="pt-2 flex justify-end">
         <button onClick={handleSave} disabled={saving}
@@ -2304,7 +2415,7 @@ export default function SettingsPage() {
   )
 
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-8">
         <div className="p-2 bg-primary-50 rounded-xl"><Settings2 size={22} className="text-primary-600" /></div>
         <div>

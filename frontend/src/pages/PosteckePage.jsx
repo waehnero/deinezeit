@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import PageHeader from '../components/PageHeader'
 import {
   Plus, Loader2, X, Megaphone, Sparkles, Camera, Trash2, Pencil,
   Send, CalendarClock, Inbox, Copy, Check, Settings2,
@@ -689,15 +690,7 @@ export default function PosteckePage() {
   return (
     <div className={`${breite} mx-auto`}>
       {/* Kopfzeile */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900 flex items-center gap-2">
-            <Megaphone size={20} className="text-primary-600" /> Postecke
-          </h1>
-          <p className="text-sm text-neutral-500 mt-0.5">
-            Posts mit KI vorbereiten und gezielt veröffentlichen
-          </p>
-        </div>
+      <PageHeader icon={Megaphone} title="Postecke" subtitle="Posts mit KI vorbereiten und gezielt veröffentlichen">
         <div className="flex items-center gap-2">
           <button onClick={() => setAnsicht(a => a === 'profile' ? 'posts' : 'profile')}
             title="Profile verwalten"
@@ -713,7 +706,7 @@ export default function PosteckePage() {
             </button>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       {ansicht === 'profile' ? (
         <ProfilVerwaltung profile={profile} onReload={laden_} onClose={() => setAnsicht('posts')} />
