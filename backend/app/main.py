@@ -54,21 +54,38 @@ except OSError as e:
 app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ── API-Router ────────────────────────────────────────────────────────────────
+# Modulrechte: Router ganzer Module werden hier mit require_module(<key>)
+# abgesichert (Admin hat immer alles; allowed_modules=NULL = alle erlaubt).
+# Bewusst OHNE Modul-Sperre (Querbezüge, siehe core/modules.py):
+#   masterdata  → Lesen für alle (Auswahlfelder); Schreiben je Endpunkt gesperrt
+#   datacenter  → Anhänge je Datensatz für alle; nur Übersicht je Endpunkt gesperrt
+#   reports     → gehört fachlich zur Zeiterfassung
+from app.api.deps import require_module as _rm
+from fastapi import Depends as _Dep
+
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(masterdata.router, prefix="/api")
-app.include_router(zeiterfassung.router, prefix="/api")
-app.include_router(reports.router, prefix="/api")
+app.include_router(zeiterfassung.router, prefix="/api",
+                   dependencies=[_Dep(_rm("zeiterfassung"))])
+app.include_router(reports.router, prefix="/api",
+                   dependencies=[_Dep(_rm("zeiterfassung"))])
 app.include_router(settings_api.router, prefix="/api")
 app.include_router(datacenter.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
-app.include_router(invoice.router, prefix="/api")
-app.include_router(accounting.router, prefix="/api")
-app.include_router(projektplan.router, prefix="/api")
-app.include_router(aufgaben.router, prefix="/api")
-app.include_router(mailimport.router, prefix="/api")
+app.include_router(invoice.router, prefix="/api",
+                   dependencies=[_Dep(_rm("verkauf"))])
+app.include_router(accounting.router, prefix="/api",
+                   dependencies=[_Dep(_rm("verkauf"))])
+app.include_router(projektplan.router, prefix="/api",
+                   dependencies=[_Dep(_rm("projekte"))])
+app.include_router(aufgaben.router, prefix="/api",
+                   dependencies=[_Dep(_rm("aufgaben"))])
+app.include_router(mailimport.router, prefix="/api",
+                   dependencies=[_Dep(_rm("aufgaben"))])
 app.include_router(gdpr.router, prefix="/api")
-app.include_router(postecke.router, prefix="/api")
+app.include_router(postecke.router, prefix="/api",
+                   dependencies=[_Dep(_rm("postecke"))])
 
 
 # ── Aktivitäts-Middleware: letzte Aktivität pro Benutzer tracken ──────────────

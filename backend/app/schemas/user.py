@@ -27,6 +27,11 @@ class UserResponse(UserBase):
     is_active: bool
     totp_enabled: bool
     created_at: datetime
+    # Gespeicherte Modulrechte (None = alle Module erlaubt)
+    allowed_modules: Optional[list[str]] = None
+    # Effektive Modul-Liste (Admin: immer alle) — Pydantic liest sie über
+    # das @property User.modules (from_attributes)
+    modules: Optional[list[str]] = None
 
     class Config:
         from_attributes = True
@@ -63,6 +68,8 @@ class AdminUserUpdate(BaseModel):
     language: Optional[str] = None
     is_active: Optional[bool] = None
     disable_totp: Optional[bool] = None  # True = 2FA deaktivieren
+    # Modulrechte: Liste erlaubter Module; None = Feld nicht ändern
+    allowed_modules: Optional[list[str]] = None
 
 
 class TOTPSetupResponse(BaseModel):

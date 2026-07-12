@@ -25,7 +25,7 @@ from app.db.base import get_db
 from app.models.attachment import Attachment
 from app.models.masterdata import EntityRecord, EntityType
 from app.models.user import User
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_module
 from app.services import storage_service
 
 
@@ -436,8 +436,11 @@ async def list_all_attachments(
     entity_id:   Optional[str] = Query(None),
     contact_id:  Optional[str] = Query(None),
     db:          Session = Depends(get_db),
-    _:           User = Depends(get_current_user),
+    _:           User = Depends(require_module("datacenter")),
 ):
+    # Übersicht über ALLE Dateien = Datacenter-Modul. Anhänge einzelner
+    # Datensätze (/{entity_type}/{entity_id}) bleiben für alle offen,
+    # damit die Anhang-Panels in anderen Modulen funktionieren.
     q = db.query(Attachment)
     if entity_type:
         q = q.filter(Attachment.entity_type == entity_type)
@@ -459,7 +462,7 @@ async def list_all_attachments(
 async def get_datacenter_stats(
     limit: int = Query(3, ge=1, le=10, description="Anzahl der neuesten Dateien"),
     db:    Session = Depends(get_db),
-    _:     User = Depends(get_current_user),
+    _:     User = Depends(require_module("datacenter")),
 ):
     """Kompakte Zahlen für das Dashboard-Widget: Gesamtanzahl, Neuzugänge
     der letzten 7 Tage und die zuletzt hochgeladenen Dateien."""

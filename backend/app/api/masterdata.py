@@ -7,7 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.db.base import get_db
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_module
 from app.models.user import User
 from app.models.masterdata import EntityType, FieldDefinition, EntityRecord
 from app.schemas.masterdata import (
@@ -266,7 +266,12 @@ async def create_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Neuen Datensatz anlegen."""
+    """Neuen Datensatz anlegen (erfordert Modul Stammdaten).
+
+    Lesen bleibt für alle offen (Auswahlfelder in anderen Modulen) —
+    Schreiben nur mit freigeschaltetem Stammdaten-Modul.
+    """
+    require_module("stammdaten")(current_user)
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")
@@ -295,7 +300,8 @@ async def update_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Datensatz bearbeiten."""
+    """Datensatz bearbeiten (erfordert Modul Stammdaten)."""
+    require_module("stammdaten")(current_user)
     record = masterdata_service.get_record(db, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
@@ -343,7 +349,8 @@ async def import_records_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Datensätze aus CSV importieren (bereits geparste Zeilen als JSON)."""
+    """Datensätze aus CSV importieren (erfordert Modul Stammdaten)."""
+    require_module("stammdaten")(current_user)
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")

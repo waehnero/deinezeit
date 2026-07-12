@@ -792,9 +792,25 @@ export default function DashboardPage() {
 
   const typeMap = Object.fromEntries(types.map(t => [t.slug, t]))
 
-  // Sichtbare Widgets: Admin-Widgets nur für Admins, versteckte nie
+  // Modulrechte: Widget-Typ → benötigtes Modul (Beschluss 2026-07-12).
+  // Widgets nicht freigeschalteter Module werden ausgeblendet.
+  const WIDGET_MODULE = {
+    aufgaben: 'aufgaben', zeiterfassung: 'zeiterfassung', berichte: 'zeiterfassung',
+    rechnungen: 'verkauf', projekte: 'projekte', datacenter: 'datacenter',
+    entity_type: 'stammdaten',
+  }
+  const userModules = user?.modules ?? null
+  const widgetAllowed = (w) => {
+    const mod = WIDGET_MODULE[w.type]
+    if (!mod || userModules === null) return true
+    return userModules.includes(mod)
+  }
+
+  // Sichtbare Widgets: Admin-Widgets nur für Admins, Modul-Widgets nur mit
+  // freigeschaltetem Modul, versteckte nie
   const visibleWidgets = widgets.filter(w => {
     if (ADMIN_TYPES.has(w.type) && !isAdmin) return false
+    if (!widgetAllowed(w)) return false
     if (w.type === 'entity_type' && !typeMap[w.slug]) return false
     return !w.hidden
   })
@@ -802,6 +818,7 @@ export default function DashboardPage() {
   // Katalog für den Bearbeiten-Modus (inkl. versteckter Widgets)
   const catalogWidgets = widgets.filter(w => {
     if (ADMIN_TYPES.has(w.type) && !isAdmin) return false
+    if (!widgetAllowed(w)) return false
     if (w.type === 'entity_type' && !typeMap[w.slug]) return false
     return true
   })

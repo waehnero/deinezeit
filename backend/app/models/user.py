@@ -23,7 +23,16 @@ class User(Base):
     language = Column(String(10), nullable=False, default="de")
     # Persönliche Dashboard-Konfiguration (Widgets, Reihenfolge, Größen); NULL = Standard
     dashboard_config = Column(JSONB, nullable=True)
+    # Modulrechte: JSON-Liste erlaubter Module (siehe core/modules.py).
+    # NULL = alle Module erlaubt (Standard); Admins haben immer alle.
+    allowed_modules = Column(JSONB, nullable=True)
     is_active = Column(Boolean, default=True)
+
+    @property
+    def modules(self) -> list:
+        """Effektive Modul-Liste (Admin: immer alle) — für API-Antworten."""
+        from app.core.modules import user_modules
+        return user_modules(self)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
