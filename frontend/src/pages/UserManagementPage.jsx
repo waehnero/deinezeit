@@ -98,6 +98,18 @@ function NewUserModal({ onClose, onCreated }) {
   )
 }
 
+// Modul-Liste — muss zu backend/app/core/modules.py passen
+const ALL_MODULES = [
+  { key: 'dashboard',     label: 'Dashboard' },
+  { key: 'zeiterfassung', label: 'Zeiterfassung' },
+  { key: 'aufgaben',      label: 'Aufgaben' },
+  { key: 'projekte',      label: 'Projekte' },
+  { key: 'verkauf',       label: 'Verkauf' },
+  { key: 'postecke',      label: 'Postecke' },
+  { key: 'stammdaten',    label: 'Stammdaten' },
+  { key: 'datacenter',    label: 'Datacenter' },
+]
+
 function EditUserModal({ user, onClose, onUpdated }) {
   const [form, setForm] = useState({
     full_name: user.full_name,
@@ -105,9 +117,20 @@ function EditUserModal({ user, onClose, onUpdated }) {
     language: user.language,
     password: '',
     disable_totp: false,
+    // null (= alle erlaubt) → volle Liste vorauswählen
+    modules: user.allowed_modules ?? ALL_MODULES.map(m => m.key),
   })
   const [loading, setLoading] = useState(false)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const toggleModule = (key) => {
+    setForm(f => ({
+      ...f,
+      modules: f.modules.includes(key)
+        ? f.modules.filter(m => m !== key)
+        : [...f.modules, key],
+    }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -118,6 +141,7 @@ function EditUserModal({ user, onClose, onUpdated }) {
         role: form.role,
         language: form.language,
         disable_totp: form.disable_totp || undefined,
+        allowed_modules: form.modules,
       }
       if (form.password) payload.password = form.password
       const res = await usersApi.updateByAdmin(user.id, payload)
@@ -163,6 +187,33 @@ function EditUserModal({ user, onClose, onUpdated }) {
             ))}
           </div>
         </div>
+        {/* Modulrechte: nur relevant für Mitarbeiter — Admins sehen immer alles */}
+        {form.role !== 'admin' && (
+          <div>
+            <label className="label">Module <span className="text-neutral-400 font-normal">(was dieser Benutzer verwenden darf)</span></label>
+            <div className="grid grid-cols-2 gap-2">
+              {ALL_MODULES.map(({ key, label }) => {
+                const active = form.modules.includes(key)
+                return (
+                  <button key={key} type="button" onClick={() => toggleModule(key)}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border-2 transition text-left font-medium ${
+                      active
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-neutral-200 text-neutral-400 hover:border-neutral-300'
+                    }`}>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${active ? 'bg-primary-500' : 'bg-neutral-300'}`} />
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            {form.modules.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1.5">
+                Ohne Module sieht der Benutzer nach dem Login nur sein Profil.
+              </p>
+            )}
+          </div>
+        )}
         {user.totp_enabled && (
           <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <ShieldOff size={16} className="text-amber-600 flex-shrink-0" />

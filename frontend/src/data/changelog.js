@@ -4,6 +4,20 @@
  */
 export const changelog = [
   {
+    version: '1.12.24',
+    day: '12',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Der Admin kann jetzt pro Benutzer festlegen, welche Module er verwenden darf (Benutzerverwaltung → Bearbeiten) — z.B. nur Zeiterfassung für Erfassungs-Mitarbeiter',
+      'Menü und Dashboard zeigen nur noch die freigeschalteten Module; die Startseite ist das erste erlaubte Modul',
+    ],
+    updates: [
+      'Bestehende Benutzer behalten automatisch alle Module — es ändert sich nichts, bis der Admin Module abschaltet',
+      'Stammdaten bleiben für alle lesbar (Auswahlfelder), Bearbeiten erfordert das Stammdaten-Modul; Datei-Anhänge an Datensätzen funktionieren weiterhin in allen Modulen',
+    ],
+  },
+  {
     version: '1.12.23',
     day: '11',
     month: 'Juli',

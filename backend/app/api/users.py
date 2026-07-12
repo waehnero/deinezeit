@@ -85,7 +85,7 @@ async def update_user_by_admin(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Benutzer bearbeiten (nur Admin): Name, Passwort, Rolle, 2FA deaktivieren."""
+    """Benutzer bearbeiten (nur Admin): Name, Passwort, Rolle, 2FA, Modulrechte."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
@@ -102,6 +102,19 @@ async def update_user_by_admin(
     if body.disable_totp:
         user.totp_secret = None
         user.totp_enabled = False
+    if body.allowed_modules is not None:
+        from app.core.modules import MODULE_KEYS
+        invalid = [m for m in body.allowed_modules if m not in MODULE_KEYS]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unbekannte Module: {', '.join(invalid)}. "
+                       f"Erlaubt: {', '.join(MODULE_KEYS)}",
+            )
+        # Vollständige Liste = "alle erlaubt" → als NULL speichern, damit
+        # künftig ergänzte Module automatisch mit erlaubt sind.
+        user.allowed_modules = (None if set(body.allowed_modules) == set(MODULE_KEYS)
+                                else body.allowed_modules)
     db.commit()
     db.refresh(user)
     return user

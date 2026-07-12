@@ -44,7 +44,7 @@ services:
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
       INSTALL_DIR: /opt/deinezeit
-      APP_VERSION: ${APP_VERSION:-1.12.23}
+      APP_VERSION: ${APP_VERSION:-1.12.24}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/deinezeit:/opt/deinezeit

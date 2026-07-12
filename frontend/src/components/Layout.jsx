@@ -11,16 +11,24 @@ import { useAuth } from '../contexts/AuthContext'
 import UpdateBanner from './UpdateBanner'
 
 
+// module = Schlüssel der Modulrechte (backend/app/core/modules.py);
+// der Admin schaltet Module pro Benutzer in der Benutzerverwaltung frei.
 const NAV_ITEMS = [
-  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/zeiterfassung',icon: Clock,           label: 'Zeiterfassung' },
-  { to: '/aufgaben',     icon: ListTodo,        label: 'Aufgaben' },
-  { to: '/projekte',     icon: GanttChartSquare, label: 'Projekte' },
-  { to: '/invoices',     icon: Receipt,         label: 'Verkauf' },
-  { to: '/postecke',     icon: Megaphone,       label: 'Postecke' },
-  { to: '/masterdata',   icon: Database,        label: 'Stammdaten' },
-  { to: '/datacenter',   icon: HardDrive,       label: 'Datacenter' },
+  { to: '/dashboard',    icon: LayoutDashboard,  label: 'Dashboard',     module: 'dashboard' },
+  { to: '/zeiterfassung',icon: Clock,            label: 'Zeiterfassung', module: 'zeiterfassung' },
+  { to: '/aufgaben',     icon: ListTodo,         label: 'Aufgaben',      module: 'aufgaben' },
+  { to: '/projekte',     icon: GanttChartSquare, label: 'Projekte',      module: 'projekte' },
+  { to: '/invoices',     icon: Receipt,          label: 'Verkauf',       module: 'verkauf' },
+  { to: '/postecke',     icon: Megaphone,        label: 'Postecke',      module: 'postecke' },
+  { to: '/masterdata',   icon: Database,         label: 'Stammdaten',    module: 'stammdaten' },
+  { to: '/datacenter',   icon: HardDrive,        label: 'Datacenter',    module: 'datacenter' },
 ]
+
+// Startziel eines Benutzers: Dashboard, sonst erstes freigeschaltetes Modul
+export function homeRoute(hasModule) {
+  const first = NAV_ITEMS.find(item => hasModule(item.module))
+  return first ? first.to : '/profile'
+}
 
 export default function Layout({ children }) {
   const { t } = useTranslation()
@@ -38,8 +46,12 @@ export default function Layout({ children }) {
     })
   }
 
-  const { isAdmin } = useAuth()
+  const { isAdmin, hasModule } = useAuth()
   const { settings } = useSettings()
+
+  // Nur freigeschaltete Module im Menü zeigen
+  const navItems = NAV_ITEMS.filter(item => hasModule(item.module))
+  const home = navItems.length ? navItems[0].to : '/profile'
 
   const handleLogout = () => {
     localStorage.removeItem('access_token')
@@ -58,11 +70,11 @@ export default function Layout({ children }) {
     <div className="flex flex-col h-full">
       {/* Logo / Firmenname – führt zum Dashboard */}
       <button
-        onClick={() => { navigate('/dashboard'); setMobileOpen(false) }}
+        onClick={() => { navigate(home); setMobileOpen(false) }}
         className={`flex items-center gap-3 border-b border-neutral-100 w-full text-left hover:bg-neutral-50 transition-colors ${
           mini ? 'justify-center px-2 py-4' : 'px-4 py-5'
         }`}
-        title="Zum Dashboard"
+        title="Zur Startseite"
       >
         {logoUrl ? (
           <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain flex-shrink-0" />
@@ -88,7 +100,7 @@ export default function Layout({ children }) {
         {!mini && (
           <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider px-2 pb-2">Menü</p>
         )}
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+        {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to} onClick={() => setMobileOpen(false)}
             title={mini ? label : undefined}
             className={({ isActive }) =>
