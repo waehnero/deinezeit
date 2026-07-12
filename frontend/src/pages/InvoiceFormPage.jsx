@@ -351,7 +351,7 @@ export default function InvoiceFormPage() {
   if (loading) return <div className="flex items-center justify-center h-64"><RefreshCw size={24} className="animate-spin text-neutral-400" /></div>
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <div className="">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/invoices')} className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500"><ArrowLeft size={18} /></button>

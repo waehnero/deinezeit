@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import PageHeader from '../components/PageHeader'
 import {
   HardDrive, FolderOpen, Folder, File, FileText, FileImage, FileVideo,
   FileArchive, Link2, Upload, Search, Download, Trash2, Share2, Eye,
@@ -961,15 +962,11 @@ export default function DatacenterPage() {
 
   const sidebarContent = (
     <>
-      <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <HardDrive size={17} className="text-primary-600" />
-            <h2 className="font-bold text-gray-900 text-sm">Datacenter</h2>
-          </div>
-          <p className="text-xs text-gray-400 mt-0.5">Dateien & Links</p>
-        </div>
-        <button onClick={() => setMobileFoldersOpen(false)} className="lg:hidden p-1.5 text-gray-400 hover:text-gray-700 rounded-lg" aria-label="Schließen">
+      {/* Symbol & Titel stehen bereits im einheitlichen Seitenkopf (PageHeader);
+          mobil bleibt nur eine schmale Leiste mit Schließen-Knopf */}
+      <div className="lg:hidden px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <span className="font-semibold text-gray-900 text-sm">Ordner</span>
+        <button onClick={() => setMobileFoldersOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg" aria-label="Schließen">
           <X size={18} />
         </button>
       </div>
@@ -998,7 +995,9 @@ export default function DatacenterPage() {
   )
 
   return (
-    <div className="flex h-full overflow-hidden -m-6">
+    <>
+    <PageHeader icon={HardDrive} title="Datacenter" subtitle="Dateien & Links" />
+    <div className="flex overflow-hidden rounded-xl border border-neutral-200 bg-surface h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-8.5rem)]">
       {/* ── Sidebar (Desktop) ─────────────────────────────────────────────── */}
       <aside className="hidden lg:flex w-56 flex-shrink-0 bg-surface border-r border-gray-200 flex-col overflow-hidden">
         {sidebarContent}
@@ -1190,5 +1189,6 @@ export default function DatacenterPage() {
         </div>
       )}
     </div>
+    </>
   )
 }

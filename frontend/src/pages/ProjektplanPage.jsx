@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import PageHeader from '../components/PageHeader'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, GanttChartSquare, Loader2, Archive, X, Settings2, MoreVertical,
@@ -114,14 +115,9 @@ export default function ProjektplanPage() {
   const initials = (name) => (name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 pb-28">
+    <div className="pb-28">
       {/* Kopf */}
-      <div className="flex items-center gap-3 mb-1">
-        <GanttChartSquare className="text-primary-600" size={26} />
-        <div className="flex-1">
-          <h1 className="text-xl md:text-2xl font-medium text-gray-900">Projekte</h1>
-          <p className="text-xs text-gray-400 hidden sm:block">Kunden · Lieferanten · Interessenten</p>
-        </div>
+      <PageHeader icon={GanttChartSquare} title="Projekte" subtitle="Kunden · Lieferanten · Interessenten">
         <button onClick={() => setShowArchived(v => !v)}
           className={`transition ${showArchived ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'}`}
           title={showArchived ? 'Archivierte ausblenden' : 'Archivierte anzeigen'}>
@@ -135,7 +131,7 @@ export default function ProjektplanPage() {
           className="hidden sm:flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
           <Plus size={16} /> Neues Projekt
         </button>
-      </div>
+      </PageHeader>
 
       {/* Tabs nach Kontakt-Typ */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg overflow-x-auto flex-nowrap sm:w-fit -mx-4 px-4 sm:mx-0 sm:px-1 mt-4 mb-3">

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import PageHeader from '../components/PageHeader'
 import {
   Plus, ListTodo, Loader2, X, Search, CheckCircle2, Circle,
   CalendarDays, User as UserIcon, Link2, Trash2, GanttChartSquare, Database,
@@ -609,13 +610,11 @@ export default function AufgabenPage() {
   const offen = todos.filter(t => t.status !== doneStatus).length
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 pb-28">
+    <div className="pb-28">
       {/* Kopf */}
-      <div className="flex items-center gap-3 mb-1">
-        <ListTodo className="text-primary-600" size={26} />
-        <h1 className="text-xl font-semibold text-neutral-900">Aufgaben</h1>
+      <PageHeader icon={ListTodo} title="Aufgaben" subtitle={`${offen} offene Aufgabe${offen === 1 ? '' : 'n'}`}>
         {/* Ansichts-Umschalter */}
-        <div className="flex rounded-lg border border-gray-300 overflow-hidden ml-auto">
+        <div className="flex rounded-lg border border-gray-300 overflow-hidden">
           {[
             { id: 'liste',    label: 'Liste',    Icon: List },
             { id: 'kanban',   label: 'Kanban',   Icon: Columns },
@@ -633,8 +632,7 @@ export default function AufgabenPage() {
           className="flex items-center px-3 py-1.5 rounded-lg border border-gray-300 bg-surface text-neutral-600 hover:bg-neutral-50">
           <Mail size={15} />
         </button>
-      </div>
-      <p className="text-sm text-neutral-500 mb-5">{offen} offene Aufgabe{offen === 1 ? '' : 'n'}</p>
+      </PageHeader>
 
       {/* KI-Vorschläge aus E-Mails (nur sichtbar, wenn offene existieren) */}
       <MailVorschlaege key={mailRefresh} onAccepted={load} />

@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import PageHeader from '../components/PageHeader'
+import { LayoutDashboard } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   masterdataApi, authApi, zeiterfassungApi, invoiceApi, projektplanApi,
@@ -829,17 +831,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div>
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-primary-500 mb-1">
-            {greeting}{firstName ? `, ${firstName}` : ''} 👋
-          </p>
-          <h1 className="text-2xl font-bold text-neutral-900">Dashboard</h1>
-          <p className="text-neutral-500 text-sm mt-1">Übersicht deiner Daten</p>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
+      <PageHeader icon={LayoutDashboard} title="Dashboard" subtitle={`${greeting}${firstName ? `, ${firstName}` : ''} — Übersicht deiner Daten`}>
+        <div className="flex items-center gap-2">
           {editMode ? (
             <>
               <span className="text-xs text-primary-600 font-medium hidden sm:block">Layout bearbeiten</span>
@@ -861,7 +856,7 @@ export default function DashboardPage() {
             </button>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       {/* Bearbeiten-Modus: Hinweis + Widget-Katalog */}
       {editMode && (

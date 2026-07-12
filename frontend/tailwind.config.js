@@ -30,6 +30,14 @@ export default {
         'surface-2': 'rgb(var(--surface-2) / <alpha-value>)',
         'page':      'rgb(var(--page-bg) / <alpha-value>)',
         'on-accent': 'rgb(var(--on-accent) / <alpha-value>)',
+        // Sidebar-Tokens (Designvorlagen färben die Sidebar separat)
+        'sidebar':             'rgb(var(--sidebar-bg) / <alpha-value>)',
+        'sidebar-border':      'rgb(var(--sidebar-border) / <alpha-value>)',
+        'sidebar-text':        'rgb(var(--sidebar-text) / <alpha-value>)',
+        'sidebar-text-hover':  'rgb(var(--sidebar-text-hover) / <alpha-value>)',
+        'sidebar-hover':       'rgb(var(--sidebar-hover-bg) / <alpha-value>)',
+        'sidebar-active':      'rgb(var(--sidebar-active-bg) / <alpha-value>)',
+        'sidebar-active-text': 'rgb(var(--sidebar-active-text) / <alpha-value>)',
       },
       fontFamily: {
         sans: 'var(--font-sans)',

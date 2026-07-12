@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import PageHeader from '../components/PageHeader'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { masterdataApi } from '../services/api'
@@ -10,7 +11,7 @@ import {
 } from 'lucide-react'
 
 // Icon-Mapping: Backend-Name → Lucide-Komponente
-const ICONS = {
+export const ICONS = {
   Users, Package, FolderOpen, Database,
   Settings, Hash,
 }
@@ -197,13 +198,8 @@ export default function MasterDataOverview() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stammdaten</h1>
-          <p className="text-gray-500 mt-1">Verwalten Sie Ihre Kunden, Lieferanten, Projekte und mehr</p>
-        </div>
+    <div>
+      <PageHeader icon={Database} title="Stammdaten" subtitle="Kontakte, Artikel und eigene Datentypen verwalten">
         {isAdmin && <button
           onClick={() => setShowNewModal(true)}
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
@@ -211,7 +207,7 @@ export default function MasterDataOverview() {
           <Plus size={18} />
           Neuer Typ
         </button>}
-      </div>
+      </PageHeader>
 
       {/* Karten-Grid */}
       {types.length === 0 ? (

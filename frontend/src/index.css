@@ -55,6 +55,15 @@
   --page-bg:   var(--n-50);      /* Seitenhintergrund             */
   --on-accent: 255 255 255;      /* Text auf Markenfarbe          */
 
+  /* ── Sidebar (eigene Tokens, da Vorlagen sie separat einfärben) ── */
+  --sidebar-bg:          255 255 255;
+  --sidebar-border:      var(--n-200);
+  --sidebar-text:        var(--n-600);
+  --sidebar-text-hover:  var(--n-900);
+  --sidebar-hover-bg:    var(--n-100);
+  --sidebar-active-bg:   var(--p-50);
+  --sidebar-active-text: var(--p-700);
+
   /* ── Form & Tiefe ── */
   --radius-s: 0.5rem;            /* rounded-lg  (Inputs, Buttons) */
   --radius:   0.75rem;           /* rounded-xl  (Karten)          */
@@ -136,6 +145,183 @@
   --p-700: 190 18 60;
   --p-800: 159 18 57;
   --p-900: 136 19 55;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGNVORLAGEN (Etappe 2 des Layout-Redesigns)
+
+   Eine Vorlage wird per data-design am <html> gesetzt (SettingsContext) und
+   überschreibt ausschließlich Design-Tokens — nie einzelne Komponenten.
+   Die Markenfarbe (--p-*) steuern Vorlagen bewusst NICHT: sie kommt weiterhin
+   aus color_theme (data-theme) bzw. brand_color (Inline-Variablen), damit
+   Whitelabel-Farbe und Vorlage frei kombinierbar bleiben.
+   Vorlagen: standard (= :root) · aurora · bento · business · kontor ·
+             nordic · midnight · kontrast
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Aurora Glas: Modern, transluzente Flächen, sanfte Verläufe ─────────── */
+[data-design="aurora"] {
+  --page-bg: 238 242 255;
+  --radius-s: 0.75rem;
+  --radius:   1.125rem;
+  --radius-l: 1.375rem;
+  --shadow-card:       0 8px 24px rgb(99 102 241 / 0.10);
+  --shadow-card-hover: 0 12px 32px rgb(99 102 241 / 0.16);
+}
+[data-design="aurora"] body {
+  background-image:
+    radial-gradient(1100px 600px at 8% -10%, rgb(224 231 255 / 0.9) 0%, transparent 55%),
+    radial-gradient(900px 500px at 108% 8%, rgb(252 231 243 / 0.7) 0%, transparent 50%),
+    linear-gradient(rgb(248 250 252), rgb(238 242 255));
+  background-attachment: fixed;
+}
+[data-design="aurora"] .card {
+  background-color: rgb(var(--surface) / 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgb(255 255 255 / 0.75);
+}
+[data-design="aurora"] aside {
+  background-color: rgb(var(--sidebar-bg) / 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Bento Studio: Modern, große Radien, weiche Kachel-Schatten ─────────── */
+[data-design="bento"] {
+  --page-bg: 246 247 251;
+  --radius-s: 0.75rem;
+  --radius:   1.375rem;
+  --radius-l: 1.5rem;
+  --shadow-card:       0 2px 10px rgb(2 32 71 / 0.06);
+  --shadow-card-hover: 0 6px 20px rgb(2 32 71 / 0.10);
+}
+
+/* ── Business Line: Klassisch, dicht, dunkle Marine-Sidebar ─────────────── */
+[data-design="business"] {
+  --page-bg: 238 241 245;
+  --radius-s: 0.375rem;
+  --radius:   0.5rem;
+  --radius-l: 0.625rem;
+  --shadow-card:       0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-card-hover: 0 2px 6px rgb(15 23 42 / 0.09);
+  --sidebar-bg:          15 43 70;
+  --sidebar-border:      15 43 70;
+  --sidebar-text:        219 230 242;
+  --sidebar-text-hover:  255 255 255;
+  --sidebar-hover-bg:    31 62 92;
+  --sidebar-active-bg:   38 71 103;
+  --sidebar-active-text: 255 255 255;
+}
+
+/* ── Kontor: Klassisch, warme Papiertöne, Serifen-Überschriften ─────────── */
+[data-design="kontor"] {
+  --n-50:  247 244 238;
+  --n-100: 241 236 225;
+  --n-200: 231 224 210;
+  --n-300: 209 200 182;
+  --n-400: 156 148 132;
+  --n-500: 140 133 120;
+  --n-600: 107 100 88;
+  --n-700: 78 72 62;
+  --n-800: 56 51 44;
+  --n-900: 41 37 31;
+  --surface: 255 253 249;
+  --page-bg: 247 244 238;
+  --radius-s: 0.5rem;
+  --radius:   0.625rem;
+  --radius-l: 0.875rem;
+  --sidebar-bg:          46 41 36;
+  --sidebar-border:      46 41 36;
+  --sidebar-text:        233 226 214;
+  --sidebar-text-hover:  255 251 243;
+  --sidebar-hover-bg:    66 59 52;
+  --sidebar-active-bg:   66 59 52;
+  --sidebar-active-text: 240 217 184;
+}
+[data-design="kontor"] h1,
+[data-design="kontor"] h2,
+[data-design="kontor"] h3,
+[data-design="kontor"] h4 {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* ── Nordic Ruhe: Zeitlos, flach, feine Linien, kein Schatten ───────────── */
+[data-design="nordic"] {
+  --n-100: 244 244 242;
+  --n-200: 236 236 234;
+  --page-bg: 251 251 250;
+  --radius-s: 0.625rem;
+  --radius:   0.75rem;
+  --radius-l: 1rem;
+  --shadow-card:       none;
+  --shadow-card-hover: none;
+  --sidebar-bg:       244 244 242;
+  --sidebar-border:   236 236 234;
+}
+
+/* ── Midnight Pro: Dark Mode (invertierte Grau-Skala) ───────────────────── */
+[data-design="midnight"] {
+  --n-50:  30 41 59;
+  --n-100: 36 48 68;
+  --n-200: 51 65 85;
+  --n-300: 71 85 105;
+  --n-400: 148 163 184;
+  --n-500: 160 174 192;
+  --n-600: 189 199 212;
+  --n-700: 209 217 228;
+  --n-800: 226 232 240;
+  --n-900: 241 245 249;
+  --surface:   18 27 46;
+  --surface-2: 15 23 40;
+  --page-bg:   11 18 32;
+  --shadow-card:       0 8px 24px rgb(0 0 0 / 0.40);
+  --shadow-card-hover: 0 12px 32px rgb(0 0 0 / 0.50);
+  --sidebar-bg:          14 22 38;
+  --sidebar-border:      30 41 59;
+  --sidebar-text:        203 213 225;
+  --sidebar-text-hover:  248 250 252;
+  --sidebar-hover-bg:    30 41 59;
+  --sidebar-active-bg:   30 45 66;
+  --sidebar-active-text: var(--p-300);
+}
+[data-design="midnight"] {
+  color-scheme: dark;
+}
+
+/* ── Kontrast Plus: Barrierefrei (WCAG 2.2), große Schrift, harte Rahmen ── */
+html[data-design="kontrast"] {
+  font-size: 17px;
+}
+[data-design="kontrast"] {
+  --n-50:  255 255 255;
+  --n-100: 245 245 245;
+  --n-200: 0 0 0;
+  --n-300: 0 0 0;
+  --n-400: 64 64 64;
+  --n-500: 51 51 51;
+  --n-600: 38 38 38;
+  --n-700: 26 26 26;
+  --n-800: 13 13 13;
+  --n-900: 0 0 0;
+  --surface: 255 255 255;
+  --page-bg: 255 255 255;
+  --radius-s: 0.25rem;
+  --radius:   0.375rem;
+  --radius-l: 0.5rem;
+  --shadow-card:       none;
+  --shadow-card-hover: none;
+  --sidebar-bg:          255 255 255;
+  --sidebar-border:      0 0 0;
+  --sidebar-text:        0 0 0;
+  --sidebar-text-hover:  0 0 0;
+  --sidebar-hover-bg:    245 245 245;
+  --sidebar-active-bg:   0 0 0;
+  --sidebar-active-text: 255 255 255;
+}
+[data-design="kontrast"] :is(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 3px solid #d97706;
+  outline-offset: 2px;
 }
 
 @layer base {
