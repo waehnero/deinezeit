@@ -1,6 +1,6 @@
 {
   "name": "deinezeit-frontend",
-  "version": "1.12.24",
+  "version": "1.12.25",
   "private": true,
   "scripts": {
     "dev": "vite",

@@ -40,7 +40,7 @@ function Card({ task, onOpen }) {
   const estimate = task.estimate_minutes || 0
   return (
     <div ref={setNodeRef} style={style}
-      className="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm select-none">
+      className="bg-surface border border-gray-200 rounded-lg p-3 mb-2 shadow-sm select-none">
       {/* Greifbereich + Klick zum Öffnen */}
       <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing">
         {task.data?.task_type && task.data.task_type !== 'aufgabe' && (
@@ -170,7 +170,7 @@ export default function KanbanBoard({ project, settings, onOpenTask, onChanged }
       </div>
       <DragOverlay>
         {activeTask ? (
-          <div className="bg-white border border-primary-300 rounded-lg p-3 shadow-lg w-60">
+          <div className="bg-surface border border-primary-300 rounded-lg p-3 shadow-lg w-60">
             <p className="text-sm text-gray-900">{activeTask.title}</p>
           </div>
         ) : null}

@@ -75,7 +75,7 @@ function Field({ label, children }) {
 }
 
 const inputCls  = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-const selectCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+const selectCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
 
 const PRESETS = [
   { id: 'heute',   label: 'Heute' },
@@ -228,7 +228,7 @@ export default function BerichtDialog({ onClose }) {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
       {/* Dialog */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative bg-surface rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
@@ -359,7 +359,7 @@ export default function BerichtDialog({ onClose }) {
                   className={inputCls}
                 />
                 {contactOpen && filteredContacts.length > 0 && (
-                  <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">
+                  <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">
                     <div className="px-3 py-1.5 text-xs text-gray-400 border-b cursor-pointer hover:bg-gray-50"
                       onMouseDown={() => { setContactName(''); setContactInput(''); setContactOpen(false) }}>
                       — Alle Kunden —
@@ -471,7 +471,7 @@ export default function BerichtDialog({ onClose }) {
               Abbrechen
             </button>
             <button onClick={handlePreview} disabled={busy || !dateFrom || !dateTo}
-              className="flex items-center gap-2 px-4 py-2 border border-primary-300 bg-white hover:bg-primary-50 disabled:opacity-50 text-primary-700 text-sm font-medium rounded-xl transition">
+              className="flex items-center gap-2 px-4 py-2 border border-primary-300 bg-surface hover:bg-primary-50 disabled:opacity-50 text-primary-700 text-sm font-medium rounded-xl transition">
               {loadingHtml
                 ? <><Loader2 size={14} className="animate-spin" /> Lade…</>
                 : <><Eye size={14} /> Vorschau</>

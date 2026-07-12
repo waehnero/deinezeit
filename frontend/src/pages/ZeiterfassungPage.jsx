@@ -222,7 +222,7 @@ function ProjectSearch({ value, onChange, disabled, placeholder = 'Projektzeitna
         disabled={disabled}
       />
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-xl shadow-lg z-30 overflow-hidden">
           {results.length > 0 ? (
             <>
               <ul className="max-h-52 overflow-y-auto">
@@ -293,7 +293,7 @@ function RunningTimerCard({ entry, onStop, onPause, onSwitch, onDelete, onUpdate
   }, [note, billable, project, pause])
 
   return (
-    <div className={`bg-white rounded-2xl border-2 overflow-hidden mb-6 ${billable ? 'border-green-400' : 'border-orange-400'}`}>
+    <div className={`bg-surface rounded-2xl border-2 overflow-hidden mb-6 ${billable ? 'border-green-400' : 'border-orange-400'}`}>
       {/* Farbiger Akzent-Streifen oben */}
       <div className={`h-1 ${billable ? 'bg-gradient-to-r from-green-400 to-green-500' : 'bg-gradient-to-r from-orange-400 to-orange-500'}`} />
 
@@ -443,7 +443,7 @@ function StartTimerCard({ onStart }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
+    <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden mb-6">
       <div className="h-1 bg-gray-100" />
       <div className="p-5">
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
@@ -653,7 +653,7 @@ function EntryModal({ entry, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl my-8">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">
             {isEdit ? 'Zeiteintrag bearbeiten' : 'Projektzeit nachtragen'}
@@ -781,7 +781,7 @@ function StatusMenu({ entry, isAdmin, currentUserId, onSetStatus }) {
         <Icon size={14} />
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 w-48">
+        <div className="absolute right-0 top-8 z-20 bg-surface border border-gray-200 rounded-xl shadow-lg py-1 w-48">
           <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100">
             Status: {cfg.label}
           </div>
@@ -1118,7 +1118,7 @@ export default function ZeiterfassungPage() {
 
       {/* Statistik-Ringe */}
       {stats && (
-        <div className="flex justify-around bg-white rounded-2xl border border-gray-200 p-5 mb-6">
+        <div className="flex justify-around bg-surface rounded-2xl border border-gray-200 p-5 mb-6">
           <RingChart label="Heute" minutes={stats.today_minutes} billableMinutes={stats.today_billable_minutes ?? stats.today_minutes} targetMinutes={stats.today_target_minutes} />
           <RingChart label="Woche" minutes={stats.week_minutes} billableMinutes={stats.week_billable_minutes ?? stats.week_minutes} targetMinutes={stats.week_target_minutes} />
           <RingChart label="Monat" minutes={stats.month_minutes} billableMinutes={stats.month_billable_minutes ?? stats.month_minutes} targetMinutes={stats.month_target_minutes} />
@@ -1131,10 +1131,10 @@ export default function ZeiterfassungPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             placeholder="In Einträgen suchen…"
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white" />
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface" />
         </div>
         <select value={filterUserId} onChange={(e) => { setFilterUserId(e.target.value); setPage(1) }}
-          className="px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+          className="px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
           <option value="">Alle Benutzer</option>
           {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
         </select>
@@ -1165,7 +1165,7 @@ export default function ZeiterfassungPage() {
       )}
 
       {/* Tabelle */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-40">
             <Loader2 size={28} className="animate-spin text-primary-400" />

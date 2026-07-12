@@ -182,7 +182,7 @@ export default function InvoicePage() {
       <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-4 overflow-x-auto flex-nowrap sm:flex-wrap sm:w-fit -mx-4 px-4 sm:mx-0 sm:px-1">
         {DOC_TYPES.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`px-3 py-1.5 text-sm rounded-md transition-all whitespace-nowrap shrink-0 ${activeTab === t.key ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded-md transition-all whitespace-nowrap shrink-0 ${activeTab === t.key ? 'bg-surface text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
@@ -206,7 +206,7 @@ export default function InvoicePage() {
         </div>
       </div>
 
-      <div className="bg-white border border-neutral-200 rounded-xl overflow-visible">
+      <div className="bg-surface border border-neutral-200 rounded-xl overflow-visible">
         {loading && invoices.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-neutral-400">
             <RefreshCw size={20} className="animate-spin mr-2" /> Laden…
@@ -369,7 +369,7 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
   const isGs = doc_type === 'gutschrift'
 
   return createPortal(
-    <div ref={menuRef} style={style} className="bg-white border border-neutral-200 rounded-lg shadow-lg py-1">
+    <div ref={menuRef} style={style} className="bg-surface border border-neutral-200 rounded-lg shadow-lg py-1">
       <button onClick={onEdit} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
         <Eye size={14} /> Öffnen / Bearbeiten
       </button>
@@ -453,7 +453,7 @@ function CancelDialog({ invoice, onClose, onConfirm }) {
   const [mode, setMode] = useState('with_credit')
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+      <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-md">
         <h2 className="text-base font-semibold mb-1">Rechnung stornieren</h2>
         <p className="text-sm text-neutral-500 mb-4">{invoice.number} — {Number(invoice.total).toLocaleString('de-AT', { minimumFractionDigits: 2 })} €</p>
         <div className="space-y-2 mb-6">
@@ -479,7 +479,7 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10))
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
+      <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm">
         <h2 className="text-base font-semibold mb-4">Als bezahlt markieren</h2>
         <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsdatum</label>
         <input type="date" value={paidAt} onChange={e => setPaidAt(e.target.value)}
@@ -504,7 +504,7 @@ function DuplicateDialog({ invoice, onClose, onConfirm }) {
   ]
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+      <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-md">
         <h2 className="text-base font-semibold mb-1">Beleg duplizieren</h2>
         <p className="text-sm text-neutral-500 mb-4">{invoice.number} — es entsteht ein neuer Entwurf mit eigener Nummer.</p>
         <div className="space-y-2 mb-6">
@@ -554,7 +554,7 @@ function DatacenterPicker({ onSelect, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-md flex flex-col" style={{maxHeight:'80vh'}}>
+      <div className="bg-surface rounded-xl shadow-xl p-5 w-full max-w-md flex flex-col" style={{maxHeight:'80vh'}}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-sm flex items-center gap-2">
             <HardDrive size={15} className="text-blue-500" /> Datacenter
@@ -689,7 +689,7 @@ function SendDialog({ invoices, onClose, onSent }) {
           }}
         />
       )}
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
+      <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-lg">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Mail size={16} className="text-blue-600" />
           {isBulk ? `${invoices.length} Belege per E-Mail senden` : `${single.number} per E-Mail senden`}

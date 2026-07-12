@@ -79,7 +79,7 @@ export default function PosteckeKalender({ posts, kanalVon, onOpen }) {
       {/* Monatsnavigation */}
       <div className="flex items-center justify-between mb-3">
         <button onClick={() => wechseln(-1)}
-          className="p-1.5 rounded-lg border border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800">
+          className="p-1.5 rounded-lg border border-neutral-200 bg-surface text-neutral-500 hover:text-neutral-800">
           <ChevronLeft size={16} />
         </button>
         <button onClick={() => setMonat(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })}
@@ -87,7 +87,7 @@ export default function PosteckeKalender({ posts, kanalVon, onOpen }) {
           {monatsname}
         </button>
         <button onClick={() => wechseln(1)}
-          className="p-1.5 rounded-lg border border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800">
+          className="p-1.5 rounded-lg border border-neutral-200 bg-surface text-neutral-500 hover:text-neutral-800">
           <ChevronRight size={16} />
         </button>
       </div>
@@ -105,7 +105,7 @@ export default function PosteckeKalender({ posts, kanalVon, onOpen }) {
             <div key={i}
               className={`rounded-lg border p-1 min-h-[72px] ${
                 key === heute ? 'border-primary-300 bg-primary-50/40'
-                  : imMonat ? 'border-neutral-200 bg-white' : 'border-neutral-100 bg-neutral-50'
+                  : imMonat ? 'border-neutral-200 bg-surface' : 'border-neutral-100 bg-neutral-50'
               }`}>
               <p className={`text-[11px] px-0.5 ${imMonat ? 'text-neutral-500' : 'text-neutral-300'} ${key === heute ? 'font-semibold text-primary-700' : ''}`}>
                 {tag.getDate()}

@@ -177,7 +177,7 @@ export default function StundenkontenPanel({ projectId = null, pending = [], onP
           </div>
           <div className="col-span-2 sm:col-span-4 flex justify-end gap-2">
             <button type="button" onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-white transition">
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-surface transition">
               Abbrechen
             </button>
             <button type="button" onClick={handleAdd} disabled={saving}
@@ -196,7 +196,7 @@ export default function StundenkontenPanel({ projectId = null, pending = [], onP
       ) : (
         <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
           {items.map(k => (
-            <li key={k.id} className="flex items-center gap-3 px-4 py-2.5 text-sm bg-white">
+            <li key={k.id} className="flex items-center gap-3 px-4 py-2.5 text-sm bg-surface">
               <div className="flex-1 min-w-0">
                 <span className="font-medium text-gray-800">{k.bezeichnung || 'Stundenkonto'}</span>
                 <span className="text-gray-400 ml-2 text-xs">

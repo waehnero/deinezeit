@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeineZeit – Layout-Redesign: 12 Designvorschläge</title>
+<style>
+/* ============ Seiten-Layout ============ */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#eef0f4;color:#1c2430}
+.bar{position:sticky;top:0;z-index:50;background:#101828;color:#fff;padding:14px 28px;display:flex;flex-wrap:wrap;align-items:center;gap:18px;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.bar h1{font-size:17px;font-weight:700}
+.bar h1 small{font-weight:400;opacity:.7;font-size:13px}
+.ctrl{display:flex;align-items:center;gap:16px;margin-left:auto;flex-wrap:wrap;font-size:13px}
+.ctrl label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.ctrl input[type=color]{width:34px;height:26px;border:none;border-radius:6px;cursor:pointer;background:none}
+#favsum{font-size:12px;background:rgba(255,255,255,.12);padding:5px 12px;border-radius:999px;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.intro{max-width:1200px;margin:28px auto 8px;padding:0 28px;font-size:14.5px;line-height:1.65;color:#3c4657}
+.intro b{color:#101828}
+.wrap{max-width:1280px;margin:0 auto;padding:12px 20px 60px}
+/* Vorschlags-Karte */
+.card{background:#fff;border-radius:18px;margin:26px 0;padding:26px 28px;box-shadow:0 2px 14px rgba(16,24,40,.07)}
+.card.fav{outline:3px solid #f59e0b;outline-offset:-3px}
+.card-head{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.nr{width:38px;height:38px;border-radius:12px;background:#101828;color:#fff;display:grid;place-items:center;font-weight:700;font-size:16px;flex-shrink:0}
+.card-head h2{font-size:20px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#eef2f7;color:#3c4657}
+.tag.stil{background:#101828;color:#fff}
+.tag.dev{background:#dbeafe;color:#1d4ed8}
+.tag.a11y{background:#dcfce7;color:#15803d}
+.favbtn{margin-left:auto;border:1.5px solid #d5dae3;background:#fff;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#3c4657}
+.card.fav .favbtn{background:#f59e0b;border-color:#f59e0b;color:#fff}
+.desc{font-size:13.5px;line-height:1.6;color:#4b5565;max-width:900px;margin:4px 0 18px}
+.frames{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end;justify-content:center}
+.dev{display:flex;flex-direction:column;align-items:center;gap:9px}
+.dev-label{font-size:11.5px;font-weight:600;color:#7a8494;text-transform:uppercase;letter-spacing:.06em}
+.hold{overflow:hidden;cursor:zoom-in;border-radius:inherit}
+.bezel{border:9px solid #16181d;border-radius:34px;box-shadow:0 10px 30px rgba(0,0,0,.22);overflow:hidden;background:#16181d}
+.bezel-pad{border:11px solid #16181d;border-radius:26px;box-shadow:0 10px 30px rgba(0,0,0,.22);overflow:hidden;background:#16181d}
+.bezel-mac{border:10px solid #16181d;border-bottom-width:22px;border-radius:14px;box-shadow:0 12px 34px rgba(0,0,0,.25);overflow:hidden;background:#16181d}
+.frame{transform-origin:top left;position:relative;overflow:hidden}
+/* Zoom-Overlay */
+#zoom{position:fixed;inset:0;background:rgba(10,14,22,.82);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;cursor:zoom-out}
+#zoom.on{display:flex}
+#zoom .zcap{color:#fff;font-size:14px;font-weight:600}
+/* Info-Sektionen */
+.sect{background:#fff;border-radius:18px;margin:26px 0;padding:28px;box-shadow:0 2px 14px rgba(16,24,40,.07)}
+.sect h2{font-size:19px;margin-bottom:6px}
+.sect .sub{font-size:13.5px;color:#7a8494;margin-bottom:18px}
+.mh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.mh{border:1px solid #e7eaf0;border-radius:12px;padding:14px 16px}
+.mh b{font-size:13.5px;display:block;margin-bottom:4px}
+.mh p{font-size:12.5px;color:#5b6472;line-height:1.55}
+.rule{display:flex;gap:14px;padding:13px 0;border-bottom:1px solid #eef0f4;font-size:13.5px;line-height:1.6;color:#3c4657}
+.rule:last-child{border-bottom:none}
+.rule .rn{width:28px;height:28px;border-radius:8px;background:#eef2f7;display:grid;place-items:center;font-weight:700;font-size:13px;flex-shrink:0;color:#101828}
+.rule b{color:#101828}
+
+/* ============ Mockup-Basis (alle Themes) ============ */
+.frame{
+  --acc:var(--brand-o,var(--acc-def));
+  --acc-def:#f97316; --on-acc:#fff;
+  --bg:#f5f6f8; --srf:#ffffff; --srf2:#f1f2f5;
+  --txt:#1c2430; --mut:#7a8494; --brd:#e4e7ec;
+  --rad:14px; --rad-s:9px;
+  --shd:0 1px 3px rgba(15,23,42,.08);
+  --side-bg:#ffffff; --side-txt:#1c2430;
+  --nav-on-bg:color-mix(in srgb,var(--acc) 13%,transparent);
+  --nav-on-txt:var(--acc);
+  --top-bg:transparent;
+  --fnt:'Inter',system-ui,sans-serif;
+  font-family:var(--fnt);background:var(--bg);color:var(--txt);
+}
+.app{display:flex;height:100%}
+.side{width:210px;background:var(--side-bg);color:var(--side-txt);padding:16px 12px;display:flex;flex-direction:column;gap:5px;border-right:1px solid var(--brd);flex-shrink:0}
+.side.rail{width:64px;align-items:center;padding:16px 8px}
+.logo-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:0 4px}
+.logo-dot{width:30px;height:30px;border-radius:9px;background:var(--acc);display:grid;place-items:center;color:var(--on-acc);font-weight:800;font-size:14px;flex-shrink:0}
+.logo-name{font-weight:700;font-size:16px;white-space:nowrap}
+.nav-it{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--rad-s);font-size:14.5px;opacity:.72;white-space:nowrap}
+.side.rail .nav-it{padding:10px}
+.nav-it.on{background:var(--nav-on-bg);color:var(--nav-on-txt);opacity:1;font-weight:600}
+.nav-it svg{flex-shrink:0}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{height:58px;display:flex;align-items:center;gap:12px;padding:0 18px;background:var(--top-bg);border-bottom:1px solid var(--brd);flex-shrink:0}
+.back{width:34px;height:34px;border-radius:var(--rad-s);border:1px solid var(--brd);display:grid;place-items:center;background:var(--srf);flex-shrink:0}
+.pg-title{font-weight:700;font-size:19px;white-space:nowrap}
+.srch{margin-left:auto;display:flex;align-items:center;gap:8px;background:var(--srf2);border:1px solid var(--brd);border-radius:var(--rad-s);padding:7px 12px;font-size:13px;color:var(--mut);white-space:nowrap}
+.kbd{font-size:10px;border:1px solid var(--brd);background:var(--srf);padding:1px 5px;border-radius:4px}
+.ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#94a3b8);flex-shrink:0}
+.content{flex:1;padding:18px;overflow:hidden;display:flex;flex-direction:column;gap:16px;position:relative}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.kpi{background:var(--srf);border:1px solid var(--brd);border-radius:var(--rad);padding:14px 16px;box-shadow:var(--shd)}
+.kpi span{font-size:12.5px;color:var(--mut);display:block;margin-bottom:4px}
+.kpi b{font-size:24px;letter-spacing:-.01em}
+.bars{display:flex;gap:3px;align-items:flex-end;height:22px;margin-top:8px}
+.bars i{flex:1;background:var(--acc);border-radius:2px;opacity:.75}
+.panel{background:var(--srf);border:1px solid var(--brd);border-radius:var(--rad);box-shadow:var(--shd);overflow:hidden;flex:1;min-height:0}
+.p-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--brd)}
+.p-head b{font-size:15px}
+.btn{background:var(--acc);color:var(--on-acc);border-radius:var(--rad-s);padding:8px 15px;font-size:13.5px;font-weight:600;white-space:nowrap}
+.row{display:grid;grid-template-columns:2.2fr 1.3fr .7fr .95fr;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--brd);font-size:14px}
+.row.hd{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.row .sub{font-size:11.5px;color:var(--mut);display:block;margin-top:1px}
+.chip{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);justify-self:start;white-space:nowrap}
+.dur{font-variant-numeric:tabular-nums;font-weight:600}
+/* Phone */
+.p-top{height:56px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--top-bg);border-bottom:1px solid var(--brd);flex-shrink:0}
+.p-shell{display:flex;flex-direction:column;height:100%}
+.p-content{flex:1;padding:14px;overflow:hidden;display:flex;flex-direction:column;gap:12px;position:relative}
+.p-kpis{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.li-card{background:var(--srf);border:1px solid var(--brd);border-radius:var(--rad);padding:12px 14px;box-shadow:var(--shd);display:flex;align-items:center;gap:10px}
+.li-card .lc-txt{flex:1;min-width:0}
+.li-card .lc-txt b{font-size:14px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-card .lc-txt span{font-size:11.5px;color:var(--mut)}
+.li-card .lc-r{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.tabbar{height:66px;display:flex;justify-content:space-around;align-items:center;border-top:1px solid var(--brd);background:var(--top-bg,var(--srf));flex-shrink:0;padding-bottom:6px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;color:var(--mut)}
+.tab.on{color:var(--acc);font-weight:600}
+.fab{position:absolute;right:16px;bottom:16px;width:52px;height:52px;border-radius:50%;background:var(--acc);color:var(--on-acc);display:grid;place-items:center;box-shadow:0 6px 16px color-mix(in srgb,var(--acc) 45%,transparent);z-index:5}
+</style>
+<style>
+/* ============ 12 Themes ============ */
+
+/* 1 · Aurora Glas (Modern, Glassmorphism) */
+.t-aurora{--acc-def:#6366f1;
+  --bg:radial-gradient(1100px 600px at 8% -10%,#e0e7ff 0%,transparent 55%),radial-gradient(900px 500px at 108% 8%,#fce7f3 0%,transparent 50%),linear-gradient(#f8fafc,#eef2ff);
+  --srf:rgba(255,255,255,.62);--srf2:rgba(255,255,255,.5);--brd:rgba(255,255,255,.75);
+  --side-bg:rgba(255,255,255,.45);--top-bg:rgba(255,255,255,.35);
+  --rad:20px;--rad-s:12px;--shd:0 8px 24px rgba(99,102,241,.13)}
+.t-aurora .kpi,.t-aurora .panel,.t-aurora .side,.t-aurora .top,.t-aurora .p-top,.t-aurora .tabbar,.t-aurora .li-card{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+
+/* 2 · Bento Studio (Modern, Bento-Grid) */
+.t-bento{--acc-def:#0ea5e9;--bg:#f6f7fb;--brd:#eceef4;
+  --rad:22px;--rad-s:12px;--shd:0 2px 10px rgba(2,32,71,.06);--side-bg:#fff}
+.t-bento .kpi:first-child{background:var(--acc);border-color:transparent;color:#fff}
+.t-bento .kpi:first-child span{color:rgba(255,255,255,.85)}
+.t-bento .kpi:first-child .bars i{background:rgba(255,255,255,.85)}
+
+/* 3 · Business Line (Klassisch, dicht, ERP) */
+.t-business{--acc-def:#1d4ed8;--bg:#eef1f5;--brd:#dde3ea;--shd:none;
+  --rad:8px;--rad-s:6px;--side-bg:#0f2b46;--side-txt:#dbe6f2;
+  --nav-on-bg:rgba(255,255,255,.13);--nav-on-txt:#fff;--top-bg:#fff}
+.t-business .row{padding:7px 16px;font-size:13px}
+.t-business .kpi b{font-size:21px}
+.t-business .logo-dot{border-radius:6px}
+
+/* 4 · Kontor (Klassisch, warm, Serifen) */
+.t-kontor{--acc-def:#8a5a2b;--bg:#f7f4ee;--srf:#fffdf9;--srf2:#f1ece1;--brd:#e7e0d2;
+  --mut:#8c8578;--rad:10px;--rad-s:7px;--side-bg:#2e2924;--side-txt:#e9e2d6;
+  --nav-on-bg:rgba(255,255,255,.1);--nav-on-txt:#f0d9b8;--top-bg:transparent}
+.t-kontor .pg-title,.t-kontor .kpi b,.t-kontor .logo-name{font-family:Georgia,'Times New Roman',serif}
+
+/* 5 · Nordic Ruhe (Zeitlos, Calm UI) */
+.t-nordic{--acc-def:#0f766e;--bg:#fbfbfa;--srf:#fff;--srf2:#f4f4f2;--brd:#ececea;
+  --txt:#2b2f33;--mut:#9aa1a9;--rad:12px;--rad-s:9px;--shd:none;--side-bg:#f4f4f2;
+  --nav-on-bg:#e5efed;--nav-on-txt:#0f766e}
+.t-nordic .kpi,.t-nordic .panel,.t-nordic .li-card{border-color:#ececea}
+
+/* 6 · Editorial Mono (Zeitlos, typografisch) */
+.t-mono{--acc-def:#111111;--bg:#fff;--srf:#fff;--srf2:#f5f5f5;--brd:#111;
+  --txt:#111;--mut:#666;--rad:0px;--rad-s:0px;--shd:none;--side-bg:#fff;--top-bg:#fff}
+.t-mono .nav-it{text-transform:uppercase;letter-spacing:.08em;font-size:12px}
+.t-mono .kpi,.t-mono .panel,.t-mono .back,.t-mono .srch,.t-mono .li-card{border-width:1.5px}
+.t-mono .chip{background:#111;color:#fff;border-radius:0}
+.t-mono .pg-title{font-family:Georgia,serif;font-style:italic}
+.t-mono .side{border-right-width:1.5px}
+
+/* 7 · Cupertino (Apple HIG: iPhone/iPad/Mac) */
+.t-cupertino{--acc-def:#007aff;--bg:#f2f2f7;--srf:#fff;--srf2:#e9e9ee;--brd:#e3e3e8;
+  --txt:#1c1c1e;--mut:#8e8e93;--rad:16px;--rad-s:10px;--shd:0 1px 2px rgba(0,0,0,.04);
+  --side-bg:rgba(246,246,249,.85);--top-bg:rgba(242,242,247,.82);
+  --fnt:-apple-system,'SF Pro Text','Helvetica Neue',sans-serif}
+.t-cupertino .side,.t-cupertino .top,.t-cupertino .p-top,.t-cupertino .tabbar{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.t-cupertino .btn{border-radius:999px}
+.t-cupertino .back{border-radius:50%}
+
+/* 8 · Fluent Work (Windows 11: Mica/Acryl) */
+.t-fluent{--acc-def:#0067c0;
+  --bg:linear-gradient(160deg,#eaf2fb 0%,#f3f3f3 45%,#eef0f4 100%);
+  --srf:rgba(255,255,255,.86);--srf2:rgba(255,255,255,.6);--brd:#e2e5e9;
+  --rad:8px;--rad-s:6px;--shd:0 2px 4px rgba(0,0,0,.06);
+  --side-bg:rgba(243,243,243,.78);--fnt:'Segoe UI Variable','Segoe UI',system-ui,sans-serif}
+.t-fluent .nav-it{position:relative}
+.t-fluent .nav-it.on{background:rgba(0,0,0,.045);color:var(--txt)}
+.t-fluent .nav-it.on::before{content:'';position:absolute;left:0;top:22%;height:56%;width:3.5px;border-radius:3px;background:var(--acc)}
+.t-fluent .side{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+
+/* 9 · Material Flow (Google Material 3: Android) */
+.t-material{--acc-def:#6750a4;--bg:#fef7ff;--srf:#f7f2fa;--srf2:#ece6f0;--brd:#e7e0ec;
+  --txt:#1d1b20;--mut:#79747e;--rad:24px;--rad-s:14px;--shd:none;
+  --side-bg:#f3edf7;--nav-on-bg:#e8def8;--nav-on-txt:#1d192b;
+  --fnt:Roboto,'Segoe UI',system-ui,sans-serif}
+.t-material .btn{border-radius:999px}
+.t-material .fab{border-radius:16px}
+.t-material .chip{border:1px solid #79747e;background:transparent;color:#49454f;border-radius:8px}
+.t-material .tab.on{background:#e8def8;padding:4px 16px;border-radius:999px;color:#1d192b}
+.t-material .nav-it{border-radius:999px}
+
+/* 10 · Midnight Pro (Modern, Dark Mode) */
+.t-midnight{--acc-def:#22d3ee;--on-acc:#06222a;--bg:#0b1220;--srf:#121b2e;--srf2:#0f1728;
+  --brd:rgba(148,163,184,.15);--txt:#e2e8f0;--mut:#8ea0b8;
+  --rad:14px;--rad-s:9px;--shd:0 0 0 1px rgba(34,211,238,.05),0 8px 24px rgba(0,0,0,.4);
+  --side-bg:#0e1626;--side-txt:#cbd5e1;--nav-on-bg:rgba(34,211,238,.13);--nav-on-txt:#22d3ee;--top-bg:#0b1220}
+.t-midnight .ava{background:linear-gradient(135deg,#22d3ee,#6366f1)}
+.t-midnight .kbd{background:#0f1728}
+
+/* 11 · Kontrast Plus (Barrierefrei, WCAG 2.2) */
+.t-kontrast{--acc-def:#0033cc;--bg:#fff;--srf:#fff;--srf2:#fff;--brd:#000;
+  --txt:#000;--mut:#333;--rad:6px;--rad-s:4px;--shd:none;
+  --side-bg:#fff;--side-txt:#000;--nav-on-bg:#000;--nav-on-txt:#fff;--top-bg:#fff}
+.t-kontrast .kpi,.t-kontrast .panel,.t-kontrast .back,.t-kontrast .srch,.t-kontrast .li-card{border-width:2px}
+.t-kontrast .side{border-right-width:2px}
+.t-kontrast .top,.t-kontrast .p-top{border-bottom-width:2px}
+.t-kontrast .tabbar{border-top-width:2px}
+.t-kontrast .nav-it{opacity:1}
+.t-kontrast .row{font-size:15px}
+.t-kontrast .row.hd{font-size:12px;color:#000}
+.t-kontrast .chip{background:#000;color:#fff}
+.t-kontrast .btn{border:2px solid #000;box-shadow:0 0 0 3px #fff,0 0 0 6px #f90}
+.t-kontrast .kpi span{color:#333;font-weight:600}
+
+/* 12 · Werkbank (Neo-Brutalismus, Trend) */
+.t-brutal{--acc-def:#ff4d6d;--bg:#fff8e7;--srf:#fff;--srf2:#fff;--brd:#000;
+  --txt:#000;--mut:#444;--rad:2px;--rad-s:2px;--shd:4px 4px 0 #000;
+  --side-bg:#ffe66d;--side-txt:#000;--nav-on-bg:#000;--nav-on-txt:#ffe66d;--top-bg:#fff8e7}
+.t-brutal .kpi,.t-brutal .panel,.t-brutal .btn,.t-brutal .back,.t-brutal .srch,.t-brutal .fab,.t-brutal .li-card{border:2px solid #000}
+.t-brutal .btn{box-shadow:3px 3px 0 #000}
+.t-brutal .side{border-right:2px solid #000}
+.t-brutal .logo-dot{border:2px solid #000;border-radius:2px}
+.t-brutal .logo-name,.t-brutal .pg-title{font-weight:800;text-transform:uppercase;letter-spacing:.02em}
+.t-brutal .chip{border:1.5px solid #000;background:#ffe66d;color:#000;border-radius:2px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <h1>DeineZeit · Layout-Redesign <small>— 12 Designvorschläge auf iPhone, iPad &amp; Desktop</small></h1>
+  <div class="ctrl">
+    <label>Whitelabel-Demo: Markenfarbe <input type="color" id="brand" value="#f97316"></label>
+    <label><input type="checkbox" id="brandOn"> auf alle Vorlagen anwenden</label>
+    <span id="favsum">Noch keine Favoriten — ★ bei den Vorschlägen wählen</span>
+  </div>
+</header>
+
+<p class="intro">
+  Jeder Vorschlag zeigt <b>dieselbe Seite (Zeiterfassung)</b> auf drei Geräten — so ist direkt vergleichbar,
+  wie sich Stil, Navigation und Tabellen-/Kartenansicht verhalten. <b>Klick auf ein Gerät vergrößert es.</b>
+  Alle Vorlagen folgen denselben Usability-Regeln (siehe „Design-Verfassung" unten):
+  Zurück-Button immer oben links, Primäraktion immer an derselben Stelle, ⌘K-Suche oben rechts,
+  Tabellen werden am Handy zu Karten mit identischer Feldreihenfolge.
+  Über den Farbwähler oben siehst du, wie <b>jede Vorlage per Whitelabel-Markenfarbe</b> umgefärbt werden kann.
+</p>
+
+<div class="wrap" id="proposals"></div>
+
+<div class="wrap">
+  <section class="sect">
+    <h2>Musthaves 2026 — in allen Vorlagen eingebaut</h2>
+    <p class="sub">Aktuelle Standards aus führenden WebApp-/SaaS-Designs, die wir von Anfang an mitnehmen.</p>
+    <div class="mh-grid">
+      <div class="mh"><b>⌘K Command-Palette</b><p>Globale Suche + Schnellaktionen per Tastatur — inzwischen Erwartungshaltung in jeder Business-App. In den Mockups als Suchfeld oben rechts sichtbar.</p></div>
+      <div class="mh"><b>Bento-Grid-KPIs</b><p>Kennzahlen als kompakte Karten-Kacheln statt langer Listen — schnell erfassbar, auf jedem Gerät stapelbar.</p></div>
+      <div class="mh"><b>Calm Design</b><p>Ruhige Flächen, viel Weißraum, wenig Chrome — der Inhalt (Zeiten, Projekte, Zahlen) steht im Vordergrund.</p></div>
+      <div class="mh"><b>Dark Mode</b><p>Als eigene Vorlage (Midnight Pro) und später als Schalter je Benutzer — über dieselben Design-Tokens umsetzbar.</p></div>
+      <div class="mh"><b>Rollenbasierte Ansichten</b><p>Passt perfekt zu unseren neuen Modulrechten: Jeder sieht nur seine Module — Navigation und Dashboard passen sich an.</p></div>
+      <div class="mh"><b>Progressive Disclosure</b><p>Details erst auf Klick (Detail-Sheets statt überladener Formulare) — besonders wichtig am Handy.</p></div>
+      <div class="mh"><b>WCAG 2.2 Barrierefreiheit</b><p>Kontraste, Fokus-Ringe, 44px-Touchziele. Als eigene Vorlage (Kontrast Plus) und als zuschaltbare Option in jedem Theme.</p></div>
+      <div class="mh"><b>Anpassbare Dashboards</b><p>Widgets je Benutzer ein-/ausblendbar und anordenbar — Grundlage dafür sind die KPI-Karten aus den Vorlagen.</p></div>
+    </div>
+  </section>
+
+  <section class="sect">
+    <h2>Design-Verfassung — gilt ab jetzt für jeden Feature-Branch</h2>
+    <p class="sub">Verbindliche Usability-Regeln, damit wir nie wieder ein Redesign nachziehen müssen.</p>
+    <div class="rule"><span class="rn">1</span><div><b>Zurück-Button immer oben links.</b> In jedem Modul, auf jedem Gerät, an exakt derselben Position — nie im Inhalt, nie unten.</div></div>
+    <div class="rule"><span class="rn">2</span><div><b>Primäraktion immer rechts im Seitenkopf</b> (Desktop/Tablet: Button oben rechts im Panel; Handy: runder FAB unten rechts). Ein Muster für „+ Neuer Eintrag", „+ Neue Rechnung", „+ Neues Projekt" usw.</div></div>
+    <div class="rule"><span class="rn">3</span><div><b>Tabellen: Desktop = Tabelle, Handy = Karten.</b> Beide zeigen dieselben Felder in derselben Reihenfolge; Statuschips sehen überall gleich aus.</div></div>
+    <div class="rule"><span class="rn">4</span><div><b>Navigation fix:</b> Desktop/Tablet = Sidebar (einklappbar zur Icon-Leiste), Handy = Bottom-Tab-Bar mit maximal 5 Plätzen (Rest unter „Mehr"). Reihenfolge = Reihenfolge der Modulrechte.</div></div>
+    <div class="rule"><span class="rn">5</span><div><b>Suche/⌘K immer oben rechts</b> neben dem Profil-Avatar — in jedem Modul identisch.</div></div>
+    <div class="rule"><span class="rn">6</span><div><b>Alle Farben nur über Design-Tokens</b> (CSS-Variablen). Kein hartkodiertes Tailwind-Blau/Orange mehr in Komponenten — sonst bricht Whitelabel.</div></div>
+    <div class="rule"><span class="rn">7</span><div><b>Touchziele min. 44×44px</b>, Fokus-Ringe auf allen interaktiven Elementen, Kontrast min. WCAG AA (4,5:1) in jedem Theme.</div></div>
+    <div class="rule"><span class="rn">8</span><div><b>Jeder neue Feature-Branch</b> prüft vor dem PR gegen diese Verfassung (Checkliste im PR-Template).</div></div>
+  </section>
+
+  <section class="sect">
+    <h2>Technische Umsetzung — Whitelabel-Architektur</h2>
+    <p class="sub">Baut direkt auf dem Bestehenden auf (CSS-Variablen --p-50…900, Logo/Favicon/Firmenname in Einstellungen/Allgemein).</p>
+    <div class="rule"><span class="rn">1</span><div><b>Token-Ebene erweitern:</b> Zusätzlich zu den Primärfarben kommen Tokens für Fläche, Text, Rahmen, Radius, Schatten und Schrift (--surface, --text, --border, --radius, --shadow, --font). Tailwind liest alle über CSS-Variablen — wie heute schon bei primary.</div></div>
+    <div class="rule"><span class="rn">2</span><div><b>Designvorlage = Preset aus Tokens:</b> Jede der gewählten Vorlagen wird ein Preset (JSON), das alle Tokens setzt. Farben (Text, Hintergrund, Buttons …) bleiben je Preset frei anpassbar — gespeichert in den Einstellungen, pro Lizenz/Mandant.</div></div>
+    <div class="rule"><span class="rn">3</span><div><b>Device-Erkennung + manuelle Wahl:</b> Die App erkennt Gerät/Plattform (iOS, Android, Windows, macOS) und schlägt die passende Vorlage vor (z. B. Cupertino am iPhone, Fluent am Windows-Desktop); der Benutzer kann sie jederzeit selbst umstellen.</div></div>
+    <div class="rule"><span class="rn">4</span><div><b>Barrierefreiheit als Schalter, nicht nur als Theme:</b> „Hoher Kontrast", „Größere Schrift" und „Weniger Animation" sind unabhängig vom gewählten Design zuschaltbar und überschreiben nur die betroffenen Tokens.</div></div>
+    <div class="rule"><span class="rn">5</span><div><b>Reseller-Whitelabel:</b> Firmenname, Logo, Favicon (bereits vorhanden) + Markenfarbe, Vorlage und Login-Seiten-Branding = komplettes Lizenz-Paket pro Kunde, ohne Code-Änderung.</div></div>
+  </section>
+</div>
+
+<div id="zoom"><div id="zbox"></div><div class="zcap">Klicken zum Schließen</div></div>
+<script>
+/* ============ Icons (inline SVG) ============ */
+const I = {
+  dash:'<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="12" width="8" height="9" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/>',
+  gantt:'<path d="M4 6h9M7 12h11M10 18h8"/>',
+  coin:'<path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5L10 21l-2-1.5L6 21V3z"/><path d="M9.5 8h5M9.5 12h5"/>',
+  db:'<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>',
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'
+};
+const sv = (n,s=17)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
+
+/* ============ Daten ============ */
+const NAV = [['dash','Dashboard'],['clock','Zeiterfassung'],['list','Aufgaben'],['gantt','Projekte'],['coin','Verkauf'],['db','Stammdaten'],['folder','Datacenter']];
+const ROWS = [
+  ['Layout Redesign – Frontend','WW Interface','2:30','läuft'],
+  ['Kundentermin Wien','Muster GmbH','1:15','erfasst'],
+  ['Rechnung #2026-041','Alpha KG','0:45','verrechnet'],
+  ['Projektplan Q3 abstimmen','Intern','1:20','erfasst'],
+];
+const BARS = [40,65,50,90,70,35,80];
+
+const PROPOSALS = [
+ {t:'t-aurora', nr:1, name:'Aurora Glas', stil:'Modern', dev:'Alle Geräte · Highlight iPhone/iPad', a11y:'AA',
+  d:'Glassmorphism mit sanften Farbverläufen im Hintergrund — der aktuell prägendste Moderne-Look. Transluzente Flächen wirken hochwertig und leicht, die Markenfarbe strahlt durch alle Ebenen. Ideal, wenn DeineZeit als Premium-Produkt verkauft werden soll.'},
+ {t:'t-bento', nr:2, name:'Bento Studio', stil:'Modern', dev:'Desktop · Tablet', a11y:'AA',
+  d:'Bento-Grid-Ansatz: Kennzahlen als markante Kacheln, die erste KPI-Karte in Markenfarbe als Blickfang. Sehr große Radien, weiche Schatten — der Look aktueller SaaS-Dashboards (Linear, Notion & Co.).'},
+ {t:'t-business', nr:3, name:'Business Line', stil:'Klassisch', dev:'Windows-Desktop · Arbeitsplatz', a11y:'AA',
+  d:'Klassisches ERP-Design mit dunkler Marine-Sidebar und dichter Tabellendarstellung — maximale Informationsdichte für Power-User, die täglich viele Einträge erfassen. Wirkt seriös und vertraut für Umsteiger von klassischer Business-Software.'},
+ {t:'t-kontor', nr:4, name:'Kontor', stil:'Klassisch', dev:'Desktop · iPad', a11y:'AA',
+  d:'Warme, papierartige Töne mit Serifen-Überschriften — Kanzlei-/Kontor-Charakter. Hebt sich bewusst von kühlen Tech-Designs ab; passt zu Steuerberatern, Anwälten, Handwerksbetrieben als Reseller-Zielgruppe.'},
+ {t:'t-nordic', nr:5, name:'Nordic Ruhe', stil:'Zeitlos', dev:'Alle Geräte', a11y:'AA',
+  d:'Skandinavischer Minimalismus: keine Schatten, feine Linien, viel Weißraum — das reinste „Calm Design". Altert nicht, lenkt nie ab und ist die sicherste Wahl als neutraler Standard für alle Lizenznehmer.'},
+ {t:'t-mono', nr:6, name:'Editorial Mono', stil:'Zeitlos', dev:'Desktop · MacBook', a11y:'AA',
+  d:'Streng typografisch, schwarz-weiß mit harten Linien und Serifen-Akzent — wie ein gut gesetztes Magazin. Sehr eigenständig und markant; die Markenfarbe kann als einziger Farbakzent gesetzt werden.'},
+ {t:'t-cupertino', nr:7, name:'Cupertino', stil:'Device-Design', dev:'iPhone · iPad · MacBook (Apple HIG)', a11y:'AA',
+  d:'Apple Human Interface Guidelines: SF-Schrift, translucente Leisten mit Blur, runde Buttons, iOS-Tab-Bar. Fühlt sich am iPhone/iPad/Mac wie eine native App an — perfekt für die PWA-Installation „Zum Home-Bildschirm".'},
+ {t:'t-fluent', nr:8, name:'Fluent Work', stil:'Device-Design', dev:'Windows-Desktop · Surface (Fluent 2)', a11y:'AA',
+  d:'Windows-11-Designsprache: Mica-Hintergrund, Acryl-Sidebar, Segoe-Schrift, dezente Radien und der typische Akzentbalken am aktiven Menüpunkt. Windows-Nutzer fühlen sich sofort zuhause.'},
+ {t:'t-material', nr:9, name:'Material Flow', stil:'Device-Design', dev:'Android-Phone · Android-Tablet (Material 3)', a11y:'AA',
+  d:'Google Material 3: tonale Flächen, Pill-Navigation, eckig-runder FAB, Roboto. Auf Android-Geräten die vertrauteste Bedienung — inklusive der typischen aktiven Navigations-Pille.'},
+ {t:'t-midnight', nr:10, name:'Midnight Pro', stil:'Modern · Dark', dev:'Alle Geräte · Highlight Desktop', a11y:'AA',
+  d:'Vollwertiger Dark Mode mit Cyan-Akzent und dezentem Glow — schont die Augen bei langen Erfassungs-Sessions und ist das meistgewünschte Feature moderner Business-Apps. Funktioniert als eigenes Theme oder als Nacht-Variante jeder anderen Vorlage.'},
+ {t:'t-kontrast', nr:11, name:'Kontrast Plus', stil:'Barrierefrei', dev:'Alle Geräte · WCAG 2.2', a11y:'AAA',
+  d:'Maximale Zugänglichkeit: echtes Schwarz auf Weiß, 2px-Rahmen, große Schrift, sichtbare Fokus-Ringe (am Button demonstriert), Touchziele ≥ 44px. Erfüllt WCAG 2.2 AAA-Kontrast — als eigenständiges Theme und als Schalter über jedem anderen Design.'},
+ {t:'t-brutal', nr:12, name:'Werkbank', stil:'Mutig · Trend', dev:'Desktop · junge Zielgruppen', a11y:'AA',
+  d:'Neo-Brutalismus: harte Konturen, Versatz-Schatten, kräftiges Gelb — der auffälligste Trend-Look. Polarisiert bewusst; als Reseller-Option für Agenturen, Start-ups und Kreativbetriebe interessant.'},
+];
+
+/* ============ Mockup-Bausteine ============ */
+function sideHTML(rail){
+  const items = NAV.map(([ic,lb],i)=>`<div class="nav-it${i===1?' on':''}">${sv(ic)}${rail?'':`<span>${lb}</span>`}</div>`).join('');
+  return `<aside class="side${rail?' rail':''}"><div class="logo-row"><span class="logo-dot">D</span>${rail?'':'<span class="logo-name">DeineZeit</span>'}</div>${items}</aside>`;
+}
+function topHTML(){
+  return `<header class="top"><span class="back">${sv('back',16)}</span><b class="pg-title">Zeiterfassung</b>
+  <span class="srch">${sv('search',13)} Suchen &amp; Befehle <span class="kbd">⌘K</span></span><span class="ava"></span></header>`;
+}
+function kpisHTML(){
+  const bars = BARS.map(h=>`<i style="height:${h}%"></i>`).join('');
+  return `<div class="kpis">
+    <div class="kpi"><span>Heute</span><b>6:45 h</b><div class="bars">${bars}</div></div>
+    <div class="kpi"><span>Diese Woche</span><b>32:10 h</b></div>
+    <div class="kpi"><span>Offen verrechenbar</span><b>€ 4.280</b></div></div>`;
+}
+function tableHTML(){
+  const rows = ROWS.map(r=>`<div class="row"><div>${r[0]}<span class="sub">Tätigkeit</span></div><div>${r[1]}</div><div class="dur">${r[2]}</div><span class="chip">${r[3]}</span></div>`).join('');
+  return `<div class="panel"><div class="p-head"><b>Heutige Einträge</b><span class="btn">+ Neuer Eintrag</span></div>
+  <div class="row hd"><div>Tätigkeit</div><div>Kunde / Projekt</div><div>Dauer</div><div>Status</div></div>${rows}</div>`;
+}
+function desktopBody(rail){
+  return `<div class="app">${sideHTML(rail)}<div class="main">${topHTML()}<div class="content">${kpisHTML()}${tableHTML()}</div></div></div>`;
+}
+function phoneBody(){
+  const cards = ROWS.map(r=>`<div class="li-card"><div class="lc-txt"><b>${r[0]}</b><span>${r[1]}</span></div><div class="lc-r"><span class="dur">${r[2]}</span><span class="chip">${r[3]}</span></div></div>`).join('');
+  const tabs = [['dash','Dashboard'],['clock','Zeit'],['list','Aufgaben'],['gantt','Projekte'],['more','Mehr']]
+    .map(([ic,lb],i)=>`<div class="tab${i===1?' on':''}">${sv(ic,19)}<span>${lb}</span></div>`).join('');
+  return `<div class="p-shell"><div class="p-top"><span class="back">${sv('back',16)}</span><b class="pg-title" style="font-size:17px">Zeiterfassung</b><span class="ava" style="margin-left:auto"></span></div>
+  <div class="p-content"><div class="p-kpis">
+    <div class="kpi"><span>Heute</span><b style="font-size:20px">6:45 h</b></div>
+    <div class="kpi"><span>Woche</span><b style="font-size:20px">32:10 h</b></div></div>
+  ${cards}<div class="fab">${sv('plus',22)}</div></div><div class="tabbar">${tabs}</div></div>`;
+}
+
+/* Geräte: [Breite, Höhe, Skalierung, Bezel-Klasse, Label, Body-Funktion] */
+const DEVICES = {
+  phone:  [390, 800, .55, 'bezel',     'iPhone / Android-Phone', ()=>phoneBody()],
+  tablet: [834, 1080,.40, 'bezel-pad', 'iPad (Icon-Sidebar)',    ()=>desktopBody(true)],
+  desktop:[1280,800, .45, 'bezel-mac', 'MacBook / Windows-Desktop', ()=>desktopBody(false)],
+};
+function frameHTML(theme, dev, scaleOverride){
+  const [w,h,s0,bez,label,body] = DEVICES[dev];
+  const s = scaleOverride || s0;
+  return `<div class="dev"><div class="${bez}"><div class="hold" data-theme="${theme}" data-dev="${dev}" style="width:${Math.round(w*s)}px;height:${Math.round(h*s)}px">
+    <div class="frame ${theme} f-${dev}" style="width:${w}px;height:${h}px;transform:scale(${s})">${body()}</div>
+  </div></div><span class="dev-label">${label}</span></div>`;
+}
+
+/* ============ Karten rendern ============ */
+const cont = document.getElementById('proposals');
+cont.innerHTML = PROPOSALS.map(p=>`
+  <article class="card" id="card-${p.t}">
+    <div class="card-head">
+      <span class="nr">${p.nr}</span>
+      <div><h2>${p.name}</h2><div class="tags">
+        <span class="tag stil">${p.stil}</span><span class="tag dev">${p.dev}</span><span class="tag a11y">Kontrast ${p.a11y}</span>
+      </div></div>
+      <button class="favbtn" data-fav="${p.t}">★ Favorit</button>
+    </div>
+    <p class="desc">${p.d}</p>
+    <div class="frames">${frameHTML(p.t,'phone')}${frameHTML(p.t,'tablet')}${frameHTML(p.t,'desktop')}</div>
+  </article>`).join('');
+
+/* ============ Whitelabel-Markenfarbe ============ */
+const brand = document.getElementById('brand'), brandOn = document.getElementById('brandOn');
+function applyBrand(){
+  if(brandOn.checked) document.body.style.setProperty('--brand-o', brand.value);
+  else document.body.style.removeProperty('--brand-o');
+}
+brand.addEventListener('input', ()=>{ brandOn.checked = true; applyBrand(); });
+brandOn.addEventListener('change', applyBrand);
+
+/* ============ Favoriten ============ */
+const favsum = document.getElementById('favsum');
+let favs = [];
+try { favs = JSON.parse(localStorage.getItem('dz-design-favs')||'[]'); } catch(e){}
+function paintFavs(){
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('fav', favs.includes(c.id.replace('card-',''))));
+  const names = PROPOSALS.filter(p=>favs.includes(p.t)).map(p=>`${p.nr} · ${p.name}`);
+  favsum.textContent = names.length ? 'Favoriten: ' + names.join('  |  ') : 'Noch keine Favoriten — ★ bei den Vorschlägen wählen';
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest('.favbtn'); if(!b) return;
+  const id = b.dataset.fav;
+  favs = favs.includes(id) ? favs.filter(x=>x!==id) : [...favs, id];
+  try { localStorage.setItem('dz-design-favs', JSON.stringify(favs)); } catch(err){}
+  paintFavs();
+});
+paintFavs();
+
+/* ============ Zoom ============ */
+const zoom = document.getElementById('zoom'), zbox = document.getElementById('zbox');
+const ZSCALE = { phone:.82, tablet:.60, desktop:.68 };
+document.addEventListener('click', e=>{
+  const holdEl = e.target.closest('.hold'); if(!holdEl || holdEl.closest('#zoom')) return;
+  zbox.innerHTML = frameHTML(holdEl.dataset.theme, holdEl.dataset.dev, ZSCALE[holdEl.dataset.dev]);
+  zoom.classList.add('on');
+});
+zoom.addEventListener('click', ()=>zoom.classList.remove('on'));
+</script>
+</body>
+</html>

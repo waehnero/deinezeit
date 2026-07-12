@@ -110,7 +110,7 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
               <select
                 value={fieldType}
                 onChange={(e) => setFieldType(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none bg-white"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none bg-surface"
               >
                 {FIELD_TYPES.map(({ key, label }) => (
                   <option key={key} value={key}>{label}</option>
@@ -149,7 +149,7 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
                 value={linkedTypeSlug}
                 onChange={(e) => setLinkedTypeSlug(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none bg-surface"
               >
                 <option value="">— Typ auswählen —</option>
                 {availableTypes.map(t => (
@@ -267,7 +267,7 @@ function FieldRow({ field, slug, onUpdated, onDeleted }) {
   }
 
   return (
-    <div className={`bg-white border rounded-xl p-4 transition ${
+    <div className={`bg-surface border rounded-xl p-4 transition ${
       editing ? 'border-primary-300 shadow-sm' : 'border-gray-200 hover:border-gray-300'
     }`}>
       {editing ? (
@@ -383,7 +383,7 @@ export default function FieldBuilder({ entityType, onFieldsChanged }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200">
+    <div className="bg-surface rounded-2xl border border-gray-200">
       {/* Header – klappbar */}
       <button
         onClick={() => setShowBuilder(!showBuilder)}

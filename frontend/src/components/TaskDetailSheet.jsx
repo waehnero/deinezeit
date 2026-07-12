@@ -206,11 +206,11 @@ export default function TaskDetailSheet({ task, settings, fields, project, proje
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
       <div
-        className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto"
+        className="bg-surface w-full md:max-w-lg rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Kopf */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-surface border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
           <span className="text-sm text-gray-500">Aufgabe bearbeiten</span>
           <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
         </div>
@@ -452,7 +452,7 @@ export default function TaskDetailSheet({ task, settings, fields, project, proje
         </div>
 
         {/* Aktionsleiste */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-5 py-3 space-y-2">
+        <div className="sticky bottom-0 bg-surface border-t border-gray-100 px-5 py-3 space-y-2">
           <button onClick={save} disabled={saving}
             className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition">
             <Save size={18} /> {saving ? 'Speichern…' : 'Speichern'}

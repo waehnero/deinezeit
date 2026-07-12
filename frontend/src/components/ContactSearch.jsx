@@ -61,7 +61,7 @@ export default function ContactSearch({ contactId, contactName, onChange, placeh
         />
       </div>
       {open && (
-        <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto">
+        <div className="absolute z-50 top-full left-0 right-0 bg-surface border border-gray-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto">
           {loading ? (
             <div className="px-3 py-2 text-xs text-gray-400">Suche…</div>
           ) : results.length === 0 ? (

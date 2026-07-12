@@ -114,7 +114,7 @@ export default function ZeiterfassungFelder() {
       </p>
 
       {/* Feldliste */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-4">
+      <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden mb-4">
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 size={24} className="animate-spin text-primary-400" />
@@ -174,7 +174,7 @@ export default function ZeiterfassungFelder() {
 
       {/* Neues Feld */}
       {showAdd ? (
-        <div className="bg-white rounded-2xl border border-primary-200 p-5">
+        <div className="bg-surface rounded-2xl border border-primary-200 p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Neues Feld</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
@@ -196,7 +196,7 @@ export default function ZeiterfassungFelder() {
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
               >
                 {FIELD_TYPES.filter(t => t.key !== 'relation').map(t => (
                   <option key={t.key} value={t.key}>{t.label}</option>
@@ -208,7 +208,7 @@ export default function ZeiterfassungFelder() {
               <select
                 value={newColSpan}
                 onChange={(e) => setNewColSpan(Number(e.target.value))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
               >
                 {COL_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>

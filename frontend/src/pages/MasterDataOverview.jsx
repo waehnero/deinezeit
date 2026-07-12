@@ -58,7 +58,7 @@ function NewTypeModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">Neuen Stammdaten-Typ anlegen</h2>
           <p className="text-sm text-gray-500 mt-1">z.B. Mitarbeiter, Fahrzeuge, Verträge …</p>
@@ -228,7 +228,7 @@ export default function MasterDataOverview() {
               <button
                 key={type.id}
                 onClick={() => navigate(`/masterdata/${type.slug}`)}
-                className="bg-white rounded-2xl border border-gray-100 p-6 text-left hover:shadow-md hover:border-gray-200 transition group"
+                className="bg-surface rounded-2xl border border-gray-100 p-6 text-left hover:shadow-md hover:border-gray-200 transition group"
               >
                 <div className="flex items-start justify-between">
                   <div

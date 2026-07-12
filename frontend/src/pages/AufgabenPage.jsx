@@ -88,7 +88,7 @@ function RecordSearch({ recordId, recordName, recordTypeSlug, onChange }) {
   return (
     <div className="flex gap-2">
       <select value={slug} onChange={e => setSlug(e.target.value)}
-        className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white w-32 shrink-0">
+        className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-surface w-32 shrink-0">
         {types.map(t => <option key={t.slug} value={t.slug}>{t.name}</option>)}
       </select>
       <div className="relative flex-1">
@@ -104,7 +104,7 @@ function RecordSearch({ recordId, recordName, recordTypeSlug, onChange }) {
           />
         </div>
         {open && results.length > 0 && (
-          <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-auto">
+          <div className="absolute z-20 mt-1 w-full bg-surface border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-auto">
             {results.map(r => (
               <button key={r.id} type="button"
                 onMouseDown={() => { onChange(r.id, r.display_name, slug); setOpen(false) }}
@@ -249,7 +249,7 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto"
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
           <div>
@@ -406,7 +406,7 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
         {removeDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
             onClick={() => setRemoveDialog(false)}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4 border-b border-neutral-100 font-semibold text-neutral-800">
                 Aufgabe entfernen
               </div>
@@ -466,7 +466,7 @@ function MailScanPopup({ onClose, onScanned }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
           <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
             <Mail size={17} className="text-primary-600" /> Mail-Import
@@ -623,14 +623,14 @@ export default function AufgabenPage() {
           ].map(({ id, label, Icon }) => (
             <button key={id} onClick={() => wechsleAnsicht(id)} title={label}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm ${ansicht === id
-                ? 'bg-primary-600 text-white' : 'bg-white text-neutral-600 hover:bg-neutral-50'}`}>
+                ? 'bg-primary-600 text-white' : 'bg-surface text-neutral-600 hover:bg-neutral-50'}`}>
               <Icon size={15} /> <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>
         {/* Mail-Import: Konten anzeigen + manuell scannen */}
         <button onClick={() => setMailPopup(true)} title="Mail-Import (Konten scannen)"
-          className="flex items-center px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-neutral-600 hover:bg-neutral-50">
+          className="flex items-center px-3 py-1.5 rounded-lg border border-gray-300 bg-surface text-neutral-600 hover:bg-neutral-50">
           <Mail size={15} />
         </button>
       </div>
@@ -641,18 +641,18 @@ export default function AufgabenPage() {
 
       {/* Filterzeile */}
       <div className="flex flex-wrap items-center gap-2 mb-5">
-        <div className="flex items-center border border-gray-300 rounded-lg px-3 bg-white flex-1 min-w-[180px]">
+        <div className="flex items-center border border-gray-300 rounded-lg px-3 bg-surface flex-1 min-w-[180px]">
           <Search size={15} className="text-gray-400 shrink-0" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…"
             className="w-full py-2 px-2 text-sm focus:outline-none bg-transparent" />
         </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+          className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-surface">
           <option value="">Alle Status</option>
           {statuses.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
         <select value={prioFilter} onChange={e => setPrioFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+          className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-surface">
           <option value="">Alle Prioritäten</option>
           {priorities.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
@@ -703,7 +703,7 @@ export default function AufgabenPage() {
               <h2 className={`text-xs font-semibold uppercase tracking-wider mb-2 ${g.color}`}>
                 {g.label} <span className="font-normal text-neutral-400">({gruppen[g.id].length})</span>
               </h2>
-              <div className="bg-white border border-neutral-200 rounded-xl divide-y divide-neutral-100">
+              <div className="bg-surface border border-neutral-200 rounded-xl divide-y divide-neutral-100">
                 {gruppen[g.id].map(t => {
                   const erledigt = t.status === doneStatus
                   return (

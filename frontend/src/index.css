@@ -2,94 +2,145 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Farbthemen (CSS-Variablen für Tailwind primary-*) ───────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN-TOKENS (Etappe 1 des Layout-Redesigns)
+
+   Alle Farben liegen als RGB-Tripel vor (z. B. "249 115 22"), damit Tailwind
+   Transparenz-Varianten wie bg-primary-50/40 korrekt rechnen kann.
+   Tailwind mappt in tailwind.config.js auf diese Variablen:
+     --p-*        → primary-*   (Markenfarbe, per Whitelabel umfärbbar)
+     --n-*        → neutral-* UND gray-* (eine gemeinsame Grau-Skala)
+     --surface    → bg-surface  (Karten, Panels, Eingabefelder)
+     --surface-2  → bg-surface-2 (abgesetzte Flächen, z. B. Tabellenkopf)
+     --page-bg    → bg-page     (Seitenhintergrund)
+     --on-accent  → text-on-accent (Text AUF Markenfarbe, z. B. Buttons)
+     --radius-*   → rounded-lg / rounded-xl / rounded-2xl
+     --shadow-*   → shadow-card / shadow-card-hover
+     --font-sans  → Standardschrift
+
+   WICHTIG (Design-Verfassung, Regel 6): In Komponenten keine hartkodierten
+   Farben mehr einführen — immer diese Tokens bzw. die gemappten
+   Tailwind-Klassen verwenden, sonst bricht das Whitelabel-Theming.
+   Die Designvorlagen (Etappe 2) überschreiben ausschließlich diese Tokens.
+   ═══════════════════════════════════════════════════════════════════════ */
+
 :root {
-  /* Standard: Orange */
-  --p-50:  #fff7ed;
-  --p-100: #ffedd5;
-  --p-200: #fed7aa;
-  --p-300: #fdba74;
-  --p-400: #fb923c;
-  --p-500: #f97316;
-  --p-600: #ea580c;
-  --p-700: #c2410c;
-  --p-800: #9a3412;
-  --p-900: #7c2d12;
+  /* ── Markenfarbe · Standard: Orange ── */
+  --p-50:  255 247 237;
+  --p-100: 255 237 213;
+  --p-200: 254 215 170;
+  --p-300: 253 186 116;
+  --p-400: 251 146 60;
+  --p-500: 249 115 22;
+  --p-600: 234 88 12;
+  --p-700: 194 65 12;
+  --p-800: 154 52 18;
+  --p-900: 124 45 18;
+
+  /* ── Grau-Skala (bisher "neutral" und "gray", jetzt vereinheitlicht) ── */
+  --n-50:  249 250 251;
+  --n-100: 243 244 246;
+  --n-200: 229 231 235;
+  --n-300: 209 213 219;
+  --n-400: 156 163 175;
+  --n-500: 107 114 128;
+  --n-600: 75 85 99;
+  --n-700: 55 65 81;
+  --n-800: 31 41 55;
+  --n-900: 17 24 39;
+
+  /* ── Semantische Flächen & Text ── */
+  --surface:   255 255 255;      /* Karten, Panels, Inputs        */
+  --surface-2: var(--n-50);      /* abgesetzte Flächen            */
+  --page-bg:   var(--n-50);      /* Seitenhintergrund             */
+  --on-accent: 255 255 255;      /* Text auf Markenfarbe          */
+
+  /* ── Form & Tiefe ── */
+  --radius-s: 0.5rem;            /* rounded-lg  (Inputs, Buttons) */
+  --radius:   0.75rem;           /* rounded-xl  (Karten)          */
+  --radius-l: 1rem;              /* rounded-2xl (große Panels)    */
+  --shadow-card:       0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
+  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.10), 0 2px 4px -1px rgb(0 0 0 / 0.06);
+
+  /* ── Schrift ── */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
+/* ── Farbthemen (Markenfarbe; per data-theme am <html> gesetzt) ──────────── */
 
 /* Thema: Blau */
 [data-theme="blue"] {
-  --p-50:  #eff6ff;
-  --p-100: #dbeafe;
-  --p-200: #bfdbfe;
-  --p-300: #93c5fd;
-  --p-400: #60a5fa;
-  --p-500: #3b82f6;
-  --p-600: #2563eb;
-  --p-700: #1d4ed8;
-  --p-800: #1e40af;
-  --p-900: #1e3a8a;
+  --p-50:  239 246 255;
+  --p-100: 219 234 254;
+  --p-200: 191 219 254;
+  --p-300: 147 197 253;
+  --p-400: 96 165 250;
+  --p-500: 59 130 246;
+  --p-600: 37 99 235;
+  --p-700: 29 78 216;
+  --p-800: 30 64 175;
+  --p-900: 30 58 138;
 }
 
 /* Thema: Grün */
 [data-theme="green"] {
-  --p-50:  #f0fdf4;
-  --p-100: #dcfce7;
-  --p-200: #bbf7d0;
-  --p-300: #86efac;
-  --p-400: #4ade80;
-  --p-500: #22c55e;
-  --p-600: #16a34a;
-  --p-700: #15803d;
-  --p-800: #166534;
-  --p-900: #14532d;
+  --p-50:  240 253 244;
+  --p-100: 220 252 231;
+  --p-200: 187 247 208;
+  --p-300: 134 239 172;
+  --p-400: 74 222 128;
+  --p-500: 34 197 94;
+  --p-600: 22 163 74;
+  --p-700: 21 128 61;
+  --p-800: 22 101 52;
+  --p-900: 20 83 45;
 }
 
 /* Thema: Lila */
 [data-theme="purple"] {
-  --p-50:  #faf5ff;
-  --p-100: #f3e8ff;
-  --p-200: #e9d5ff;
-  --p-300: #d8b4fe;
-  --p-400: #c084fc;
-  --p-500: #a855f7;
-  --p-600: #9333ea;
-  --p-700: #7e22ce;
-  --p-800: #6b21a8;
-  --p-900: #581c87;
+  --p-50:  250 245 255;
+  --p-100: 243 232 255;
+  --p-200: 233 213 255;
+  --p-300: 216 180 254;
+  --p-400: 192 132 252;
+  --p-500: 168 85 247;
+  --p-600: 147 51 234;
+  --p-700: 126 34 206;
+  --p-800: 107 33 168;
+  --p-900: 88 28 135;
 }
 
 /* Thema: Teal */
 [data-theme="teal"] {
-  --p-50:  #f0fdfa;
-  --p-100: #ccfbf1;
-  --p-200: #99f6e4;
-  --p-300: #5eead4;
-  --p-400: #2dd4bf;
-  --p-500: #14b8a6;
-  --p-600: #0d9488;
-  --p-700: #0f766e;
-  --p-800: #115e59;
-  --p-900: #134e4a;
+  --p-50:  240 253 250;
+  --p-100: 204 251 241;
+  --p-200: 153 246 228;
+  --p-300: 94 234 212;
+  --p-400: 45 212 191;
+  --p-500: 20 184 166;
+  --p-600: 13 148 136;
+  --p-700: 15 118 110;
+  --p-800: 17 94 89;
+  --p-900: 19 78 74;
 }
 
 /* Thema: Rot */
 [data-theme="red"] {
-  --p-50:  #fff1f2;
-  --p-100: #ffe4e6;
-  --p-200: #fecdd3;
-  --p-300: #fda4af;
-  --p-400: #fb7185;
-  --p-500: #f43f5e;
-  --p-600: #e11d48;
-  --p-700: #be123c;
-  --p-800: #9f1239;
-  --p-900: #881337;
+  --p-50:  255 241 242;
+  --p-100: 255 228 230;
+  --p-200: 254 205 211;
+  --p-300: 253 164 175;
+  --p-400: 251 113 133;
+  --p-500: 244 63 94;
+  --p-600: 225 29 72;
+  --p-700: 190 18 60;
+  --p-800: 159 18 57;
+  --p-900: 136 19 55;
 }
 
 @layer base {
   body {
-    @apply text-neutral-900 antialiased bg-neutral-50;
+    @apply text-neutral-900 antialiased bg-page;
   }
 
   h1, h2, h3, h4 {
@@ -100,12 +151,12 @@
 @layer components {
   .btn-primary {
     @apply inline-flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600
-           text-white text-sm font-medium rounded-lg transition-all duration-150
+           text-on-accent text-sm font-medium rounded-lg transition-all duration-150
            shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-1;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-neutral-50
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-surface hover:bg-neutral-50
            text-neutral-700 text-sm font-medium rounded-lg border border-neutral-200
            transition-all duration-150 shadow-sm focus:outline-none
            focus:ring-2 focus:ring-primary-400 focus:ring-offset-1;
@@ -118,12 +169,11 @@
   }
 
   .card {
-    @apply bg-white rounded-xl border border-neutral-200;
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
+    @apply bg-surface rounded-xl border border-neutral-200 shadow-card;
   }
 
   .input {
-    @apply w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-sm
+    @apply w-full px-3 py-2 bg-surface border border-neutral-200 rounded-lg text-sm
            text-neutral-900 placeholder-neutral-400 transition-all duration-150
            focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400;
   }

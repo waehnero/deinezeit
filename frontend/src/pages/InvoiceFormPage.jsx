@@ -65,7 +65,7 @@ function ContactSearch({ value, label, onChange }) {
       <input value={search} onChange={e => { setSearch(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)}
         placeholder="Kontakt suchen…" className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" />
       {open && results.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 bg-white border border-neutral-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+        <div className="absolute z-50 top-full left-0 right-0 bg-surface border border-neutral-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
           {results.map(r => (
             <button key={r.id} className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 border-b last:border-0"
               onMouseDown={() => { onChange(r.id, r.display_name); setSearch(r.display_name); setOpen(false) }}>
@@ -96,7 +96,7 @@ function ArticleSearch({ onSelect }) {
       <input value={search} onChange={e => { setSearch(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)}
         placeholder="Artikel aus Stammdaten…" className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" />
       {open && results.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 bg-white border border-neutral-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+        <div className="absolute z-50 top-full left-0 right-0 bg-surface border border-neutral-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
           {results.map(r => (
             <button key={r.id} className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 border-b last:border-0"
               onMouseDown={() => {
@@ -148,7 +148,7 @@ function TimeEntryPicker({ contactId, onAdd }) {
       </button>
       {open && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+          <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">Nicht verrechnete Zeiteinträge</h2>
               {entries.length > 0 && <button onClick={() => setSelected(new Set(entries.map(e => e.id)))} className="text-xs text-primary-600 hover:underline">Alle auswählen</button>}
@@ -397,7 +397,7 @@ export default function InvoiceFormPage() {
 
       <div className="space-y-5">
         {isNew && (
-          <div className="bg-white border border-neutral-200 rounded-xl p-5">
+          <div className="bg-surface border border-neutral-200 rounded-xl p-5">
             <h2 className="text-sm font-semibold text-neutral-700 mb-3">Dokumenttyp</h2>
             <div className="flex gap-2 flex-wrap">
               {Object.entries(DOC_TYPE_LABELS).map(([k, v]) => (
@@ -407,7 +407,7 @@ export default function InvoiceFormPage() {
           </div>
         )}
 
-        <div className="bg-white border border-neutral-200 rounded-xl p-5">
+        <div className="bg-surface border border-neutral-200 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-neutral-700 mb-4">Grunddaten</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -454,7 +454,7 @@ export default function InvoiceFormPage() {
         </div>
 
         {docType === 'rechnung' && (
-          <div className="bg-white border border-neutral-200 rounded-xl p-5">
+          <div className="bg-surface border border-neutral-200 rounded-xl p-5">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} className="w-4 h-4 rounded" />
               <Repeat size={16} className="text-primary-600" />
@@ -512,7 +512,7 @@ export default function InvoiceFormPage() {
           </div>
         )}
 
-        <div className="bg-white border border-neutral-200 rounded-xl p-5">
+        <div className="bg-surface border border-neutral-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-neutral-700">Positionen</h2>
             <TimeEntryPicker contactId={contactId} onAdd={addTimeEntries} />
@@ -537,7 +537,7 @@ export default function InvoiceFormPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200 rounded-xl p-5">
+        <div className="bg-surface border border-neutral-200 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-neutral-700 mb-3">Interne Notiz</h2>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
             placeholder="Wird nicht auf dem Dokument gedruckt"
@@ -555,24 +555,24 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
       <div className="grid grid-cols-2 md:grid-cols-12 gap-2 items-start">
         <div className="col-span-2 md:col-span-5">
           <input value={pos.description} onChange={e => onChange('description', e.target.value)} placeholder="Beschreibung *"
-            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white" />
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface" />
         </div>
         <div className="col-span-1 md:col-span-1">
           <input type="number" value={pos.quantity} onChange={e => onChange('quantity', e.target.value)} placeholder="Menge"
-            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white text-right" />
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface text-right" />
         </div>
         <div className="col-span-1 md:col-span-1">
           <input value={pos.unit || ''} onChange={e => onChange('unit', e.target.value)} placeholder="Einh."
-            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white" />
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface" />
         </div>
         <div className="col-span-1 md:col-span-2">
           <input type="number" step="0.01" value={pos.unit_price} onChange={e => onChange('unit_price', e.target.value)} placeholder="Preis"
-            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-white text-right" />
+            className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface text-right" />
         </div>
         {taxMode !== 'kleinunternehmer' && (
           <div className="col-span-1 md:col-span-1">
             <select value={pos.tax_rate} onChange={e => onChange('tax_rate', e.target.value)}
-              className="w-full border border-neutral-200 rounded px-1 py-1.5 text-sm bg-white">
+              className="w-full border border-neutral-200 rounded px-1 py-1.5 text-sm bg-surface">
               <option value="20">20%</option><option value="10">10%</option>
               <option value="0">0%</option><option value="">RC</option>
             </select>
@@ -586,7 +586,7 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
         </div>
       </div>
       <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
-        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-white text-neutral-500" />
+        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-surface text-neutral-500" />
     </div>
   )
 }

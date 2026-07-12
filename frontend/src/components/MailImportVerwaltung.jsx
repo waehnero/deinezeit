@@ -178,7 +178,7 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto"
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
           <h2 className="font-semibold text-neutral-900">

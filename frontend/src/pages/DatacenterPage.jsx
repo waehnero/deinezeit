@@ -97,7 +97,7 @@ function ShareDialog({ attachment, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Share-Link</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
@@ -171,7 +171,7 @@ function ExtendDialog({ attachment, onClose, onExtended }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Freigabe verlängern</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
@@ -345,7 +345,7 @@ function PreviewModal({ attachment, onClose }) {
           <Loader2 size={32} className="animate-spin text-white" />
         ) : isText ? (
           textInhalt !== null ? (
-            <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-full overflow-auto">
+            <div className="bg-surface rounded-lg shadow-2xl max-w-3xl w-full max-h-full overflow-auto">
               <pre className="whitespace-pre-wrap p-6 text-sm text-gray-800 font-sans leading-relaxed">{textInhalt}</pre>
             </div>
           ) : (
@@ -355,7 +355,7 @@ function PreviewModal({ attachment, onClose }) {
           isImage ? (
             <img src={url} alt={attachment.filename} className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
           ) : isPdf || isEml ? (
-            <iframe src={url} className="w-full h-full rounded-lg bg-white" title={attachment.filename} />
+            <iframe src={url} className="w-full h-full rounded-lg bg-surface" title={attachment.filename} />
           ) : (
             <div className="text-white text-center">
               <File size={48} className="mx-auto mb-3 text-gray-400" />
@@ -390,7 +390,7 @@ function FolderTree({ folders, selected, onSelect, viewMode, onViewModeChange })
         <button
           onClick={() => onViewModeChange('module')}
           className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition ${
-            viewMode === 'module' ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            viewMode === 'module' ? 'bg-surface text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           Nach Modul
@@ -398,7 +398,7 @@ function FolderTree({ folders, selected, onSelect, viewMode, onViewModeChange })
         <button
           onClick={() => onViewModeChange('contact')}
           className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition ${
-            viewMode === 'contact' ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            viewMode === 'contact' ? 'bg-surface text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           Nach Kontakt
@@ -687,7 +687,7 @@ function ContactEditDialog({ attachment, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Kontakt der Datei</h3>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
@@ -1000,7 +1000,7 @@ export default function DatacenterPage() {
   return (
     <div className="flex h-full overflow-hidden -m-6">
       {/* ── Sidebar (Desktop) ─────────────────────────────────────────────── */}
-      <aside className="hidden lg:flex w-56 flex-shrink-0 bg-white border-r border-gray-200 flex-col overflow-hidden">
+      <aside className="hidden lg:flex w-56 flex-shrink-0 bg-surface border-r border-gray-200 flex-col overflow-hidden">
         {sidebarContent}
       </aside>
 
@@ -1008,7 +1008,7 @@ export default function DatacenterPage() {
       {mobileFoldersOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileFoldersOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden shadow-xl">
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-surface border-r border-gray-200 flex flex-col overflow-hidden shadow-xl">
             {sidebarContent}
           </aside>
         </div>
@@ -1017,7 +1017,7 @@ export default function DatacenterPage() {
       {/* ── Hauptbereich ──────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
         {/* Toolbar */}
-        <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 flex-wrap sm:flex-nowrap flex-shrink-0">
+        <div className="bg-surface border-b border-gray-200 px-5 py-3 flex items-center gap-3 flex-wrap sm:flex-nowrap flex-shrink-0">
           <button onClick={() => setMobileFoldersOpen(true)}
             className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <Folder size={14} /> Ordner
@@ -1081,7 +1081,7 @@ export default function DatacenterPage() {
               </p>
             </div>
           ) : selected === 'shared' ? (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
@@ -1105,7 +1105,7 @@ export default function DatacenterPage() {
               </table>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
@@ -1157,7 +1157,7 @@ export default function DatacenterPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setDeleteTarget(null)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-100 font-semibold text-gray-800">
               Datei löschen
             </div>

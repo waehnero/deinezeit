@@ -75,7 +75,7 @@ export default function MailVorschlaege({ onAccepted }) {
       </button>
 
       {offen && (
-        <div className="divide-y divide-amber-100 border-t border-amber-100 bg-white">
+        <div className="divide-y divide-amber-100 border-t border-amber-100 bg-surface">
           {vorschlaege.map(v => (
             <div key={v.id} className="px-4 py-3">
               <div className="flex items-start gap-3">

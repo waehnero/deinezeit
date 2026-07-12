@@ -62,7 +62,7 @@ function ProfilForm({ profil, onSave, onCancel }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-3">
+    <div className="bg-surface rounded-xl border border-neutral-200 p-4 space-y-3">
       <div>
         <label className="text-xs font-medium text-neutral-500">Name</label>
         <input value={name} onChange={e => setName(e.target.value)}
@@ -72,7 +72,7 @@ function ProfilForm({ profil, onSave, onCancel }) {
       <div>
         <label className="text-xs font-medium text-neutral-500">Kanal</label>
         <select value={kanal} onChange={e => setKanal(e.target.value)}
-          className="mt-1 w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200">
+          className="mt-1 w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-200">
           {KANAELE.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
         </select>
       </div>
@@ -145,7 +145,7 @@ function ProfilVerwaltung({ profile, onReload, onClose }) {
       )}
 
       {profile.map(p => (
-        <div key={p.id} className="bg-white rounded-xl border border-neutral-200 p-4 flex items-start gap-3">
+        <div key={p.id} className="bg-surface rounded-xl border border-neutral-200 p-4 flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-medium text-sm text-neutral-900">{p.name}</span>
@@ -443,7 +443,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                     profilId === p.id
                       ? 'bg-primary-50 border-primary-300 text-primary-700'
-                      : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                      : 'bg-surface border-neutral-200 text-neutral-600 hover:border-neutral-300'
                   }`}>
                   {p.name}
                 </button>
@@ -487,7 +487,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
 
           {/* Ergebnis (editierbar) */}
           {(generiert || text) && (
-            <div className="space-y-3 bg-white rounded-xl border border-neutral-200 p-3">
+            <div className="space-y-3 bg-surface rounded-xl border border-neutral-200 p-3">
               <div>
                 <label className="text-xs font-medium text-neutral-500">Posttext</label>
                 <textarea value={text} onChange={e => setText(e.target.value)} rows={6}
@@ -524,7 +524,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
           {(text || generiert) && (
             <div className="space-y-2">
               <button onClick={assistiertPosten} disabled={laufend}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-neutral-200 bg-white hover:border-primary-300 text-left">
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-neutral-200 bg-surface hover:border-primary-300 text-left">
                 <Send size={18} className="text-primary-600 flex-shrink-0" />
                 <span>
                   <span className="block text-sm font-medium text-neutral-900">
@@ -539,7 +539,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
               </button>
               {!kannTeilen && (aktuell?.fotos?.length > 0) && (
                 <button onClick={fotosHerunterladen} disabled={laufend}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border border-neutral-200 bg-white hover:border-primary-300 text-left">
+                  className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border border-neutral-200 bg-surface hover:border-primary-300 text-left">
                   <Camera size={16} className="text-neutral-500 flex-shrink-0" />
                   <span className="text-xs text-neutral-600">
                     Fotos herunterladen ({aktuell.fotos.length}) — fürs Hochladen beim Kanal
@@ -548,7 +548,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
               )}
 
               <button onClick={() => setPlanenOffen(v => !v)} disabled={laufend}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-neutral-200 bg-white hover:border-primary-300 text-left">
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-neutral-200 bg-surface hover:border-primary-300 text-left">
                 <CalendarClock size={18} className="text-primary-600 flex-shrink-0" />
                 <span>
                   <span className="block text-sm font-medium text-neutral-900">Planen</span>
@@ -558,7 +558,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
               {planenOffen && (
                 <div className="flex gap-2 px-1">
                   <input type="datetime-local" value={geplantAm} onChange={e => setGeplantAm(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200" />
+                    className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-200" />
                   <button onClick={planen} disabled={laufend}
                     className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
                     <Check size={16} />
@@ -567,7 +567,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
               )}
 
               <button onClick={ablegen} disabled={laufend}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-neutral-200 bg-white hover:border-primary-300 text-left">
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-neutral-200 bg-surface hover:border-primary-300 text-left">
                 <Inbox size={18} className="text-neutral-500 flex-shrink-0" />
                 <span>
                   <span className="block text-sm font-medium text-neutral-900">In die Postecke legen</span>
@@ -580,7 +580,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
           {/* Ohne KI-Text nur speichern */}
           {!text && !generiert && (
             <button onClick={ablegen} disabled={laufend}
-              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300">
+              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium border border-neutral-200 bg-surface text-neutral-600 hover:border-neutral-300">
               Als Entwurf ablegen
             </button>
           )}
@@ -703,7 +703,7 @@ export default function PosteckePage() {
             title="Profile verwalten"
             className={`p-2 rounded-lg border ${ansicht === 'profile'
               ? 'bg-primary-50 border-primary-300 text-primary-700'
-              : 'bg-white border-neutral-200 text-neutral-500 hover:text-neutral-800'}`}>
+              : 'bg-surface border-neutral-200 text-neutral-500 hover:text-neutral-800'}`}>
             <Settings2 size={17} />
           </button>
           {ansicht === 'posts' && (
@@ -731,7 +731,7 @@ export default function PosteckePage() {
                   <button key={id} onClick={() => darstellungWaehlen(id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                       darstellung === id
-                        ? 'bg-white text-neutral-900 shadow-sm'
+                        ? 'bg-surface text-neutral-900 shadow-sm'
                         : 'text-neutral-500 hover:text-neutral-800'
                     }`}>
                     <Icon size={13} /> {label}
@@ -742,7 +742,7 @@ export default function PosteckePage() {
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input value={suche} onChange={e => setSuche(e.target.value)}
                   placeholder="Suchen (Text, Hashtags, Ort, Profil) …"
-                  className="w-full pl-8 pr-8 py-2 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200" />
+                  className="w-full pl-8 pr-8 py-2 rounded-lg border border-neutral-200 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-200" />
                 {suche && (
                   <button onClick={() => setSuche('')}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-neutral-400 hover:text-neutral-700">
@@ -797,7 +797,7 @@ export default function PosteckePage() {
                 <div className="space-y-2">
                   {g.eintraege.map(post => (
                     <div key={post.id}
-                      className="bg-white rounded-xl border border-neutral-200 p-3 flex gap-3 items-start hover:border-neutral-300 cursor-pointer"
+                      className="bg-surface rounded-xl border border-neutral-200 p-3 flex gap-3 items-start hover:border-neutral-300 cursor-pointer"
                       onClick={() => setEditor(post)}>
                       {post.fotos?.length > 0 ? (
                         <FotoThumb fotoId={post.fotos[0].id} className="w-14 h-14 rounded-lg flex-shrink-0" />

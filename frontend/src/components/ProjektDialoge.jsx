@@ -9,7 +9,7 @@ import ContactSearch from './ContactSearch'
 function Overlay({ children, onClose }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>
@@ -304,7 +304,7 @@ export function ProjectActionsMenu({ onEdit, onDuplicate, onDelete, align = 'rig
   // Fallback: altes absolutes Verhalten, wenn kein anchorRef übergeben wurde
   if (!anchorRef) {
     return (
-      <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-44`}>
+      <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-8 z-20 bg-surface border border-gray-200 rounded-lg shadow-lg py-1 w-44`}>
         {items}
       </div>
     )
@@ -317,7 +317,7 @@ export function ProjectActionsMenu({ onEdit, onDuplicate, onDelete, align = 'rig
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[70] bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-44"
+      className="fixed z-[70] bg-surface border border-gray-200 rounded-lg shadow-lg py-1 w-44"
       style={{ top: pos.top, left: pos.left }}
     >
       {items}

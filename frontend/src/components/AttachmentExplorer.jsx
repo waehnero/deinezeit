@@ -81,7 +81,7 @@ function ShareDialog({ attachment, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
             <Share2 size={16} className="text-primary-500" /> Download-Link erstellen
@@ -156,7 +156,7 @@ export function AddLinkDialog({ entityType, entityId, providers, onClose, onAdde
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-surface rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
             <Link size={16} className="text-primary-500" /> Cloud-Link hinzufügen
@@ -235,7 +235,7 @@ function PreviewModal({ attachment, onClose }) {
         paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))',
       }}
       onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-full overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface rounded-xl shadow-xl max-w-4xl w-full max-h-full overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-3 border-b border-gray-100">
           <span className="font-medium text-gray-800 text-sm">{attachment.display_name}</span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
@@ -486,7 +486,7 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
   if (!fullPage) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '85vh' }}>
+        <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '85vh' }}>
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">

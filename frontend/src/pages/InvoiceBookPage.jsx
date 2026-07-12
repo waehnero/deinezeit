@@ -164,7 +164,7 @@ export default function InvoiceBookPage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white border border-neutral-200 rounded-xl p-4 mb-5 flex flex-wrap items-end gap-4">
+      <div className="bg-surface border border-neutral-200 rounded-xl p-4 mb-5 flex flex-wrap items-end gap-4">
         <div>
           <label className="block text-xs font-medium text-neutral-500 mb-1">Zeitraum</label>
           <select
@@ -211,7 +211,7 @@ export default function InvoiceBookPage() {
               { label: 'MwSt.', value: fmtEuro(data.summary.total_tax) },
               { label: 'Brutto', value: fmtEuro(data.summary.total_gross), highlight: true },
             ].map(s => (
-              <div key={s.label} className={`rounded-xl p-4 border ${s.highlight ? 'bg-primary-50 border-primary-200' : 'bg-white border-neutral-200'}`}>
+              <div key={s.label} className={`rounded-xl p-4 border ${s.highlight ? 'bg-primary-50 border-primary-200' : 'bg-surface border-neutral-200'}`}>
                 <p className="text-xs text-neutral-500 mb-1">{s.label}</p>
                 <p className={`text-lg font-semibold ${s.highlight ? 'text-primary-700' : 'text-neutral-800'}`}>
                   {s.plain ? data.summary.count : s.value}
@@ -221,7 +221,7 @@ export default function InvoiceBookPage() {
           </div>
 
           {/* Tabelle */}
-          <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
+          <div className="bg-surface border border-neutral-200 rounded-xl overflow-hidden">
             {data.invoices.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-neutral-400">
                 <FileText size={36} className="mb-2 opacity-30" />
