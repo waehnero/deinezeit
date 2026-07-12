@@ -110,8 +110,8 @@ function RuleDialog({ rule, statuses, taskTypes, onClose, onSave }) {
     (r.action_email_assignee || r.action_activate_successors || r.action_set_status)
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-surface w-full md:max-w-lg rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] sheet-safe flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-surface w-full md:max-w-lg rounded-2xl max-h-full lg:max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <h2 className="text-base font-medium text-gray-900">{rule.name ? 'Regel bearbeiten' : 'Neue Regel'}</h2>
           <button onClick={onClose}><X size={20} className="text-gray-400" /></button>

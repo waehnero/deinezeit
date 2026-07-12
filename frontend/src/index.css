@@ -367,4 +367,16 @@ html[data-design="kontrast"] {
   .label {
     @apply block text-sm font-medium text-neutral-700 mb-1;
   }
+
+}
+
+/* Dialoge & Bottom-Sheets am Handy (Design-Verfassung, Regel 4):
+   Jedes Overlay mit .sheet-safe endet IMMER oberhalb der Bottom-Tab-Bar —
+   die Menüleiste bleibt frei sichtbar — und lässt oben/seitlich Luft.
+   Steht bewusst NACH den Tailwind-Utilities, damit es deren p-4 am Handy
+   übersteuert. Ab Desktop-Breite (keine Tab-Bar) ohne Wirkung. */
+@media (max-width: 1023.98px) {
+  .sheet-safe {
+    padding: max(1rem, env(safe-area-inset-top)) 0.75rem calc(4.25rem + env(safe-area-inset-bottom));
+  }
 }

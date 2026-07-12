@@ -97,8 +97,8 @@ function ShareDialog({ attachment, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Share-Link</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
@@ -171,8 +171,8 @@ function ExtendDialog({ attachment, onClose, onExtended }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm">
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Freigabe verlängern</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
@@ -687,8 +687,8 @@ function ContactEditDialog({ attachment, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 sheet-safe" onClick={onClose}>
+      <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Kontakt der Datei</h3>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
@@ -997,7 +997,7 @@ export default function DatacenterPage() {
   return (
     <>
     <PageHeader icon={HardDrive} title="Datacenter" subtitle="Dateien & Links" />
-    <div className="flex overflow-hidden rounded-xl border border-neutral-200 bg-surface h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-8.5rem)]">
+    <div className="flex overflow-hidden rounded-xl border border-neutral-200 bg-surface h-[calc(100dvh-16.5rem)] lg:h-[calc(100dvh-8.5rem)]">
       {/* ── Sidebar (Desktop) ─────────────────────────────────────────────── */}
       <aside className="hidden lg:flex w-56 flex-shrink-0 bg-surface border-r border-gray-200 flex-col overflow-hidden">
         {sidebarContent}
@@ -1154,9 +1154,9 @@ export default function DatacenterPage() {
 
       {/* Lösch-Bestätigung */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 sheet-safe"
           onClick={() => setDeleteTarget(null)}>
-          <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-100 font-semibold text-gray-800">
               Datei löschen
             </div>

@@ -128,8 +128,8 @@ function Column({ spalte, posts, profilName, kanalLabel, onOpen, onArchivieren, 
 function PlanenDialog({ post, onBestaetigen, onAbbrechen }) {
   const [wert, setWert] = useState('')
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-900/40 flex items-center justify-center p-4">
-      <div className="bg-surface rounded-2xl p-4 w-full max-w-xs space-y-3">
+    <div className="fixed inset-0 z-50 bg-neutral-900/40 flex items-center justify-center p-4 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-2xl p-4 w-full max-w-xs space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-neutral-900">Wann soll gepostet werden?</p>
           <button onClick={onAbbrechen} className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-500">

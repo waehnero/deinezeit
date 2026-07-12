@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import PageHeader from '../components/PageHeader'
+import Fab from '../components/Fab'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, GanttChartSquare, Loader2, Archive, X, Settings2, MoreVertical,
@@ -228,16 +229,13 @@ export default function ProjektplanPage() {
       {dupProj && <DuplicateProjectDialog project={dupProj} onClose={() => setDupProj(null)} onDuplicated={(np) => navigate(`/projekte/${np.id}`)} />}
       {delProj && <DeleteProjectDialog project={delProj} onClose={() => setDelProj(null)} onArchived={load} onDeleted={load} />}
 
-      {/* FAB (nur Handy) */}
-      <button onClick={() => setShowCreate(true)}
-        className="sm:hidden fixed bottom-6 right-6 flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-full shadow-lg">
-        <Plus size={20} /> <span className="font-medium">Neu</span>
-      </button>
+      {/* Primäraktion am Handy: einheitlicher runder FAB unten rechts */}
+      <Fab onClick={() => setShowCreate(true)} title="Neues Projekt" />
 
       {/* Anlegen-Sheet */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowCreate(false)}>
-          <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 sheet-safe flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowCreate(false)}>
+          <div className="max-h-full overflow-y-auto bg-surface w-full md:max-w-md rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900">Neues Projekt</h2>
               <button onClick={() => setShowCreate(false)}><X size={20} className="text-gray-400" /></button>

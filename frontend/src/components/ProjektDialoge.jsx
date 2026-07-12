@@ -8,8 +8,8 @@ import ContactSearch from './ContactSearch'
 
 function Overlay({ children, onClose }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] sheet-safe flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-surface w-full md:max-w-md rounded-2xl max-h-full lg:max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

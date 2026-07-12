@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import PageHeader from '../components/PageHeader'
+import Fab from '../components/Fab'
 import { useNavigate } from 'react-router-dom'
 import { zeiterfassungApi, masterdataApi, usersApi, datacenterApi } from '../services/api'
 import toast from 'react-hot-toast'
@@ -653,8 +654,8 @@ function EntryModal({ entry, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl my-8">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-2xl my-8">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">
             {isEdit ? 'Zeiteintrag bearbeiten' : 'Projektzeit nachtragen'}
@@ -1090,12 +1091,15 @@ export default function ZeiterfassungPage() {
             <span className="hidden sm:inline">Bericht erstellen</span>
           </button>
           <button onClick={() => setModalEntry(null)} title="Projektzeit nachtragen"
-            className="flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+            className="hidden sm:flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
             <Plus size={16} />
             <span className="hidden sm:inline">Projektzeit nachtragen</span>
           </button>
         </div>
       </PageHeader>
+
+      {/* Primäraktion am Handy: einheitlicher runder FAB unten rechts */}
+      <Fab onClick={() => setModalEntry(null)} title="Projektzeit nachtragen" />
 
       {/* Timer-Bereich */}
       {running ? (

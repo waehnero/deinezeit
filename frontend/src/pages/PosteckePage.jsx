@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import PageHeader from '../components/PageHeader'
+import Fab from '../components/Fab'
 import {
   Plus, Loader2, X, Megaphone, Sparkles, Camera, Trash2, Pencil,
   Send, CalendarClock, Inbox, Copy, Check, Settings2,
@@ -387,9 +388,9 @@ function PostEditor({ post, profile, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-900/40 flex items-end sm:items-center justify-center"
+    <div className="fixed inset-0 z-50 bg-neutral-900/40 sheet-safe flex items-end sm:items-center justify-center"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <div className="bg-neutral-50 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto"
+      <div className="bg-neutral-50 w-full sm:max-w-lg rounded-2xl max-h-full lg:max-h-[92vh] overflow-y-auto"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
 
         {/* Kopf */}
@@ -701,12 +702,14 @@ export default function PosteckePage() {
           </button>
           {ansicht === 'posts' && (
             <button onClick={() => setEditor('neu')}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700">
+              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700">
               <Plus size={15} /> Neuer Post
             </button>
           )}
         </div>
       </PageHeader>
+
+      {ansicht === 'posts' && <Fab onClick={() => setEditor('neu')} title="Neuer Post" />}
 
       {ansicht === 'profile' ? (
         <ProfilVerwaltung profile={profile} onReload={laden_} onClose={() => setAnsicht('posts')} />

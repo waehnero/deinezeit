@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import PageHeader from '../components/PageHeader'
 import { Receipt } from 'lucide-react'
+import Fab from '../components/Fab'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
@@ -170,9 +171,10 @@ export default function InvoicePage() {
               <Book size={15} /> Verkaufsbuch
             </button>
             <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+              className="flex-1 hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
               <Plus size={15} /> Neu erstellen
             </button>
+            <Fab onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))} title="Neu erstellen" />
           </div>
         </div>
       </PageHeader>
@@ -450,8 +452,8 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
 function CancelDialog({ invoice, onClose, onConfirm }) {
   const [mode, setMode] = useState('with_credit')
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-6 w-full max-w-md">
         <h2 className="text-base font-semibold mb-1">Rechnung stornieren</h2>
         <p className="text-sm text-neutral-500 mb-4">{invoice.number} — {Number(invoice.total).toLocaleString('de-AT', { minimumFractionDigits: 2 })} €</p>
         <div className="space-y-2 mb-6">
@@ -476,8 +478,8 @@ function CancelDialog({ invoice, onClose, onConfirm }) {
 function PaidDialog({ invoice, onClose, onConfirm }) {
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10))
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm">
         <h2 className="text-base font-semibold mb-4">Als bezahlt markieren</h2>
         <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsdatum</label>
         <input type="date" value={paidAt} onChange={e => setPaidAt(e.target.value)}
@@ -501,8 +503,8 @@ function DuplicateDialog({ invoice, onClose, onConfirm }) {
     { key: 'attachments', label: 'Anhänge',                   desc: 'Datei-Anhänge des Belegs mitkopieren' },
   ]
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-6 w-full max-w-md">
         <h2 className="text-base font-semibold mb-1">Beleg duplizieren</h2>
         <p className="text-sm text-neutral-500 mb-4">{invoice.number} — es entsteht ein neuer Entwurf mit eigener Nummer.</p>
         <div className="space-y-2 mb-6">
@@ -551,8 +553,8 @@ function DatacenterPicker({ onSelect, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
-      <div className="bg-surface rounded-xl shadow-xl p-5 w-full max-w-md flex flex-col" style={{maxHeight:'80vh'}}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-5 w-full max-w-md flex flex-col" style={{maxHeight:'80vh'}}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-sm flex items-center gap-2">
             <HardDrive size={15} className="text-blue-500" /> Datacenter
@@ -670,7 +672,7 @@ function SendDialog({ invoices, onClose, onSent }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 sheet-safe">
       {showDcPicker && (
         <DatacenterPicker
           onClose={() => setShowDcPicker(false)}

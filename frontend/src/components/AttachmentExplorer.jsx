@@ -80,8 +80,8 @@ function ShareDialog({ attachment, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-      <div className="bg-surface rounded-xl shadow-xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
             <Share2 size={16} className="text-primary-500" /> Download-Link erstellen
@@ -155,8 +155,8 @@ export function AddLinkDialog({ entityType, entityId, providers, onClose, onAdde
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-      <div className="bg-surface rounded-xl shadow-xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
             <Link size={16} className="text-primary-500" /> Cloud-Link hinzufügen
@@ -485,8 +485,8 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
   // Als Modal anzeigen (wenn onClose übergeben wird)
   if (!fullPage) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '85vh' }}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 sheet-safe">
+        <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '85vh' }}>
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">

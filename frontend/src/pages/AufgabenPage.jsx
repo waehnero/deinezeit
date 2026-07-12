@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import PageHeader from '../components/PageHeader'
+import Fab from '../components/Fab'
 import {
   Plus, ListTodo, Loader2, X, Search, CheckCircle2, Circle,
   CalendarDays, User as UserIcon, Link2, Trash2, GanttChartSquare, Database,
@@ -249,8 +250,8 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
   const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400'
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-surface rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto"
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4 sheet-safe" onClick={onClose}>
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
           <div>
@@ -405,9 +406,9 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
 
         {/* Entfernen-Dialog: Archivieren oder endgültig löschen */}
         {removeDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 sheet-safe"
             onClick={() => setRemoveDialog(false)}>
-            <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
               <div className="px-5 py-4 border-b border-neutral-100 font-semibold text-neutral-800">
                 Aufgabe entfernen
               </div>
@@ -466,8 +467,8 @@ function MailScanPopup({ onClose, onScanned }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-surface rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4 sheet-safe" onClick={onClose}>
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
           <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
             <Mail size={17} className="text-primary-600" /> Mail-Import
@@ -663,10 +664,13 @@ export default function AufgabenPage() {
             className="rounded border-gray-300" /> Erledigte
         </label>
         <button onClick={() => setDialogTodo({})}
-          className="ml-auto flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg">
+          className="ml-auto hidden sm:flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg">
           <Plus size={16} /> Neue Aufgabe
         </button>
       </div>
+
+      {/* Primäraktion am Handy: einheitlicher runder FAB unten rechts */}
+      <Fab onClick={() => setDialogTodo({})} title="Neue Aufgabe" />
 
       {/* Inhalt je Ansicht */}
       {loading ? (

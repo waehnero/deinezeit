@@ -1674,8 +1674,8 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
           ))}
         </div>
         {previewTemplate && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-surface rounded-2xl shadow-2xl flex flex-col w-full max-w-4xl" style={{height: '90vh'}}>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sheet-safe">
+            <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl flex flex-col w-full max-w-4xl" style={{height: '90vh'}}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200">
                 <span className="font-semibold text-neutral-800">Vorschau: {TEMPLATE_NAMES[previewTemplate]}</span>
                 <div className="flex gap-2">

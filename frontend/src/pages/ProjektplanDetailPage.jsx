@@ -315,7 +315,7 @@ export default function ProjektplanDetailPage() {
       {/* FAB Quick-Add */}
       <button
         onClick={() => openQuickAdd(null)}
-        className="fixed bottom-6 right-6 md:right-auto md:left-1/2 md:-translate-x-1/2 md:max-w-3xl flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-full shadow-lg transition"
+        className="fixed right-6 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-6 md:right-auto md:left-1/2 md:-translate-x-1/2 md:max-w-3xl flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-full shadow-lg transition"
       >
         <Plus size={20} />
         <span className="font-medium">Aufgabe</span>
@@ -323,8 +323,8 @@ export default function ProjektplanDetailPage() {
 
       {/* Quick-Add Bottom-Sheet */}
       {quickAdd && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setQuickAdd(false)}>
-          <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 sheet-safe flex items-end md:items-center justify-center bg-black/40" onClick={() => setQuickAdd(false)}>
+          <div className="max-h-full overflow-y-auto bg-surface w-full md:max-w-md rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm text-gray-500">
                 {quickParent ? `Teilaufgabe zu „${quickParent.title}"` : 'Neue Aufgabe'}

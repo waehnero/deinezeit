@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { CsvExportButton, CsvImportButton } from '../components/CsvImportExport'
 import PageHeader from '../components/PageHeader'
+import ResponsiveTable from '../components/ResponsiveTable'
+import Fab from '../components/Fab'
 import { ICONS } from './MasterDataOverview'
 
 // ── Rest-Budget-Zelle (nur Projektzeiten) ─────────────────────────────────────
@@ -35,87 +37,70 @@ function BudgetCell({ budget }) {
 }
 
 // ── Datensatz-Zeile in der Tabelle ────────────────────────────────────────────
-function RecordRow({ record, fields, onEdit, onDelete, onArchive, onRestore,
-                     isAdmin = false, archivedView = false,
-                     budget = undefined, showBudget = false }) {
-  const listFields = fields.filter(f => f.show_in_list).slice(0, 5)
+// Feldwert für Listen-/Kartenansicht formatieren (je nach Feldtyp)
+function formatFieldValue(field, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (field.field_type === 'checkbox') return value ? '✓ Ja' : '✗ Nein'
+  if (field.field_type === 'date') {
+    try { return new Date(value).toLocaleDateString('de-AT') } catch { return value }
+  }
+  if (field.field_type === 'relation') {
+    if (typeof value === 'object' && value?.display_name) return value.display_name
+    return '—'
+  }
+  if (field.field_type === 'url') return (
+    <a href={value} target="_blank" rel="noopener noreferrer"
+      className="text-primary-600 hover:underline truncate block max-w-[200px]"
+      onClick={(e) => e.stopPropagation()}>
+      {value}
+    </a>
+  )
+  return String(value).length > 60 ? String(value).slice(0, 60) + '…' : value
+}
+
+// Aktions-Knöpfe je Datensatz (Bearbeiten/Archivieren/Löschen) — von
+// ResponsiveTable rechts in der Tabellenzeile bzw. auf der Karte gerendert
+function RecordActions({ record, onEdit, onDelete, onArchive, onRestore,
+                         isAdmin = false, archivedView = false }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
-
-  const formatValue = (field, value) => {
-    if (value === null || value === undefined || value === '') return '—'
-    if (field.field_type === 'checkbox') return value ? '✓ Ja' : '✗ Nein'
-    if (field.field_type === 'date') {
-      try { return new Date(value).toLocaleDateString('de-AT') } catch { return value }
-    }
-    if (field.field_type === 'relation') {
-      if (typeof value === 'object' && value?.display_name) return value.display_name
-      return '—'
-    }
-    if (field.field_type === 'url') return (
-      <a href={value} target="_blank" rel="noopener noreferrer"
-        className="text-primary-600 hover:underline truncate block max-w-[200px]"
-        onClick={(e) => e.stopPropagation()}>
-        {value}
-      </a>
-    )
-    return String(value).length > 60 ? String(value).slice(0, 60) + '…' : value
-  }
-
   return (
-    <tr className="hover:bg-gray-50 transition cursor-pointer" onClick={() => onEdit(record)}>
-      {listFields.map((field) => (
-        <td key={field.id} className="px-4 py-3 text-sm text-gray-700">
-          {formatValue(field, record.data[field.key])}
-        </td>
-      ))}
-      {showBudget && (
-        <td className="px-4 py-3 whitespace-nowrap">
-          <BudgetCell budget={budget} />
-        </td>
+    <>
+      <button onClick={() => onEdit(record)}
+        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+        <Pencil size={14} />
+      </button>
+      {isAdmin && archivedView && (
+        <button
+          onClick={() => onRestore(record)}
+          className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
+          title="Wiederherstellen">
+          <ArchiveRestore size={14} />
+        </button>
       )}
-      <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
-        {new Date(record.updated_at).toLocaleDateString('de-AT')}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => onEdit(record)}
-            className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
-            <Pencil size={14} />
-          </button>
-          {isAdmin && archivedView && (
-            <button
-              onClick={() => onRestore(record)}
-              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
-              title="Wiederherstellen">
-              <ArchiveRestore size={14} />
-            </button>
-          )}
-          {isAdmin && !archivedView && (
-            <button
-              onClick={() => { if (confirmArchive) { onArchive(record); setConfirmArchive(false) } else setConfirmArchive(true) }}
-              onBlur={() => setTimeout(() => setConfirmArchive(false), 200)}
-              className={`p-1.5 rounded-lg transition ${
-                confirmArchive ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-              }`}
-              title={confirmArchive ? 'Nochmal klicken um zu archivieren' : 'Archivieren (aus Listen ausblenden, wiederherstellbar)'}>
-              <Archive size={14} />
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              onClick={() => { if (confirmDelete) onDelete(record); else setConfirmDelete(true) }}
-              onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
-              className={`p-1.5 rounded-lg transition ${
-                confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-              }`}
-              title={confirmDelete ? 'Nochmal klicken um endgültig zu löschen' : 'Endgültig löschen (nur ohne Verknüpfungen möglich)'}>
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
+      {isAdmin && !archivedView && (
+        <button
+          onClick={() => { if (confirmArchive) { onArchive(record); setConfirmArchive(false) } else setConfirmArchive(true) }}
+          onBlur={() => setTimeout(() => setConfirmArchive(false), 200)}
+          className={`p-1.5 rounded-lg transition ${
+            confirmArchive ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+          }`}
+          title={confirmArchive ? 'Nochmal klicken um zu archivieren' : 'Archivieren (aus Listen ausblenden, wiederherstellbar)'}>
+          <Archive size={14} />
+        </button>
+      )}
+      {isAdmin && (
+        <button
+          onClick={() => { if (confirmDelete) onDelete(record); else setConfirmDelete(true) }}
+          onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
+          className={`p-1.5 rounded-lg transition ${
+            confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+          }`}
+          title={confirmDelete ? 'Nochmal klicken um endgültig zu löschen' : 'Endgültig löschen (nur ohne Verknüpfungen möglich)'}>
+          <Trash2 size={14} />
+        </button>
+      )}
+    </>
   )
 }
 
@@ -283,12 +268,13 @@ export default function MasterDataDetail() {
           {!showArchived && (
             <button
               onClick={() => setModalRecord(null)}
-              className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
+              className="hidden sm:flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
             >
               <Plus size={18} />
               Neu anlegen
             </button>
           )}
+          {!showArchived && <Fab onClick={() => setModalRecord(null)} title="Neu anlegen" />}
         </div>
       </PageHeader>
 
@@ -357,45 +343,29 @@ export default function MasterDataDetail() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  {listFields.map(f => (
-                    <th key={f.id} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      {f.name}
-                    </th>
-                  ))}
-                  {isProjektzeiten && (
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      Stundenkonto
-                    </th>
-                  )}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Geändert
-                  </th>
-                  <th className="px-4 py-3 w-20"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {records.map(record => (
-                  <RecordRow
-                    key={record.id}
-                    record={record}
-                    fields={entityType.fields}
-                    onEdit={(r) => setModalRecord(r)}
-                    onDelete={handleDelete}
-                    onArchive={handleArchive}
-                    onRestore={handleRestore}
-                    isAdmin={isAdmin}
-                    archivedView={showArchived}
-                    showBudget={isProjektzeiten}
-                    budget={budgets[record.id]}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            columns={[
+              ...listFields.map(f => ({
+                key: f.key, label: f.name,
+                render: r => formatFieldValue(f, r.data[f.key]),
+              })),
+              ...(isProjektzeiten ? [{
+                key: '_budget', label: 'Stundenkonto',
+                render: r => <BudgetCell budget={budgets[r.id]} />,
+              }] : []),
+              {
+                key: 'updated_at', label: 'Geändert', muted: true,
+                render: r => new Date(r.updated_at).toLocaleDateString('de-AT'),
+              },
+            ]}
+            rows={records}
+            onRowClick={r => setModalRecord(r)}
+            actions={r => (
+              <RecordActions record={r} onEdit={x => setModalRecord(x)}
+                onDelete={handleDelete} onArchive={handleArchive} onRestore={handleRestore}
+                isAdmin={isAdmin} archivedView={showArchived} />
+            )}
+          />
         )}
 
         {/* Paginierung */}
