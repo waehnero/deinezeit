@@ -1,7 +1,10 @@
+import { Search } from 'lucide-react'
+import { openCommandPalette } from './CommandPalette'
+
 // Einheitlicher Seitenkopf für ALLE Module (Design-Verfassung, Regel 3):
 // immer Symbol + Modultitel in gleicher Größe, optionale Beschreibung
-// darunter, Aktionen (Buttons) immer rechts. Seiten definieren keine
-// eigenen Kopfzeilen mehr.
+// darunter, Aktionen (Buttons) immer rechts — gefolgt vom ⌘K-Suchknopf,
+// der auf jeder Seite an derselben Stelle sitzt (Regel 5).
 //
 // Verwendung:
 //   <PageHeader icon={Clock} title="Zeiterfassung" subtitle="...">
@@ -24,9 +27,15 @@ export default function PageHeader({ icon: Icon, title, subtitle, children }) {
           )}
         </div>
       </div>
-      {children && (
-        <div className="flex items-center gap-2 flex-wrap">{children}</div>
-      )}
+      <div className="flex items-center gap-2 flex-wrap">
+        {children}
+        {/* Globale Suche (⌘K) — immer ganz rechts, auf jeder Seite gleich */}
+        <button onClick={openCommandPalette} title="Suchen & Befehle (⌘K)"
+          className="flex items-center gap-2 px-2.5 py-2.5 rounded-xl border border-neutral-200 bg-surface text-neutral-400 hover:text-neutral-700 hover:bg-neutral-50 transition">
+          <Search size={16} />
+          <kbd className="hidden md:block text-[10px] border border-neutral-200 rounded px-1 py-0.5">⌘K</kbd>
+        </button>
+      </div>
     </div>
   )
 }

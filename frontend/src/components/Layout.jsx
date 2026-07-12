@@ -10,6 +10,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
 import { masterdataApi } from '../services/api'
 import UpdateBanner from './UpdateBanner'
+import CommandPalette from './CommandPalette'
 
 
 // module = Schlüssel der Modulrechte (backend/app/core/modules.py);
@@ -62,6 +63,16 @@ export default function Layout({ children }) {
     // Bei Routenwechsel innerhalb der Stammdaten neu laden (neue Typen sichtbar)
   }, [hasModule('stammdaten'), location.pathname.startsWith('/masterdata')])
   const mdOpen = location.pathname.startsWith('/masterdata')
+
+  // Einträge der ⌘K-Befehlspalette: Module, Stammdaten-Typen, Aktionen
+  const paletteItems = [
+    ...NAV_ITEMS.filter(item => hasModule(item.module))
+      .map(item => ({ label: item.label, icon: item.icon, to: item.to, group: 'Module' })),
+    ...mdTypes.map(t2 => ({ label: t2.name, icon: Database, to: `/masterdata/${t2.slug}`, group: 'Stammdaten' })),
+    ...(isAdmin ? [{ label: 'Einstellungen', icon: Settings2, to: '/settings', group: 'Aktionen' }] : []),
+    { label: 'Mein Profil', icon: User, to: '/profile', group: 'Aktionen' },
+    { label: 'Abmelden', icon: LogOut, action: () => handleLogout(), group: 'Aktionen' },
+  ]
 
   // Nur freigeschaltete Module im Menü zeigen
   const navItems = NAV_ITEMS.filter(item => hasModule(item.module))
@@ -219,7 +230,8 @@ export default function Layout({ children }) {
     <div className="flex h-screen bg-neutral-50 overflow-hidden">
       <UpdateBanner />
       {/* Desktop Sidebar */}
-      <aside className={`hidden lg:flex flex-col bg-sidebar border-r border-sidebar-border flex-shrink-0 relative transition-all duration-200 ${
+      <aside style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)' }}
+        className={`hidden lg:flex flex-col bg-sidebar border-r border-sidebar-border flex-shrink-0 relative transition-all duration-200 ${
         collapsed ? 'w-16' : 'w-56'
       }`}>
         <SidebarContent mini={collapsed} />
@@ -233,9 +245,10 @@ export default function Layout({ children }) {
         </button>
       </aside>
 
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay — liegt ÜBER der Bottom-Tab-Bar (z-40), damit auch
+          die unteren Menüpunkte (Profil, Abmelden) erreichbar sind */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-[60] lg:hidden">
           <div className="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-56 bg-sidebar shadow-xl z-50 overflow-y-auto"
             style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
@@ -265,16 +278,55 @@ export default function Layout({ children }) {
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto"
+          style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
           {/* Einheitlicher Seitenrahmen (Design-Verfassung, Regel 3/4):
               gleiche maximale Breite und gleiche Außenabstände für ALLE
               Module, responsive auf iPhone/iPad/Desktop. Seiten definieren
-              keine eigenen Außenbreiten/-abstände mehr. */}
-          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 py-4 sm:py-6">
+              keine eigenen Außenbreiten/-abstände mehr. Unten am Handy Platz
+              für die Bottom-Tab-Bar. */}
+          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 pt-4 sm:pt-6 pb-24 lg:pb-6">
             {children}
           </div>
         </main>
+
+        {/* Bottom-Tab-Bar (nur mobil; Design-Verfassung, Regel 4):
+            maximal 5 Plätze — die ersten 4 freigeschalteten Module plus
+            „Mehr" (öffnet das vollständige Menü). Reihenfolge = Modulrechte. */}
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-sidebar border-t border-sidebar-border flex items-stretch justify-around"
+          style={{
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            paddingLeft:   'env(safe-area-inset-left)',
+            paddingRight:  'env(safe-area-inset-right)',
+          }}>
+          {navItems.slice(0, 4).map(({ to, icon: Icon, label }) => (
+            <NavLink key={to} to={to} onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center gap-0.5 flex-1 py-2 min-h-[56px] text-[10px] font-medium transition-colors ${
+                  isActive ? 'text-sidebar-active-text' : 'text-sidebar-text/70'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span className={`px-3 py-0.5 rounded-full ${isActive ? 'bg-sidebar-active' : ''}`}>
+                    <Icon size={19} />
+                  </span>
+                  <span className="truncate max-w-[72px]">{label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+          <button onClick={() => setMobileOpen(true)}
+            className="flex flex-col items-center justify-center gap-0.5 flex-1 py-2 min-h-[56px] text-[10px] font-medium text-sidebar-text/70">
+            <span className="px-3 py-0.5"><Menu size={19} /></span>
+            <span>Mehr</span>
+          </button>
+        </nav>
       </div>
+
+      {/* ⌘K-Befehlspalette (global, öffnet per Cmd/Ctrl+K oder Suchknopf) */}
+      <CommandPalette items={paletteItems} />
     </div>
   )
 }

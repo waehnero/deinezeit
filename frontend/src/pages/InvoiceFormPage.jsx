@@ -147,8 +147,8 @@ function TimeEntryPicker({ contactId, onAdd }) {
         <Clock size={14} /> Zeiteinträge übernehmen
       </button>
       {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 sheet-safe">
+          <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">Nicht verrechnete Zeiteinträge</h2>
               {entries.length > 0 && <button onClick={() => setSelected(new Set(entries.map(e => e.id)))} className="text-xs text-primary-600 hover:underline">Alle auswählen</button>}

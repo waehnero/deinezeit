@@ -58,8 +58,8 @@ function NewTypeModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">Neuen Stammdaten-Typ anlegen</h2>
           <p className="text-sm text-gray-500 mt-1">z.B. Mitarbeiter, Fahrzeuge, Verträge …</p>

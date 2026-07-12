@@ -204,9 +204,9 @@ export default function TaskDetailSheet({ task, settings, fields, project, proje
   const isImage = (a) => (a.mimetype || '').startsWith('image/')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 sheet-safe flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
       <div
-        className="bg-surface w-full md:max-w-lg rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto"
+        className="bg-surface w-full md:max-w-lg rounded-2xl max-h-full lg:max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Kopf */}

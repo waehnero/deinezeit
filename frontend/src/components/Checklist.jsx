@@ -207,8 +207,8 @@ function AssignDialog({ item, onClose, onAssigned }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[70] sheet-safe flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-surface w-full md:max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-medium text-gray-900">Element zuweisen</h2>
           <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
