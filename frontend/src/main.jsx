@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 import './i18n'
 import './index.css'
+import { initPrefs } from './utils/anzeige'
 
 import { SettingsProvider } from './contexts/SettingsContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -114,6 +115,9 @@ function App() {
     </BrowserRouter>
   )
 }
+
+// Anzeige-Präferenzen (Dunkelmodus, Barrierefreiheit) vor dem ersten Render anwenden
+initPrefs()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

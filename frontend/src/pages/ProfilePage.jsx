@@ -7,6 +7,7 @@ import {
   User, Globe, Shield, Fingerprint, Key,
   Check, Loader2, Eye, EyeOff, Smartphone, Trash2
 } from 'lucide-react'
+import AnzeigeEinstellungen from '../components/AnzeigeEinstellungen'
 
 export default function ProfilePage() {
   const { t, i18n } = useTranslation()
@@ -181,6 +182,9 @@ export default function ProfilePage() {
             </button>
           </form>
         </div>
+
+        {/* ── Anzeige & Barrierefreiheit (pro Benutzer/Gerät) ── */}
+        <AnzeigeEinstellungen />
 
         {/* ── Passwort ── */}
         <div className="bg-surface rounded-2xl border border-gray-200 p-6">

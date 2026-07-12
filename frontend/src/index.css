@@ -260,8 +260,11 @@
   --sidebar-border:   236 236 234;
 }
 
-/* ── Midnight Pro: Dark Mode (invertierte Grau-Skala) ───────────────────── */
-[data-design="midnight"] {
+/* ── Midnight Pro: Dark Mode (invertierte Grau-Skala) ─────────────────────
+   Gilt auch als BENUTZER-Schalter (data-dark am <html>, „Mein Profil"):
+   legt sich als Nacht-Variante über jede gewählte Designvorlage. */
+[data-design="midnight"],
+[data-dark="true"] {
   --n-50:  30 41 59;
   --n-100: 36 48 68;
   --n-200: 51 65 85;
@@ -285,15 +288,24 @@
   --sidebar-active-bg:   30 45 66;
   --sidebar-active-text: var(--p-300);
 }
-[data-design="midnight"] {
+[data-design="midnight"],
+[data-dark="true"] {
   color-scheme: dark;
 }
+/* Im Dunkelmodus helle Vorlagen-Hintergründe (z. B. Aurora-Verlauf) abschalten */
+[data-dark="true"] body {
+  background-image: none;
+}
 
-/* ── Kontrast Plus: Barrierefrei (WCAG 2.2), große Schrift, harte Rahmen ── */
-html[data-design="kontrast"] {
+/* ── Kontrast Plus: Barrierefrei (WCAG 2.2), große Schrift, harte Rahmen ──
+   Gilt auch als BENUTZER-Schalter (data-contrast am <html>, „Mein Profil"):
+   übersteuert jede Vorlage und auch den Dunkelmodus. */
+html[data-design="kontrast"],
+html[data-contrast="true"] {
   font-size: 17px;
 }
-[data-design="kontrast"] {
+[data-design="kontrast"],
+[data-contrast="true"] {
   --n-50:  255 255 255;
   --n-100: 245 245 245;
   --n-200: 0 0 0;
@@ -319,9 +331,33 @@ html[data-design="kontrast"] {
   --sidebar-active-bg:   0 0 0;
   --sidebar-active-text: 255 255 255;
 }
-[data-design="kontrast"] :is(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+[data-design="kontrast"] :is(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible,
+[data-contrast="true"] :is(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
   outline: 3px solid #d97706;
   outline-offset: 2px;
+}
+
+/* ── Benutzer-Schalter: Größere Schrift (unabhängig von der Vorlage) ────── */
+html[data-bigtext="true"] {
+  font-size: 17.5px;
+}
+
+/* ── Benutzer-Schalter: Weniger Animation — plus Systemeinstellung ──────── */
+html[data-calm="true"] *,
+html[data-calm="true"] *::before,
+html[data-calm="true"] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer base {

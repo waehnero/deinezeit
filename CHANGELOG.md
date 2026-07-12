@@ -1,23 +1,35 @@
 # Changelog
 
-## [1.12.27] – 2026-07-12 – Layout redesign
+## [1.12.27] – 2026-07-12 – Layout-Redesign: Handy-Optimierung & Barrierefreiheit
+
+### Neue Funktionen
+- Menüleiste unten am Handy mit den wichtigsten Modulen und rundem Plus-Knopf für „Neu anlegen"
+- Schnellsuche mit Cmd/Strg+K über Module, Stammdaten und Aktionen
+- Dunkelmodus und Barrierefreiheit pro Benutzer (Hell/Dunkel/Automatisch, hoher Kontrast, größere Schrift, weniger Animation)
 
 ### Aktualisierungen
-- (Release-Notes ergänzen)
+- Dialogfenster verdecken am Handy die Menüleiste nicht mehr und sind durchscrollbar
+- Stammdaten-Listen erscheinen am Handy als Karten
 
 ---
 
-## [1.12.26] – 2026-07-12 – Layout redesign
+## [1.12.26] – 2026-07-12 – Layout-Redesign: Designvorlagen & Whitelabel
+
+### Neue Funktionen
+- 8 Designvorlagen mit Live-Vorschau (Einstellungen → Design)
+- Eigene Markenfarbe färbt die gesamte App (Whitelabel)
+- Stammdaten-Typen direkt im Menü aufklappbar
 
 ### Aktualisierungen
-- (Release-Notes ergänzen)
+- Einheitlicher Seitenaufbau in allen Modulen (Symbol, Titel, Aktionen an fester Position)
+- Feinanpassung für Text-, Hintergrund- und Flächenfarben
 
 ---
 
-## [1.12.25] – 2026-07-12 – Layout redesign
+## [1.12.25] – 2026-07-12 – Layout-Redesign: Fundament
 
 ### Aktualisierungen
-- (Release-Notes ergänzen)
+- Technisches Fundament für das neue Design (Design-Tokens) — Optik unverändert
 
 ---
 

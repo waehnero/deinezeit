@@ -8,9 +8,14 @@ export const changelog = [
     day: '12',
     month: 'Juli',
     year: '2026',
-    features: [],
+    features: [
+      'Neu auf dem Handy: Menüleiste unten mit den wichtigsten Modulen und runder Plus-Knopf für „Neu anlegen" — immer an derselben Stelle',
+      'Schnellsuche mit Cmd/Strg+K: Module, Stammdaten und Aktionen blitzschnell finden — auch über das Lupensymbol oben rechts',
+      'Dunkelmodus und Barrierefreiheit unter „Mein Profil": Hell/Dunkel/Automatisch, hoher Kontrast, größere Schrift und weniger Animation — pro Benutzer einstellbar',
+    ],
     updates: [
-      '(Release-Notes ergänzen)',
+      'Alle Dialogfenster passen sich am Handy an: Sie verdecken die Menüleiste nicht mehr und lange Formulare lassen sich durchscrollen',
+      'Stammdaten-Listen erscheinen am Handy als übersichtliche Karten',
     ],
   },
   {
@@ -18,9 +23,14 @@ export const changelog = [
     day: '12',
     month: 'Juli',
     year: '2026',
-    features: [],
+    features: [
+      'Designvorlagen: 8 Stilrichtungen von klassisch bis dunkel — unter Einstellungen → Design mit Live-Vorschau wählbar',
+      'Eigene Markenfarbe: Beliebiger Firmen-Farbton färbt die gesamte App — ideal für individuelles Branding',
+      'Stammdaten neu organisiert: Kontakte, Artikel & Co. direkt im Menü aufklappbar',
+    ],
     updates: [
-      '(Release-Notes ergänzen)',
+      'Einheitliche Ansichten: Jedes Modul nutzt jetzt denselben Seitenaufbau mit Symbol, Titel und Aktionen an fester Position',
+      'Feinanpassung der Farben für Text, Hintergrund und Flächen in den Einstellungen',
     ],
   },
   {
@@ -30,7 +40,7 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      '(Release-Notes ergänzen)',
+      'Technisches Fundament für das neue Design gelegt — Optik unverändert, aber ab jetzt vollständig anpassbar',
     ],
   },
   {
