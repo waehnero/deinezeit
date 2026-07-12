@@ -144,7 +144,7 @@ export default function GanttChart({ project, onChanged, onOpenTask }) {
   const totalH = rows.length * ROW_H
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white"
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-surface"
       onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
       <div className="flex">
         {/* Fixierte Namensspalte */}

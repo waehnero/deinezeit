@@ -11,7 +11,7 @@ export default function ForgotPasswordPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-primary-500 flex-col justify-between p-12">
         <div>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-surface rounded-xl flex items-center justify-center">
               <span className="text-primary-600 font-bold text-lg">DZ</span>
             </div>
             <span className="text-white font-semibold text-xl">DeineZeit</span>

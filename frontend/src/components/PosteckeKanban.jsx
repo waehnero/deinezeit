@@ -46,7 +46,7 @@ function Card({ post, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen 
   }
   return (
     <div ref={setNodeRef} style={style}
-      className="bg-white border border-neutral-200 rounded-lg p-3 mb-2 shadow-sm select-none">
+      className="bg-surface border border-neutral-200 rounded-lg p-3 mb-2 shadow-sm select-none">
       <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing">
         {post.fotos?.length > 0 ? (
           <PosteckeFotoThumb fotoId={post.fotos[0].id} className="w-full h-28 rounded-md mb-2" />
@@ -129,7 +129,7 @@ function PlanenDialog({ post, onBestaetigen, onAbbrechen }) {
   const [wert, setWert] = useState('')
   return (
     <div className="fixed inset-0 z-50 bg-neutral-900/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-4 w-full max-w-xs space-y-3">
+      <div className="bg-surface rounded-2xl p-4 w-full max-w-xs space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-neutral-900">Wann soll gepostet werden?</p>
           <button onClick={onAbbrechen} className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-500">
@@ -140,7 +140,7 @@ function PlanenDialog({ post, onBestaetigen, onAbbrechen }) {
           {post.titel || post.text?.slice(0, 50) || 'Post'}
         </p>
         <input type="datetime-local" value={wert} onChange={e => setWert(e.target.value)} autoFocus
-          className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-200" />
+          className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-200" />
         <div className="flex gap-2 justify-end">
           <button onClick={onAbbrechen}
             className="px-3 py-2 rounded-lg text-sm text-neutral-600 hover:bg-neutral-100">Abbrechen</button>
@@ -211,7 +211,7 @@ export default function PosteckeKanban({ posts, profilName, kanalLabel, onOpen, 
         </div>
         <DragOverlay>
           {activePost ? (
-            <div className="bg-white border border-primary-300 rounded-lg p-3 shadow-lg w-60">
+            <div className="bg-surface border border-primary-300 rounded-lg p-3 shadow-lg w-60">
               <p className="text-sm text-neutral-900">
                 {activePost.titel || activePost.text?.slice(0, 50) || 'Post'}
               </p>

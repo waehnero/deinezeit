@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.25] – 2026-07-12 – Layout redesign
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.24] – 2026-07-12 – Modulrechte pro Benutzer
 
 ### Neu

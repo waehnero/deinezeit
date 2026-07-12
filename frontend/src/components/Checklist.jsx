@@ -208,7 +208,7 @@ function AssignDialog({ item, onClose, onAssigned }) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-medium text-gray-900">Element zuweisen</h2>
           <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
@@ -246,7 +246,7 @@ function AssignDialog({ item, onClose, onAssigned }) {
                   placeholder="Kontakt suchen…"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400" />
                 {contactResults.length > 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-44 overflow-y-auto">
+                  <div className="absolute z-50 top-full left-0 right-0 bg-surface border border-gray-200 rounded-lg shadow-lg mt-1 max-h-44 overflow-y-auto">
                     {contactResults.map(r => (
                       <button key={r.id} type="button"
                         onMouseDown={() => {

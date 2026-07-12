@@ -37,7 +37,7 @@ function Card({ todo, prioColor, onOpen }) {
   const wichtig = todo.priority === 'hoch' || todo.priority === 'kritisch'
   return (
     <div ref={setNodeRef} style={style}
-      className="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm select-none">
+      className="bg-surface border border-gray-200 rounded-lg p-3 mb-2 shadow-sm select-none">
       <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing">
         <p className="text-sm text-gray-900 leading-snug mb-1.5">{todo.title}</p>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-gray-400">
@@ -160,7 +160,7 @@ export default function AufgabenKanban({ todos, statuses, priorities, onOpen, on
       </div>
       <DragOverlay>
         {activeTodo ? (
-          <div className="bg-white border border-primary-300 rounded-lg p-3 shadow-lg w-60">
+          <div className="bg-surface border border-primary-300 rounded-lg p-3 shadow-lg w-60">
             <p className="text-sm text-gray-900">{activeTodo.title}</p>
           </div>
         ) : null}

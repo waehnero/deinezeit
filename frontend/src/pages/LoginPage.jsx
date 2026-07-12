@@ -35,7 +35,7 @@ function NewsPanel() {
           onClick={() => setActiveTab('features')}
           className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition ${
             activeTab === 'features'
-              ? 'bg-white text-primary-700 shadow-sm'
+              ? 'bg-surface text-primary-700 shadow-sm'
               : 'text-white/80 hover:text-white hover:bg-white/10'
           }`}
         >
@@ -45,7 +45,7 @@ function NewsPanel() {
           onClick={() => setActiveTab('updates')}
           className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition ${
             activeTab === 'updates'
-              ? 'bg-white text-primary-700 shadow-sm'
+              ? 'bg-surface text-primary-700 shadow-sm'
               : 'text-white/80 hover:text-white hover:bg-white/10'
           }`}
         >

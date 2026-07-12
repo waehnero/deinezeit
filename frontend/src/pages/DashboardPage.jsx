@@ -266,7 +266,7 @@ function ZeiterfassungWidget({ stats, running, elapsedSec, onStop, editMode, nav
           {!editMode && (
             <button
               onClick={(e) => { e.stopPropagation(); onStop() }}
-              className="flex items-center gap-1 bg-white text-neutral-900 rounded-lg px-2.5 py-1 text-xs font-semibold hover:bg-neutral-200 transition-colors flex-shrink-0"
+              className="flex items-center gap-1 bg-surface text-neutral-900 rounded-lg px-2.5 py-1 text-xs font-semibold hover:bg-neutral-200 transition-colors flex-shrink-0"
             >
               <Square size={11} fill="currentColor" />
               Stopp

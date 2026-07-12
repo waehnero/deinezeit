@@ -95,7 +95,7 @@ export default function AufgabenKalender({ todos, statuses, doneStatus, onOpen, 
       onClick={e => { e.stopPropagation(); onOpen(t) }}
       title={t.title}
       className={`w-full text-left text-[11px] leading-snug px-1.5 py-1 rounded border-l-2 truncate transition-colors
-        ${istErledigt(t) ? 'line-through text-neutral-400 bg-neutral-50' : 'text-neutral-800 bg-white hover:bg-neutral-50'}
+        ${istErledigt(t) ? 'line-through text-neutral-400 bg-neutral-50' : 'text-neutral-800 bg-surface hover:bg-neutral-50'}
         ${istUeberfaellig(t) ? '!text-red-600' : ''}`}
       style={{ borderLeftColor: statusColor(t.status) }}>
       {mitZeit && t.due_time && <span className="font-medium mr-1">{t.due_time.slice(0, 5)}</span>}
@@ -159,7 +159,7 @@ export default function AufgabenKalender({ todos, statuses, doneStatus, onOpen, 
               <div key={iso}
                 onClick={() => onCreate(iso)}
                 className={`rounded-lg border p-1 min-h-[84px] cursor-pointer transition-colors hover:bg-primary-50
-                  ${imMonat ? 'bg-white border-neutral-200' : 'bg-neutral-50/60 border-neutral-100'}`}>
+                  ${imMonat ? 'bg-surface border-neutral-200' : 'bg-neutral-50/60 border-neutral-100'}`}>
                 <div className={`text-[11px] mb-0.5 w-5 h-5 flex items-center justify-center rounded-full
                   ${istHeute ? 'bg-primary-600 text-white font-semibold'
                              : imMonat ? 'text-neutral-600' : 'text-neutral-300'}`}>
@@ -190,7 +190,7 @@ export default function AufgabenKalender({ todos, statuses, doneStatus, onOpen, 
           const start = startOfWeek(erster)
           const zellen = Array.from({ length: 42 }, (_, i) => addDays(start, i))
           return (
-            <div key={m} className="bg-white border border-neutral-200 rounded-xl p-3">
+            <div key={m} className="bg-surface border border-neutral-200 rounded-xl p-3">
               <button
                 onClick={() => { setDatum(erster); wechsleModus('monat') }}
                 className="text-sm font-medium text-neutral-800 hover:text-primary-700 mb-2">
@@ -237,7 +237,7 @@ export default function AufgabenKalender({ todos, statuses, doneStatus, onOpen, 
           {MODI.map(m => (
             <button key={m.id} onClick={() => wechsleModus(m.id)}
               className={`px-3 py-1.5 text-sm ${modus === m.id
-                ? 'bg-primary-600 text-white' : 'bg-white text-neutral-600 hover:bg-neutral-50'}`}>
+                ? 'bg-primary-600 text-white' : 'bg-surface text-neutral-600 hover:bg-neutral-50'}`}>
               {m.label}
             </button>
           ))}

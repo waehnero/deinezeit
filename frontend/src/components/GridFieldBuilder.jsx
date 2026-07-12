@@ -115,8 +115,8 @@ function SortableField({ field, slug, tabs, activeTab, onUpdated, onDeleted, onC
     <div ref={setNodeRef} style={style} className={`${colClass} group`}>
       <div className={`rounded-xl border transition h-full ${
         isDragging ? 'border-primary-300 bg-primary-50'
-        : editing   ? 'border-primary-400 bg-white shadow-sm'
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+        : editing   ? 'border-primary-400 bg-surface shadow-sm'
+                    : 'border-gray-200 bg-surface hover:border-gray-300 hover:shadow-sm'
       }`}>
         <div className="p-3">
           {editing ? (
@@ -202,7 +202,7 @@ function SortableField({ field, slug, tabs, activeTab, onUpdated, onDeleted, onC
               <select
                 value={field.tab || tabs[0]}
                 onChange={e => onTabChange(field.id, e.target.value)}
-                className="ml-auto text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                className="ml-auto text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-surface text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 title="Tab-Zuweisung"
               >
                 {tabs.map(t => <option key={t} value={t}>{t}</option>)}
@@ -302,7 +302,7 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Feldtyp</label>
             <select value={fieldType} onChange={e => setFieldType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
               {FIELD_TYPES.map(({ key, label }) => <option key={key} value={key}>{label}</option>)}
             </select>
           </div>
@@ -315,7 +315,7 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
               <p className="text-xs text-gray-400 py-2">Keine anderen Stammdaten-Typen vorhanden</p>
             ) : (
               <select value={linkedTypeSlug} onChange={e => setLinkedTypeSlug(e.target.value)} required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                 <option value="">— Typ auswählen —</option>
                 {availableTypes.map(t => <option key={t.slug} value={t.slug}>{t.name}</option>)}
               </select>
@@ -343,7 +343,7 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Tab-Zugehörigkeit</label>
             <select value={selectedTab || tabs[0]} onChange={e => setSelectedTab(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
               {tabs.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
@@ -474,7 +474,7 @@ function TabManager({ slug, tabs, onTabsChanged }) {
       ) : (
         <div className="flex flex-wrap gap-2 mb-3">
           {tabs.map((tab, idx) => (
-            <div key={idx} className="flex items-center gap-1 bg-white border border-amber-300 rounded-lg px-2 py-1">
+            <div key={idx} className="flex items-center gap-1 bg-surface border border-amber-300 rounded-lg px-2 py-1">
               {editingIdx === idx ? (
                 <>
                   <input
@@ -517,7 +517,7 @@ function TabManager({ slug, tabs, onTabsChanged }) {
           onChange={e => setNewTabName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTab() } }}
           placeholder="Register-Name, z.B. Bankdaten"
-          className="flex-1 px-3 py-1.5 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+          className="flex-1 px-3 py-1.5 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-surface"
         />
         <button
           onClick={addTab}
@@ -674,7 +674,7 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
   const activeField = fields.find(f => f.id === activeId)
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200">
+    <div className="bg-surface rounded-2xl border border-gray-200">
       {/* Header */}
       <button
         onClick={() => setShowBuilder(!showBuilder)}

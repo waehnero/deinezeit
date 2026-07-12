@@ -141,7 +141,7 @@ export default function ProfilePage() {
       <div className="space-y-4">
 
         {/* ── Profil ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-surface rounded-2xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <User size={18} className="text-gray-400" /> Persönliche Daten
           </h2>
@@ -183,7 +183,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Passwort ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-surface rounded-2xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Key size={18} className="text-gray-400" /> Passwort ändern
           </h2>
@@ -207,7 +207,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── 2FA (TOTP) ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-surface rounded-2xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
             <Shield size={18} className="text-gray-400" /> {t('profile.twoFactor')}
           </h2>
@@ -285,7 +285,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Passkeys / Face ID ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-surface rounded-2xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
             <Fingerprint size={18} className="text-gray-400" /> {t('profile.passkeys')}
           </h2>
@@ -303,7 +303,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Mail-Import (persönliche Konten, Aufgabenmodul) ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-surface rounded-2xl border border-gray-200 p-6">
           <MailKonten />
         </div>
 

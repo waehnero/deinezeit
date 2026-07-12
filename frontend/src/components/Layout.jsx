@@ -176,7 +176,7 @@ export default function Layout({ children }) {
     <div className="flex h-screen bg-neutral-50 overflow-hidden">
       <UpdateBanner />
       {/* Desktop Sidebar */}
-      <aside className={`hidden lg:flex flex-col bg-white border-r border-neutral-200 flex-shrink-0 relative transition-all duration-200 ${
+      <aside className={`hidden lg:flex flex-col bg-surface border-r border-neutral-200 flex-shrink-0 relative transition-all duration-200 ${
         collapsed ? 'w-16' : 'w-56'
       }`}>
         <SidebarContent mini={collapsed} />
@@ -184,7 +184,7 @@ export default function Layout({ children }) {
         <button
           onClick={toggleCollapsed}
           title={collapsed ? 'Menü ausklappen' : 'Menü einklappen'}
-          className="absolute -right-3 top-20 z-10 w-6 h-6 bg-white border border-neutral-200 rounded-full flex items-center justify-center text-neutral-400 hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
+          className="absolute -right-3 top-20 z-10 w-6 h-6 bg-surface border border-neutral-200 rounded-full flex items-center justify-center text-neutral-400 hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
         >
           {collapsed ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
         </button>
@@ -194,7 +194,7 @@ export default function Layout({ children }) {
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-56 bg-white shadow-xl z-50 overflow-y-auto"
+          <aside className="absolute left-0 top-0 bottom-0 w-56 bg-surface shadow-xl z-50 overflow-y-auto"
             style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <SidebarContent />
           </aside>
@@ -204,7 +204,7 @@ export default function Layout({ children }) {
       {/* Hauptbereich */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile Header – berücksichtigt iOS Safe Area (Notch/Statusleiste) */}
-        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-neutral-200"
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-surface border-b border-neutral-200"
           style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}>
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-3" title="Zum Dashboard">
             {logoUrl ? (

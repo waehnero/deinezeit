@@ -24,7 +24,7 @@ const COL_OPTIONS = [
 
 function Section({ title, desc, children }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
+    <div className="bg-surface border border-gray-200 rounded-xl p-5 mb-5">
       <h2 className="text-base font-medium text-gray-900">{title}</h2>
       {desc && <p className="text-sm text-gray-500 mt-0.5 mb-4">{desc}</p>}
       {children}
@@ -111,7 +111,7 @@ function RuleDialog({ rule, statuses, taskTypes, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-surface w-full md:max-w-lg rounded-t-2xl md:rounded-2xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <h2 className="text-base font-medium text-gray-900">{rule.name ? 'Regel bearbeiten' : 'Neue Regel'}</h2>
           <button onClick={onClose}><X size={20} className="text-gray-400" /></button>

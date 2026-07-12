@@ -277,7 +277,7 @@ export default function ProjektplanDetailPage() {
         <KanbanBoard project={project} settings={settings} onOpenTask={setDetailTask} onChanged={load} />
       ) : (
         /* Aufgabenliste (rekursiv) */
-        <div className="bg-white border border-gray-200 rounded-xl py-1.5">
+        <div className="bg-surface border border-gray-200 rounded-xl py-1.5">
           {project.tasks.length === 0 ? (
             <p className="text-center text-gray-400 text-sm py-8">
               Noch keine Aufgaben. Tippe unten auf „Aufgabe".
@@ -308,7 +308,7 @@ export default function ProjektplanDetailPage() {
       )}
 
       {/* Checkliste auf Projektebene */}
-      <div className="mt-5 bg-white border border-gray-200 rounded-xl p-4">
+      <div className="mt-5 bg-surface border border-gray-200 rounded-xl p-4">
         <Checklist parentType="project" parentId={project.id} onItemPromoted={load} />
       </div>
 
@@ -324,7 +324,7 @@ export default function ProjektplanDetailPage() {
       {/* Quick-Add Bottom-Sheet */}
       {quickAdd && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setQuickAdd(false)}>
-          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm text-gray-500">
                 {quickParent ? `Teilaufgabe zu „${quickParent.title}"` : 'Neue Aufgabe'}

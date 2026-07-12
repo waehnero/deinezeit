@@ -17,7 +17,7 @@ const ROLE_COLORS = {
 function Modal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
           <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
           <button onClick={onClose} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition">
@@ -222,7 +222,7 @@ function EditUserModal({ user, onClose, onUpdated }) {
               <p className="text-xs text-amber-600">Deaktivieren wenn Benutzer keinen Zugriff mehr hat</p>
             </div>
             <button type="button" onClick={() => set('disable_totp', !form.disable_totp)}
-              className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${form.disable_totp ? 'bg-red-100 border-red-300 text-red-700' : 'bg-white border-amber-300 text-amber-700 hover:bg-amber-100'}`}>
+              className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${form.disable_totp ? 'bg-red-100 border-red-300 text-red-700' : 'bg-surface border-amber-300 text-amber-700 hover:bg-amber-100'}`}>
               {form.disable_totp ? '✓ Wird deaktiviert' : '2FA deaktivieren'}
             </button>
           </div>

@@ -260,7 +260,7 @@ function TabAllgemein({ settings, onSaved }) {
             <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
               <ImageIcon size={12} /> Berichtskopf
             </div>
-            <div className="h-16 border border-gray-200 rounded-xl bg-white flex items-center justify-center p-2">
+            <div className="h-16 border border-gray-200 rounded-xl bg-surface flex items-center justify-center p-2">
               {logoHeaderUrl
                 ? <img src={`${logoHeaderUrl}?v=${Date.now()}`} alt="Header" className="max-h-full max-w-full object-contain" />
                 : <div className="text-xs text-gray-300 text-center">600 × 120 px<br/>für Berichte</div>
@@ -275,7 +275,7 @@ function TabAllgemein({ settings, onSaved }) {
               <Monitor size={12} /> Browser-Tab
             </div>
             <div className="h-16 border border-gray-200 rounded-xl bg-gray-100 flex items-center gap-3 px-4">
-              <div className="w-8 h-8 border border-gray-200 rounded bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <div className="w-8 h-8 border border-gray-200 rounded bg-surface flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {logoFaviconUrl
                   ? <img src={`${logoFaviconUrl}?v=${Date.now()}`} alt="Favicon" className="w-full h-full object-contain" />
                   : <Monitor size={14} className="text-gray-300" />
@@ -309,7 +309,7 @@ function TabAllgemein({ settings, onSaved }) {
               }`}
               title="Sidebar-Logo umschalten"
             >
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface rounded-full shadow transition-transform ${
                 sidebarLogoSource === 'favicon' ? 'translate-x-5' : ''
               }`} />
             </button>
@@ -611,7 +611,7 @@ function TabBackup({ settings, onSaved }) {
                 className={`text-left p-3 rounded-xl border-2 transition ${
                   isActive
                     ? 'border-primary-400 bg-primary-50'
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                    : 'border-gray-200 hover:border-gray-300 bg-surface'
                 }`}
               >
                 <div className="font-medium text-sm text-gray-800 mb-0.5 flex items-center gap-1.5">
@@ -690,7 +690,7 @@ function TabBackup({ settings, onSaved }) {
         ) : (
           <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
             {history.map((iso, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 bg-white">
+              <div key={i} className="flex items-center gap-3 px-4 py-3 bg-surface">
                 <div className={`w-2 h-2 rounded-full flex-shrink-0 ${i === 0 ? 'bg-green-400' : 'bg-gray-300'}`} />
                 <span className="text-sm text-gray-700">{fmtBackupDate(iso)}</span>
                 {i === 0 && <span className="ml-auto text-xs text-green-600 font-medium">Letztes</span>}
@@ -1542,7 +1542,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
           {[1, 2, 3, 4, 5].map(n => (
             <div key={n} className={`flex flex-col rounded-xl border-2 transition-all overflow-hidden ${Number(defaultTemplate) === n ? 'border-primary-500' : 'border-neutral-200'}`}>
-              <button onClick={() => setDefaultTemplate(n)} className={`flex flex-col items-center gap-2 p-3 w-full ${Number(defaultTemplate) === n ? 'bg-primary-50' : 'bg-white hover:bg-neutral-50'}`}>
+              <button onClick={() => setDefaultTemplate(n)} className={`flex flex-col items-center gap-2 p-3 w-full ${Number(defaultTemplate) === n ? 'bg-primary-50' : 'bg-surface hover:bg-neutral-50'}`}>
                 <FileText size={24} className={Number(defaultTemplate) === n ? 'text-primary-600' : 'text-neutral-400'} />
                 <span className={`text-xs font-semibold ${Number(defaultTemplate) === n ? 'text-primary-700' : 'text-neutral-700'}`}>{TEMPLATE_NAMES[n]}</span>
                 <span className="text-xs text-neutral-400 text-center leading-tight">{TEMPLATE_DESCRIPTIONS[n]}</span>
@@ -1564,7 +1564,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         </div>
         {previewTemplate && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-4xl" style={{height: '90vh'}}>
+            <div className="bg-surface rounded-2xl shadow-2xl flex flex-col w-full max-w-4xl" style={{height: '90vh'}}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-200">
                 <span className="font-semibold text-neutral-800">Vorschau: {TEMPLATE_NAMES[previewTemplate]}</span>
                 <div className="flex gap-2">
@@ -1573,7 +1573,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
                 </div>
               </div>
               <div className="flex-1 overflow-hidden rounded-b-2xl relative">
-                {previewLoading && <div className="absolute inset-0 flex items-center justify-center bg-white z-10"><Loader2 size={28} className="animate-spin text-neutral-400" /></div>}
+                {previewLoading && <div className="absolute inset-0 flex items-center justify-center bg-surface z-10"><Loader2 size={28} className="animate-spin text-neutral-400" /></div>}
                 <iframe srcdoc={previewHtml} className="w-full h-full border-0" sandbox="allow-same-origin" />
               </div>
             </div>
@@ -1839,7 +1839,7 @@ function TabAllgemeinWrapper({ settings, onSaved }) {
       <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit max-w-full">
         {subTabs.map(t => (
           <button key={t.id} onClick={() => setSub(t.id)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-surface text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
@@ -1864,7 +1864,7 @@ function TabParameter() {
       <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit max-w-full">
         {subTabs.map(t => (
           <button key={t.id} onClick={() => setSub(t.id)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-surface text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
@@ -1892,7 +1892,7 @@ function TabSystemWrapper({ settings, onSaved }) {
       <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit max-w-full">
         {subTabs.map(t => (
           <button key={t.id} onClick={() => setSub(t.id)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-surface text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
@@ -2018,7 +2018,7 @@ function TabSpeicher({ settings, onSaved }) {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-all
                 ${provider === p.id
                   ? 'bg-orange-50 border-orange-400 text-orange-700 font-medium'
-                  : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+                  : 'bg-surface border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
               <span>{p.icon}</span>{p.label}
             </button>
           ))}
@@ -2066,7 +2066,7 @@ function TabSpeicher({ settings, onSaved }) {
             <div onClick={() => setOdUseGraph(!odUseGraph)}
               className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5
                 ${odUseGraph ? 'bg-orange-500' : 'bg-neutral-300'}`}>
-              <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform
+              <div className={`w-5 h-5 bg-surface rounded-full shadow transition-transform
                 ${odUseGraph ? 'translate-x-4' : 'translate-x-0'}`} />
             </div>
             <span className="text-sm text-neutral-700">Graph-Einstellungen aus E-Mail wiederverwenden</span>
@@ -2103,7 +2103,7 @@ function TabSpeicher({ settings, onSaved }) {
                   className={`px-3 py-1.5 rounded-lg border text-sm transition-all
                     ${odDriveType === dt.id
                       ? 'bg-orange-50 border-orange-400 text-orange-700 font-medium'
-                      : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+                      : 'bg-surface border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
                   {dt.label}
                 </button>
               ))}
@@ -2221,7 +2221,7 @@ function TabEmailVorlagen() {
       <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-5 flex-wrap w-fit">
         {DOC_TYPES_VORLAGEN.map(t => (
           <button key={t.key} onClick={() => setActiveType(t.key)}
-            className={`px-3 py-1.5 text-sm rounded-md transition-all ${activeType === t.key ? 'bg-white text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded-md transition-all ${activeType === t.key ? 'bg-surface text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}

@@ -142,7 +142,7 @@ export default function ProjektplanPage() {
         {typeTabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`text-sm px-3 py-1.5 rounded-md whitespace-nowrap transition ${
-              tab === t.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              tab === t.id ? 'bg-surface text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}>
             {t.label} <span className="text-gray-400">{t.count}</span>
           </button>
@@ -180,7 +180,7 @@ export default function ProjektplanPage() {
         </div>
       ) : grouped ? (
         // ── Gruppierte Tabelle ──
-        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        <div className="border border-gray-200 rounded-xl overflow-hidden bg-surface">
           <div className="hidden md:grid bg-gray-50 border-b border-gray-200 px-4 py-2 text-[11px] text-gray-400"
             style={{ gridTemplateColumns: '1.6fr 110px 90px 90px 40px' }}>
             <span>Projekt</span><span className="text-center">Status</span>
@@ -209,7 +209,7 @@ export default function ProjektplanPage() {
         </div>
       ) : (
         // ── Flache Tabelle ──
-        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        <div className="border border-gray-200 rounded-xl overflow-hidden bg-surface">
           <div className="hidden md:grid bg-gray-50 border-b border-gray-200 px-4 py-2 text-[11px] text-gray-400"
             style={{ gridTemplateColumns: '1.4fr 1.1fr 110px 80px 80px 40px' }}>
             <span>Projekt</span><span>Kontakt</span><span className="text-center">Status</span>
@@ -241,7 +241,7 @@ export default function ProjektplanPage() {
       {/* Anlegen-Sheet */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowCreate(false)}>
-          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900">Neues Projekt</h2>
               <button onClick={() => setShowCreate(false)}><X size={20} className="text-gray-400" /></button>

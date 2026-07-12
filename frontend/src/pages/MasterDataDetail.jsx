@@ -273,7 +273,7 @@ export default function MasterDataDetail() {
               className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border transition ${
                 showArchived
                   ? 'bg-amber-50 text-amber-700 border-amber-300'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-amber-400 hover:text-amber-600'
+                  : 'bg-surface text-gray-600 border-gray-300 hover:border-amber-400 hover:text-amber-600'
               }`}
               title="Archivierte Datensätze anzeigen/ausblenden">
               <Archive size={16} />
@@ -315,7 +315,7 @@ export default function MasterDataDetail() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
           placeholder={`In ${entityType.name} suchen…`}
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
         />
       </div>
 
@@ -334,7 +334,7 @@ export default function MasterDataDetail() {
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition border whitespace-nowrap shrink-0 ${
                 typFilter === value
                   ? 'bg-primary-600 text-white border-primary-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400 hover:text-primary-600'
+                  : 'bg-surface text-gray-600 border-gray-300 hover:border-primary-400 hover:text-primary-600'
               }`}
             >
               {label}
@@ -344,7 +344,7 @@ export default function MasterDataDetail() {
       )}
 
       {/* Tabelle */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-40">
             <Loader2 size={28} className="animate-spin text-primary-400" />

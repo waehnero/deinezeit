@@ -108,7 +108,7 @@ function InlineCreateModal({ entityType, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[60] flex items-start justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl my-8">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-xl my-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-primary-50 rounded-lg">
@@ -289,7 +289,7 @@ function RelationField({ field, value, onChange, disabled }) {
 
             {/* Suchergebnis-Dropdown */}
             {isOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
                 {results.length > 0 ? (
                   <ul className="max-h-48 overflow-y-auto">
                     {results.map(record => (
@@ -408,7 +408,7 @@ function FieldInput({ field, value, onChange, disabled }) {
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             required={field.is_required}
-            className={`${baseInput} appearance-none bg-white`}
+            className={`${baseInput} appearance-none bg-surface`}
           >
             <option value="">— bitte wählen —</option>
             {(field.options || []).map((opt) => (

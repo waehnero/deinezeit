@@ -143,7 +143,7 @@ function CsvImportModal({ slug, entityType, onClose, onImported }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
@@ -209,7 +209,7 @@ function CsvImportModal({ slug, entityType, onClose, onImported }) {
                       <select
                         value={mapping[h] || '__ignore__'}
                         onChange={e => setMapping({ ...mapping, [h]: e.target.value })}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
                       >
                         <option value="__ignore__">— Ignorieren —</option>
                         {fields.map(f => (
