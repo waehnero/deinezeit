@@ -107,6 +107,9 @@ export const zeiterfassungApi = {
   // Statistik
   getStats: (userId) => api.get('/zeiterfassung/stats', { params: userId ? { user_id: userId } : {} }),
 
+  // KI: Sprach-Nachtragen (Transkript auswerten → Vorschlag)
+  kiNachtragen: (transcript) => api.post('/zeiterfassung/ki-nachtragen', { transcript }),
+
   // Stundenkonten / Projekt-Budgets
   listStundenkonten: (projectId) => api.get(`/zeiterfassung/projekte/${projectId}/stundenkonten`),
   createStundenkonto: (projectId, data) => api.post(`/zeiterfassung/projekte/${projectId}/stundenkonten`, data),

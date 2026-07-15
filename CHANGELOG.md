@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.12.28] – 2026-07-15 – Zeiterfassung: Sprach-Eintrag per KI & flexible Zeiten
+
+### Neu
+- Projektzeit per Sprache nachtragen: neuer Aufnahme-Knopf in der Zeiterfassung — die Ansage wird per KI ausgewertet und der Nachtragen-Dialog automatisch vorbefüllt
+- Start- und Endzeit im Timer-Bereich jederzeit manuell anpassbar, mit Vorschlägen wie letzter Endzeit oder aktueller Uhrzeit
+
+### Aktualisierungen
+- Aktions-Symbole in der Eintragsliste sind jetzt bei jedem Eintrag dauerhaft sichtbar (auch auf Touch-Geräten)
+
+---
+
 ## [1.12.27] – 2026-07-12 – Layout-Redesign: Handy-Optimierung & Barrierefreiheit
 
 ### Neue Funktionen

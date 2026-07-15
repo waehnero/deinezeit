@@ -9,7 +9,8 @@ from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
 from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
-from app.models.masterdata import EntityRecord
+from app.models.masterdata import EntityRecord, EntityType
+from app.services.ki import load_ki_settings, call_ki
 from app.models.invoice import InvoicePosition
 from app.schemas.zeiterfassung import (
     TimeEntryFieldCreate, TimeEntryFieldUpdate, TimeEntryFieldResponse,
@@ -18,6 +19,7 @@ from app.schemas.zeiterfassung import (
     TimeEntryResponse, TimeEntryListResponse, TimeStats,
     TimeEntryStatusUpdate, TimeEntryStatusBatch,
     StundenkontoCreate, StundenkontoUpdate, StundenkontoResponse, ProjectBudget,
+    KiNachtragenRequest, KiNachtragenResponse,
 )
 
 router = APIRouter(prefix="/zeiterfassung", tags=["Zeiterfassung"])
@@ -580,6 +582,174 @@ async def get_budgets(
     if len(ids) > 200:
         raise HTTPException(status_code=400, detail="Maximal 200 Projekt-IDs pro Abfrage")
     return [_compute_budget(db, pid) for pid in ids]
+
+
+# ── KI: Projektzeit per Sprache nachtragen ────────────────────────────────────
+
+def _ki_nachtragen_prompt(transcript: str, projekte: list, heute: str) -> str:
+    """Baut den Prompt für die Extraktion eines Zeiteintrags aus einem Transkript."""
+    import json as _json
+    projekt_liste = _json.dumps(
+        [{"id": str(p["id"]), "name": p["name"], "kontakt": p["kontakt"]} for p in projekte],
+        ensure_ascii=False,
+    )
+    return f"""Du bist ein Assistent für eine Zeiterfassungs-Software.
+Aus dem folgenden gesprochenen Text soll ein Zeiteintrag (Projektzeit nachtragen) erstellt werden.
+
+Heutiges Datum: {heute}
+
+Verfügbare Projektzeiten (Stammdaten) mit zugehörigem Kontakt:
+{projekt_liste}
+
+Gesprochener Text:
+\"\"\"{transcript}\"\"\"
+
+Aufgabe:
+1. Finde die passende Projektzeit aus der Liste (Namen können leicht abweichend
+   ausgesprochen/transkribiert sein, z.B. "Eurofib" vs. "EuroFib" — wähle den
+   plausibelsten Treffer). Prüfe auch, ob der genannte Kunde/Kontakt zum
+   Projekt passt.
+2. Extrahiere Datum (relative Angaben wie "gestern"/"am Dienstag" aufs heutige
+   Datum beziehen), Startzeit, Endzeit, Pause (Minuten) und die Notiz.
+3. Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, ohne Erklärungen und ohne
+   Markdown-Codeblock, mit exakt diesen Feldern:
+{{
+  "matched_project_id": "<id aus der Liste oder null>",
+  "spoken_project_name": "<gesprochener Projektname oder null>",
+  "spoken_contact_name": "<gesprochener Kunde/Kontakt oder null>",
+  "date": "YYYY-MM-DD oder null",
+  "end_date": "YYYY-MM-DD oder null (nur wenn über Mitternacht)",
+  "start_time": "HH:MM oder null",
+  "end_time": "HH:MM oder null",
+  "pause_minutes": <Zahl, 0 wenn nicht genannt>,
+  "note": "<Notiz oder null>",
+  "billable": <true/false, true wenn nicht genannt>,
+  "warnings": ["<Hinweis, z.B. Projektzeit nicht gefunden oder Kontakt passt nicht zum Projekt>"]
+}}"""
+
+
+def _parse_ki_json(text: str) -> dict:
+    """KI-Antwort robust als JSON parsen (toleriert Markdown-Codeblöcke)."""
+    import json as _json
+    import re as _re
+    text = text.strip()
+    if text.startswith("```"):
+        text = _re.sub(r"^```[a-zA-Z]*\n?", "", text)
+        text = _re.sub(r"\n?```$", "", text).strip()
+    try:
+        return _json.loads(text)
+    except Exception:
+        # letzter Versuch: erstes {...} im Text
+        m = _re.search(r"\{.*\}", text, _re.DOTALL)
+        if m:
+            try:
+                return _json.loads(m.group(0))
+            except Exception:
+                pass
+    raise HTTPException(status_code=502, detail="KI-Antwort konnte nicht ausgewertet werden")
+
+
+@router.post("/ki-nachtragen", response_model=KiNachtragenResponse)
+async def ki_nachtragen(
+    body: KiNachtragenRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Transkript einer Sprachaufnahme per KI auswerten.
+
+    Liefert einen Vorschlag für „Projektzeit nachtragen" (Projektzeit,
+    Kontakt, Datum, Von/Bis, Pause, Notiz) inkl. Stammdaten-Abgleich.
+    Gespeichert wird NICHTS — der Vorschlag wird im Dialog zur Kontrolle,
+    Anpassung und Freigabe angezeigt.
+    """
+    # Projektzeiten-Stammdaten als Abgleich-Kontext laden
+    typ = db.query(EntityType).filter(EntityType.slug == "projektzeiten").first()
+    projekte = []
+    if typ:
+        records = (
+            db.query(EntityRecord)
+            .filter(EntityRecord.entity_type_id == typ.id,
+                    EntityRecord.anonymized_at.is_(None))
+            .order_by(EntityRecord.display_name)
+            .limit(300)
+            .all()
+        )
+        for r in records:
+            kontakt = ""
+            data = r.data or {}
+            for key in ("kontakt", "kunde"):
+                v = data.get(key)
+                if isinstance(v, dict) and v.get("display_name"):
+                    kontakt = v["display_name"]
+                    break
+            projekte.append({"id": r.id, "name": r.display_name or "", "kontakt": kontakt})
+
+    heute = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d (%A)")
+    prompt = _ki_nachtragen_prompt(body.transcript, projekte, heute)
+
+    ki = load_ki_settings(db)
+    try:
+        antwort = call_ki(ki, prompt, max_tokens=800)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    daten = _parse_ki_json(antwort)
+    warnings = [w for w in (daten.get("warnings") or []) if isinstance(w, str)]
+
+    # Stammdaten-Abgleich serverseitig verifizieren (KI könnte halluzinieren)
+    project_id = None
+    project_name = daten.get("spoken_project_name")
+    contact_name = daten.get("spoken_contact_name")
+    matched = daten.get("matched_project_id")
+    if matched:
+        rec = next((p for p in projekte if str(p["id"]) == str(matched)), None)
+        if rec:
+            project_id = rec["id"]
+            project_name = rec["name"]
+            contact_name = rec["kontakt"] or contact_name
+        else:
+            warnings.append("Von der KI genannte Projektzeit existiert nicht in den Stammdaten")
+
+    # Passt der gesprochene Name plausibel zum gefundenen Eintrag? Wenn nicht,
+    # KEINE Vorauswahl treffen — der Benutzer wählt im Dialog selbst aus der
+    # Vorschlagsliste (gesprochener Name wird als Suchbegriff vorbefüllt).
+    gesprochen = (daten.get("spoken_project_name") or "").strip()
+    if project_id and gesprochen:
+        import difflib
+
+        def _norm(s: str) -> str:
+            return "".join(ch for ch in s.lower() if ch.isalnum())
+
+        a, b = _norm(gesprochen), _norm(project_name or "")
+        aehnlich = bool(a and b) and (
+            a in b or b in a or difflib.SequenceMatcher(None, a, b).ratio() >= 0.6
+        )
+        if not aehnlich:
+            warnings.append(
+                f"Gesprochener Projektname „{gesprochen}“ passt nicht sicher zu "
+                f"„{project_name}“ — bitte die richtige Projektzeit auswählen")
+            project_id = None
+            project_name = gesprochen
+            contact_name = daten.get("spoken_contact_name")
+
+    if not project_id and project_name:
+        if not any("nicht sicher" in w for w in warnings):
+            warnings.append(f"Projektzeit „{project_name}“ wurde in den Stammdaten nicht gefunden")
+
+    return KiNachtragenResponse(
+        transcript=body.transcript,
+        project_id=project_id,
+        project_name=project_name,
+        contact_name=contact_name,
+        date=daten.get("date"),
+        end_date=daten.get("end_date"),
+        start_time=daten.get("start_time"),
+        end_time=daten.get("end_time"),
+        pause_minutes=int(daten.get("pause_minutes") or 0),
+        note=daten.get("note"),
+        billable=bool(daten.get("billable", True)),
+        warnings=warnings,
+    )
 
 
 # ── Statistik ─────────────────────────────────────────────────────────────────
