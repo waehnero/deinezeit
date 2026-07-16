@@ -58,7 +58,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: deinezeit-files
       MINIO_PUBLIC_URL: http://localhost
-      APP_VERSION: ${APP_VERSION:-1.12.27}
+      APP_VERSION: ${APP_VERSION:-1.12.28}
       DEPLOY_MODE: local
     networks:
       - deinezeit_local

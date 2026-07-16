@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.12.28',
+    day: '15',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Projektzeit per Sprache nachtragen: neuer Aufnahme-Knopf in der Zeiterfassung — die Ansage wird per KI ausgewertet und der Nachtragen-Dialog automatisch vorbefüllt',
+      'Start- und Endzeit im Timer-Bereich jederzeit manuell anpassbar, mit Vorschlägen wie letzter Endzeit oder aktueller Uhrzeit',
+    ],
+    updates: [
+      'Aktions-Symbole in der Eintragsliste sind jetzt bei jedem Eintrag dauerhaft sichtbar (auch auf Touch-Geräten)',
+    ],
+  },
+  {
     version: '1.12.27',
     day: '12',
     month: 'Juli',

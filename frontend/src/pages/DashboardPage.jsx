@@ -18,7 +18,9 @@ import {
   GripVertical, Settings2, ChevronRight, Plus, Play, Square,
   Database, Clock, Check, FileText, GanttChartSquare, CheckSquare,
   FolderOpen, BarChart3, Landmark, ShieldCheck, Mail, Zap,
+  Mic, Sparkles,
 } from 'lucide-react'
+import VoiceEntryDialog from '../components/VoiceEntryDialog'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 const ICON_MAP = { Users: '👥', Package: '📦', FolderOpen: '📁', Database: '🗄️', Settings: '⚙️' }
@@ -243,6 +245,15 @@ function AufgabenWidget({ stats, mailCount, editMode, navigate }) {
 
 // ── Widget: Zeiterfassung (inkl. aktivem Zeitgeber) ───────────────────────────
 function ZeiterfassungWidget({ stats, running, elapsedSec, onStop, editMode, navigate }) {
+  const [voiceOpen, setVoiceOpen] = useState(false)
+
+  // KI-Vorschlag → weiter zur Zeiterfassung, dort öffnet der vorbefüllte
+  // Nachtragen-Dialog (Übergabe über den Router-State)
+  const handleVoiceResult = (v) => {
+    setVoiceOpen(false)
+    navigate('/zeiterfassung', { state: { kiVorschlag: v } })
+  }
+
   const rows = [
     { label: 'Heute',  total: stats?.today_minutes,  billable: stats?.today_billable_minutes,  target: stats?.today_target_minutes },
     { label: 'Woche',  total: stats?.week_minutes,   billable: stats?.week_billable_minutes,   target: stats?.week_target_minutes  },
@@ -266,25 +277,52 @@ function ZeiterfassungWidget({ stats, running, elapsedSec, onStop, editMode, nav
             {running.project_name || running.contact_name || running.note || 'Zeit läuft'}
           </span>
           {!editMode && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onStop() }}
-              className="flex items-center gap-1 bg-surface text-neutral-900 rounded-lg px-2.5 py-1 text-xs font-semibold hover:bg-neutral-200 transition-colors flex-shrink-0"
-            >
-              <Square size={11} fill="currentColor" />
-              Stopp
-            </button>
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); setVoiceOpen(true) }}
+                title="Projektzeit per Sprache nachtragen (KI)"
+                className="relative flex items-center bg-primary-500 hover:bg-primary-600 text-white rounded-lg px-2 py-1 transition-colors flex-shrink-0"
+              >
+                <Mic size={12} />
+                <Sparkles size={8} className="absolute top-0.5 right-0.5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onStop() }}
+                className="flex items-center gap-1 bg-surface text-neutral-900 rounded-lg px-2.5 py-1 text-xs font-semibold hover:bg-neutral-200 transition-colors flex-shrink-0"
+              >
+                <Square size={11} fill="currentColor" />
+                Stopp
+              </button>
+            </>
           )}
         </div>
       ) : (
         !editMode && (
-          <button
-            onClick={() => navigate('/zeiterfassung')}
-            className="flex items-center justify-center gap-1.5 w-full bg-primary-500 hover:bg-primary-600 text-white rounded-xl px-3 py-2 mb-4 text-sm font-semibold transition-colors"
-          >
-            <Play size={14} fill="currentColor" />
-            Timer starten
-          </button>
+          <div className="flex items-stretch gap-2 mb-4">
+            <button
+              onClick={() => navigate('/zeiterfassung')}
+              className="flex items-center justify-center gap-1.5 flex-1 bg-primary-500 hover:bg-primary-600 text-white rounded-xl px-3 py-2 text-sm font-semibold transition-colors"
+            >
+              <Play size={14} fill="currentColor" />
+              Timer starten
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setVoiceOpen(true) }}
+              title="Projektzeit per Sprache nachtragen (KI)"
+              className="relative flex items-center justify-center bg-primary-500 hover:bg-primary-600 text-white rounded-xl px-3 transition-colors flex-shrink-0"
+            >
+              <Mic size={15} />
+              <Sparkles size={9} className="absolute top-1 right-1" />
+            </button>
+          </div>
         )
+      )}
+
+      {/* Sprach-Nachtragen (KI) */}
+      {voiceOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <VoiceEntryDialog onClose={() => setVoiceOpen(false)} onResult={handleVoiceResult} />
+        </div>
       )}
 
       {stats ? (
