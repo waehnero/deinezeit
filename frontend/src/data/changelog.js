@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.29',
+    day: '20',
+    month: 'Juli',
+    year: '2026',
+    features: [],
+    updates: [
+      'Kein ungewolltes Hineinzoomen mehr bei Eingabefeldern am iPhone und iPad — die Ansicht bleibt stabil im Geräterahmen',
+    ],
+  },
+  {
     version: '1.12.28',
     day: '15',
     month: 'Juli',
