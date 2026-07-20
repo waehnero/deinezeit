@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.29] – 2026-07-20 – iPhone-Anzeige stabilisiert
+
+### Aktualisierungen
+- Kein ungewolltes Hineinzoomen mehr bei Eingabefeldern am iPhone und iPad — die Ansicht bleibt stabil im Geräterahmen
+
+---
+
 ## [1.12.28] – 2026-07-15 – Zeiterfassung: Sprach-Eintrag per KI & flexible Zeiten
 
 ### Neu

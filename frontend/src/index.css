@@ -415,4 +415,12 @@ html[data-calm="true"] *::after {
   .sheet-safe {
     padding: max(1rem, env(safe-area-inset-top)) 0.75rem calc(4.25rem + env(safe-area-inset-bottom));
   }
+
+  /* iOS/iPadOS zoomt automatisch in die Seite, sobald ein Eingabefeld mit
+     Schrift < 16px fokussiert wird — und bleibt danach gezoomt („Rahmen
+     verrutscht"). Deshalb haben Eingaben am Handy/Tablet immer mindestens
+     16px; der Auto-Zoom entfällt damit komplett. */
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
 }
