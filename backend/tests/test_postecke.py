@@ -192,6 +192,72 @@ def test_foto_upload_und_loeschen(auth_client, monkeypatch):
     assert speicher == {}
 
 
+# ── Profil-Parameter & Bild-Ausspielung ──────────────────────────────────────
+def _test_bild(breite=400, hoehe=200) -> bytes:
+    """Erzeugt ein kleines Test-JPEG."""
+    import io
+    from PIL import Image
+    img = Image.new("RGB", (breite, hoehe), (200, 120, 40))
+    out = io.BytesIO()
+    img.save(out, format="JPEG")
+    return out.getvalue()
+
+
+def test_profil_bild_parameter(auth_client):
+    profil = _profil_anlegen(auth_client, kanal="tiktok",
+                             bild_format="1:1", bild_filter="brillant")
+    assert profil["kanal"] == "tiktok"
+    assert profil["bild_format"] == "1:1"
+    assert profil["bild_filter"] == "brillant"
+
+    # Ungültige Werte werden abgelehnt
+    assert auth_client.post("/api/postecke/profile",
+                            json={"name": "X", "kanal": "facebook_privat",
+                                  "bild_format": "3:7"}).status_code == 422
+    assert auth_client.post("/api/postecke/profile",
+                            json={"name": "X", "kanal": "facebook_privat",
+                                  "bild_filter": "sepia-extrem"}).status_code == 422
+
+
+def test_bearbeite_foto_zuschnitt_und_filter():
+    """1:1-Zuschnitt liefert quadratisches JPEG; Filter laufen fehlerfrei durch."""
+    import io
+    from PIL import Image
+    from app.services.postecke import bearbeite_foto
+
+    daten, mimetype = bearbeite_foto(_test_bild(400, 200), "1:1", "brillant")
+    assert mimetype == "image/jpeg"
+    img = Image.open(io.BytesIO(daten))
+    assert img.size[0] == img.size[1]  # quadratisch
+
+    for f in ("kein", "warm", "kuehl", "kontrast", "sw"):
+        out, _ = bearbeite_foto(_test_bild(), "original", f)
+        assert len(out) > 0
+
+
+def test_foto_ausspielung_endpoint(auth_client, monkeypatch):
+    """Ausspielung liefert das Foto im Profil-Format (1:1) als JPEG."""
+    speicher = {}
+    monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
+                        lambda key, data, mt, db=None: speicher.__setitem__(key, data))
+    monkeypatch.setattr("app.api.postecke.storage_service.download_file",
+                        lambda key, db=None: (speicher[key], "image/jpeg"))
+
+    profil = _profil_anlegen(auth_client, bild_format="1:1", bild_filter="kein")
+    post = _post_anlegen(auth_client, profil_id=profil["id"])
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
+                            files=[("files", ("t.jpg", _test_bild(400, 200), "image/jpeg"))])
+    foto_id = resp.json()["fotos"][0]["id"]
+
+    resp = auth_client.get(f"/api/postecke/fotos/{foto_id}/ausspielung")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/jpeg")
+    import io
+    from PIL import Image
+    img = Image.open(io.BytesIO(resp.content))
+    assert img.size[0] == img.size[1]  # Profil-Format 1:1 angewendet
+
+
 # ── Datacenter-Postsarchiv ────────────────────────────────────────────────────
 def test_archivieren_spiegelt_ins_datacenter(auth_client, db_session, monkeypatch):
     """Archivieren legt Markdown+Fotos im Datacenter ab; Wiederherstellen räumt auf."""

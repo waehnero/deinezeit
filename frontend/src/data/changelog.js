@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.12.30',
+    day: '20',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Postecke: Je Profil sind jetzt Bildformat (z. B. 1:1 Quadrat, 4:5, 16:9, 9:16 Story) und ein Foto-Filter (Brillant, Warm, Kühl, Kontrast+, Schwarz-Weiß) hinterlegbar — beim Teilen und Herunterladen werden alle Fotos automatisch so ausgespielt, die Originale bleiben erhalten',
+      'Postecke: Neue Kanäle für Profile — TikTok, YouTube, WhatsApp (Status/Kanal), X (Twitter), Threads, Google Unternehmensprofil und Pinterest',
+    ],
+    updates: [],
+  },
+  {
     version: '1.12.29',
     day: '20',
     month: 'Juli',

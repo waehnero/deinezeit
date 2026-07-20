@@ -20,13 +20,38 @@ import ContactSearch from '../components/ContactSearch'
  * ──────────────────────────────────────────────────────────────────────────── */
 
 const KANAELE = [
-  { id: 'facebook_privat', label: 'Facebook privat', url: 'https://www.facebook.com/' },
-  { id: 'facebook_seite',  label: 'Facebook-Seite',  url: 'https://www.facebook.com/' },
-  { id: 'instagram',       label: 'Instagram',       url: 'https://www.instagram.com/' },
-  { id: 'linkedin',        label: 'LinkedIn',        url: 'https://www.linkedin.com/feed/' },
-  { id: 'sonstige',        label: 'Sonstige',        url: '' },
+  { id: 'facebook_privat', label: 'Facebook privat',          url: 'https://www.facebook.com/' },
+  { id: 'facebook_seite',  label: 'Facebook-Seite',           url: 'https://www.facebook.com/' },
+  { id: 'instagram',       label: 'Instagram',                url: 'https://www.instagram.com/' },
+  { id: 'linkedin',        label: 'LinkedIn',                 url: 'https://www.linkedin.com/feed/' },
+  { id: 'tiktok',          label: 'TikTok',                   url: 'https://www.tiktok.com/' },
+  { id: 'youtube',         label: 'YouTube',                  url: 'https://studio.youtube.com/' },
+  { id: 'whatsapp',        label: 'WhatsApp (Status/Kanal)',  url: 'https://web.whatsapp.com/' },
+  { id: 'x',               label: 'X (Twitter)',              url: 'https://x.com/' },
+  { id: 'threads',         label: 'Threads',                  url: 'https://www.threads.net/' },
+  { id: 'google_business', label: 'Google Unternehmensprofil', url: 'https://business.google.com/' },
+  { id: 'pinterest',       label: 'Pinterest',                url: 'https://www.pinterest.com/' },
+  { id: 'sonstige',        label: 'Sonstige',                 url: '' },
 ]
-const kanalInfo = (id) => KANAELE.find(k => k.id === id) || KANAELE[4]
+const kanalInfo = (id) =>
+  KANAELE.find(k => k.id === id) || KANAELE[KANAELE.length - 1]
+
+// Bild-Parameter je Profil (siehe Backend BILD_FORMATE / BILD_FILTER)
+const BILD_FORMATE = [
+  { id: 'original', label: 'Original (kein Zuschnitt)' },
+  { id: '1:1',      label: '1:1 Quadrat (empfohlen)' },
+  { id: '4:5',      label: '4:5 Hochformat (Insta-Feed)' },
+  { id: '16:9',     label: '16:9 Querformat' },
+  { id: '9:16',     label: '9:16 Story/Reel' },
+]
+const BILD_FILTER = [
+  { id: 'kein',     label: 'Kein Filter' },
+  { id: 'brillant', label: 'Brillant (Auto-Kontrast + Farbe)' },
+  { id: 'warm',     label: 'Warm' },
+  { id: 'kuehl',    label: 'Kühl' },
+  { id: 'kontrast', label: 'Kontrast+' },
+  { id: 'sw',       label: 'Schwarz-Weiß' },
+]
 
 const STATUS_META = {
   entwurf:         { label: 'Entwurf',        badge: 'bg-neutral-100 text-neutral-600' },
@@ -53,13 +78,18 @@ function ProfilForm({ profil, onSave, onCancel }) {
   const [name, setName] = useState(profil?.name || '')
   const [kanal, setKanal] = useState(profil?.kanal || 'facebook_privat')
   const [stil, setStil] = useState(profil?.stil_prompt || '')
+  const [bildFormat, setBildFormat] = useState(profil?.bild_format || 'original')
+  const [bildFilter, setBildFilter] = useState(profil?.bild_filter || 'kein')
   const [saving, setSaving] = useState(false)
 
   const speichern = async () => {
     if (!name.trim()) { toast.error('Bitte einen Namen angeben'); return }
     setSaving(true)
     try {
-      await onSave({ name: name.trim(), kanal, stil_prompt: stil.trim() || null })
+      await onSave({
+        name: name.trim(), kanal, stil_prompt: stil.trim() || null,
+        bild_format: bildFormat, bild_filter: bildFilter,
+      })
     } finally { setSaving(false) }
   }
 
@@ -77,6 +107,26 @@ function ProfilForm({ profil, onSave, onCancel }) {
           className="mt-1 w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-200">
           {KANAELE.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
         </select>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-neutral-500">Bildformat (Ausspielung)</label>
+          <select value={bildFormat} onChange={e => setBildFormat(e.target.value)}
+            className="mt-1 w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-200">
+            {BILD_FORMATE.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-neutral-500">Foto-Filter</label>
+          <select value={bildFilter} onChange={e => setBildFilter(e.target.value)}
+            className="mt-1 w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-200">
+            {BILD_FILTER.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+          </select>
+        </div>
+        <p className="sm:col-span-2 text-[11px] text-neutral-400 -mt-1">
+          Wird beim Teilen/Herunterladen auf alle Fotos dieses Profils angewendet
+          (mittiger Zuschnitt) — die Originale bleiben erhalten.
+        </p>
       </div>
       <div>
         <label className="text-xs font-medium text-neutral-500">
@@ -196,7 +246,8 @@ function PostEditor({ post, profile, onClose, onSaved }) {
   const fileRef = useRef(null)
 
   // Fotos für die Web Share API vorladen (muss VOR dem Klick passieren,
-  // damit navigator.share synchron im Klick-Kontext aufgerufen werden kann)
+  // damit navigator.share synchron im Klick-Kontext aufgerufen werden kann).
+  // Ausspielungs-Variante: Zielformat + Filter des Profils sind angewendet.
   const [shareDateien, setShareDateien] = useState([])
   useEffect(() => {
     let aktiv = true
@@ -204,11 +255,12 @@ function PostEditor({ post, profile, onClose, onSaved }) {
     const fotos = aktuell?.fotos || []
     if (!navigator.canShare || fotos.length === 0) return
     Promise.all(fotos.map(async f => {
-      const res = await posteckeApi.getFoto(f.id)
-      return new File([res.data], f.filename, { type: f.mimetype })
+      const res = await posteckeApi.getFotoAusspielung(f.id)
+      const name = f.filename.replace(/\.[^.]+$/, '') + '.jpg'
+      return new File([res.data], name, { type: 'image/jpeg' })
     })).then(dateien => { if (aktiv) setShareDateien(dateien) }).catch(() => {})
     return () => { aktiv = false }
-  }, [aktuell?.fotos])
+  }, [aktuell?.fotos, profilId])
 
   // Natives Teilen mit Dateien möglich? (iPhone/iPad: ja; Desktop: meist nein)
   const kannTeilen = shareDateien.length > 0 &&
@@ -337,15 +389,15 @@ function PostEditor({ post, profile, onClose, onSaved }) {
     await nachVeroeffentlichungFragen()
   }
 
-  /** Desktop-Fallback: alle Fotos herunterladen (fürs Hochladen beim Kanal) */
+  /** Desktop-Fallback: alle Fotos herunterladen (Ausspielungs-Variante) */
   const fotosHerunterladen = async () => {
     for (const f of (aktuell?.fotos || [])) {
       try {
-        const res = await posteckeApi.getFoto(f.id)
+        const res = await posteckeApi.getFotoAusspielung(f.id)
         const url = URL.createObjectURL(res.data)
         const a = document.createElement('a')
         a.href = url
-        a.download = f.filename
+        a.download = f.filename.replace(/\.[^.]+$/, '') + '.jpg'
         document.body.appendChild(a)
         a.click()
         a.remove()

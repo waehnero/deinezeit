@@ -298,6 +298,43 @@ async def upload_fotos(
     return p
 
 
+@router.get("/fotos/{foto_id}/ausspielung")
+def get_foto_ausspielung(
+    foto_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Foto in der Ausspielungs-Variante des Post-Profils: Zielformat
+    (z.B. 1:1, mittiger Zuschnitt) und Filter angewendet, als JPEG.
+    Ohne Profil bzw. bei "original"/"kein" nur vereinheitlicht.
+    Wird beim Teilen und beim Foto-Download genutzt — das Original
+    bleibt unverändert gespeichert.
+    """
+    zeile = (db.query(SocialPostFoto, SocialPost)
+             .join(SocialPost, SocialPost.id == SocialPostFoto.post_id)
+             .filter(SocialPostFoto.id == foto_id,
+                     SocialPost.owner_user_id == current_user.id).first())
+    if not zeile:
+        raise HTTPException(404, "Foto nicht gefunden")
+    foto, post = zeile
+
+    bild_format, bild_filter = "original", "kein"
+    if post.profil_id:
+        profil = db.query(SocialProfil).filter(SocialProfil.id == post.profil_id).first()
+        if profil:
+            bild_format = profil.bild_format or "original"
+            bild_filter = profil.bild_filter or "kein"
+
+    data, _ct = storage_service.download_file(foto.storage_key, db)
+    try:
+        daten, mimetype = postecke_service.bearbeite_foto(data, bild_format, bild_filter)
+    except Exception:
+        # Bearbeitung fehlgeschlagen (z.B. exotisches Format) -> Original liefern
+        daten, mimetype = data, foto.mimetype or "image/jpeg"
+    return Response(content=daten, media_type=mimetype)
+
+
 @router.get("/fotos/{foto_id}")
 def get_foto(
     foto_id: UUID,

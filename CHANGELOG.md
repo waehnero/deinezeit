@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.30] – 2026-07-20 – Postecke: Profil-Parameter für Fotos & neue Kanäle
+
+### Neu
+- Postecke: Je Profil sind jetzt Bildformat (z. B. 1:1 Quadrat, 4:5, 16:9, 9:16 Story) und ein Foto-Filter (Brillant, Warm, Kühl, Kontrast+, Schwarz-Weiß) hinterlegbar — beim Teilen und Herunterladen werden alle Fotos automatisch so ausgespielt, die Originale bleiben erhalten
+- Postecke: Neue Kanäle für Profile — TikTok, YouTube, WhatsApp (Status/Kanal), X (Twitter), Threads, Google Unternehmensprofil und Pinterest
+
+---
+
 ## [1.12.29] – 2026-07-20 – iPhone-Anzeige stabilisiert
 
 ### Aktualisierungen
