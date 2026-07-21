@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models.postecke import KANAELE, POST_STATUS
+from app.models.postecke import KANAELE, POST_STATUS, BILD_FORMATE, BILD_FILTER
 
 
 # ── Profile ───────────────────────────────────────────────────────────────────
@@ -14,6 +14,8 @@ class ProfilBase(BaseModel):
     name: str
     kanal: str
     stil_prompt: Optional[str] = None
+    bild_format: str = "original"
+    bild_filter: str = "kein"
     is_active: bool = True
 
     @field_validator("kanal")
@@ -21,6 +23,20 @@ class ProfilBase(BaseModel):
     def kanal_gueltig(cls, v: str) -> str:
         if v not in KANAELE:
             raise ValueError(f"Ungültiger Kanal (erlaubt: {', '.join(KANAELE)})")
+        return v
+
+    @field_validator("bild_format")
+    @classmethod
+    def format_gueltig(cls, v: str) -> str:
+        if v not in BILD_FORMATE:
+            raise ValueError(f"Ungültiges Bildformat (erlaubt: {', '.join(BILD_FORMATE)})")
+        return v
+
+    @field_validator("bild_filter")
+    @classmethod
+    def filter_gueltig(cls, v: str) -> str:
+        if v not in BILD_FILTER:
+            raise ValueError(f"Ungültiger Filter (erlaubt: {', '.join(BILD_FILTER)})")
         return v
 
 
@@ -32,6 +48,8 @@ class ProfilUpdate(BaseModel):
     name: Optional[str] = None
     kanal: Optional[str] = None
     stil_prompt: Optional[str] = None
+    bild_format: Optional[str] = None
+    bild_filter: Optional[str] = None
     is_active: Optional[bool] = None
 
     @field_validator("kanal")
@@ -39,6 +57,20 @@ class ProfilUpdate(BaseModel):
     def kanal_gueltig(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and v not in KANAELE:
             raise ValueError(f"Ungültiger Kanal (erlaubt: {', '.join(KANAELE)})")
+        return v
+
+    @field_validator("bild_format")
+    @classmethod
+    def format_gueltig(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in BILD_FORMATE:
+            raise ValueError(f"Ungültiges Bildformat (erlaubt: {', '.join(BILD_FORMATE)})")
+        return v
+
+    @field_validator("bild_filter")
+    @classmethod
+    def filter_gueltig(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in BILD_FILTER:
+            raise ValueError(f"Ungültiger Filter (erlaubt: {', '.join(BILD_FILTER)})")
         return v
 
 

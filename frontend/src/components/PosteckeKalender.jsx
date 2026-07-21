@@ -20,6 +20,13 @@ const KANAL_FARBEN = {
   facebook_seite:  'bg-blue-50 text-blue-700',
   instagram:       'bg-pink-50 text-pink-700',
   linkedin:        'bg-purple-50 text-purple-700',
+  tiktok:          'bg-neutral-800/10 text-neutral-800',
+  youtube:         'bg-red-50 text-red-700',
+  whatsapp:        'bg-green-50 text-green-700',
+  x:               'bg-neutral-800/10 text-neutral-800',
+  threads:         'bg-neutral-800/10 text-neutral-800',
+  google_business: 'bg-amber-50 text-amber-700',
+  pinterest:       'bg-red-50 text-red-700',
   sonstige:        'bg-neutral-100 text-neutral-600',
 }
 

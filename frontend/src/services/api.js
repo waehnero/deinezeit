@@ -367,6 +367,9 @@ export const posteckeApi = {
   deleteFoto: (fotoId) => api.delete(`/postecke/fotos/${fotoId}`),
   // Foto als Blob laden (Bearer-Token nötig, daher kein direktes <img src>)
   getFoto:    (fotoId) => api.get(`/postecke/fotos/${fotoId}`, { responseType: 'blob' }),
+  // Ausspielungs-Variante: Zielformat + Filter des Post-Profils angewendet (JPEG)
+  getFotoAusspielung: (fotoId) =>
+    api.get(`/postecke/fotos/${fotoId}/ausspielung`, { responseType: 'blob' }),
 }
 
 // ── Anlagen (Datacenter-API, generisch über entity_type/entity_id) ────────────

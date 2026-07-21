@@ -27,7 +27,15 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 # Kanäle: bestimmt Ziel-URL beim assistierten Posten und später die Anbindung
-KANAELE = ("facebook_privat", "facebook_seite", "instagram", "linkedin", "sonstige")
+KANAELE = ("facebook_privat", "facebook_seite", "instagram", "linkedin",
+           "tiktok", "youtube", "whatsapp", "x", "threads",
+           "google_business", "pinterest", "sonstige")
+
+# Bild-Ausspielung je Profil: Zielformat (Seitenverhältnis, mittiger Zuschnitt)
+BILD_FORMATE = ("original", "1:1", "4:5", "16:9", "9:16")
+
+# Vordefinierte Foto-Filter für eine gleichbleibende Anzeigequalität je Profil
+BILD_FILTER = ("kein", "brillant", "warm", "kuehl", "kontrast", "sw")
 
 # Status-Workflow eines Posts (Kanban-Spalten in Etappe 2);
 # "archiviert" = aus dem Board/Kalender ausgeblendet, aber nicht gelöscht
@@ -53,6 +61,11 @@ class SocialProfil(Base):
     # Verschlüsselte Zugangsdaten/Token für die Direktanbindung (Etappe 3).
     # In Etappe 1 ungenutzt; nie im Klartext speichern (services/ki.py: Fernet).
     zugang_enc = Column(Text, nullable=True)
+
+    # Bild-Parameter für die Ausspielung: Originale bleiben unangetastet,
+    # Zuschnitt/Filter werden erst beim Teilen/Herunterladen angewendet.
+    bild_format = Column(String(10), default="original", nullable=False)  # siehe BILD_FORMATE
+    bild_filter = Column(String(30), default="kein", nullable=False)      # siehe BILD_FILTER
 
     is_active = Column(Boolean, default=True, nullable=False)
 

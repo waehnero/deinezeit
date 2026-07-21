@@ -112,6 +112,77 @@ def generiere_vorschlag(db: Session, post: SocialPost,
     }
 
 
+# ── Bild-Ausspielung (Zuschnitt + Filter je Profil) ──────────────────────────
+# Die Originalfotos bleiben unverändert im Speicher; Zielformat und Filter des
+# Profils werden erst beim Teilen/Herunterladen angewendet. So sieht jeder
+# Kanal immer gleich aus, ohne dass Originale verloren gehen.
+
+# Seitenverhältnisse (Breite / Höhe)
+_FORMAT_RATIOS = {"1:1": 1.0, "4:5": 4 / 5, "16:9": 16 / 9, "9:16": 9 / 16}
+
+# Maximale Kantenlänge der Ausspielung (ausreichend für alle Kanäle)
+MAX_AUSSPIELUNG_KANTE = 2048
+
+
+def bearbeite_foto(data: bytes, bild_format: str = "original",
+                   bild_filter: str = "kein") -> Tuple[bytes, str]:
+    """
+    Wendet Zielformat (mittiger Zuschnitt) und Filter auf ein Foto an.
+    Liefert (JPEG-Bytes, "image/jpeg"). Bei "original"/"kein" wird nur
+    dezent verkleinert und nach JPEG gewandelt (einheitliche Ausspielung).
+    """
+    import io
+    from PIL import Image, ImageEnhance, ImageOps
+
+    img = Image.open(io.BytesIO(data))
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+
+    # 1. Zuschnitt auf das Zielformat (mittig)
+    ratio = _FORMAT_RATIOS.get(bild_format)
+    if ratio:
+        b, h = img.size
+        ist = b / h
+        if ist > ratio:        # zu breit -> links/rechts beschneiden
+            neu_b = int(h * ratio)
+            x = (b - neu_b) // 2
+            img = img.crop((x, 0, x + neu_b, h))
+        elif ist < ratio:      # zu hoch -> oben/unten beschneiden
+            neu_h = int(b / ratio)
+            y = (h - neu_h) // 2
+            img = img.crop((0, y, b, y + neu_h))
+
+    # 2. Filter für gleichbleibende Anzeigequalität
+    if bild_filter == "brillant":
+        img = ImageOps.autocontrast(img, cutoff=1)
+        img = ImageEnhance.Color(img).enhance(1.15)
+        img = ImageEnhance.Sharpness(img).enhance(1.1)
+    elif bild_filter == "warm":
+        r, g, b_ = img.convert("RGB").split()
+        r = r.point(lambda v: min(255, int(v * 1.06)))
+        b_ = b_.point(lambda v: int(v * 0.94))
+        img = Image.merge("RGB", (r, g, b_))
+        img = ImageEnhance.Color(img).enhance(1.05)
+    elif bild_filter == "kuehl":
+        r, g, b_ = img.convert("RGB").split()
+        r = r.point(lambda v: int(v * 0.94))
+        b_ = b_.point(lambda v: min(255, int(v * 1.06)))
+        img = Image.merge("RGB", (r, g, b_))
+    elif bild_filter == "kontrast":
+        img = ImageEnhance.Contrast(img).enhance(1.2)
+    elif bild_filter == "sw":
+        img = ImageOps.grayscale(img)
+
+    # 3. Größe begrenzen und als JPEG ausgeben
+    if max(img.size) > MAX_AUSSPIELUNG_KANTE:
+        img.thumbnail((MAX_AUSSPIELUNG_KANTE, MAX_AUSSPIELUNG_KANTE))
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=90)
+    return out.getvalue(), "image/jpeg"
+
+
 # ── Datacenter-Postsarchiv ────────────────────────────────────────────────────
 # Beim Archivieren wird der Post (Content als Markdown + alle Fotos als Kopien)
 # ins Datacenter gespiegelt: mit Kontakt unter dem Kontakt-Ordner, sonst global —
