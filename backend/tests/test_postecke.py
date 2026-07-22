@@ -166,7 +166,7 @@ def test_foto_upload_und_loeschen(auth_client, monkeypatch):
     """Upload legt Datensatz + Storage-Objekt an; Löschen räumt beides weg."""
     speicher = {}
     monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None: speicher.__setitem__(key, data))
+                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
     monkeypatch.setattr("app.api.postecke.storage_service.delete_file",
                         lambda key, db=None: speicher.pop(key, None))
 
@@ -239,7 +239,7 @@ def test_foto_ausspielung_endpoint(auth_client, monkeypatch):
     """Ausspielung liefert das Foto im Profil-Format (1:1) als JPEG."""
     speicher = {}
     monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None: speicher.__setitem__(key, data))
+                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
     monkeypatch.setattr("app.api.postecke.storage_service.download_file",
                         lambda key, db=None: (speicher[key], "image/jpeg"))
 
@@ -362,9 +362,9 @@ def test_archivieren_spiegelt_ins_datacenter(auth_client, db_session, monkeypatc
 
     speicher = {}
     monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None: speicher.__setitem__(key, data))
+                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
     monkeypatch.setattr("app.services.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None: speicher.__setitem__(key, data))
+                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
     monkeypatch.setattr("app.services.postecke.storage_service.download_file",
                         lambda key, db=None: (speicher[key], "image/jpeg"))
     monkeypatch.setattr("app.services.postecke.storage_service.delete_file",
@@ -404,7 +404,7 @@ def test_archivieren_mit_kontakt_landet_beim_kontakt(auth_client, db_session, mo
 
     speicher = {}
     monkeypatch.setattr("app.services.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None: speicher.__setitem__(key, data))
+                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
 
     kontakt_id = str(uuid4())
     post = _post_anlegen(auth_client, titel="Kundenevent",
@@ -418,7 +418,8 @@ def test_archivieren_mit_kontakt_landet_beim_kontakt(auth_client, db_session, mo
     assert a.entity_type == "kontakte"
     assert str(a.entity_id) == kontakt_id
     assert a.contact_name == "Musterfirma"
-    assert a.storage_key.startswith(f"kontakte/{kontakt_id}/Postsarchiv/")
+    # Ordner nutzt den Kundennamen statt der ID (neue Namensstruktur)
+    assert a.storage_key.startswith("kontakte/Musterfirma/Postsarchiv/")
 
 
 # ── KI-Generierung ────────────────────────────────────────────────────────────

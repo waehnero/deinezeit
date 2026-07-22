@@ -57,9 +57,10 @@ def test_backup_settings_roundtrip_und_secret_maskiert(admin_client):
 
 
 # ── Admin-Schutz ──────────────────────────────────────────────────────────────
-def test_backup_onedrive_test_ohne_login_401(client):
+def test_backup_onedrive_test_ohne_login_abgelehnt(client):
+    # Admin-Endpunkte liefern ohne Token 403 (HTTPBearer „Not authenticated")
     r = client.post("/api/settings/backup/onedrive/test", json={})
-    assert r.status_code == 401
+    assert r.status_code in (401, 403)
 
 
 def test_backup_onedrive_test_als_employee_403(auth_client):
@@ -67,9 +68,9 @@ def test_backup_onedrive_test_als_employee_403(auth_client):
     assert r.status_code == 403
 
 
-def test_backup_run_ohne_login_401(client):
+def test_backup_run_ohne_login_abgelehnt(client):
     r = client.post("/api/settings/backup/run")
-    assert r.status_code == 401
+    assert r.status_code in (401, 403)
 
 
 def test_backup_run_als_employee_403(auth_client):
