@@ -258,6 +258,103 @@ def test_foto_ausspielung_endpoint(auth_client, monkeypatch):
     assert img.size[0] == img.size[1]  # Profil-Format 1:1 angewendet
 
 
+# ── Direktanbindung Facebook-Seite ───────────────────────────────────────────
+def test_profil_zugang_verschluesselt(auth_client):
+    """Zugangsdaten werden gespeichert (has_zugang), aber nie zurückgegeben."""
+    profil = _profil_anlegen(auth_client, kanal="facebook_seite",
+                             zugang={"page_id": "123456", "page_token": "GEHEIM-TOKEN"})
+    assert profil["has_zugang"] is True
+    assert profil["direktanbindung"] is True
+    assert "GEHEIM-TOKEN" not in str(profil)
+
+    # Update ohne zugang lässt die Daten unverändert
+    resp = auth_client.put(f"/api/postecke/profile/{profil['id']}",
+                           json={"name": "Umbenannt"})
+    assert resp.json()["has_zugang"] is True
+
+    # facebook_privat hat nie eine Direktanbindung
+    p2 = _profil_anlegen(auth_client, name="Privat", kanal="facebook_privat")
+    assert p2["direktanbindung"] is False
+
+
+def test_direkt_veroeffentlichen(auth_client, monkeypatch):
+    """Veröffentlichen über die Direktanbindung setzt Status + extern_url."""
+    from app.services import social_publish
+
+    def _fake_publisher(db, post, profil):
+        return "https://www.facebook.com/123_456"
+    monkeypatch.setitem(social_publish.KANAL_PUBLISHER, "facebook_seite", _fake_publisher)
+
+    profil = _profil_anlegen(auth_client, kanal="facebook_seite",
+                             zugang={"page_id": "1", "page_token": "t"})
+    post = _post_anlegen(auth_client, profil_id=profil["id"])
+    auth_client.put(f"/api/postecke/posts/{post['id']}", json={"text": "Hallo Seite!"})
+
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/veroeffentlichen")
+    assert resp.status_code == 200, resp.text
+    daten = resp.json()
+    assert daten["status"] == "veroeffentlicht"
+    assert daten["extern_url"] == "https://www.facebook.com/123_456"
+    assert daten["veroeffentlicht_am"] is not None
+
+    # Ohne Text -> 422; ohne Direktanbindung -> 400
+    post2 = _post_anlegen(auth_client, profil_id=profil["id"])
+    assert auth_client.post(f"/api/postecke/posts/{post2['id']}/veroeffentlichen").status_code == 422
+    privat = _profil_anlegen(auth_client, name="Privat", kanal="facebook_privat")
+    post3 = _post_anlegen(auth_client, profil_id=privat["id"])
+    auth_client.put(f"/api/postecke/posts/{post3['id']}", json={"text": "x"})
+    assert auth_client.post(f"/api/postecke/posts/{post3['id']}/veroeffentlichen").status_code == 400
+
+
+def test_worker_veroeffentlicht_faellige(auth_client, db_session, monkeypatch):
+    """Der Worker veröffentlicht fällige geplante Posts; Fehler bleiben am Post."""
+    from app.services import social_publish
+
+    aufrufe = []
+    def _fake_publisher(db, post, profil):
+        aufrufe.append(post.id)
+        return "https://www.facebook.com/x"
+    monkeypatch.setitem(social_publish.KANAL_PUBLISHER, "facebook_seite", _fake_publisher)
+
+    profil = _profil_anlegen(auth_client, kanal="facebook_seite",
+                             zugang={"page_id": "1", "page_token": "t"})
+
+    # fälliger Post (geplant in der Vergangenheit)
+    vergangen = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    post = _post_anlegen(auth_client, profil_id=profil["id"])
+    auth_client.put(f"/api/postecke/posts/{post['id']}", json={"text": "Automatisch!"})
+    auth_client.post(f"/api/postecke/posts/{post['id']}/status",
+                     json={"status": "geplant", "geplant_am": vergangen})
+
+    # noch nicht fälliger Post
+    zukunft = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    post2 = _post_anlegen(auth_client, profil_id=profil["id"])
+    auth_client.post(f"/api/postecke/posts/{post2['id']}/status",
+                     json={"status": "geplant", "geplant_am": zukunft})
+
+    anzahl = social_publish.veroeffentliche_faellige(db_session)
+    assert anzahl == 1
+    assert len(aufrufe) == 1
+
+    fertig = auth_client.get(f"/api/postecke/posts/{post['id']}").json()
+    assert fertig["status"] == "veroeffentlicht"
+    offen = auth_client.get(f"/api/postecke/posts/{post2['id']}").json()
+    assert offen["status"] == "geplant"
+
+    # Fehlerfall: Publisher wirft -> publish_error am Post, Status bleibt geplant
+    def _kaputt(db, post, profil):
+        raise RuntimeError("Token abgelaufen")
+    monkeypatch.setitem(social_publish.KANAL_PUBLISHER, "facebook_seite", _kaputt)
+    post3 = _post_anlegen(auth_client, profil_id=profil["id"])
+    auth_client.put(f"/api/postecke/posts/{post3['id']}", json={"text": "x"})
+    auth_client.post(f"/api/postecke/posts/{post3['id']}/status",
+                     json={"status": "geplant", "geplant_am": vergangen})
+    assert social_publish.veroeffentliche_faellige(db_session) == 0
+    fehler = auth_client.get(f"/api/postecke/posts/{post3['id']}").json()
+    assert fehler["status"] == "geplant"
+    assert "Token abgelaufen" in fehler["publish_error"]
+
+
 # ── Datacenter-Postsarchiv ────────────────────────────────────────────────────
 def test_archivieren_spiegelt_ins_datacenter(auth_client, db_session, monkeypatch):
     """Archivieren legt Markdown+Fotos im Datacenter ab; Wiederherstellen räumt auf."""

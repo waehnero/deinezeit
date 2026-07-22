@@ -343,6 +343,8 @@ export const posteckeApi = {
   createProfil:  (data)      => api.post('/postecke/profile', data),
   updateProfil:  (id, data)  => api.put(`/postecke/profile/${id}`, data),
   deleteProfil:  (id)        => api.delete(`/postecke/profile/${id}`),
+  // Direktanbindung: hinterlegte Zugangsdaten gegen den Kanal prüfen
+  testeVerbindung: (id)      => api.post(`/postecke/profile/${id}/verbindung-testen`),
 
   // Posts
   listPosts:  (status)     => api.get('/postecke/posts', { params: status ? { status } : {} }),
@@ -352,6 +354,8 @@ export const posteckeApi = {
   deletePost: (id)         => api.delete(`/postecke/posts/${id}`),
   setStatus:  (id, status, geplantAm) =>
     api.post(`/postecke/posts/${id}/status`, { status, geplant_am: geplantAm || null }),
+  // Sofort über die Direktanbindung veröffentlichen (z.B. Facebook-Seite)
+  veroeffentlichen: (id) => api.post(`/postecke/posts/${id}/veroeffentlichen`),
 
   // KI-Vorschlag (Fotos + Beschreibung + Profil-Stil)
   generieren: (id, beschreibung) =>

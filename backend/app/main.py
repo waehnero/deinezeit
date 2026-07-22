@@ -123,6 +123,12 @@ async def startup_event():
         start_recurring_worker()
     except Exception as e:
         print(f"[WARN] Wiederkehr-Worker konnte nicht gestartet werden: {e}")
+    # Postecke: geplante Posts mit Direktanbindung automatisch veröffentlichen
+    try:
+        from app.services.social_publish import start_postecke_worker
+        start_postecke_worker()
+    except Exception as e:
+        print(f"[WARN] Postecke-Worker konnte nicht gestartet werden: {e}")
 
 
 @app.get("/api/health")

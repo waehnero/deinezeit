@@ -33,8 +33,11 @@ from app.schemas.postecke import (
     PostCreate, PostUpdate, PostStatusUpdate, PostResponse,
     GenerierenRequest, GenerierenResponse,
 )
+import json
+
 from app.services import storage_service
 from app.services import postecke as postecke_service
+from app.services import social_publish
 
 router = APIRouter(prefix="/postecke", tags=["Postecke"])
 
@@ -63,14 +66,23 @@ def _get_post(db: Session, post_id: UUID, user: User) -> SocialPost:
 
 
 # ── Profile ───────────────────────────────────────────────────────────────────
+def _profil_response(p: SocialProfil) -> ProfilResponse:
+    """Response mit Zugangs-Status (die Zugangsdaten selbst bleiben am Server)."""
+    resp = ProfilResponse.model_validate(p)
+    resp.has_zugang = bool(p.zugang_enc)
+    resp.direktanbindung = social_publish.hat_direktanbindung(p)
+    return resp
+
+
 @router.get("/profile", response_model=List[ProfilResponse])
 def list_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return (db.query(SocialProfil)
+    rows = (db.query(SocialProfil)
             .filter(SocialProfil.owner_user_id == current_user.id)
             .order_by(SocialProfil.created_at).all())
+    return [_profil_response(p) for p in rows]
 
 
 @router.post("/profile", response_model=ProfilResponse, status_code=201)
@@ -79,11 +91,15 @@ def create_profil(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    p = SocialProfil(owner_user_id=current_user.id, **body.model_dump())
+    daten = body.model_dump()
+    zugang = daten.pop("zugang", None)
+    p = SocialProfil(owner_user_id=current_user.id, **daten)
+    if zugang:
+        p.zugang_enc = social_publish.encrypt_secret(json.dumps(zugang))
     db.add(p)
     db.commit()
     db.refresh(p)
-    return p
+    return _profil_response(p)
 
 
 @router.put("/profile/{profil_id}", response_model=ProfilResponse)
@@ -94,11 +110,32 @@ def update_profil(
     current_user: User = Depends(get_current_user),
 ):
     p = _get_profil(db, profil_id, current_user)
-    for key, value in body.model_dump(exclude_unset=True).items():
+    daten = body.model_dump(exclude_unset=True)
+    zugang = daten.pop("zugang", None)
+    for key, value in daten.items():
         setattr(p, key, value)
+    if zugang:  # None = unverändert lassen
+        p.zugang_enc = social_publish.encrypt_secret(json.dumps(zugang))
     db.commit()
     db.refresh(p)
-    return p
+    return _profil_response(p)
+
+
+@router.post("/profile/{profil_id}/verbindung-testen")
+def teste_profil_verbindung(
+    profil_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Prüft die hinterlegten Zugangsdaten gegen den Kanal (z.B. Graph API)."""
+    p = _get_profil(db, profil_id, current_user)
+    tester = social_publish.KANAL_VERBINDUNGSTEST.get(p.kanal)
+    if not tester:
+        raise HTTPException(400, f"Kanal {p.kanal} hat (noch) keine Direktanbindung")
+    zugang = social_publish.lade_zugang(p)
+    if not zugang:
+        raise HTTPException(400, "Keine Zugangsdaten hinterlegt")
+    return tester(zugang)
 
 
 @router.delete("/profile/{profil_id}", status_code=204)
@@ -212,6 +249,35 @@ def set_post_status(
         except Exception as e:
             print(f"[WARN] Postsarchiv-Aufräumen fehlgeschlagen für {p.id}: {e}")
 
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+# ── Direkt veröffentlichen (Kanäle mit Anbindung, z.B. Facebook-Seite) ────────
+@router.post("/posts/{post_id}/veroeffentlichen", response_model=PostResponse)
+def veroeffentliche_post(
+    post_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Veröffentlicht den Post sofort über die Direktanbindung seines Profils
+    (Fotos in der Ausspielungs-Variante + Text/Hashtags). Setzt Status auf
+    "veröffentlicht" und speichert die Beitrags-URL.
+    """
+    p = _get_post(db, post_id, current_user)
+    if not (p.text or "").strip():
+        raise HTTPException(422, "Der Post hat noch keinen Text")
+    profil = None
+    if p.profil_id:
+        profil = db.query(SocialProfil).filter(SocialProfil.id == p.profil_id).first()
+    if not social_publish.hat_direktanbindung(profil):
+        raise HTTPException(400, "Dieses Profil hat keine Direktanbindung — bitte assistiert posten")
+    try:
+        social_publish.publiziere(db, p, profil)
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
     db.commit()
     db.refresh(p)
     return p
