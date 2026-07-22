@@ -107,6 +107,11 @@ class SocialPost(Base):
 
     ki_model = Column(String(100), nullable=True)   # womit generiert (Nachvollziehbarkeit)
 
+    # Direktanbindung (Etappe 3): URL des veröffentlichten Beitrags bzw.
+    # letzter Fehler des Publish-Workers (bleibt "geplant", erneuter Versuch)
+    extern_url = Column(String(500), nullable=True)
+    publish_error = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))

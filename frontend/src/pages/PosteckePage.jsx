@@ -80,17 +80,40 @@ function ProfilForm({ profil, onSave, onCancel }) {
   const [stil, setStil] = useState(profil?.stil_prompt || '')
   const [bildFormat, setBildFormat] = useState(profil?.bild_format || 'original')
   const [bildFilter, setBildFilter] = useState(profil?.bild_filter || 'kein')
+  // Direktanbindung Facebook-Seite: Zugangsdaten (werden verschlüsselt gespeichert)
+  const [seiteId, setSeiteId] = useState('')
+  const [seiteToken, setSeiteToken] = useState('')
+  const [testeVerb, setTesteVerb] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const speichern = async () => {
     if (!name.trim()) { toast.error('Bitte einen Namen angeben'); return }
+    if ((seiteId.trim() && !seiteToken.trim()) || (!seiteId.trim() && seiteToken.trim())) {
+      toast.error('Bitte Seiten-ID UND Token angeben (oder beides leer lassen)')
+      return
+    }
     setSaving(true)
     try {
       await onSave({
         name: name.trim(), kanal, stil_prompt: stil.trim() || null,
         bild_format: bildFormat, bild_filter: bildFilter,
+        // nur mitschicken, wenn neu eingegeben — sonst bleiben die Daten unverändert
+        zugang: (seiteId.trim() && seiteToken.trim())
+          ? { page_id: seiteId.trim(), page_token: seiteToken.trim() } : null,
       })
     } finally { setSaving(false) }
+  }
+
+  const verbindungTesten = async () => {
+    if (!profil?.id) return
+    setTesteVerb(true)
+    try {
+      const res = await posteckeApi.testeVerbindung(profil.id)
+      if (res.data.ok) toast.success(res.data.message)
+      else toast.error(res.data.message)
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Verbindungstest fehlgeschlagen')
+    } finally { setTesteVerb(false) }
   }
 
   return (
@@ -128,6 +151,36 @@ function ProfilForm({ profil, onSave, onCancel }) {
           (mittiger Zuschnitt) — die Originale bleiben erhalten.
         </p>
       </div>
+      {kanal === 'facebook_seite' && (
+        <div className="rounded-lg border border-primary-100 bg-primary-50/40 p-3 space-y-2">
+          <p className="text-xs font-medium text-neutral-700">
+            Direktanbindung — automatisches Posten &amp; Planen
+            {profil?.has_zugang && (
+              <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">verbunden</span>
+            )}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input value={seiteId} onChange={e => setSeiteId(e.target.value)}
+              placeholder={profil?.has_zugang ? 'Seiten-ID (leer = unverändert)' : 'Seiten-ID'}
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-200" />
+            <input value={seiteToken} onChange={e => setSeiteToken(e.target.value)} type="password"
+              placeholder={profil?.has_zugang ? 'Page-Access-Token (leer = unverändert)' : 'Page-Access-Token'}
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-200" />
+          </div>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-[11px] text-neutral-500">
+              Anleitung: FACEBOOK-SEITE-ANBINDEN.md im Projektordner — Meta-App im
+              Entwicklermodus genügt, kein App-Review nötig.
+            </p>
+            {profil?.has_zugang && (
+              <button type="button" onClick={verbindungTesten} disabled={testeVerb}
+                className="text-xs px-3 py-1.5 rounded-lg border border-neutral-200 bg-surface text-neutral-600 hover:border-primary-300 flex items-center gap-1.5">
+                {testeVerb && <Loader2 size={12} className="animate-spin" />} Verbindung testen
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div>
         <label className="text-xs font-medium text-neutral-500">
           Stil &amp; Redensart (Vorgabe für die KI)
@@ -340,6 +393,21 @@ function PostEditor({ post, profile, onClose, onSaved }) {
     } catch (e) {
       toast.error(e.response?.data?.detail || e.message || 'Speichern fehlgeschlagen')
       return null
+    } finally { setLaufend(false) }
+  }
+
+  /** Direktanbindung: sofort über die API des Kanals veröffentlichen */
+  const direktVeroeffentlichen = async () => {
+    setLaufend(true)
+    try {
+      const p = await sicherstellen()
+      const res = await posteckeApi.veroeffentlichen(p.id)
+      toast.success('Veröffentlicht!')
+      if (res.data.extern_url) window.open(res.data.extern_url, '_blank', 'noopener')
+      onSaved()
+      onClose()
+    } catch (e) {
+      toast.error(e.response?.data?.detail || e.message || 'Veröffentlichen fehlgeschlagen')
     } finally { setLaufend(false) }
   }
 
@@ -577,6 +645,18 @@ function PostEditor({ post, profile, onClose, onSaved }) {
           {/* Aktionen */}
           {(text || generiert) && (
             <div className="space-y-2">
+              {profil?.direktanbindung && (
+                <button onClick={direktVeroeffentlichen} disabled={laufend}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-primary-300 bg-primary-50/50 hover:bg-primary-50 text-left">
+                  <Send size={18} className="text-primary-600 flex-shrink-0" />
+                  <span>
+                    <span className="block text-sm font-medium text-neutral-900">Jetzt veröffentlichen</span>
+                    <span className="block text-xs text-neutral-500">
+                      Direkt auf {kanal?.label || 'dem Kanal'} — Fotos und Text werden automatisch übertragen
+                    </span>
+                  </span>
+                </button>
+              )}
               <button onClick={assistiertPosten} disabled={laufend}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-neutral-200 bg-surface hover:border-primary-300 text-left">
                 <Send size={18} className="text-primary-600 flex-shrink-0" />
@@ -606,7 +686,11 @@ function PostEditor({ post, profile, onClose, onSaved }) {
                 <CalendarClock size={18} className="text-primary-600 flex-shrink-0" />
                 <span>
                   <span className="block text-sm font-medium text-neutral-900">Planen</span>
-                  <span className="block text-xs text-neutral-500">In den Redaktionsplan mit Termin</span>
+                  <span className="block text-xs text-neutral-500">
+                    {profil?.direktanbindung
+                      ? 'Wird zur geplanten Zeit automatisch veröffentlicht'
+                      : 'In den Redaktionsplan mit Termin'}
+                  </span>
                 </span>
               </button>
               {planenOffen && (
@@ -881,7 +965,17 @@ export default function PosteckePage() {
                               <Check size={11} /> {datumZeit(post.veroeffentlicht_am)}
                             </span>
                           )}
+                          {post.extern_url && (
+                            <a href={post.extern_url} target="_blank" rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className="text-primary-600 hover:underline">Beitrag öffnen</a>
+                          )}
                           {post.fotos?.length > 0 && <span>{post.fotos.length} Foto{post.fotos.length > 1 ? 's' : ''}</span>}
+                          {post.status === 'geplant' && post.publish_error && (
+                            <span className="text-red-600 w-full">
+                              ⚠ Automatisches Posten fehlgeschlagen: {post.publish_error.slice(0, 120)}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1" onClick={e => e.stopPropagation()}>

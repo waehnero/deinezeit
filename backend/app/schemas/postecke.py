@@ -40,8 +40,15 @@ class ProfilBase(BaseModel):
         return v
 
 
+class ProfilZugang(BaseModel):
+    """Zugangsdaten für die Direktanbindung (aktuell: Facebook-Seite)."""
+    page_id: str
+    page_token: str
+
+
 class ProfilCreate(ProfilBase):
-    pass
+    # Optional: Zugangsdaten für die Direktanbindung (werden verschlüsselt)
+    zugang: Optional[ProfilZugang] = None
 
 
 class ProfilUpdate(BaseModel):
@@ -51,6 +58,8 @@ class ProfilUpdate(BaseModel):
     bild_format: Optional[str] = None
     bild_filter: Optional[str] = None
     is_active: Optional[bool] = None
+    # Zugangsdaten nur bei Änderung mitschicken; None = unverändert lassen
+    zugang: Optional[ProfilZugang] = None
 
     @field_validator("kanal")
     @classmethod
@@ -76,6 +85,10 @@ class ProfilUpdate(BaseModel):
 
 class ProfilResponse(ProfilBase):
     id: UUID
+    # Zugangsdaten hinterlegt? (die Daten selbst verlassen den Server nie)
+    has_zugang: bool = False
+    # Kanal direkt angebunden UND Zugangsdaten da -> automatisches Posten möglich
+    direktanbindung: bool = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -141,6 +154,8 @@ class PostResponse(BaseModel):
     geplant_am: Optional[datetime] = None
     veroeffentlicht_am: Optional[datetime] = None
     ki_model: Optional[str] = None
+    extern_url: Optional[str] = None
+    publish_error: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     fotos: List[FotoResponse] = []

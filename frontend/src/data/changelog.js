@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.31',
+    day: '20',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Postecke: Facebook-Seiten sind jetzt direkt angebunden — „Jetzt veröffentlichen" postet Text, Hashtags und Fotos ohne Umweg direkt auf die Seite',
+      'Postecke: Geplante Posts auf angebundenen Kanälen werden zur eingestellten Zeit vollautomatisch veröffentlicht; Fehler werden am Post angezeigt und automatisch erneut versucht',
+      'Postecke: Zugangsdaten (Seiten-ID + Token) werden verschlüsselt je Profil gespeichert, mit „Verbindung testen"-Knopf — Einrichtungsanleitung liegt bei (FACEBOOK-SEITE-ANBINDEN.md)',
+    ],
+    updates: [],
+  },
+  {
     version: '1.12.30',
     day: '20',
     month: 'Juli',
