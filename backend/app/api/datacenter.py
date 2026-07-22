@@ -510,7 +510,7 @@ async def download_via_share_link(
     if att.share_expires_at and att.share_expires_at < datetime.now(timezone.utc):
         raise HTTPException(410, "Dieser Download-Link ist abgelaufen")
 
-    data, content_type = storage_service.download_file(att.storage_key)
+    data, content_type = storage_service.download_file(att.storage_key, db=db, backend=att.storage_provider)
     return Response(
         content=data, media_type=content_type,
         headers={
@@ -555,7 +555,7 @@ async def download_file(
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not att or att.type != "file":
         raise HTTPException(404, "Anhang nicht gefunden")
-    data, content_type = storage_service.download_file(att.storage_key)
+    data, content_type = storage_service.download_file(att.storage_key, db=db, backend=att.storage_provider)
     return Response(
         content=data, media_type=content_type,
         headers={
@@ -586,7 +586,7 @@ async def preview_file(
     if not is_eml and not is_msg and not any(mimetype.startswith(t) for t in PREVIEW_MIMETYPES):
         raise HTTPException(415, "Keine Vorschau für diesen Dateityp")
 
-    data, content_type = storage_service.download_file(att.storage_key)
+    data, content_type = storage_service.download_file(att.storage_key, db=db, backend=att.storage_provider)
 
     if is_msg:
         return HTMLResponse(content=_render_msg_preview(data))
@@ -705,15 +705,16 @@ async def upload_file(
 
     filename    = file.filename or "datei"
     mimetype    = file.content_type or "application/octet-stream"
-    storage_key = storage_service.build_storage_key(entity_type, entity_id, filename)
+    storage_key = storage_service.build_storage_key(entity_type, entity_id, filename, db=db)
 
     if db.query(Attachment).filter(Attachment.storage_key == storage_key).first():
         storage_key = storage_service.build_storage_key(
-            entity_type, entity_id, f"{uuid.uuid4().hex[:6]}_{filename}"
+            entity_type, entity_id, f"{uuid.uuid4().hex[:6]}_{filename}", db=db
         )
 
+    backend = storage_service.current_backend(db)
     try:
-        storage_service.upload_file(storage_key, data, mimetype, db=db)
+        storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
     except Exception as exc:
         raise HTTPException(500, f"Speicher-Fehler: {exc}")
 
@@ -721,7 +722,7 @@ async def upload_file(
 
     attachment = Attachment(
         entity_type=entity_type, entity_id=entity_id,
-        type="file", storage_key=storage_key,
+        type="file", storage_key=storage_key, storage_provider=backend,
         filename=filename, filesize=len(data), mimetype=mimetype,
         display_name=filename, uploaded_by=current.id,
         contact_id=contact_id, contact_name=contact_name,
@@ -805,7 +806,7 @@ async def delete_attachment(
     _check_attachment_deletable(db, att, current_user)
 
     if att.type == "file" and att.storage_key:
-        storage_service.delete_file(att.storage_key)
+        storage_service.delete_file(att.storage_key, db=db, backend=att.storage_provider)
     db.delete(att)
     db.commit()
     return {"ok": True}

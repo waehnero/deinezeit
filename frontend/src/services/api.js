@@ -151,8 +151,16 @@ export const settingsApi = {
   getContactOptions: () => api.get('/settings/contact-options'),
   testEmail: (toEmail) => api.post('/settings/test-email', { to_email: toEmail }),
   downloadBackup: () => api.get('/settings/backup/download', { responseType: 'blob' }),
+  testBackupOnedrive: (data) => api.post('/settings/backup/onedrive/test', data),
+  runBackup:      ()     => api.post('/settings/backup/run'),
   testStorage:    (data) => api.post('/settings/storage/test', data),
   applyStorage:   ()     => api.post('/settings/storage/apply'),
+  storageMigrationStatus: () => api.get('/settings/storage/migration-status'),
+  // Migration kann je nach Dateimenge dauern → großzügiges Timeout
+  storageMigrate: (deleteSource) => api.post('/settings/storage/migrate',
+    { delete_source: !!deleteSource }, { timeout: 600000 }),
+  storageRepathStatus: () => api.get('/settings/storage/repath-status'),
+  storageRepath: () => api.post('/settings/storage/repath', {}, { timeout: 600000 }),
 }
 
 export const datacenterApi = {

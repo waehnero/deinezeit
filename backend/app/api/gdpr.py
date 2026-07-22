@@ -166,11 +166,12 @@ async def erase_record(
     )
     filename = f"DSGVO-Loeschprotokoll-{log.executed_at.strftime('%Y-%m-%d')}-{str(log.id)[:8]}.pdf"
     try:
-        storage_key = storage_service.build_storage_key("dsgvo", str(log.id), filename)
-        storage_service.upload_file(storage_key, anon_pdf, "application/pdf", db=db)
+        storage_key = storage_service.build_storage_key("dsgvo", str(log.id), filename, db=db)
+        backend = storage_service.current_backend(db)
+        storage_service.upload_file(storage_key, anon_pdf, "application/pdf", db=db, backend=backend)
         filed = Attachment(
             entity_type="dsgvo", entity_id=log.id,
-            type="file", storage_key=storage_key,
+            type="file", storage_key=storage_key, storage_provider=backend,
             filename=filename, filesize=len(anon_pdf), mimetype="application/pdf",
             display_name=filename, uploaded_by=current_user.id,
             contact_id=company_contact_id,

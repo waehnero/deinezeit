@@ -1117,9 +1117,11 @@ async def upload_contract(
         return "".join(c for c in s if c.isalnum() or c in "._- ").strip() or "datei"
     stored_name = f"{safe_num}_{orig}"
     unique = uuid4().hex[:6]
-    storage_key = f"kontakte/{inv.contact_id}/Vertraege/{unique}_{_safe(stored_name)}"
+    _folder = storage_service.folder_name_for(db, inv.contact_id)
+    storage_key = f"kontakte/{_folder}/Vertraege/{unique}_{_safe(stored_name)}"
+    backend = storage_service.current_backend(db)
     try:
-        storage_service.upload_file(storage_key, data, mimetype, db=db)
+        storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
     except Exception as exc:
         raise HTTPException(500, f"Speicher-Fehler: {exc}")
 
@@ -1129,7 +1131,7 @@ async def upload_contract(
     # 1) Datacenter-Eintrag unter dem Kunden, Ordner "Verträge"
     dc = Attachment(
         entity_type="kontakte", entity_id=inv.contact_id,
-        type="file", storage_key=storage_key,
+        type="file", storage_key=storage_key, storage_provider=backend,
         filename=stored_name, filesize=len(data), mimetype=mimetype,
         display_name=f"Vertrag {inv.number} – {orig}",
         contact_id=inv.contact_id, contact_name=contact_name,
@@ -1158,12 +1160,18 @@ async def download_contract(
 ):
     """Lädt ein bestimmtes hinterlegtes Vertrags-Dokument herunter."""
     from app.services import storage_service
+    from app.models.attachment import Attachment
     att = db.query(InvoiceAttachment).filter(
         InvoiceAttachment.id == attachment_id,
         InvoiceAttachment.attach_type == "contract").first()
     if not att or not att.file_path:
         raise HTTPException(404, "Vertrag nicht gefunden")
-    data, mime = storage_service.download_file(att.file_path)
+    # Provider aus dem verknüpften Datacenter-Eintrag ermitteln (Mischbetrieb)
+    backend = None
+    if att.datacenter_id:
+        dc = db.query(Attachment).filter(Attachment.id == att.datacenter_id).first()
+        backend = dc.storage_provider if dc else None
+    data, mime = storage_service.download_file(att.file_path, db=db, backend=backend)
     return Response(content=data, media_type=mime or att.mime_type or "application/octet-stream",
                     headers={"Content-Disposition": f'inline; filename="{att.filename or "vertrag"}"'})
 

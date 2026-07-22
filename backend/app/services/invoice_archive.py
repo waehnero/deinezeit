@@ -83,10 +83,12 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
     # Schrägstrich entfernen). Pfadsegmente ASCII-sicher machen.
     def _safe(s: str) -> str:
         return "".join(c for c in s if c.isalnum() or c in "._- ").strip() or "Belege"
-    storage_key = f"kontakte/{invoice.contact_id}/{_safe(folder)}/{_safe(filename)}"
+    _folder = storage_service.folder_name_for(db, invoice.contact_id)
+    storage_key = f"kontakte/{_folder}/{_safe(folder)}/{_safe(filename)}"
 
+    backend = storage_service.current_backend(db)
     try:
-        storage_service.upload_file(storage_key, pdf_bytes, "application/pdf", db=db)
+        storage_service.upload_file(storage_key, pdf_bytes, "application/pdf", db=db, backend=backend)
     except Exception as e:
         print(f"[WARN] Archiv-Upload fehlgeschlagen ({invoice.number}): {e}")
         return False
@@ -96,7 +98,7 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
 
     att = Attachment(
         entity_type="kontakte", entity_id=invoice.contact_id,
-        type="file", storage_key=storage_key,
+        type="file", storage_key=storage_key, storage_provider=backend,
         filename=filename, filesize=len(pdf_bytes), mimetype="application/pdf",
         display_name=f"{invoice.number} · {ts}",
         contact_id=invoice.contact_id, contact_name=contact_name,

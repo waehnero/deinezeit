@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.33] – 2026-07-22 – OneDrive-Anbindung für Datei-Speicher & Backup
+
+### Neu
+- Datei-Speicher wahlweise in Microsoft OneDrive/SharePoint (Graph API) – persönliches OneDrive (über Benutzer) oder SharePoint-Site
+- Automatisches tägliches Server-Backup der Datenbank nach OneDrive inkl. Aufbewahrung, plus manueller Sofort-Upload
+- Speicher-Konsolidierung: alle Dateien per Klick auf den aktiven Speicher umziehen
+- Cloud-Ordner werden nach Kundennamen benannt statt interner IDs; Bestandsdateien per Klick umstellbar
+
+### Aktualisierungen
+- OneDrive-Verbindungstest korrigiert (kein Fehler 500 mehr) mit klaren Meldungen bei fehlenden Zugangsdaten
+- Jede Datei merkt sich ihren Speicherort – Mischbetrieb MinIO/OneDrive und Provider-Wechsel ohne Datenverlust
+- OneDrive-Upload-Pfad korrigiert (Sonderzeichen, versehentliche Windows-Backslashes)
+
+---
+
 ## [1.12.32] – 2026-07-22 – Einrichtungsassistent für die Erstinstallation
 
 ### Neu

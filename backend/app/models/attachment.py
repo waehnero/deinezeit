@@ -15,6 +15,9 @@ class Attachment(Base):
 
     # Für type=file
     storage_key   = Column(String(500), nullable=True)
+    # In welchem Speicher liegt die Datei (minio | nextcloud | seadrive | onedrive).
+    # Down-/Vorschau nutzen genau diesen Provider (Mischbetrieb-fähig).
+    storage_provider = Column(String(20), nullable=True)
     filename      = Column(String(255), nullable=True)
     filesize      = Column(BigInteger,  nullable=True)
     mimetype      = Column(String(255), nullable=True)
