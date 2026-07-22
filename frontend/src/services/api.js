@@ -40,6 +40,12 @@ export const authApi = {
     api.post('/auth/webauthn/login/complete', { email, credential }),
 }
 
+// ── Erstinstallations-Assistent ──────────────────────────────────────────────
+export const setupApi = {
+  status: () => api.get('/setup/status'),
+  init:   (data) => api.post('/setup/init', data),
+}
+
 export const usersApi = {
   list: () => api.get('/users/'),
   create: (data) => api.post('/users/', data),
