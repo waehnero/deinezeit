@@ -642,11 +642,27 @@ function guessUsername(currentDir) {
 
 // ── Tab: Backup ───────────────────────────────────────────────────────────────
 function TabBackup({ settings, onSaved }) {
+  const [target,        setTarget]        = useState(settings.backup_target || 'local')
   const [backupDir,     setBackupDir]     = useState(settings.backup_dir            || '')
   const [scheduleTime,  setScheduleTime]  = useState(settings.backup_schedule_time  || '02:00')
   const [keepDays,      setKeepDays]      = useState(settings.backup_keep_days      || '30')
   const [saving,        setSaving]        = useState(false)
   const [downloading,   setDownloading]   = useState(false)
+  // OneDrive-Backup-Ziel (analog Speicher-Tab)
+  const [odUseGraph,     setOdUseGraph]     = useState(settings.backup_onedrive_use_graph_creds === 'true')
+  const [odTenantId,     setOdTenantId]     = useState(settings.backup_onedrive_tenant_id  || '')
+  const [odClientId,     setOdClientId]     = useState(settings.backup_onedrive_client_id  || '')
+  const [odClientSecret, setOdClientSecret] = useState('')
+  const [odDriveType,    setOdDriveType]    = useState(settings.backup_onedrive_drive_type || 'personal')
+  const [odSiteId,       setOdSiteId]       = useState(settings.backup_onedrive_site_id    || '')
+  const [odUser,         setOdUser]         = useState(settings.backup_onedrive_user       || '')
+  const [odFolder,       setOdFolder]       = useState(settings.backup_onedrive_folder     || 'DeineZeit-Backups')
+  const [testing,        setTesting]        = useState(false)
+  const [testResult,     setTestResult]     = useState(null)
+  const [running,        setRunning]        = useState(false)
+  const [lastRun,        setLastRun]        = useState(null)
+
+  const isOneDrive = target === 'onedrive'
 
   // Letzte 3 Backups aus backup_history (JSON-Array von ISO-Strings)
   let history = []
@@ -657,17 +673,64 @@ function TabBackup({ settings, onSaved }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await settingsApi.update({
-        backup_dir:           backupDir,
+      const payload = {
+        backup_target:        target,
         backup_schedule_time: scheduleTime,
         backup_keep_days:     keepDays,
-      })
+      }
+      if (isOneDrive) {
+        payload.backup_onedrive_use_graph_creds = odUseGraph ? 'true' : 'false'
+        payload.backup_onedrive_drive_type      = odDriveType
+        payload.backup_onedrive_site_id         = odSiteId
+        payload.backup_onedrive_user            = odUser
+        payload.backup_onedrive_folder          = odFolder
+        if (!odUseGraph) {
+          payload.backup_onedrive_tenant_id = odTenantId
+          payload.backup_onedrive_client_id = odClientId
+          if (odClientSecret) payload.backup_onedrive_client_secret = odClientSecret
+        }
+      } else {
+        payload.backup_dir = backupDir
+      }
+      await settingsApi.update(payload)
       toast.success('Backup-Einstellungen gespeichert')
       onSaved()
-      // Windows-Aufgabenplaner via URI-Handler aktualisieren (UAC erscheint kurz)
-      window.location.href = 'deinezeit://update-task'
-    } catch { toast.error('Fehler beim Speichern') }
+      // Nur beim lokalen Ziel den Windows-Aufgabenplaner via URI-Handler aktualisieren
+      if (!isOneDrive) window.location.href = 'deinezeit://update-task'
+    } catch (e) { toast.error('Fehler beim Speichern: ' + (e?.response?.data?.detail || e.message)) }
     finally { setSaving(false) }
+  }
+
+  const handleTestOnedrive = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await settingsApi.testBackupOnedrive({
+        use_graph_creds: odUseGraph ? 'true' : 'false',
+        tenant_id:       odTenantId,
+        client_id:       odClientId,
+        client_secret:   odClientSecret,
+        drive_type:      odDriveType,
+        site_id:         odSiteId,
+        user:            odUser,
+        folder:          odFolder,
+      })
+      setTestResult(res.data)
+    } catch (e) {
+      setTestResult({ ok: false, message: e?.response?.data?.detail || e.message })
+    } finally { setTesting(false) }
+  }
+
+  const handleRunOnedrive = async () => {
+    setRunning(true)
+    try {
+      const res = await settingsApi.runBackup()
+      setLastRun({ filename: res.data?.filename, url: res.data?.web_url })
+      toast.success('Backup nach OneDrive hochgeladen')
+      onSaved()
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Backup fehlgeschlagen')
+    } finally { setRunning(false) }
   }
 
   const handleDownload = async () => {
@@ -701,7 +764,32 @@ function TabBackup({ settings, onSaved }) {
   return (
     <div className="space-y-6">
 
-      {/* Cloud-Speicher Schnellauswahl */}
+      {/* Backup-Ziel */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Backup-Ziel</label>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { id: 'local',    icon: '💻', label: 'Lokaler Ordner' },
+            { id: 'onedrive', icon: '📁', label: 'OneDrive (Graph)' },
+          ].map(t => (
+            <button key={t.id} onClick={() => { setTarget(t.id); setTestResult(null) }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm transition-all
+                ${target === t.id
+                  ? 'bg-primary-50 border-primary-400 text-primary-700 font-medium'
+                  : 'bg-surface border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+              <span>{t.icon}</span>{t.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          {isOneDrive
+            ? 'Der Server erstellt das Backup und lädt es direkt via Microsoft Graph nach OneDrive/SharePoint hoch — unabhängig von einem Windows-PC.'
+            : 'Backups werden über den Windows-Aufgabenplaner in einen lokalen bzw. Cloud-Sync-Ordner geschrieben.'}
+        </p>
+      </div>
+
+      {/* ── Lokales Ziel ── */}
+      {!isOneDrive && (<>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
           <Cloud size={14} className="text-gray-400" />
@@ -735,18 +823,98 @@ function TabBackup({ settings, onSaved }) {
           })}
         </div>
       </div>
-
-      <hr className="border-gray-100" />
-
-      {/* Automatisches Backup – Einstellungen */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
         <Field label="Backup-Ordner" hint="Lokaler oder Cloud-Sync-Pfad für die .sql-Dateien">
           <Input value={backupDir} onChange={setBackupDir} placeholder="C:\Backups\DeineZeit" />
         </Field>
-        <Field label="Tägliche Backup-Zeit" hint="Uhrzeit für den automatischen Windows-Task">
+      </div>
+      <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
+        <strong>Automatische Synchronisation:</strong> Änderungen werden innerhalb von 30 Sekunden
+        automatisch auf den Windows-Aufgabenplaner übertragen — kein manuelles Ausführen nötig.
+      </div>
+      </>)}
+
+      {/* ── OneDrive-Ziel (analog Speicher-Tab) ── */}
+      {isOneDrive && (
+        <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <p className="text-xs text-gray-500">
+            Microsoft OneDrive oder SharePoint via Graph API (App-Berechtigung
+            <strong> Files.ReadWrite.All</strong> erforderlich). Hinweis: Persönliches OneDrive
+            (<em>personal</em>) ist mit App-Zugangsdaten meist nicht erreichbar — für den
+            Server-Betrieb <strong>SharePoint / OneDrive for Business</strong> mit Site-ID verwenden.
+          </p>
+          {/* Graph-Credentials Toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => setOdUseGraph(!odUseGraph)}
+              className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5
+                ${odUseGraph ? 'bg-primary-500' : 'bg-gray-300'}`}>
+              <div className={`w-5 h-5 bg-surface rounded-full shadow transition-transform
+                ${odUseGraph ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+            <span className="text-sm text-gray-700">Graph-Einstellungen aus E-Mail wiederverwenden</span>
+          </label>
+          {!odUseGraph && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Tenant-ID">
+                <Input value={odTenantId} onChange={setOdTenantId} placeholder="00000000-0000-0000-0000-000000000000" />
+              </Field>
+              <Field label="Client-ID">
+                <Input value={odClientId} onChange={setOdClientId} placeholder="App-Registrierung (Client-ID)" />
+              </Field>
+              <Field label="Client-Secret" hint={settings.backup_onedrive_client_id ? 'Leer lassen = gespeichertes Secret behalten' : ''}>
+                <input type="password" value={odClientSecret} onChange={e => setOdClientSecret(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </Field>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Laufwerkstyp">
+              <select value={odDriveType} onChange={e => setOdDriveType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="personal">Persönliches OneDrive</option>
+                <option value="sharepoint">SharePoint / OneDrive for Business</option>
+              </select>
+            </Field>
+            {odDriveType === 'personal' && (
+              <Field label="OneDrive-Benutzer (E-Mail/UPN)" hint="Pflicht: App-only greift über /users/{E-Mail}/drive zu (nicht /me)">
+                <Input value={odUser} onChange={setOdUser} placeholder="benutzer@firma.at" />
+              </Field>
+            )}
+            {odDriveType === 'sharepoint' && (
+              <Field label="Site-ID" hint="SharePoint-Site (z.B. contoso.sharepoint.com,GUID,GUID)">
+                <Input value={odSiteId} onChange={setOdSiteId} placeholder="contoso.sharepoint.com,…" />
+              </Field>
+            )}
+            <Field label="Zielverzeichnis in OneDrive" hint="Ordner, in den die .sql-Dateien geschrieben werden">
+              <Input value={odFolder} onChange={setOdFolder} placeholder="DeineZeit-Backups" />
+            </Field>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={handleTestOnedrive} disabled={testing}
+              className="flex items-center gap-2 px-4 py-2 bg-surface border border-gray-300 hover:border-gray-400 disabled:opacity-50 text-gray-700 text-sm font-medium rounded-xl transition">
+              {testing ? <Loader2 size={15} className="animate-spin" /> : <Cloud size={15} />}
+              Verbindung testen
+            </button>
+            {testResult && (
+              <span className={`text-sm flex items-center gap-1.5 ${testResult.ok ? 'text-green-600' : 'text-red-600'}`}>
+                {testResult.ok ? <CheckCircle size={15} /> : <XCircle size={15} />}
+                {testResult.message}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <hr className="border-gray-100" />
+
+      {/* Zeitplan / Aufbewahrung (für beide Ziele) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Tägliche Backup-Zeit" hint={isOneDrive ? 'Uhrzeit für das automatische Server-Backup' : 'Uhrzeit für den automatischen Windows-Task'}>
           <Input value={scheduleTime} onChange={setScheduleTime} placeholder="02:00" />
         </Field>
-        <Field label="Aufbewahrung">
+        <Field label="Aufbewahrung" hint={isOneDrive ? 'Ältere Backups im Zielordner werden automatisch gelöscht' : undefined}>
           <select value={keepDays} onChange={e => setKeepDays(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
             <option value="7">7 Tage</option>
@@ -759,11 +927,6 @@ function TabBackup({ settings, onSaved }) {
         </Field>
       </div>
 
-      <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
-        <strong>Automatische Synchronisation:</strong> Änderungen werden innerhalb von 30 Sekunden
-        automatisch auf den Windows-Aufgabenplaner übertragen — kein manuelles Ausführen nötig.
-      </div>
-
       <div className="flex justify-end">
         <button onClick={handleSave} disabled={saving}
           className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition">
@@ -774,21 +937,40 @@ function TabBackup({ settings, onSaved }) {
 
       <hr className="border-gray-100" />
 
-      {/* Manuelles Backup / Download */}
+      {/* Manuelles Backup */}
       <div className="p-4 border border-gray-200 rounded-2xl bg-gray-50 space-y-3">
         <div>
           <p className="text-sm font-medium text-gray-700">Backup jetzt erstellen</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            Erstellt sofort einen vollständigen Datenbank-Dump und lädt ihn in deinen Download-Ordner.
+            {isOneDrive
+              ? 'Erstellt sofort einen vollständigen Datenbank-Dump und lädt ihn nach OneDrive hoch.'
+              : 'Erstellt sofort einen vollständigen Datenbank-Dump und lädt ihn in deinen Download-Ordner.'}
           </p>
         </div>
-        <button onClick={handleDownload} disabled={downloading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-400 text-white text-sm font-medium rounded-xl transition">
-          {downloading
-            ? <><Loader2 size={15} className="animate-spin" /> Erstelle Backup…</>
-            : <><Download size={15} /> Backup herunterladen</>
-          }
-        </button>
+        {isOneDrive ? (
+          <div className="space-y-2">
+            <button onClick={handleRunOnedrive} disabled={running}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-400 text-white text-sm font-medium rounded-xl transition">
+              {running
+                ? <><Loader2 size={15} className="animate-spin" /> Sichere nach OneDrive…</>
+                : <><Cloud size={15} /> Jetzt nach OneDrive sichern</>}
+            </button>
+            {lastRun && (
+              <div className="text-xs text-gray-600">
+                <CheckCircle size={13} className="inline text-green-500 mr-1" />
+                {lastRun.filename} hochgeladen
+                {lastRun.url && <> — <a href={lastRun.url} target="_blank" rel="noreferrer" className="text-primary-600 underline break-all">in OneDrive öffnen</a></>}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button onClick={handleDownload} disabled={downloading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-400 text-white text-sm font-medium rounded-xl transition">
+            {downloading
+              ? <><Loader2 size={15} className="animate-spin" /> Erstelle Backup…</>
+              : <><Download size={15} /> Backup herunterladen</>}
+          </button>
+        )}
       </div>
 
       <hr className="border-gray-100" />
@@ -2024,6 +2206,167 @@ function TabSystemWrapper({ settings, onSaved }) {
   )
 }
 
+// ── Speicher-Konsolidierung (alle Dateien zum aktiven Provider umziehen) ──────
+const PROVIDER_LABELS = { minio: 'MinIO', nextcloud: 'Nextcloud', seadrive: 'SeaDrive', onedrive: 'OneDrive' }
+const provLabel = (id) => PROVIDER_LABELS[id] || id
+
+function StorageMigrationPanel() {
+  const [status,       setStatus]       = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [migrating,    setMigrating]    = useState(false)
+  const [deleteSource, setDeleteSource] = useState(false)
+  const [result,       setResult]       = useState(null)
+  // Re-Path (Ordnerstruktur auf Kundennamen)
+  const [repathStatus, setRepathStatus] = useState(null)
+  const [repathing,    setRepathing]    = useState(false)
+  const [repathResult, setRepathResult] = useState(null)
+
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const [mig, rep] = await Promise.all([
+        settingsApi.storageMigrationStatus(),
+        settingsApi.storageRepathStatus(),
+      ])
+      setStatus(mig.data)
+      setRepathStatus(rep.data)
+    } catch { /* still. Anzeige bleibt leer */ }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { refresh() }, [])
+
+  const handleRepath = async () => {
+    if (!window.confirm('Bestehende Dateien im Speicher in Ordner mit Kundennamen verschieben? '
+      + 'Die Dateien werden im jeweiligen Speicher umbenannt/verschoben.')) return
+    setRepathing(true)
+    setRepathResult(null)
+    try {
+      const res = await settingsApi.storageRepath()
+      setRepathResult(res.data)
+      if (res.data.failed === 0) toast.success(`${res.data.moved} Datei(en) umgezogen`)
+      else toast.error(`${res.data.moved} umgezogen, ${res.data.failed} fehlgeschlagen`)
+      refresh()
+    } catch (e) {
+      toast.error('Umstellung fehlgeschlagen: ' + (e?.response?.data?.detail || e.message))
+    } finally { setRepathing(false) }
+  }
+
+  const handleMigrate = async () => {
+    if (!window.confirm(
+      `Alle Dateien, die nicht bei „${provLabel(status?.active)}" liegen, dorthin kopieren`
+      + (deleteSource ? ' und die Quelldateien anschließend löschen' : '') + '?')) return
+    setMigrating(true)
+    setResult(null)
+    try {
+      const res = await settingsApi.storageMigrate(deleteSource)
+      setResult(res.data)
+      if (res.data.failed === 0) toast.success(`${res.data.migrated} Datei(en) migriert`)
+      else toast.error(`${res.data.migrated} migriert, ${res.data.failed} fehlgeschlagen`)
+      refresh()
+    } catch (e) {
+      toast.error('Migration fehlgeschlagen: ' + (e?.response?.data?.detail || e.message))
+    } finally { setMigrating(false) }
+  }
+
+  if (loading) return null
+  if (!status) return null
+
+  const pending = status.pending || 0
+  const dist = Object.entries(status.counts || {})
+
+  return (
+    <div className="mt-8 pt-6 border-t border-neutral-200 space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-neutral-800">Dateien konsolidieren</h3>
+        <p className="text-xs text-neutral-500 mt-0.5">
+          Verschiebt alle vorhandenen Dateien zum aktuell aktiven Speicher
+          („{provLabel(status.active)}"). Nützlich nach einem Provider-Wechsel.
+        </p>
+      </div>
+
+      {dist.length > 0 && (
+        <div className="flex flex-wrap gap-2 text-xs">
+          {dist.map(([prov, n]) => (
+            <span key={prov} className={`px-2 py-1 rounded-lg border ${prov === status.active
+              ? 'bg-green-50 border-green-200 text-green-700' : 'bg-neutral-50 border-neutral-200 text-neutral-600'}`}>
+              {provLabel(prov)}: {n}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {pending === 0 ? (
+        <p className="text-xs text-green-600 flex items-center gap-1.5">
+          <CheckCircle size={14} /> Alle {status.total} Dateien liegen bereits bei „{provLabel(status.active)}".
+        </p>
+      ) : (
+        <>
+          <label className="flex items-center gap-2 text-xs text-neutral-600 cursor-pointer">
+            <input type="checkbox" checked={deleteSource} onChange={e => setDeleteSource(e.target.checked)} />
+            Quelldateien nach erfolgreichem Kopieren löschen
+          </label>
+          <button onClick={handleMigrate} disabled={migrating}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-900 text-white text-sm font-medium disabled:opacity-50">
+            {migrating ? <><Loader2 size={14} className="animate-spin" /> Migriere…</>
+                       : <><RefreshCw size={14} /> {pending} Datei(en) zu „{provLabel(status.active)}" migrieren</>}
+          </button>
+          <p className="text-xs text-neutral-400">
+            Kann je nach Dateimenge dauern. Bricht nicht ab, wenn einzelne Dateien fehlschlagen.
+          </p>
+        </>
+      )}
+
+      {result && (
+        <div className={`text-xs p-3 rounded-lg border ${result.failed === 0
+          ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          <div>{result.migrated} migriert · {result.skipped} bereits am Ziel · {result.failed} fehlgeschlagen</div>
+          {result.errors?.length > 0 && (
+            <ul className="mt-1 list-disc list-inside space-y-0.5">
+              {result.errors.map((er, i) => <li key={i} className="break-all">{er}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Ordnerstruktur auf Kundennamen umstellen */}
+      <div className="pt-4 mt-2 border-t border-neutral-100 space-y-2">
+        <div>
+          <h4 className="text-sm font-semibold text-neutral-800">Ordner auf Kundennamen umstellen</h4>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            Verschiebt bestehende Dateien im Speicher aus den ID-Ordnern in Ordner mit dem
+            Kundennamen (z.B. <code>kontakte/WWInterface GmbH/…</code>) — passend zur Datacenter-Anzeige.
+          </p>
+        </div>
+        {repathStatus && (repathStatus.pending === 0 ? (
+          <p className="text-xs text-green-600 flex items-center gap-1.5">
+            <CheckCircle size={14} /> Alle Dateien liegen bereits in Namensordnern.
+          </p>
+        ) : (
+          <>
+            <button onClick={handleRepath} disabled={repathing}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-900 text-white text-sm font-medium disabled:opacity-50">
+              {repathing ? <><Loader2 size={14} className="animate-spin" /> Stelle um…</>
+                         : <><RefreshCw size={14} /> {repathStatus.pending} Datei(en) auf Kundennamen umstellen</>}
+            </button>
+            <p className="text-xs text-neutral-400">Verschiebt die Dateien im Speicher und löscht die alten ID-Ordner-Dateien.</p>
+          </>
+        ))}
+        {repathResult && (
+          <div className={`text-xs p-3 rounded-lg border ${repathResult.failed === 0
+            ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+            <div>{repathResult.moved} umgezogen · {repathResult.skipped} bereits ok · {repathResult.failed} fehlgeschlagen</div>
+            {repathResult.errors?.length > 0 && (
+              <ul className="mt-1 list-disc list-inside space-y-0.5">
+                {repathResult.errors.map((er, i) => <li key={i} className="break-all">{er}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Tab: Speicher ────────────────────────────────────────────────────────────
 const STORAGE_PROVIDERS = [
   { id: 'minio',     label: 'MinIO',     icon: '🗄️', hint: 'Lokaler MinIO-Objektspeicher (Standard)' },
@@ -2049,6 +2392,7 @@ function TabSpeicher({ settings, onSaved }) {
   const [odClientSecret,   setOdClientSecret]   = useState('')
   const [odDriveType,      setOdDriveType]      = useState(settings.onedrive_drive_type || 'personal')
   const [odSiteId,         setOdSiteId]         = useState(settings.onedrive_site_id    || '')
+  const [odUser,           setOdUser]           = useState(settings.onedrive_user       || '')
   const [odRootFolder,     setOdRootFolder]     = useState(settings.onedrive_root_folder|| 'DeineZeit')
 
   const [saving,      setSaving]      = useState(false)
@@ -2075,6 +2419,7 @@ function TabSpeicher({ settings, onSaved }) {
           onedrive_client_secret:   odClientSecret,
           onedrive_drive_type:      odDriveType,
           onedrive_site_id:         odSiteId,
+          onedrive_user:            odUser,
           onedrive_root_folder:     odRootFolder,
         })
       }
@@ -2101,6 +2446,7 @@ function TabSpeicher({ settings, onSaved }) {
         payload.onedrive_use_graph_creds = odUseGraph ? 'true' : 'false'
         payload.onedrive_drive_type      = odDriveType
         payload.onedrive_site_id         = odSiteId
+        payload.onedrive_user            = odUser
         payload.onedrive_root_folder     = odRootFolder
         if (!odUseGraph) {
           payload.onedrive_tenant_id  = odTenantId
@@ -2220,13 +2566,22 @@ function TabSpeicher({ settings, onSaved }) {
               ))}
             </div>
           </div>
+          {odDriveType === 'personal' && (
+            <div>
+              <label className="block text-xs font-medium text-neutral-500 mb-1">OneDrive-Benutzer (E-Mail / UPN)</label>
+              <input type="text" value={odUser} onChange={e => setOdUser(e.target.value)}
+                placeholder="benutzer@firma.at"
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+              <p className="mt-1 text-xs text-neutral-400">Pflicht bei persönlichem OneDrive: App-only greift über <code>/users/&#123;E-Mail&#125;/drive</code> zu (nicht <code>/me</code>). Der Benutzer braucht eine OneDrive-for-Business-Lizenz.</p>
+            </div>
+          )}
           {odDriveType === 'sharepoint' && (
             <div>
               <label className="block text-xs font-medium text-neutral-500 mb-1">SharePoint Site-ID</label>
               <input type="text" value={odSiteId} onChange={e => setOdSiteId(e.target.value)}
                 placeholder="wwinterfacegmbh.sharepoint.com,abc123,def456"
                 className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-              <p className="mt-1 text-xs text-neutral-400">Format: hostname,siteId,webId — z.B. https://graph.microsoft.com/v1.0/sites/wwinterfacegmbh.sharepoint.com:/sites/MeineSeite</p>
+              <p className="mt-1 text-xs text-neutral-400">Format: hostname,siteId,webId — oder hostname:/sites/Name. Reiner Hostname = Root-Site.</p>
             </div>
           )}
           <div>
@@ -2263,6 +2618,8 @@ function TabSpeicher({ settings, onSaved }) {
           Speichern
         </button>
       </div>
+
+      <StorageMigrationPanel />
     </div>
   )
 }

@@ -4,6 +4,23 @@
  */
 export const changelog = [
   {
+    version: '1.12.33',
+    day: '22',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Datei-Speicher wahlweise in Microsoft OneDrive/SharePoint (Graph API) – persönliches OneDrive (über Benutzer) oder SharePoint-Site',
+      'Automatisches tägliches Server-Backup der Datenbank nach OneDrive inkl. Aufbewahrung, plus manueller Sofort-Upload',
+      'Speicher-Konsolidierung: alle Dateien per Klick auf den aktiven Speicher umziehen',
+      'Cloud-Ordner werden nach Kundennamen benannt statt interner IDs; Bestandsdateien per Klick umstellbar',
+    ],
+    updates: [
+      'OneDrive-Verbindungstest korrigiert (kein Fehler 500 mehr) mit klaren Meldungen bei fehlenden Zugangsdaten',
+      'Jede Datei merkt sich ihren Speicherort – Mischbetrieb MinIO/OneDrive und Provider-Wechsel ohne Datenverlust',
+      'OneDrive-Upload-Pfad korrigiert (Sonderzeichen, versehentliche Windows-Backslashes)',
+    ],
+  },
+  {
     version: '1.12.32',
     day: '22',
     month: 'Juli',

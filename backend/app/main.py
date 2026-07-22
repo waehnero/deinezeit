@@ -130,6 +130,12 @@ async def startup_event():
         start_postecke_worker()
     except Exception as e:
         print(f"[WARN] Postecke-Worker konnte nicht gestartet werden: {e}")
+    # Serverseitiges OneDrive-Backup (tägliche Automatik); in Tests deaktiviert
+    try:
+        from app.services.backup_service import start_backup_worker
+        start_backup_worker()
+    except Exception as e:
+        print(f"[WARN] Backup-Worker konnte nicht gestartet werden: {e}")
 
 
 @app.get("/api/health")

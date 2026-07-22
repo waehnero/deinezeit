@@ -78,7 +78,7 @@ def _generate_logo_variants(original_bytes: bytes, ext: str) -> tuple[bytes, byt
 async def get_settings(db: Session = Depends(get_db)):
     data = _load(db)
     # Secrets niemals zurückgeben
-    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret', 'webdav_password', 'onedrive_client_secret')}
+    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret', 'webdav_password', 'onedrive_client_secret', 'backup_onedrive_client_secret')}
     return SettingsResponse(**{k: safe.get(k, '') for k in SettingsResponse.model_fields})
 
 
@@ -395,54 +395,112 @@ async def download_backup(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    db_url = os.environ.get("DATABASE_URL", "")
+    from app.services.backup_service import create_pg_dump
     try:
-        parts   = db_url.replace("postgresql://", "").split("@")
-        user_pw = parts[0].split(":")
-        host_db = parts[1].split("/")
-        db_user = user_pw[0]
-        db_pass = user_pw[1] if len(user_pw) > 1 else ""
-        db_host = host_db[0].split(":")[0]
-        db_name = host_db[1]
-    except Exception:
-        raise HTTPException(500, "Datenbank-URL konnte nicht geparst werden")
+        dump_bytes = create_pg_dump(timeout=60)
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
 
-    env = os.environ.copy()
-    env["PGPASSWORD"] = db_pass
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename  = f"deinezeit_backup_{timestamp}.sql"
+    _save(db, "backup_last_at", datetime.now(timezone.utc).isoformat())
 
+    return StreamingResponse(
+        io.BytesIO(dump_bytes),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ── Backup-Ziel OneDrive (serverseitig via Graph) ─────────────────────────────
+
+class BackupOneDriveTestRequest(BaseModel):
+    use_graph_creds: str = "false"   # 'true' = ms_*-Felder wiederverwenden
+    tenant_id:       str = ""
+    client_id:       str = ""
+    client_secret:   str = ""
+    drive_type:      str = "personal"  # 'personal' | 'sharepoint'
+    site_id:         str = ""
+    user:            str = ""            # UPN/E-Mail für drive_type='personal'
+    folder:          str = "DeineZeit-Backups"
+
+
+@router.post("/backup/onedrive/test")
+async def test_backup_onedrive(
+    body: BackupOneDriveTestRequest,
+    db:   Session = Depends(get_db),
+    _:    User    = Depends(require_admin),
+):
+    """Verbindungstest für das OneDrive-Backup-Ziel."""
+    from app.services.storage_service import OneDriveProvider
+    if body.use_graph_creds == "true":
+        rows = {r.key: r.value for r in db.query(Setting).filter(
+            Setting.key.in_(["ms_tenant_id", "ms_client_id", "ms_client_secret"])
+        ).all()}
+        tenant_id     = (rows.get("ms_tenant_id") or "").strip()
+        client_id     = (rows.get("ms_client_id") or "").strip()
+        client_secret = (rows.get("ms_client_secret") or "").strip()
+        src = "aus E-Mail-Einstellungen"
+    else:
+        tenant_id     = (body.tenant_id or "").strip()
+        client_id     = (body.client_id or "").strip()
+        client_secret = (body.client_secret or "").strip()
+        # Leeres Secret im Test → gespeichertes Secret verwenden (Feld wird maskiert)
+        if not client_secret:
+            saved = db.query(Setting).filter(
+                Setting.key == "backup_onedrive_client_secret").first()
+            client_secret = (saved.value if saved else "").strip()
+        src = "manuell eingegeben"
+    if not all([tenant_id, client_id, client_secret]):
+        fehlt = [n for n, v in (("Tenant-ID", tenant_id), ("Client-ID", client_id),
+                                ("Client-Secret", client_secret)) if not v]
+        return {"ok": False,
+                "message": f"Zugangsdaten unvollständig ({src}): {', '.join(fehlt)} fehlt"}
+    provider = OneDriveProvider(
+        tenant_id     = tenant_id,
+        client_id     = client_id,
+        client_secret = client_secret,
+        drive_type    = body.drive_type,
+        site_id       = body.site_id,
+        user          = body.user,
+        root_folder   = body.folder or "DeineZeit-Backups",
+    )
+    return provider.test_connection()
+
+
+@router.post("/backup/run")
+async def run_backup_now(
+    db: Session = Depends(get_db),
+    _:  User    = Depends(require_admin),
+):
+    """Erzeugt sofort einen DB-Dump und lädt ihn nach OneDrive hoch (manueller Trigger)."""
+    from app.services.backup_service import run_onedrive_backup
     try:
-        result = subprocess.run(
-            ["pg_dump", "-h", db_host, "-U", db_user, "-d", db_name, "--no-owner"],
-            capture_output=True, text=True, env=env, timeout=60
-        )
-        if result.returncode != 0:
-            raise HTTPException(500, f"pg_dump Fehler: {result.stderr[:200]}")
-
-        dump_bytes = result.stdout.encode("utf-8")
-        timestamp  = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        filename   = f"deinezeit_backup_{timestamp}.sql"
-
-        _save(db, "backup_last_at", datetime.now(timezone.utc).isoformat())
-
-        return StreamingResponse(
-            io.BytesIO(dump_bytes),
-            media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-        )
-    except subprocess.TimeoutExpired:
-        raise HTTPException(500, "Backup-Timeout nach 60 Sekunden")
-    except FileNotFoundError:
-        raise HTTPException(500, "pg_dump nicht gefunden — bitte Container neu bauen (Dockerfile wurde aktualisiert)")
+        return run_onedrive_backup(db)
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"OneDrive-Backup fehlgeschlagen: {e}")
 
 
 # ── Storage-Provider ──────────────────────────────────────────────────────────
 
 class StorageTestRequest(BaseModel):
     storage_backend:    str = "minio"
+    # WebDAV
     webdav_url:         str = ""
     webdav_user:        str = ""
     webdav_password:    str = ""
     webdav_root_folder: str = "DeineZeit"
+    # OneDrive / Microsoft Graph
+    onedrive_use_graph_creds: str = "false"   # 'true' = ms_*-Felder wiederverwenden
+    onedrive_tenant_id:       str = ""
+    onedrive_client_id:       str = ""
+    onedrive_client_secret:   str = ""
+    onedrive_drive_type:      str = "personal"  # 'personal' | 'sharepoint'
+    onedrive_site_id:         str = ""
+    onedrive_user:            str = ""            # UPN/E-Mail für drive_type='personal'
+    onedrive_root_folder:     str = "DeineZeit"
 
 
 @router.post("/storage/test")
@@ -466,19 +524,27 @@ async def test_storage_connection(
             rows = {r.key: r.value for r in db.query(_Setting).filter(
                 _Setting.key.in_(["ms_tenant_id", "ms_client_id", "ms_client_secret"])
             ).all()}
-            tenant_id     = rows.get("ms_tenant_id", "")
-            client_id     = rows.get("ms_client_id", "")
-            client_secret = rows.get("ms_client_secret", "")
+            tenant_id     = (rows.get("ms_tenant_id") or "").strip()
+            client_id     = (rows.get("ms_client_id") or "").strip()
+            client_secret = (rows.get("ms_client_secret") or "").strip()
+            src = "aus E-Mail-Einstellungen"
         else:
-            tenant_id     = body.onedrive_tenant_id
-            client_id     = body.onedrive_client_id
-            client_secret = body.onedrive_client_secret
+            tenant_id     = (body.onedrive_tenant_id or "").strip()
+            client_id     = (body.onedrive_client_id or "").strip()
+            client_secret = (body.onedrive_client_secret or "").strip()
+            src = "manuell eingegeben"
+        if not all([tenant_id, client_id, client_secret]):
+            fehlt = [n for n, v in (("Tenant-ID", tenant_id), ("Client-ID", client_id),
+                                    ("Client-Secret", client_secret)) if not v]
+            return {"ok": False,
+                    "message": f"Zugangsdaten unvollständig ({src}): {', '.join(fehlt)} fehlt"}
         provider = OneDriveProvider(
             tenant_id     = tenant_id,
             client_id     = client_id,
             client_secret = client_secret,
             drive_type    = body.onedrive_drive_type,
             site_id       = body.onedrive_site_id,
+            user          = body.onedrive_user,
             root_folder   = body.onedrive_root_folder,
         )
     else:
@@ -495,3 +561,50 @@ async def apply_storage_settings(
     from app.services.storage_service import invalidate_provider_cache
     invalidate_provider_cache()
     return {"ok": True}
+
+
+# ── Konsolidierung: alle Dateien auf den aktiven Provider umziehen ─────────────
+
+class StorageMigrateRequest(BaseModel):
+    delete_source: bool = False   # Quelldateien nach erfolgreichem Kopieren löschen
+
+
+@router.get("/storage/migration-status")
+async def storage_migration_status(
+    db: Session = Depends(get_db),
+    _:  User    = Depends(require_admin),
+):
+    """Wie viele Dateien liegen (nicht) beim aktiven Speicher."""
+    from app.services.storage_service import migration_status
+    return migration_status(db)
+
+
+@router.post("/storage/migrate")
+async def storage_migrate(
+    body: StorageMigrateRequest,
+    db:   Session = Depends(get_db),
+    _:    User    = Depends(require_admin),
+):
+    """Verschiebt alle Dateien zum aktuell aktiven Speicher-Provider."""
+    from app.services.storage_service import migrate_all_to_active
+    return migrate_all_to_active(db, delete_source=body.delete_source)
+
+
+@router.get("/storage/repath-status")
+async def storage_repath_status(
+    db: Session = Depends(get_db),
+    _:  User    = Depends(require_admin),
+):
+    """Wie viele Dateien liegen noch unter einem ID-Ordner statt Kundennamen."""
+    from app.services.storage_service import repath_status
+    return repath_status(db)
+
+
+@router.post("/storage/repath")
+async def storage_repath(
+    db: Session = Depends(get_db),
+    _:  User    = Depends(require_admin),
+):
+    """Stellt die Ordnerstruktur im Speicher auf Kundennamen um (verschiebt Dateien)."""
+    from app.services.storage_service import repath_all_to_names
+    return repath_all_to_names(db, delete_source=True)

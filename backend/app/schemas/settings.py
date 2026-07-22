@@ -36,6 +36,16 @@ class SettingsResponse(BaseModel):
     backup_schedule_time:   str = '02:00'
     backup_last_at:         str = ''
     backup_history:         str = '[]'
+    # Backup-Ziel: 'local' (Windows-Sync-Ordner) | 'onedrive' (serverseitig via Graph)
+    backup_target:                  str = 'local'
+    backup_onedrive_use_graph_creds: str = 'false'  # 'true' = ms_*-Felder wiederverwenden
+    backup_onedrive_tenant_id:      str = ''
+    backup_onedrive_client_id:      str = ''
+    backup_onedrive_drive_type:     str = 'personal'  # 'personal' | 'sharepoint'
+    backup_onedrive_site_id:        str = ''
+    backup_onedrive_user:           str = ''          # UPN/E-Mail für drive_type='personal'
+    backup_onedrive_folder:         str = 'DeineZeit-Backups'
+    # backup_onedrive_client_secret wird NICHT zurückgegeben (Sicherheit)
     # Firmenkontakt
     company_contact_id:     str = ''
     company_contact_type:   str = ''
@@ -53,6 +63,7 @@ class SettingsResponse(BaseModel):
     onedrive_client_id:       str = ''
     onedrive_drive_type:      str = 'personal'  # 'personal' | 'sharepoint'
     onedrive_site_id:         str = ''
+    onedrive_user:            str = ''            # UPN/E-Mail für drive_type='personal'
     onedrive_root_folder:     str = 'DeineZeit'
     # onedrive_client_secret wird NICHT zurückgegeben (Sicherheit)
 
@@ -86,6 +97,16 @@ class SettingsUpdate(BaseModel):
     backup_keep_days:       Optional[str] = None
     backup_dir:             Optional[str] = None
     backup_schedule_time:   Optional[str] = None
+    # Backup-Ziel OneDrive (serverseitig via Graph)
+    backup_target:                   Optional[str] = None
+    backup_onedrive_use_graph_creds: Optional[str] = None
+    backup_onedrive_tenant_id:       Optional[str] = None
+    backup_onedrive_client_id:       Optional[str] = None
+    backup_onedrive_client_secret:   Optional[str] = None
+    backup_onedrive_drive_type:      Optional[str] = None
+    backup_onedrive_site_id:         Optional[str] = None
+    backup_onedrive_user:            Optional[str] = None
+    backup_onedrive_folder:          Optional[str] = None
     # Firmenkontakt
     company_contact_id:     Optional[str] = None
     company_contact_type:   Optional[str] = None
@@ -104,6 +125,7 @@ class SettingsUpdate(BaseModel):
     onedrive_client_secret:   Optional[str] = None
     onedrive_drive_type:      Optional[str] = None
     onedrive_site_id:         Optional[str] = None
+    onedrive_user:            Optional[str] = None
     onedrive_root_folder:     Optional[str] = None
 
 

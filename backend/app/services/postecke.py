@@ -252,17 +252,20 @@ def archiviere_ins_datacenter(db: Session, post: SocialPost,
     basis = f"{datum.strftime('%Y-%m-%d')}_{_safe(post.titel or 'Post') or 'Post'}"
 
     if post.kontakt_id:
-        key_prefix = f"kontakte/{post.kontakt_id}/{ARCHIV_ORDNER}"
+        _folder = storage_service.folder_name_for(db, post.kontakt_id, post.kontakt_name)
+        key_prefix = f"kontakte/{_folder}/{ARCHIV_ORDNER}"
         entity_type, entity_id = "kontakte", post.kontakt_id
     else:
         key_prefix = f"postecke-archiv/{post.id}"
         entity_type, entity_id = "postecke", post.id
 
+    _backend = storage_service.current_backend(db)
+
     def _anlage(storage_key, daten, mimetype, filename, anzeige):
-        storage_service.upload_file(storage_key, daten, mimetype, db=db)
+        storage_service.upload_file(storage_key, daten, mimetype, db=db, backend=_backend)
         db.add(Attachment(
             entity_type=entity_type, entity_id=entity_id,
-            type="file", storage_key=storage_key,
+            type="file", storage_key=storage_key, storage_provider=_backend,
             filename=filename, filesize=len(daten), mimetype=mimetype,
             display_name=anzeige, description=marker,
             contact_id=post.kontakt_id, contact_name=post.kontakt_name,
