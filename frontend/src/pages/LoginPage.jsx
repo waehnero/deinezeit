@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
-import { authApi } from '../services/api'
+import { authApi, setupApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { version } from '../../package.json'
 import toast from 'react-hot-toast'
@@ -111,6 +111,13 @@ export default function LoginPage() {
   const [showTotp, setShowTotp] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // Frische Installation ohne Benutzer → direkt zum Einrichtungsassistenten
+  useEffect(() => {
+    setupApi.status()
+      .then((r) => { if (r.data.needs_setup) navigate('/setup', { replace: true }) })
+      .catch(() => {})
+  }, [navigate])
 
   // Update-Nachricht anzeigen wenn Benutzer durch Update abgemeldet wurde
   const updateMessage = sessionStorage.getItem('update_message')

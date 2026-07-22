@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import os
 from app.core.config import settings
-from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke
+from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup
 from app.api import settings as settings_api
 from app.services import storage_service
 from app.api.system import record_activity
@@ -63,6 +63,7 @@ app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 from app.api.deps import require_module as _rm
 from fastapi import Depends as _Dep
 
+app.include_router(setup.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(masterdata.router, prefix="/api")

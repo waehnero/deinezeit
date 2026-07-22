@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.12.32',
+    day: '22',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Neue Installationen sind sofort startklar: Ein geführter Assistent legt beim ersten Start den Administrator und die Firmendaten (inkl. Logo) an – ganz ohne Kommandozeile.',
+    ],
+    updates: [
+      'Firmendaten werden automatisch als Briefkopf hinterlegt und der Firmenname in die Einstellungen übernommen.',
+      'Kontakte-Register aufgeräumt (Standard/Finanz inkl. Zahlungsziel); das Modul „Zeitprojekte“ hat jetzt eine direkte Kontakt-Verknüpfung.',
+    ],
+  },
+  {
     version: '1.12.31',
     day: '20',
     month: 'Juli',

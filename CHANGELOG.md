@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.12.32] – 2026-07-22 – Einrichtungsassistent für die Erstinstallation
+
+### Neu
+- Neue Installationen sind sofort startklar: Ein geführter Assistent legt beim ersten Start den Administrator und die Firmendaten (inkl. Logo) an – ganz ohne Kommandozeile.
+
+### Aktualisierungen
+- Firmendaten werden automatisch als Briefkopf hinterlegt und der Firmenname in die Einstellungen übernommen.
+- Kontakte-Register aufgeräumt (Standard/Finanz inkl. Zahlungsziel); das Modul „Zeitprojekte“ hat jetzt eine direkte Kontakt-Verknüpfung.
+
+---
+
 ## [1.12.31] – 2026-07-20 – Postecke: Facebook-Seiten direkt angebunden
 
 ### Neu

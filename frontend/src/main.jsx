@@ -10,6 +10,7 @@ import { initPrefs } from './utils/anzeige'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
+import SetupPage from './pages/SetupPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import MasterDataOverview from './pages/MasterDataOverview'
@@ -71,6 +72,7 @@ function App() {
           <Toaster position="top-right" toastOptions={{ duration: 4000 }}
             containerStyle={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }} />
           <Routes>
+            <Route path="/setup" element={<SetupPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route
