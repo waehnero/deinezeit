@@ -17,6 +17,24 @@ import pytest
 from app.services import postecke as postecke_service
 
 
+# Alle Postecke-Tests laufen ohne echtes MinIO: der Datacenter-Sync in
+# create_post/update_post ruft sonst echten Storage (in der CI nicht vorhanden ->
+# Hänger). Storage wird daher generell in-memory gestubbt. Tests mit eigenem
+# Storage-Mock überschreiben das einfach (spätere monkeypatch-Zuweisung gewinnt).
+@pytest.fixture(autouse=True)
+def _storage_in_memory(monkeypatch):
+    ablage = {}
+    monkeypatch.setattr(
+        "app.services.storage_service.upload_file",
+        lambda key, data, mimetype=None, db=None, backend=None: ablage.__setitem__(key, data))
+    monkeypatch.setattr(
+        "app.services.storage_service.download_file",
+        lambda key, db=None: (ablage.get(key, b""), "application/octet-stream"))
+    monkeypatch.setattr(
+        "app.services.storage_service.delete_file",
+        lambda key, db=None: ablage.pop(key, None))
+
+
 # ── Hilfen ────────────────────────────────────────────────────────────────────
 def _profil_anlegen(auth_client, **kwargs):
     daten = {"name": "Facebook privat Test", "kanal": "facebook_privat",

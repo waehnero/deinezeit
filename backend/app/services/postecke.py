@@ -10,7 +10,7 @@ auf (services/ki.py — Einstellungen -> System -> KI & Mail-Importer).
 import json
 import os
 import re
-import subprocess
+import subprocess  # nosec B404 - fester ffmpeg-Aufruf, keine Shell, keine Nutzereingabe
 import tempfile
 from typing import List, Optional, Tuple
 
@@ -201,7 +201,7 @@ def erzeuge_video_poster(video_bytes: bytes, dateiendung: str = ".mp4") -> Optio
             tmp_in = f_in.name
         tmp_out = tmp_in + ".jpg"
         # Erstes Frame, Höhe auf max. 720 px begrenzt (Vorschau reicht)
-        subprocess.run(
+        subprocess.run(  # nosec B603 - festes Kommando ohne Shell, Pfade selbst erzeugt
             ["ffmpeg", "-y", "-i", tmp_in, "-frames:v", "1",
              "-vf", "scale=-2:720", "-q:v", "3", tmp_out],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
