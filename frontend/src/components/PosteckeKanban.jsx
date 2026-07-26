@@ -7,6 +7,7 @@ import { Camera, Bell, Check, X, Archive, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { posteckeApi } from '../services/api'
 import PosteckeFotoThumb from './PosteckeFotoThumb'
+import PosteckeVideoThumb from './PosteckeVideoThumb'
 
 /**
  * Kanban-Board für die Postecke (Etappe 2).
@@ -50,6 +51,9 @@ function Card({ post, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen 
       <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing">
         {post.fotos?.length > 0 ? (
           <PosteckeFotoThumb fotoId={post.fotos[0].id} className="w-full h-28 rounded-md mb-2" />
+        ) : post.video ? (
+          <PosteckeVideoThumb videoId={post.video.id} hasPoster={post.video.has_poster}
+            className="w-full h-28 rounded-md mb-2" />
         ) : (
           <div className="w-full h-14 rounded-md bg-neutral-50 flex items-center justify-center mb-2">
             <Camera size={16} className="text-neutral-300" />

@@ -388,6 +388,20 @@ export const posteckeApi = {
   // Ausspielungs-Variante: Zielformat + Filter des Post-Profils angewendet (JPEG)
   getFotoAusspielung: (fotoId) =>
     api.get(`/postecke/fotos/${fotoId}/ausspielung`, { responseType: 'blob' }),
+
+  // Video (max. eines je Post, MP4/MOV; kein Misch-Post mit Fotos)
+  uploadVideo: (id, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    // Content-Type bewusst undefined: Browser setzt multipart-boundary selbst
+    return api.post(`/postecke/posts/${id}/video`, form, { headers: { 'Content-Type': undefined } })
+  },
+  deleteVideo: (videoId) => api.delete(`/postecke/videos/${videoId}`),
+  // Video als Blob laden (Bearer-Token nötig, daher kein direktes <video src>)
+  getVideo:    (videoId) => api.get(`/postecke/videos/${videoId}`, { responseType: 'blob' }),
+  // Standbild (erstes Frame) des Videos als Blob — für die Vorschau
+  getVideoPoster: (videoId) =>
+    api.get(`/postecke/videos/${videoId}/poster`, { responseType: 'blob' }),
 }
 
 // ── Anlagen (Datacenter-API, generisch über entity_type/entity_id) ────────────

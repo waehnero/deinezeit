@@ -90,16 +90,42 @@ def teste_verbindung_fb_seite(zugang: dict) -> dict:
         return {"ok": False, "message": f"Facebook nicht erreichbar ({e.__class__.__name__})"}
 
 
+def _publiziere_fb_seite_video(db: Session, post: SocialPost, profil: SocialProfil,
+                               page_id: str, token: str) -> str:
+    """
+    Veröffentlicht ein Video auf einer Facebook-Seite über den /videos-Endpunkt.
+    Text + Hashtags werden als Videobeschreibung übertragen. Video wird
+    unverändert (kein Filter/Zuschnitt) hochgeladen. Liefert die Beitrags-URL.
+    """
+    video = post.video
+    beschreibung = "\n\n".join(t for t in (post.text, post.hashtags) if t) or ""
+    daten, _ct = storage_service.download_file(video.storage_key, db)
+    resp = httpx.post(
+        f"{GRAPH_API}/{page_id}/videos",
+        data={"description": beschreibung, "access_token": token},
+        files={"source": (video.filename, daten, video.mimetype or "video/mp4")},
+        timeout=600,  # große Uploads brauchen länger
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(_fb_fehlertext(resp))
+    video_id = resp.json().get("id", "")
+    return f"https://www.facebook.com/{video_id}" if video_id else ""
+
+
 def _publiziere_fb_seite(db: Session, post: SocialPost, profil: SocialProfil) -> str:
     """
-    Veröffentlicht einen Post mit Fotos auf einer Facebook-Seite.
-    Fotos werden in der Ausspielungs-Variante des Profils übertragen
-    (Zielformat + Filter). Liefert die URL des Facebook-Posts.
+    Veröffentlicht einen Post auf einer Facebook-Seite. Enthält der Post ein
+    Video, wird der Video-Weg (/videos) genutzt, sonst der Foto-/Text-Weg
+    (kein Misch-Post). Liefert die URL des Facebook-Beitrags.
     """
     zugang = lade_zugang(profil)
     if not zugang or not zugang.get("page_id") or not zugang.get("page_token"):
         raise RuntimeError("Keine Zugangsdaten hinterlegt (Profil bearbeiten -> Seiten-ID/Token)")
     page_id, token = zugang["page_id"], zugang["page_token"]
+
+    # Video-Post: eigener Endpunkt, keine Fotos, kein Filter/Zuschnitt
+    if getattr(post, "video", None) is not None:
+        return _publiziere_fb_seite_video(db, post, profil, page_id, token)
 
     text = "\n\n".join(t for t in (post.text, post.hashtags) if t) or ""
 

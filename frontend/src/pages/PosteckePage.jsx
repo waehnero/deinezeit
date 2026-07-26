@@ -5,11 +5,13 @@ import {
   Plus, Loader2, X, Megaphone, Sparkles, Camera, Trash2, Pencil,
   Send, CalendarClock, Inbox, Copy, Check, Settings2,
   ChevronLeft, RefreshCw, MapPin, Smile, Bell,
-  List, Columns, CalendarDays, Search, Archive, ArchiveRestore,
+  List, Columns, CalendarDays, Search, Archive, ArchiveRestore, Info, Film,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { posteckeApi } from '../services/api'
 import FotoThumb from '../components/PosteckeFotoThumb'
+import VideoVorschau from '../components/PosteckeVideoVorschau'
+import VideoThumb from '../components/PosteckeVideoThumb'
 import PosteckeKanban from '../components/PosteckeKanban'
 import PosteckeKalender from '../components/PosteckeKalender'
 import ContactSearch from '../components/ContactSearch'
@@ -35,6 +37,50 @@ const KANAELE = [
 ]
 const kanalInfo = (id) =>
   KANAELE.find(k => k.id === id) || KANAELE[KANAELE.length - 1]
+
+// Einrichtungshilfe je Kanal (Infokasten im Profil-Formular). Erklärt, ob der
+// Kanal direkt angebunden werden kann oder nur assistiert bespielt wird, und
+// nennt beim Facebook-Seiten-Kanal die Kurzschritte zum Token (Details:
+// FACEBOOK-SEITE-ANBINDEN.md). Rest fällt auf den assistierten Weg zurück.
+const KANAL_HILFE = {
+  facebook_seite: {
+    modus: 'Direktanbindung möglich',
+    intro: 'Automatisches Veröffentlichen und Planen. Du brauchst zwei Angaben: '
+      + 'die Seiten-ID und einen langlebigen Page-Access-Token.',
+    schritte: [
+      'Auf developers.facebook.com eine App anlegen (Typ „Business", im '
+        + 'Entwicklermodus — kein App-Review nötig).',
+      'Im Graph API Explorer einen Nutzer-Token mit den Berechtigungen '
+        + 'pages_show_list, pages_read_engagement und pages_manage_posts erzeugen '
+        + 'und dabei die Seite anhaken.',
+      'Die Abfrage „me/accounts" senden: access_token = Page-Access-Token, '
+        + 'id = Seiten-ID.',
+      'Beides unten im Kasten „Direktanbindung" eintragen, speichern und auf '
+        + '„Verbindung testen" klicken.',
+    ],
+    fuss: 'Ausführliche Anleitung: FACEBOOK-SEITE-ANBINDEN.md im Projektordner.',
+  },
+  facebook_privat: {
+    modus: 'Nur assistiert (Meta-Vorgabe)',
+    intro: 'Für private Profile erlaubt Facebook seit 2018 keine automatische '
+      + 'Veröffentlichung. DeineZeit bereitet Text, Hashtags und Fotos vor und '
+      + 'öffnet Facebook — den letzten Klick zum Posten machst Du selbst.',
+  },
+  instagram: {
+    modus: 'Assistiert (Direktanbindung geplant)',
+    intro: 'Eine spätere Direktanbindung setzt ein Instagram-Professionell-Konto '
+      + '(Business oder Creator) voraus, das mit einer Facebook-Seite verknüpft ist. '
+      + 'Aktuell läuft Instagram assistiert: Beitrag vorbereiten, App öffnen, '
+      + 'einfügen, veröffentlichen.',
+  },
+}
+const KANAL_HILFE_ASSISTIERT = {
+  modus: 'Assistiert',
+  intro: 'Text und Hashtags werden in die Zwischenablage kopiert und der Kanal '
+    + 'wird geöffnet. Du fügst den Beitrag ein und veröffentlichst ihn selbst; '
+    + 'Fotos lädst Du im geöffneten Kanal hoch.',
+}
+const kanalHilfe = (id) => KANAL_HILFE[id] || KANAL_HILFE_ASSISTIERT
 
 // Bild-Parameter je Profil (siehe Backend BILD_FORMATE / BILD_FILTER)
 const BILD_FORMATE = [
@@ -73,7 +119,74 @@ function postText(post) {
   return [post.text || '', post.hashtags || ''].filter(Boolean).join('\n\n')
 }
 
+/* Meta-Prompt: erzeugt in Claude (o.ä.) aus eigenen Beispiel-Posts einen
+ * maßgeschneiderten Stil-Prompt, den man anschließend ins Stil-Feld einsetzt. */
+const PROMPT_GENERATOR = `Du bist ein Experte für Stilanalyse und Prompt-Engineering.
+
+AUFGABE:
+1. Analysiere die folgenden BEISPIELE meiner eigenen Inhalte (Posts/Texte).
+2. Extrahiere meinen einzigartigen Schreibstil.
+3. Erstelle daraus einen fertigen, wiederverwendbaren Stil-Prompt, mit dem eine
+   KI neue Beiträge im GLEICHEN Stil schreiben kann.
+
+BEISPIELE ZUM ANALYSIEREN:
+[HIER 5-10 DEINER BESTEN BEISPIELE EINFÜGEN – gerne kurze UND lange, private UND offizielle]
+
+--- Beispiel 1 ---
+[Text]
+
+--- Beispiel 2 ---
+[Text]
+
+...
+
+ANALYSIERE DABEI:
+- Tonalität: Welches Gefühl vermittelt die Stimme (warm, formal, humorvoll, direkt)?
+  Wird "ich" verwendet? Werden andere Menschen gewürdigt?
+- Struktur: Aufbau (Hook → Details → Abschluss?), Satz- und Absatzlänge, wiederkehrende Muster.
+- Wortschatz & Phrasen: Lieblingswörter/-wendungen; Begriffe, die NIE vorkommen; formal vs. locker.
+- Formatierung: Absatzlänge, Zeilenumbrüche, Großschreibung, Sonderzeichen.
+- Emojis & visuelle Elemente: welche, wie häufig, wie viele pro Post; Listen; Hashtags (viele/wenige/keine).
+- Längen-Variabilität: kurze vs. lange Posts, Durchschnittslänge, welche Länge für welchen Anlass.
+- Themen: typische Themen, Kategorien (privat/offiziell), Call-to-Action, Fokus auf Menschen oder Fakten.
+
+FASSE ZUSAMMEN:
+- 3-5 Kerncharakteristiken und 1-2 einzigartige Erkennungsmerkmale.
+- Was wird bewusst NICHT gemacht (Tabus, vermiedene Fehler)?
+
+GIB MIR ALS ERGEBNIS EINEN FERTIGEN STIL-PROMPT MIT:
+- Tonalität & Charakter (mit Beispielsätzen, wie die Stimme klingt)
+- Lieblingswörter & Phrasen (und was NICHT verwendet wird)
+- Standard-Struktur eines Posts (Eröffnung, Hauptteil, Kernbotschaft/Dank, CTA/Wünsche)
+- Sprachliche Eigenheiten (Satz-/Absatzlänge, Grammatik)
+- Emoji-Richtlinien (welche, wie häufig, max. pro Post)
+- Hashtag-Richtlinien
+- Kurze Checkliste (5-7 Punkte), damit der Output authentisch bleibt
+
+Gib den Stil-Prompt als zusammenhängenden, copy-paste-fertigen Text aus.`
+
 /* ── Profilverwaltung ────────────────────────────────────────────────────────── */
+
+/** Infokasten mit der Einrichtungshilfe zum gewählten Kanal. */
+function KanalEinrichtungshilfe({ kanalId }) {
+  const h = kanalHilfe(kanalId)
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 flex gap-2.5">
+      <Info size={15} className="text-primary-600 shrink-0 mt-0.5" />
+      <div className="space-y-1.5 text-[12px] leading-relaxed text-neutral-600">
+        <p className="font-medium text-neutral-700">So richtest Du diesen Kanal ein — {h.modus}</p>
+        <p>{h.intro}</p>
+        {h.schritte && (
+          <ol className="list-decimal ml-4 space-y-0.5">
+            {h.schritte.map((s, i) => <li key={i}>{s}</li>)}
+          </ol>
+        )}
+        {h.fuss && <p className="text-[11px] text-neutral-400">{h.fuss}</p>}
+      </div>
+    </div>
+  )
+}
+
 function ProfilForm({ profil, onSave, onCancel }) {
   const [name, setName] = useState(profil?.name || '')
   const [kanal, setKanal] = useState(profil?.kanal || 'facebook_privat')
@@ -104,6 +217,15 @@ function ProfilForm({ profil, onSave, onCancel }) {
     } finally { setSaving(false) }
   }
 
+  const promptGeneratorKopieren = async () => {
+    try {
+      await navigator.clipboard.writeText(PROMPT_GENERATOR)
+      toast.success('Prompt-Generator kopiert — in Claude einfügen, Beispiele ergänzen, Ergebnis hier einsetzen')
+    } catch {
+      toast.error('Zwischenablage nicht verfügbar — bitte manuell kopieren')
+    }
+  }
+
   const verbindungTesten = async () => {
     if (!profil?.id) return
     setTesteVerb(true)
@@ -131,6 +253,7 @@ function ProfilForm({ profil, onSave, onCancel }) {
           {KANAELE.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
         </select>
       </div>
+      <KanalEinrichtungshilfe kanalId={kanal} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-neutral-500">Bildformat (Ausspielung)</label>
@@ -182,12 +305,22 @@ function ProfilForm({ profil, onSave, onCancel }) {
         </div>
       )}
       <div>
-        <label className="text-xs font-medium text-neutral-500">
-          Stil &amp; Redensart (Vorgabe für die KI)
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-xs font-medium text-neutral-500">
+            Stil &amp; Redensart (Vorgabe für die KI)
+          </label>
+          <button type="button" onClick={promptGeneratorKopieren}
+            className="text-[11px] px-2 py-1 rounded-lg border border-neutral-200 bg-surface text-neutral-600 hover:border-primary-300 flex items-center gap-1.5 shrink-0">
+            <Copy size={12} /> Prompt-Generator kopieren
+          </button>
+        </div>
         <textarea value={stil} onChange={e => setStil(e.target.value)} rows={4}
           placeholder="z.B. Locker und persönlich, per Du, gerne Emojis, kurze Sätze, regionaler Bezug zu Ebreichsdorf …"
           className="mt-1 w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-200" />
+        <p className="mt-1 text-[11px] text-neutral-400">
+          Tipp: „Prompt-Generator kopieren" → in Claude einfügen und 5–10 eigene Beispiel-Posts ergänzen →
+          den erzeugten Stil-Prompt hier einsetzen.
+        </p>
       </div>
       <div className="flex gap-2 justify-end">
         <button onClick={onCancel}
@@ -292,11 +425,13 @@ function PostEditor({ post, profile, onClose, onSaved }) {
   const [ort, setOrt] = useState(post?.ort || '')
   const [gefuehl, setGefuehl] = useState(post?.gefuehl || '')
   const [neueFotos, setNeueFotos] = useState([])          // File-Objekte vor dem Upload
+  const [videoLaedt, setVideoLaedt] = useState(false)     // Video wird gerade hochgeladen
   const [generiert, setGeneriert] = useState(!!post?.text)
   const [laufend, setLaufend] = useState(false)
   const [planenOffen, setPlanenOffen] = useState(false)
   const [geplantAm, setGeplantAm] = useState('')
   const fileRef = useRef(null)
+  const videoRef = useRef(null)
 
   // Fotos für die Web Share API vorladen (muss VOR dem Klick passieren,
   // damit navigator.share synchron im Klick-Kontext aufgerufen werden kann).
@@ -321,6 +456,11 @@ function PostEditor({ post, profile, onClose, onSaved }) {
 
   const profil = profile.find(p => p.id === profilId) || null
   const kanal = profil ? kanalInfo(profil.kanal) : null
+
+  // Ein Post ist entweder Foto- oder Video-Post (kein Misch-Post): sobald das
+  // eine belegt ist, wird das andere im Editor ausgeblendet.
+  const hatFotos = (aktuell?.fotos?.length > 0) || neueFotos.length > 0
+  const hatVideo = !!aktuell?.video || videoLaedt
 
   /** Post am Server anlegen/aktualisieren + neue Fotos hochladen; liefert Post */
   const sicherstellen = useCallback(async () => {
@@ -363,7 +503,11 @@ function PostEditor({ post, profile, onClose, onSaved }) {
   const kiVorschlag = async () => {
     if (!profilId) { toast.error('Bitte zuerst ein Profil wählen'); return }
     if (!beschreibung.trim() && neueFotos.length === 0 && !(aktuell?.fotos?.length)) {
-      toast.error('Bitte Fotos hinzufügen oder kurz beschreiben, worum es geht')
+      // Ein Video kann die KI nicht ansehen -> für Video-Posts ist die
+      // Beschreibung die Grundlage für den Textvorschlag.
+      toast.error(aktuell?.video
+        ? 'Bitte kurz beschreiben, worum es geht — das Video kann die KI nicht ansehen'
+        : 'Bitte Fotos hinzufügen oder kurz beschreiben, worum es geht')
       return
     }
     setLaufend(true)
@@ -507,6 +651,38 @@ function PostEditor({ post, profile, onClose, onSaved }) {
     } catch { toast.error('Foto konnte nicht gelöscht werden') }
   }
 
+  const videoWaehlen = async (e) => {
+    const datei = (e.target.files || [])[0]
+    e.target.value = ''
+    if (!datei) return
+    const okTyp = ['video/mp4', 'video/quicktime'].includes(datei.type) ||
+      /\.(mp4|mov)$/i.test(datei.name)
+    if (!okTyp) { toast.error('Bitte ein MP4- oder MOV-Video wählen'); return }
+    if (datei.size > 200 * 1024 * 1024) { toast.error('Video zu groß (max. 200 MB)'); return }
+    // Sofort hochladen, damit der Server das Standbild erzeugt und die Vorschau
+    // direkt erscheint (unabhängig vom Video-Format des Browsers).
+    setVideoLaedt(true)
+    try {
+      const p = await sicherstellen()
+      await posteckeApi.uploadVideo(p.id, datei)
+      const neu = await posteckeApi.getPost(p.id)
+      setAktuell(neu.data)
+    } catch (e2) {
+      const grund = e2.response?.status === 413
+        ? 'zu groß für den Server' : (e2.response?.data?.detail || e2.message || 'Upload fehlgeschlagen')
+      toast.error(`Video „${datei.name}": ${grund}`)
+    } finally { setVideoLaedt(false) }
+  }
+
+  const videoLoeschen = async () => {
+    if (!aktuell?.video) return
+    try {
+      await posteckeApi.deleteVideo(aktuell.video.id)
+      const neu = await posteckeApi.getPost(aktuell.id)
+      setAktuell(neu.data)
+    } catch { toast.error('Video konnte nicht gelöscht werden') }
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-neutral-900/40 sheet-safe flex items-end sm:items-center justify-center"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -525,7 +701,8 @@ function PostEditor({ post, profile, onClose, onSaved }) {
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Fotos */}
+          {/* Fotos (ausgeblendet, sobald ein Video gewählt ist — kein Misch-Post) */}
+          {!hatVideo && (
           <div>
             <label className="text-xs font-medium text-neutral-500">Fotos</label>
             <div className="mt-1 grid grid-cols-4 gap-2">
@@ -555,6 +732,42 @@ function PostEditor({ post, profile, onClose, onSaved }) {
             </div>
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={fotoWaehlen} />
           </div>
+          )}
+
+          {/* Video (ausgeblendet, sobald Fotos gewählt sind — max. ein Video je Post) */}
+          {!hatFotos && (
+          <div>
+            <label className="text-xs font-medium text-neutral-500">Video</label>
+            {videoLaedt ? (
+              <div className="mt-1 w-full py-8 rounded-lg border border-neutral-200 bg-neutral-50 flex flex-col items-center justify-center text-neutral-400">
+                <Loader2 size={22} className="animate-spin" />
+                <span className="text-[11px] mt-1.5">Video wird hochgeladen &amp; Vorschau erstellt …</span>
+              </div>
+            ) : aktuell?.video ? (
+              <div className="mt-1 relative rounded-lg overflow-hidden">
+                <VideoVorschau
+                  videoId={aktuell.video.id}
+                  hasPoster={aktuell.video.has_poster}
+                  className="w-full min-h-[8rem] max-h-64" />
+                <button onClick={videoLoeschen}
+                  className="absolute top-1 right-1 p-1 rounded-full bg-neutral-900/60 text-white opacity-80 hover:opacity-100 z-10">
+                  <X size={14} />
+                </button>
+                <p className="mt-1 text-[11px] text-neutral-400 truncate">
+                  {aktuell.video.filename}
+                </p>
+              </div>
+            ) : (
+              <button onClick={() => videoRef.current?.click()}
+                className="mt-1 w-full py-4 rounded-lg border-2 border-dashed border-neutral-300 flex flex-col items-center justify-center text-neutral-400 hover:border-primary-400 hover:text-primary-500">
+                <Film size={20} />
+                <span className="text-[11px] mt-0.5">Video hinzufügen (MP4/MOV, max. 200 MB)</span>
+              </button>
+            )}
+            <input ref={videoRef} type="file" accept="video/mp4,video/quicktime,.mp4,.mov"
+              className="hidden" onChange={videoWaehlen} />
+          </div>
+          )}
 
           {/* Profil */}
           <div>
@@ -933,6 +1146,9 @@ export default function PosteckePage() {
                       onClick={() => setEditor(post)}>
                       {post.fotos?.length > 0 ? (
                         <FotoThumb fotoId={post.fotos[0].id} className="w-14 h-14 rounded-lg flex-shrink-0" />
+                      ) : post.video ? (
+                        <VideoThumb videoId={post.video.id} hasPoster={post.video.has_poster}
+                          className="w-14 h-14 rounded-lg flex-shrink-0" />
                       ) : (
                         <div className="w-14 h-14 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0">
                           <Camera size={18} className="text-neutral-300" />
