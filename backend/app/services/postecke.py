@@ -8,7 +8,10 @@ auf (services/ki.py — Einstellungen -> System -> KI & Mail-Importer).
 """
 
 import json
+import os
 import re
+import subprocess
+import tempfile
 from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -183,29 +186,82 @@ def bearbeite_foto(data: bytes, bild_format: str = "original",
     return out.getvalue(), "image/jpeg"
 
 
-# ── Datacenter-Postsarchiv ────────────────────────────────────────────────────
-# Beim Archivieren wird der Post (Content als Markdown + alle Fotos als Kopien)
-# ins Datacenter gespiegelt: mit Kontakt unter dem Kontakt-Ordner, sonst global —
-# jeweils im Unterordner "Postsarchiv" (analog zum Beleg-Archiv des Verkaufs).
-# Der Marker in Attachment.description ("postecke:<id>") verknüpft die Spiegelung
-# mit dem Post, damit die Wiederherstellung sie wieder entfernen kann.
+# ── Video-Standbild (Poster) ──────────────────────────────────────────────────
+def erzeuge_video_poster(video_bytes: bytes, dateiendung: str = ".mp4") -> Optional[bytes]:
+    """
+    Erzeugt mit ffmpeg ein Standbild (erstes Frame) als JPEG. So ist die Vorschau
+    unabhängig davon, ob der Browser das Video-Format (z.B. iPhone-.mov/HEVC)
+    selbst dekodieren kann. Liefert None bei Fehler (ffmpeg fehlt, Format nicht
+    dekodierbar o.ä.) — der Video-Upload läuft dann trotzdem, nur ohne Poster.
+    """
+    tmp_in = tmp_out = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=dateiendung, delete=False) as f_in:
+            f_in.write(video_bytes)
+            tmp_in = f_in.name
+        tmp_out = tmp_in + ".jpg"
+        # Erstes Frame, Höhe auf max. 720 px begrenzt (Vorschau reicht)
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", tmp_in, "-frames:v", "1",
+             "-vf", "scale=-2:720", "-q:v", "3", tmp_out],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=120, check=True,
+        )
+        with open(tmp_out, "rb") as f:
+            daten = f.read()
+        return daten or None
+    except Exception:
+        return None
+    finally:
+        for pfad in (tmp_in, tmp_out):
+            if pfad and os.path.exists(pfad):
+                try:
+                    os.remove(pfad)
+                except Exception:
+                    pass
 
-ARCHIV_ORDNER = "Postsarchiv"
+
+# ── Datacenter-Ablage (Postecke) ──────────────────────────────────────────────
+# Anhänge und Content eines Posts werden laufend ins Datacenter gespiegelt:
+#   - ohne Kontakt: globaler Ordner "Postecke" (entity_type "postecke")
+#   - mit Kontakt:  Unterordner "Postecke" beim Kontakt
+# Gespiegelt werden der Content als Textdatei (Markdown) sowie – je nach Post –
+# die Fotos ODER das Video als Kopien (kein Misch-Post). Die Spiegelung wird bei
+# jeder Änderung synchronisiert (nur Neues rein, Gelöschtes/Verschobenes raus)
+# und bleibt auch nach dem Löschen des Posts als Beleg erhalten.
+# Marker in Attachment.description: "postecke:<post_id>#<teil>"
+#   Teil = "text" | "foto:<foto_id>" | "video:<video_id>"
+
+POSTECKE_ORDNER = "Postecke"
 
 _ENDUNGEN = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
-             "image/heic": ".heic", "image/heif": ".heif"}
+             "image/heic": ".heic", "image/heif": ".heif",
+             "video/mp4": ".mp4", "video/quicktime": ".mov"}
 
 
 def _safe(s: str) -> str:
     return "".join(c for c in (s or "") if c.isalnum() or c in "._- ").strip()
 
 
-def _archiv_marker(post: SocialPost) -> str:
+def _post_marker(post: SocialPost) -> str:
+    """Prefix-Marker über alle Spiegelungen eines Posts."""
     return f"postecke:{post.id}"
 
 
-def _archiv_markdown(post: SocialPost, profil: Optional[SocialProfil]) -> str:
-    """Content des Posts als lesbares Markdown fürs Archiv."""
+def _teil_marker(post: SocialPost, teil: str) -> str:
+    return f"postecke:{post.id}#{teil}"
+
+
+def _hat_inhalt(post: SocialPost) -> bool:
+    """True, sobald ein Post etwas Spiegelbares hat (kein leerer Entwurf)."""
+    return bool(post.fotos or post.video
+                or (post.text or "").strip()
+                or (post.hashtags or "").strip()
+                or (post.beschreibung or "").strip())
+
+
+def _content_markdown(post: SocialPost, profil: Optional[SocialProfil]) -> str:
+    """Content des Posts als lesbares Markdown fürs Datacenter."""
     def z(iso):
         return iso.strftime("%d.%m.%Y %H:%M") if iso else "—"
     zeilen = [
@@ -230,19 +286,25 @@ def _archiv_markdown(post: SocialPost, profil: Optional[SocialProfil]) -> str:
     return "\n".join(zeilen).strip() + "\n"
 
 
-def archiviere_ins_datacenter(db: Session, post: SocialPost,
-                              user_id=None) -> int:
+def synchronisiere_datacenter(db: Session, post: SocialPost, user_id=None) -> int:
     """
-    Spiegelt einen Post ins Datacenter (Markdown + Foto-Kopien).
-    Liefert die Anzahl angelegter Anlagen (0, wenn schon vorhanden).
-    Die Attachments werden per db.flush() in die laufende Transaktion des
-    Aufrufers eingefügt (der Aufrufer committet).
+    Hält die Datacenter-Spiegelung eines Posts aktuell (idempotent, beim
+    Erstellen/Speichern sowie bei Foto-/Video-Änderungen aufgerufen).
+
+    - Ordner "Postecke" (global) bzw. Kontakt-Unterordner "Postecke".
+    - Content als Textdatei (wird bei jeder Änderung neu geschrieben).
+    - Fotos/Video als Kopien: nur fehlende werden hochgeladen, verwaiste oder an
+      den falschen Ort (Kontaktwechsel) gehörende Spiegelungen werden entfernt.
+    - Große Videos werden dadurch NICHT bei jeder Textänderung neu hochgeladen.
+
+    Liefert die Anzahl neu angelegter Anlagen. Die Attachments landen per
+    db.flush() in der laufenden Transaktion des Aufrufers (der Aufrufer committet).
     """
     from app.models.attachment import Attachment
 
-    marker = _archiv_marker(post)
-    if db.query(Attachment).filter(Attachment.description == marker).first():
-        return 0  # bereits gespiegelt
+    # Leere Entwürfe nicht spiegeln
+    if not _hat_inhalt(post):
+        return 0
 
     profil = None
     if post.profil_id:
@@ -253,60 +315,89 @@ def archiviere_ins_datacenter(db: Session, post: SocialPost,
 
     if post.kontakt_id:
         _folder = storage_service.folder_name_for(db, post.kontakt_id, post.kontakt_name)
-        key_prefix = f"kontakte/{_folder}/{ARCHIV_ORDNER}"
+        key_prefix = f"kontakte/{_folder}/{POSTECKE_ORDNER}"
         entity_type, entity_id = "kontakte", post.kontakt_id
     else:
-        key_prefix = f"postecke-archiv/{post.id}"
+        key_prefix = f"postecke/{POSTECKE_ORDNER}/{post.id}"
         entity_type, entity_id = "postecke", post.id
 
     _backend = storage_service.current_backend(db)
 
-    def _anlage(storage_key, daten, mimetype, filename, anzeige):
+    # Soll-Zustand: welche Teile soll es geben?
+    soll_teile = {"text"}
+    for foto in (post.fotos or []):
+        soll_teile.add(f"foto:{foto.id}")
+    if post.video is not None:
+        soll_teile.add(f"video:{post.video.id}")
+
+    # Bestehende Spiegelungen dieses Posts (Prefix-Marker deckt auch Altbestand
+    # mit reinem "postecke:<id>" ohne #Teil ab -> wird migriert).
+    vorhandene = (db.query(Attachment)
+                  .filter(Attachment.description.like(f"{_post_marker(post)}%")).all())
+
+    def _teil_of(a) -> str:
+        d = a.description or ""
+        return d.split("#", 1)[1] if "#" in d else ""
+
+    vorhandene_teile = set()
+    # 1. Verwaiste / falsch platzierte / Text-Spiegelungen entfernen
+    for a in vorhandene:
+        teil = _teil_of(a)
+        falscher_ort = not (a.storage_key or "").startswith(key_prefix + "/")
+        # "text" immer neu schreiben (Content kann sich geändert haben)
+        if teil == "text" or teil not in soll_teile or falscher_ort:
+            try:
+                storage_service.delete_file(a.storage_key, db)
+            except Exception:
+                pass
+            db.delete(a)
+        else:
+            vorhandene_teile.add(teil)
+    db.flush()
+
+    anzahl = 0
+
+    def _anlage(teil, storage_key, daten, mimetype, filename, anzeige):
+        nonlocal anzahl
         storage_service.upload_file(storage_key, daten, mimetype, db=db, backend=_backend)
         db.add(Attachment(
             entity_type=entity_type, entity_id=entity_id,
             type="file", storage_key=storage_key, storage_provider=_backend,
             filename=filename, filesize=len(daten), mimetype=mimetype,
-            display_name=anzeige, description=marker,
+            display_name=anzeige, description=_teil_marker(post, teil),
             contact_id=post.kontakt_id, contact_name=post.kontakt_name,
-            folder=ARCHIV_ORDNER, uploaded_by=user_id,
+            folder=POSTECKE_ORDNER, uploaded_by=user_id,
         ))
+        anzahl += 1
 
-    anzahl = 0
-    # 1. Content als Markdown
-    md = _archiv_markdown(post, profil).encode("utf-8")
-    _anlage(f"{key_prefix}/{basis}.md", md, "text/markdown",
+    # 2. Content immer (neu) schreiben
+    md = _content_markdown(post, profil).encode("utf-8")
+    _anlage("text", f"{key_prefix}/{basis}.md", md, "text/markdown",
             f"{basis}.md", f"{post.titel or 'Post'} · Text")
-    anzahl += 1
 
-    # 2. Fotos als Kopien (unabhängig vom Post-Speicher, Archiv bleibt
-    #    auch nach endgültigem Löschen des Posts erhalten)
+    # 3. Fotos — nur fehlende hinzufügen (bereits gespiegelte bleiben)
     for i, foto in enumerate(post.fotos or [], start=1):
+        if f"foto:{foto.id}" in vorhandene_teile:
+            continue
         try:
             daten, _ct = storage_service.download_file(foto.storage_key, db)
         except Exception:
-            continue  # fehlendes Einzelfoto bricht das Archiv nicht ab
+            continue  # fehlendes Einzelfoto bricht die Spiegelung nicht ab
         endung = _ENDUNGEN.get(foto.mimetype, ".jpg")
         fname = f"{basis}_Foto{i}{endung}"
-        _anlage(f"{key_prefix}/{fname}", daten, foto.mimetype or "image/jpeg",
-                fname, f"{post.titel or 'Post'} · Foto {i}")
-        anzahl += 1
+        _anlage(f"foto:{foto.id}", f"{key_prefix}/{fname}", daten,
+                foto.mimetype or "image/jpeg", fname, f"{post.titel or 'Post'} · Foto {i}")
+
+    # 4. Video — nur wenn noch nicht gespiegelt (kein Re-Upload bei Textänderung)
+    if post.video is not None and f"video:{post.video.id}" not in vorhandene_teile:
+        try:
+            daten, _ct = storage_service.download_file(post.video.storage_key, db)
+            endung = _ENDUNGEN.get(post.video.mimetype, ".mp4")
+            fname = f"{basis}_Video{endung}"
+            _anlage(f"video:{post.video.id}", f"{key_prefix}/{fname}", daten,
+                    post.video.mimetype or "video/mp4", fname, f"{post.titel or 'Post'} · Video")
+        except Exception:
+            pass  # fehlendes Video bricht die Spiegelung nicht ab
 
     db.flush()
     return anzahl
-
-
-def entferne_datacenter_archiv(db: Session, post: SocialPost) -> int:
-    """Entfernt die Datacenter-Spiegelung eines Posts (bei Wiederherstellung)."""
-    from app.models.attachment import Attachment
-
-    anlagen = (db.query(Attachment)
-               .filter(Attachment.description == _archiv_marker(post)).all())
-    for a in anlagen:
-        try:
-            storage_service.delete_file(a.storage_key, db)
-        except Exception:
-            pass
-        db.delete(a)
-    db.flush()
-    return len(anlagen)

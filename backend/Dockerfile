@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libgdk-pixbuf-xlib-2.0-0 \
     libffi-dev \
     shared-mime-info \
+    ffmpeg \
     git \
     curl \
     && install -m 0755 -d /etc/apt/keyrings \

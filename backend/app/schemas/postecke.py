@@ -106,6 +106,17 @@ class FotoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ── Video ─────────────────────────────────────────────────────────────────────
+class VideoResponse(BaseModel):
+    id: UUID
+    filename: str
+    mimetype: str
+    size_bytes: Optional[int] = None
+    has_poster: bool = False   # Standbild (erstes Frame) für die Vorschau vorhanden?
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ── Posts ─────────────────────────────────────────────────────────────────────
 class PostCreate(BaseModel):
     profil_id: Optional[UUID] = None
@@ -159,6 +170,7 @@ class PostResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     fotos: List[FotoResponse] = []
+    video: Optional[VideoResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
 

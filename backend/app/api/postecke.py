@@ -12,6 +12,10 @@ Endpunkte:
   Fotos:    POST           /postecke/posts/{id}/fotos       (Upload, multipart)
             GET            /postecke/fotos/{id}             (Bild abrufen)
             DELETE         /postecke/fotos/{id}
+  Video:    POST           /postecke/posts/{id}/video       (Upload MP4/MOV, ein Video)
+            GET            /postecke/videos/{id}            (Video abrufen)
+            GET            /postecke/videos/{id}/poster     (Standbild/Vorschau)
+            DELETE         /postecke/videos/{id}
 
 Rechte: Profile und Posts sind persönlich — sichtbar/änderbar nur für den
 Besitzer (private Social-Media-Konten).
@@ -27,7 +31,9 @@ from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.postecke import SocialProfil, SocialPost, SocialPostFoto, POST_STATUS
+from app.models.postecke import (
+    SocialProfil, SocialPost, SocialPostFoto, SocialPostVideo, POST_STATUS,
+)
 from app.schemas.postecke import (
     ProfilCreate, ProfilUpdate, ProfilResponse,
     PostCreate, PostUpdate, PostStatusUpdate, PostResponse,
@@ -44,6 +50,23 @@ router = APIRouter(prefix="/postecke", tags=["Postecke"])
 ERLAUBTE_FOTO_TYPEN = ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif")
 MAX_FOTO_BYTES = 25 * 1024 * 1024  # 25 MB je Foto (iPhone-Originale)
 MAX_FOTOS_JE_POST = 20
+
+# Video: max. eines je Post, kein Misch-Post mit Fotos. MP4/MOV, bis 200 MB
+# (nginx client_max_body_size ist entsprechend auf 200M gesetzt).
+ERLAUBTE_VIDEO_TYPEN = ("video/mp4", "video/quicktime")
+MAX_VIDEO_BYTES = 200 * 1024 * 1024  # 200 MB je Video
+
+
+def _sync_datacenter(db: Session, post: SocialPost, user_id) -> None:
+    """
+    Spiegelt den Post laufend ins Datacenter (Ordner „Postecke" bzw. beim
+    Kontakt). Fehler dürfen die eigentliche Aktion nie scheitern lassen — sie
+    werden nur protokolliert. Committet selbst nicht; der Aufrufer committet.
+    """
+    try:
+        postecke_service.synchronisiere_datacenter(db, post, user_id=user_id)
+    except Exception as e:
+        print(f"[WARN] Datacenter-Ablage (Postecke) fehlgeschlagen für {post.id}: {e}")
 
 
 # ── Hilfen ────────────────────────────────────────────────────────────────────
@@ -176,6 +199,9 @@ def create_post(
     db.add(p)
     db.commit()
     db.refresh(p)
+    _sync_datacenter(db, p, current_user.id)
+    db.commit()
+    db.refresh(p)
     return p
 
 
@@ -203,6 +229,9 @@ def update_post(
         setattr(p, key, value)
     db.commit()
     db.refresh(p)
+    _sync_datacenter(db, p, current_user.id)
+    db.commit()
+    db.refresh(p)
     return p
 
 
@@ -215,6 +244,10 @@ def delete_post(
     p = _get_post(db, post_id, current_user)
     for foto in list(p.fotos or []):
         storage_service.delete_file(foto.storage_key, db)
+    if p.video is not None:
+        storage_service.delete_file(p.video.storage_key, db)
+        if p.video.poster_key:
+            storage_service.delete_file(p.video.poster_key, db)
     db.delete(p)
     db.commit()
 
@@ -236,19 +269,11 @@ def set_post_status(
     if body.status == "veroeffentlicht":
         p.veroeffentlicht_am = datetime.now(timezone.utc)
 
-    # Datacenter-Postsarchiv: beim Archivieren spiegeln, bei Wiederherstellung
-    # aufräumen. Fehler dürfen den Statuswechsel nicht scheitern lassen.
-    if body.status == "archiviert" and vorher != "archiviert":
-        try:
-            postecke_service.archiviere_ins_datacenter(db, p, user_id=current_user.id)
-        except Exception as e:
-            print(f"[WARN] Postsarchiv (Datacenter) fehlgeschlagen für {p.id}: {e}")
-    elif vorher == "archiviert" and body.status != "archiviert":
-        try:
-            postecke_service.entferne_datacenter_archiv(db, p)
-        except Exception as e:
-            print(f"[WARN] Postsarchiv-Aufräumen fehlgeschlagen für {p.id}: {e}")
-
+    db.commit()
+    db.refresh(p)
+    # Datacenter-Ablage aktuell halten (z.B. frisches Veröffentlicht-Datum im
+    # Content-Text). Die Kopien bleiben unabhängig vom Status erhalten.
+    _sync_datacenter(db, p, current_user.id)
     db.commit()
     db.refresh(p)
     return p
@@ -262,8 +287,9 @@ def veroeffentliche_post(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Veröffentlicht den Post sofort über die Direktanbindung seines Profils
-    (Fotos in der Ausspielungs-Variante + Text/Hashtags). Setzt Status auf
+    Veröffentlicht den Post sofort über die Direktanbindung seines Profils:
+    Foto-Post (Fotos in der Ausspielungs-Variante + Text/Hashtags) ODER
+    Video-Post (Video + Text/Hashtags als Beschreibung). Setzt Status auf
     "veröffentlicht" und speichert die Beitrags-URL.
     """
     p = _get_post(db, post_id, current_user)
@@ -278,6 +304,9 @@ def veroeffentliche_post(
         social_publish.publiziere(db, p, profil)
     except RuntimeError as e:
         raise HTTPException(502, str(e))
+    db.commit()
+    db.refresh(p)
+    _sync_datacenter(db, p, current_user.id)
     db.commit()
     db.refresh(p)
     return p
@@ -331,6 +360,9 @@ async def upload_fotos(
     current_user: User = Depends(get_current_user),
 ):
     p = _get_post(db, post_id, current_user)
+    if p.video is not None:
+        raise HTTPException(422, "Dieser Post enthält bereits ein Video — "
+                                 "Foto und Video lassen sich nicht mischen.")
     vorhandene = len(p.fotos or [])
     if vorhandene + len(files) > MAX_FOTOS_JE_POST:
         raise HTTPException(422, f"Maximal {MAX_FOTOS_JE_POST} Fotos je Post")
@@ -359,6 +391,9 @@ async def upload_fotos(
             sort_order=vorhandene + i,
         ))
 
+    db.commit()
+    db.refresh(p)
+    _sync_datacenter(db, p, current_user.id)
     db.commit()
     db.refresh(p)
     return p
@@ -429,6 +464,138 @@ def delete_foto(
                     SocialPost.owner_user_id == current_user.id).first())
     if not foto:
         raise HTTPException(404, "Foto nicht gefunden")
+    post_id = foto.post_id
     storage_service.delete_file(foto.storage_key, db)
     db.delete(foto)
     db.commit()
+    # Datacenter-Spiegelung nachziehen (entfernt die Kopie des gelöschten Fotos)
+    post = db.query(SocialPost).filter(SocialPost.id == post_id).first()
+    if post is not None:
+        db.refresh(post)
+        _sync_datacenter(db, post, current_user.id)
+        db.commit()
+
+
+# ── Video (max. eines je Post; kein Misch-Post mit Fotos) ─────────────────────
+@router.post("/posts/{post_id}/video", response_model=PostResponse, status_code=201)
+async def upload_video(
+    post_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Lädt ein einzelnes Video (MP4/MOV, bis 200 MB) zu einem Post hoch. Ein Post
+    ist entweder Foto- oder Video-Post — hat er bereits Fotos, wird abgelehnt.
+    Ein bereits vorhandenes Video wird ersetzt.
+    """
+    p = _get_post(db, post_id, current_user)
+    if p.fotos:
+        raise HTTPException(422, "Dieser Post enthält bereits Fotos — "
+                                 "Foto und Video lassen sich nicht mischen.")
+
+    mimetype = (file.content_type or "").lower()
+    if mimetype not in ERLAUBTE_VIDEO_TYPEN:
+        raise HTTPException(422, "Videotyp nicht erlaubt — bitte MP4 oder MOV.")
+    data = await file.read()
+    if len(data) > MAX_VIDEO_BYTES:
+        raise HTTPException(422, "Video zu groß (max. 200 MB).")
+
+    # Vorhandenes Video ersetzen (Datei + Poster + Datensatz entfernen)
+    if p.video is not None:
+        storage_service.delete_file(p.video.storage_key, db)
+        if p.video.poster_key:
+            storage_service.delete_file(p.video.poster_key, db)
+        db.delete(p.video)
+        db.flush()
+
+    video_id = uuid4()
+    filename = file.filename or "video.mp4"
+    storage_key = storage_service.build_storage_key(
+        "postecke", str(p.id), f"{video_id}_{filename}")
+    storage_service.upload_file(storage_key, data, mimetype, db)
+
+    # Standbild (erstes Frame) per ffmpeg erzeugen und ablegen — schlägt es fehl,
+    # bleibt poster_key leer (Vorschau fällt dann auf den Video-Player zurück).
+    poster_key = None
+    endung = ".mov" if mimetype == "video/quicktime" else ".mp4"
+    poster = postecke_service.erzeuge_video_poster(data, endung)
+    if poster:
+        poster_key = storage_service.build_storage_key(
+            "postecke", str(p.id), f"{video_id}_poster.jpg")
+        storage_service.upload_file(poster_key, poster, "image/jpeg", db)
+
+    db.add(SocialPostVideo(
+        id=video_id,
+        post_id=p.id,
+        storage_key=storage_key,
+        filename=filename,
+        mimetype=mimetype,
+        size_bytes=len(data),
+        poster_key=poster_key,
+    ))
+    db.commit()
+    db.refresh(p)
+    _sync_datacenter(db, p, current_user.id)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@router.get("/videos/{video_id}")
+def get_video(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    video = (db.query(SocialPostVideo)
+             .join(SocialPost, SocialPost.id == SocialPostVideo.post_id)
+             .filter(SocialPostVideo.id == video_id,
+                     SocialPost.owner_user_id == current_user.id).first())
+    if not video:
+        raise HTTPException(404, "Video nicht gefunden")
+    data, content_type = storage_service.download_file(video.storage_key, db)
+    return Response(content=data, media_type=content_type or video.mimetype)
+
+
+@router.get("/videos/{video_id}/poster")
+def get_video_poster(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Standbild (erstes Frame) des Videos als JPEG — für die Vorschau."""
+    video = (db.query(SocialPostVideo)
+             .join(SocialPost, SocialPost.id == SocialPostVideo.post_id)
+             .filter(SocialPostVideo.id == video_id,
+                     SocialPost.owner_user_id == current_user.id).first())
+    if not video or not video.poster_key:
+        raise HTTPException(404, "Kein Standbild vorhanden")
+    data, _ct = storage_service.download_file(video.poster_key, db)
+    return Response(content=data, media_type="image/jpeg")
+
+
+@router.delete("/videos/{video_id}", status_code=204)
+def delete_video(
+    video_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    video = (db.query(SocialPostVideo)
+             .join(SocialPost, SocialPost.id == SocialPostVideo.post_id)
+             .filter(SocialPostVideo.id == video_id,
+                     SocialPost.owner_user_id == current_user.id).first())
+    if not video:
+        raise HTTPException(404, "Video nicht gefunden")
+    post_id = video.post_id
+    storage_service.delete_file(video.storage_key, db)
+    if video.poster_key:
+        storage_service.delete_file(video.poster_key, db)
+    db.delete(video)
+    db.commit()
+    # Datacenter-Spiegelung nachziehen (entfernt die Kopie des gelöschten Videos)
+    post = db.query(SocialPost).filter(SocialPost.id == post_id).first()
+    if post is not None:
+        db.refresh(post)
+        _sync_datacenter(db, post, current_user.id)
+        db.commit()

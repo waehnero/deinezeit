@@ -192,6 +192,116 @@ def test_foto_upload_und_loeschen(auth_client, monkeypatch):
     assert speicher == {}
 
 
+# ── Video (Etappe „Video + Instagram", Teilschritt 1) ─────────────────────────
+def _mock_storage(monkeypatch):
+    """Gemeinsamer In-Memory-Storage-Mock (upload/delete) für die Video-Tests."""
+    speicher = {}
+    monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
+                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
+    monkeypatch.setattr("app.api.postecke.storage_service.delete_file",
+                        lambda key, db=None: speicher.pop(key, None))
+    return speicher
+
+
+def test_video_upload_und_loeschen(auth_client, monkeypatch):
+    """Upload legt Datensatz + Storage-Objekt an; Löschen räumt beides weg."""
+    speicher = _mock_storage(monkeypatch)
+
+    post = _post_anlegen(auth_client)
+    resp = auth_client.post(
+        f"/api/postecke/posts/{post['id']}/video",
+        files={"file": ("clip.mp4", b"fake-mp4-daten", "video/mp4")})
+    assert resp.status_code == 201, resp.text
+    video = resp.json()["video"]
+    assert video is not None
+    assert video["filename"] == "clip.mp4"
+    assert len(speicher) == 1  # Objekt liegt im (gemockten) Storage
+
+    # Nicht erlaubter Typ (nur MP4/MOV)
+    post_b = _post_anlegen(auth_client)
+    resp = auth_client.post(
+        f"/api/postecke/posts/{post_b['id']}/video",
+        files={"file": ("clip.avi", b"x", "video/x-msvideo")})
+    assert resp.status_code == 422
+
+    # Löschen entfernt auch das Storage-Objekt
+    resp = auth_client.delete(f"/api/postecke/videos/{video['id']}")
+    assert resp.status_code == 204
+    assert speicher == {}
+
+
+def test_video_ersetzt_vorhandenes(auth_client, monkeypatch):
+    """Ein zweites Video ersetzt das erste; nur das neue bleibt im Storage."""
+    speicher = _mock_storage(monkeypatch)
+
+    post = _post_anlegen(auth_client)
+    auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                     files={"file": ("a.mp4", b"aaa", "video/mp4")})
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                            files={"file": ("b.mov", b"bbb", "video/quicktime")})
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["video"]["filename"] == "b.mov"
+    assert len(speicher) == 1
+
+
+def test_foto_und_video_schliessen_sich_aus(auth_client, monkeypatch):
+    """Kein Misch-Post: Foto blockiert Video-Upload und umgekehrt (422)."""
+    _mock_storage(monkeypatch)
+
+    # Foto vorhanden -> Video wird abgelehnt
+    p1 = _post_anlegen(auth_client)
+    auth_client.post(f"/api/postecke/posts/{p1['id']}/fotos",
+                     files=[("files", ("f.jpg", b"jpeg", "image/jpeg"))])
+    resp = auth_client.post(f"/api/postecke/posts/{p1['id']}/video",
+                            files={"file": ("v.mp4", b"mp4", "video/mp4")})
+    assert resp.status_code == 422
+
+    # Video vorhanden -> Foto wird abgelehnt
+    p2 = _post_anlegen(auth_client)
+    auth_client.post(f"/api/postecke/posts/{p2['id']}/video",
+                     files={"file": ("v.mp4", b"mp4", "video/mp4")})
+    resp = auth_client.post(f"/api/postecke/posts/{p2['id']}/fotos",
+                            files=[("files", ("f.jpg", b"jpeg", "image/jpeg"))])
+    assert resp.status_code == 422
+
+
+def test_post_loeschen_entfernt_video_im_storage(auth_client, monkeypatch):
+    """Post löschen räumt auch das Video-Storage-Objekt weg."""
+    speicher = _mock_storage(monkeypatch)
+
+    post = _post_anlegen(auth_client)
+    auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                     files={"file": ("clip.mp4", b"daten", "video/mp4")})
+    assert len(speicher) == 1
+    resp = auth_client.delete(f"/api/postecke/posts/{post['id']}")
+    assert resp.status_code == 204
+    assert speicher == {}
+
+
+def test_video_poster_wird_erzeugt_und_ausgeliefert(auth_client, monkeypatch):
+    """Beim Upload wird ein Standbild abgelegt (ffmpeg gemockt); Poster abrufbar."""
+    speicher = _mock_storage(monkeypatch)
+    monkeypatch.setattr("app.api.postecke.postecke_service.erzeuge_video_poster",
+                        lambda data, endung=".mp4": b"jpeg-poster-bytes")
+    monkeypatch.setattr("app.api.postecke.storage_service.download_file",
+                        lambda key, db=None: (speicher.get(key, b""), "image/jpeg"))
+
+    post = _post_anlegen(auth_client)
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                            files={"file": ("clip.mp4", b"x", "video/mp4")})
+    assert resp.status_code == 201, resp.text
+    video = resp.json()["video"]
+    assert video["has_poster"] is True
+
+    r = auth_client.get(f"/api/postecke/videos/{video['id']}/poster")
+    assert r.status_code == 200
+    assert r.content == b"jpeg-poster-bytes"
+
+    # Video löschen entfernt auch das Poster-Objekt
+    auth_client.delete(f"/api/postecke/videos/{video['id']}")
+    assert auth_client.get(f"/api/postecke/videos/{video['id']}/poster").status_code == 404
+
+
 # ── Profil-Parameter & Bild-Ausspielung ──────────────────────────────────────
 def _test_bild(breite=400, hoehe=200) -> bytes:
     """Erzeugt ein kleines Test-JPEG."""
@@ -277,6 +387,44 @@ def test_profil_zugang_verschluesselt(auth_client):
     assert p2["direktanbindung"] is False
 
 
+def test_fb_seite_video_publisher_nutzt_videos_endpunkt(auth_client, monkeypatch):
+    """Ein Post mit Video wird über den /videos-Endpunkt der Seite gepostet."""
+    from app.services import social_publish
+
+    aufrufe = {}
+
+    class _Resp:
+        status_code = 200
+        def json(self):
+            return {"id": "555"}
+
+    def _fake_post(url, data=None, files=None, timeout=None):
+        aufrufe["url"] = url
+        aufrufe["data"] = data
+        aufrufe["hat_datei"] = files is not None
+        return _Resp()
+
+    monkeypatch.setattr(social_publish.httpx, "post", _fake_post)
+    monkeypatch.setattr(social_publish.storage_service, "download_file",
+                        lambda key, db=None: (b"videobytes", "video/mp4"))
+    monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
+                        lambda key, data, mt, db=None, backend=None: None)
+
+    profil = _profil_anlegen(auth_client, kanal="facebook_seite",
+                             zugang={"page_id": "42", "page_token": "tok"})
+    post = _post_anlegen(auth_client, profil_id=profil["id"])
+    auth_client.put(f"/api/postecke/posts/{post['id']}", json={"text": "Videobeitrag"})
+    auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                     files={"file": ("clip.mp4", b"x", "video/mp4")})
+
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/veroeffentlichen")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["extern_url"] == "https://www.facebook.com/555"
+    assert aufrufe["url"].endswith("/42/videos")
+    assert aufrufe["data"]["description"] == "Videobeitrag"
+    assert aufrufe["hat_datei"] is True
+
+
 def test_direkt_veroeffentlichen(auth_client, monkeypatch):
     """Veröffentlichen über die Direktanbindung setzt Status + extern_url."""
     from app.services import social_publish
@@ -355,71 +503,92 @@ def test_worker_veroeffentlicht_faellige(auth_client, db_session, monkeypatch):
     assert "Token abgelaufen" in fehler["publish_error"]
 
 
-# ── Datacenter-Postsarchiv ────────────────────────────────────────────────────
-def test_archivieren_spiegelt_ins_datacenter(auth_client, db_session, monkeypatch):
-    """Archivieren legt Markdown+Fotos im Datacenter ab; Wiederherstellen räumt auf."""
-    from app.models.attachment import Attachment
-
+# ── Datacenter-Ablage (Postecke) ──────────────────────────────────────────────
+def _mock_storage_mit_download(monkeypatch):
+    """Storage-Mock (upload/download/delete, api + service) für die Sync-Tests."""
     speicher = {}
-    monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
-    monkeypatch.setattr("app.services.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
+    _up = lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data)
+    _del = lambda key, db=None: speicher.pop(key, None)
+    for pfad in ("app.api.postecke.storage_service.upload_file",
+                 "app.services.postecke.storage_service.upload_file"):
+        monkeypatch.setattr(pfad, _up)
+    for pfad in ("app.api.postecke.storage_service.delete_file",
+                 "app.services.postecke.storage_service.delete_file"):
+        monkeypatch.setattr(pfad, _del)
     monkeypatch.setattr("app.services.postecke.storage_service.download_file",
-                        lambda key, db=None: (speicher[key], "image/jpeg"))
-    monkeypatch.setattr("app.services.postecke.storage_service.delete_file",
-                        lambda key, db=None: speicher.pop(key, None))
+                        lambda key, db=None: (speicher[key], "application/octet-stream"))
+    return speicher
 
-    post = _post_anlegen(auth_client, titel="Feuerwehrfest",
-                         kontakt_name="Feuerwehr Ebreichsdorf")
+
+def test_datacenter_ablage_beim_speichern_ohne_kontakt(auth_client, db_session, monkeypatch):
+    """Ohne Kontakt: Content + Foto landen beim Speichern im Ordner „Postecke"."""
+    from app.models.attachment import Attachment
+    speicher = _mock_storage_mit_download(monkeypatch)
+
+    post = _post_anlegen(auth_client, titel="Feuerwehrfest")
     auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
                      files=[("files", ("a.jpg", b"foto-a", "image/jpeg"))])
     auth_client.put(f"/api/postecke/posts/{post['id']}",
                     json={"text": "Toller Abend!", "hashtags": "#ff"})
 
-    # Archivieren -> Markdown + 1 Foto als Anlagen mit Ordner "Postsarchiv"
-    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/status",
-                            json={"status": "archiviert"})
-    assert resp.status_code == 200
     anlagen = (db_session.query(Attachment)
-               .filter(Attachment.description == f"postecke:{post['id']}").all())
-    assert len(anlagen) == 2  # 1x Markdown, 1x Foto
-    assert all(a.folder == "Postsarchiv" for a in anlagen)
+               .filter(Attachment.description.like(f"postecke:{post['id']}%")).all())
+    assert len(anlagen) == 2  # Content-Text + 1 Foto
+    assert all(a.folder == "Postecke" for a in anlagen)
+    assert all(a.entity_type == "postecke" for a in anlagen)
+    assert all(a.storage_key.startswith(f"postecke/Postecke/{post['id']}/") for a in anlagen)
     md = [a for a in anlagen if a.mimetype == "text/markdown"][0]
     inhalt = speicher[md.storage_key].decode("utf-8")
     assert "Toller Abend!" in inhalt and "#ff" in inhalt
 
-    # Wiederherstellen -> Spiegelung wird entfernt
-    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/status",
-                            json={"status": "entwurf"})
-    assert resp.status_code == 200
-    assert (db_session.query(Attachment)
-            .filter(Attachment.description == f"postecke:{post['id']}").count()) == 0
+    # Foto löschen -> Kopie verschwindet, Content bleibt
+    foto = auth_client.get(f"/api/postecke/posts/{post['id']}").json()["fotos"][0]
+    auth_client.delete(f"/api/postecke/fotos/{foto['id']}")
+    rest = (db_session.query(Attachment)
+            .filter(Attachment.description.like(f"postecke:{post['id']}%")).all())
+    assert len(rest) == 1 and rest[0].mimetype == "text/markdown"
 
 
-def test_archivieren_mit_kontakt_landet_beim_kontakt(auth_client, db_session, monkeypatch):
-    """Mit Kontakt: Anlagen hängen am Kontakt (entity_type=kontakte)."""
+def test_datacenter_ablage_mit_kontakt(auth_client, db_session, monkeypatch):
+    """Mit Kontakt: Ablage im Unterordner „Postecke" beim Kontakt."""
     from uuid import uuid4
     from app.models.attachment import Attachment
-
-    speicher = {}
-    monkeypatch.setattr("app.services.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
+    _mock_storage_mit_download(monkeypatch)
 
     kontakt_id = str(uuid4())
     post = _post_anlegen(auth_client, titel="Kundenevent",
                          kontakt_id=kontakt_id, kontakt_name="Musterfirma")
-    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/status",
-                            json={"status": "archiviert"})
-    assert resp.status_code == 200
     a = (db_session.query(Attachment)
-         .filter(Attachment.description == f"postecke:{post['id']}").first())
+         .filter(Attachment.description.like(f"postecke:{post['id']}%")).first())
     assert a is not None
     assert a.entity_type == "kontakte"
     assert str(a.entity_id) == kontakt_id
     assert a.contact_name == "Musterfirma"
-    # Ordner nutzt den Kundennamen statt der ID (neue Namensstruktur)
-    assert a.storage_key.startswith("kontakte/Musterfirma/Postsarchiv/")
+    assert a.folder == "Postecke"
+    assert a.storage_key.startswith("kontakte/Musterfirma/Postecke/")
+
+
+def test_datacenter_ablage_video_und_persistenz(auth_client, db_session, monkeypatch):
+    """Video wird als Kopie abgelegt und bleibt beim Löschen des Posts erhalten."""
+    from app.models.attachment import Attachment
+    speicher = _mock_storage_mit_download(monkeypatch)
+
+    post = _post_anlegen(auth_client, titel="Clip")
+    auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                     files={"file": ("clip.mp4", b"video-bytes", "video/mp4")})
+
+    anlagen = (db_session.query(Attachment)
+               .filter(Attachment.description.like(f"postecke:{post['id']}%")).all())
+    v = [a for a in anlagen if "#video:" in a.description][0]
+    assert v.mimetype == "video/mp4"
+    assert v.storage_key.endswith("_Video.mp4")
+    assert speicher[v.storage_key] == b"video-bytes"
+
+    # Post löschen -> Datacenter-Kopien bleiben als Beleg erhalten
+    auth_client.delete(f"/api/postecke/posts/{post['id']}")
+    rest = (db_session.query(Attachment)
+            .filter(Attachment.description.like(f"postecke:{post['id']}%")).count())
+    assert rest >= 2  # Content-Text + Video-Kopie bleiben
 
 
 # ── KI-Generierung ────────────────────────────────────────────────────────────

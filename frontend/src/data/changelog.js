@@ -4,6 +4,21 @@
  */
 export const changelog = [
   {
+    version: '1.12.34',
+    day: '26',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Video-Beiträge (MP4/MOV bis 200 MB) inkl. automatischer Veröffentlichung auf Facebook-Seiten; pro Beitrag Fotos oder ein Video.',
+    ],
+    updates: [
+      'Neuer Infokasten im Profil-Formular erklärt je Kanal die Einrichtung (Facebook-Seite, Instagram, assistierte Kanäle).',
+      'Beiträge werden beim Speichern automatisch im Datacenter abgelegt (Ordner „Postecke" bzw. beim verknüpften Kontakt): Fotos oder Video plus der Text als Datei.',
+      'Video-Vorschau im Editor zeigt jetzt ein Standbild (erstes Bild) — funktioniert für jedes Format, auch iPhone-Videos.',
+      'Profilanlage: Button „Prompt-Generator kopieren" liefert einen fertigen Prompt, um aus eigenen Beispiel-Posts einen persönlichen Stil-Prompt zu erstellen.',
+    ],
+  },
+  {
     version: '1.12.33',
     day: '22',
     month: 'Juli',

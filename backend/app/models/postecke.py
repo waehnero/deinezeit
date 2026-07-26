@@ -91,8 +91,8 @@ class SocialPost(Base):
     beschreibung = Column(Text, nullable=True)      # Nutzereingabe an die KI ("was/wo war ich")
 
     # Optionaler Kontaktbezug (EntityRecord aus Stammdaten, denormalisiert wie
-    # bei Attachment). Beim Archivieren wandert der Post ins Datacenter unter
-    # diesen Kontakt (Unterordner "Postsarchiv"); ohne Kontakt global.
+    # bei Attachment). Der Post wird beim Speichern ins Datacenter gespiegelt:
+    # mit Kontakt in dessen Unterordner "Postecke", ohne Kontakt global.
     kontakt_id = Column(UUID(as_uuid=True), nullable=True)
     kontakt_name = Column(String(300), nullable=True)
 
@@ -118,6 +118,9 @@ class SocialPost(Base):
 
     fotos = relationship("SocialPostFoto", cascade="all, delete-orphan",
                          order_by="SocialPostFoto.sort_order", lazy="selectin")
+    # Max. ein Video je Post (kein Misch-Post Foto+Video); 1:1 über unique post_id
+    video = relationship("SocialPostVideo", cascade="all, delete-orphan",
+                         uselist=False, lazy="selectin")
 
 
 class SocialPostFoto(Base):
@@ -136,3 +139,33 @@ class SocialPostFoto(Base):
     sort_order = Column(Integer, default=0, nullable=False)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class SocialPostVideo(Base):
+    """Ein Video eines Posts (max. eines je Post; Datei im Objektspeicher).
+
+    Bewusst getrennt von den Fotos: ein Post ist entweder ein Foto-Post ODER
+    ein Video-Post — kein Misch-Post. Die 1:1-Beziehung ist über die
+    eindeutige post_id abgesichert.
+    """
+
+    __tablename__ = "social_post_videos"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    post_id = Column(UUID(as_uuid=True),
+                     ForeignKey("social_posts.id", ondelete="CASCADE"),
+                     nullable=False, unique=True)
+
+    storage_key = Column(String(500), nullable=False)
+    filename = Column(String(300), nullable=False)
+    mimetype = Column(String(100), nullable=False)
+    size_bytes = Column(Integer, nullable=True)
+    # Standbild (erstes Frame) als JPEG im Objektspeicher; per ffmpeg beim Upload
+    # erzeugt. Ermöglicht eine Vorschau unabhängig vom Video-Format des Browsers.
+    poster_key = Column(String(500), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    @property
+    def has_poster(self) -> bool:
+        return bool(self.poster_key)
