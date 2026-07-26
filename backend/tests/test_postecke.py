@@ -182,11 +182,7 @@ def test_fremder_post_nicht_sichtbar(auth_client, db_session):
 # ── Fotos ─────────────────────────────────────────────────────────────────────
 def test_foto_upload_und_loeschen(auth_client, monkeypatch):
     """Upload legt Datensatz + Storage-Objekt an; Löschen räumt beides weg."""
-    speicher = {}
-    monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
-                        lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
-    monkeypatch.setattr("app.api.postecke.storage_service.delete_file",
-                        lambda key, db=None: speicher.pop(key, None))
+    speicher = _mock_storage(monkeypatch)
 
     post = _post_anlegen(auth_client)
     resp = auth_client.post(
@@ -212,12 +208,16 @@ def test_foto_upload_und_loeschen(auth_client, monkeypatch):
 
 # ── Video (Etappe „Video + Instagram", Teilschritt 1) ─────────────────────────
 def _mock_storage(monkeypatch):
-    """Gemeinsamer In-Memory-Storage-Mock (upload/delete) für die Video-Tests."""
+    """In-Memory-Storage-Mock (upload/delete) für die fokussierten Medien-Tests.
+    Der Datacenter-Sync wird hier deaktiviert, damit die Storage-Anzahl nur die
+    Medien widerspiegelt (die Datacenter-Ablage wird separat getestet)."""
     speicher = {}
     monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
                         lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
     monkeypatch.setattr("app.api.postecke.storage_service.delete_file",
                         lambda key, db=None: speicher.pop(key, None))
+    monkeypatch.setattr("app.services.postecke.synchronisiere_datacenter",
+                        lambda db, post, user_id=None: 0)
     return speicher
 
 
