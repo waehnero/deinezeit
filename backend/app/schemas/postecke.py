@@ -41,9 +41,14 @@ class ProfilBase(BaseModel):
 
 
 class ProfilZugang(BaseModel):
-    """Zugangsdaten für die Direktanbindung (aktuell: Facebook-Seite)."""
-    page_id: str
-    page_token: str
+    """Zugangsdaten für die Direktanbindung (Facebook-Seite oder Instagram).
+    Es werden nur die zum Kanal passenden Felder gefüllt und gespeichert."""
+    # Facebook-Seite
+    page_id: Optional[str] = None
+    page_token: Optional[str] = None
+    # Instagram (Professionell-Konto, mit einer Facebook-Seite verknüpft)
+    ig_user_id: Optional[str] = None
+    ig_token: Optional[str] = None
 
 
 class ProfilCreate(ProfilBase):

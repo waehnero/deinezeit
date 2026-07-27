@@ -658,3 +658,148 @@ def test_generieren_unbrauchbare_antwort(auth_client, monkeypatch):
     post = _post_anlegen(auth_client)
     resp = auth_client.post(f"/api/postecke/posts/{post['id']}/generieren", json={})
     assert resp.status_code == 400
+
+
+# ── Instagram + öffentlicher Medien-Abruf ─────────────────────────────────────
+class _IGResp:
+    """Minimale httpx.Response-Attrappe für die Instagram-Tests."""
+    def __init__(self, data):
+        self._d = data
+        self.status_code = 200
+        self.text = ""
+
+    def json(self):
+        return self._d
+
+
+def _mock_ig_httpx(monkeypatch, status="FINISHED"):
+    """httpx in social_publish mocken; sammelt die Aufrufe für Assertions."""
+    from app.services import social_publish
+    aufrufe = []
+
+    def _post(url, data=None, files=None, timeout=None):
+        aufrufe.append(("POST", url, data))
+        if url.endswith("/media"):
+            return _IGResp({"id": "container-x"})
+        if url.endswith("/media_publish"):
+            return _IGResp({"id": "media-x"})
+        return _IGResp({})
+
+    def _get(url, params=None, timeout=None):
+        aufrufe.append(("GET", url, params))
+        felder = (params or {}).get("fields", "")
+        if "permalink" in felder:
+            return _IGResp({"permalink": "https://www.instagram.com/p/abc/"})
+        if "status_code" in felder:
+            return _IGResp({"status_code": status})
+        return _IGResp({})
+
+    monkeypatch.setattr(social_publish.httpx, "post", _post)
+    monkeypatch.setattr(social_publish.httpx, "get", _get)
+    monkeypatch.setattr(social_publish.time, "sleep", lambda s: None)
+    return aufrufe
+
+
+def test_medien_token_signatur():
+    from app.services import social_publish
+    tok = social_publish.signiere_medien_token("foto", "abc-123", ttl=60)
+    assert social_publish.pruefe_medien_token(tok) == ("foto", "abc-123")
+    assert social_publish.pruefe_medien_token(tok + "x") is None   # manipuliert
+    assert social_publish.pruefe_medien_token("kaputt") is None
+    abgelaufen = social_publish.signiere_medien_token("foto", "abc-123", ttl=-5)
+    assert social_publish.pruefe_medien_token(abgelaufen) is None
+
+
+def test_oeffentlicher_medien_abruf(auth_client, monkeypatch):
+    """Öffentlicher Endpunkt liefert ein Video per gültigem Token; sonst 404."""
+    from app.services import social_publish
+    _mock_storage(monkeypatch)
+    monkeypatch.setattr("app.api.oeffentlich.storage_service.download_file",
+                        lambda key, db=None: (b"video-bytes", "video/mp4"))
+
+    post = _post_anlegen(auth_client)
+    r = auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                         files={"file": ("clip.mp4", b"x", "video/mp4")})
+    video_id = r.json()["video"]["id"]
+
+    token = social_publish.signiere_medien_token("video", video_id, ttl=60)
+    resp = auth_client.get(f"/api/oeffentlich/postecke/medien/{token}")
+    assert resp.status_code == 200
+    assert resp.content == b"video-bytes"
+
+    assert auth_client.get("/api/oeffentlich/postecke/medien/kaputt").status_code == 404
+    abgelaufen = social_publish.signiere_medien_token("video", video_id, ttl=-5)
+    assert auth_client.get(f"/api/oeffentlich/postecke/medien/{abgelaufen}").status_code == 404
+
+
+def _ig_profil_mit_post(auth_client, **post_kwargs):
+    profil = _profil_anlegen(auth_client, name="Insta", kanal="instagram",
+                             zugang={"ig_user_id": "123", "ig_token": "t"})
+    assert profil["direktanbindung"] is True
+    post = _post_anlegen(auth_client, profil_id=profil["id"], **post_kwargs)
+    auth_client.put(f"/api/postecke/posts/{post['id']}", json={"text": "Hallo Insta"})
+    return post
+
+
+def test_instagram_einzelfoto(auth_client, monkeypatch):
+    _mock_storage(monkeypatch)
+    aufrufe = _mock_ig_httpx(monkeypatch)
+
+    post = _ig_profil_mit_post(auth_client)
+    auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
+                     files=[("files", ("a.jpg", b"jpeg", "image/jpeg"))])
+
+    r = auth_client.post(f"/api/postecke/posts/{post['id']}/veroeffentlichen")
+    assert r.status_code == 200, r.text
+    assert r.json()["extern_url"] == "https://www.instagram.com/p/abc/"
+    container = [u for (m, u, d) in aufrufe if m == "POST" and u.endswith("/media")]
+    assert len(container) == 1  # ein Foto = ein Container
+    publish = [u for (m, u, d) in aufrufe if m == "POST" and u.endswith("/media_publish")]
+    assert len(publish) == 1
+
+
+def test_instagram_carousel(auth_client, monkeypatch):
+    _mock_storage(monkeypatch)
+    aufrufe = _mock_ig_httpx(monkeypatch)
+
+    post = _ig_profil_mit_post(auth_client)
+    for i in range(3):
+        auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
+                         files=[("files", (f"f{i}.jpg", b"jpeg", "image/jpeg"))])
+
+    r = auth_client.post(f"/api/postecke/posts/{post['id']}/veroeffentlichen")
+    assert r.status_code == 200, r.text
+    container = [d for (m, u, d) in aufrufe if m == "POST" and u.endswith("/media")]
+    # 3 Kind-Container + 1 Carousel-Container
+    assert len(container) == 4
+    carousel = [d for d in container if d.get("media_type") == "CAROUSEL"]
+    assert len(carousel) == 1
+    assert carousel[0]["children"].count(",") == 2  # 3 Kinder -> 2 Kommata
+
+
+def test_instagram_reel(auth_client, monkeypatch):
+    _mock_storage(monkeypatch)
+    aufrufe = _mock_ig_httpx(monkeypatch, status="FINISHED")
+
+    post = _ig_profil_mit_post(auth_client)
+    auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                     files={"file": ("clip.mp4", b"x", "video/mp4")})
+
+    r = auth_client.post(f"/api/postecke/posts/{post['id']}/veroeffentlichen")
+    assert r.status_code == 200, r.text
+    container = [d for (m, u, d) in aufrufe if m == "POST" and u.endswith("/media")]
+    assert len(container) == 1 and container[0]["media_type"] == "REELS"
+    assert any("status_code" in (p or {}).get("fields", "")
+               for (m, u, p) in aufrufe if m == "GET")
+
+
+def test_instagram_verbindung_testen(auth_client, monkeypatch):
+    from app.services import social_publish
+    monkeypatch.setattr(social_publish.httpx, "get",
+                        lambda url, params=None, timeout=None: _IGResp({"username": "wwinterface"}))
+    profil = _profil_anlegen(auth_client, name="Insta", kanal="instagram",
+                             zugang={"ig_user_id": "123", "ig_token": "t"})
+    r = auth_client.post(f"/api/postecke/profile/{profil['id']}/verbindung-testen")
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert "wwinterface" in r.json()["message"]

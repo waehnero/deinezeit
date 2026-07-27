@@ -67,11 +67,22 @@ const KANAL_HILFE = {
       + 'öffnet Facebook — den letzten Klick zum Posten machst Du selbst.',
   },
   instagram: {
-    modus: 'Assistiert (Direktanbindung geplant)',
-    intro: 'Eine spätere Direktanbindung setzt ein Instagram-Professionell-Konto '
-      + '(Business oder Creator) voraus, das mit einer Facebook-Seite verknüpft ist. '
-      + 'Aktuell läuft Instagram assistiert: Beitrag vorbereiten, App öffnen, '
-      + 'einfügen, veröffentlichen.',
+    modus: 'Direktanbindung möglich',
+    intro: 'Automatisches Veröffentlichen und Planen. Voraussetzung: ein '
+      + 'Instagram-Professionell-Konto (Business oder Creator), das mit einer '
+      + 'Facebook-Seite verknüpft ist. Du brauchst zwei Angaben: die '
+      + 'Instagram-Konto-ID und einen Access-Token.',
+    schritte: [
+      'Instagram-Konto auf „Professionell" umstellen und in den Facebook-'
+        + 'Seiteneinstellungen mit Deiner Seite verknüpfen.',
+      'Dieselbe Meta-App wie für die Facebook-Seite verwenden; im Graph API '
+        + 'Explorer einen Token mit instagram_basic, instagram_content_publish '
+        + 'und pages_show_list erzeugen.',
+      'Die Konto-ID über „me/accounts?fields=instagram_business_account" abfragen.',
+      'Konto-ID und Access-Token unten im Kasten „Direktanbindung" eintragen, '
+        + 'speichern und „Verbindung testen".',
+    ],
+    fuss: 'Ausführliche Anleitung: INSTAGRAM-ANBINDEN.md im Projektordner.',
   },
 }
 const KANAL_HILFE_ASSISTIERT = {
@@ -193,26 +204,38 @@ function ProfilForm({ profil, onSave, onCancel }) {
   const [stil, setStil] = useState(profil?.stil_prompt || '')
   const [bildFormat, setBildFormat] = useState(profil?.bild_format || 'original')
   const [bildFilter, setBildFilter] = useState(profil?.bild_filter || 'kein')
-  // Direktanbindung Facebook-Seite: Zugangsdaten (werden verschlüsselt gespeichert)
-  const [seiteId, setSeiteId] = useState('')
-  const [seiteToken, setSeiteToken] = useState('')
+  // Direktanbindung: Zugangsdaten (werden verschlüsselt gespeichert)
+  const [seiteId, setSeiteId] = useState('')          // Facebook-Seite: Seiten-ID
+  const [seiteToken, setSeiteToken] = useState('')    // Facebook-Seite: Page-Access-Token
+  const [igUserId, setIgUserId] = useState('')        // Instagram: Konto-ID (ig_user_id)
+  const [igToken, setIgToken] = useState('')          // Instagram: Access-Token
   const [testeVerb, setTesteVerb] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const speichern = async () => {
     if (!name.trim()) { toast.error('Bitte einen Namen angeben'); return }
-    if ((seiteId.trim() && !seiteToken.trim()) || (!seiteId.trim() && seiteToken.trim())) {
-      toast.error('Bitte Seiten-ID UND Token angeben (oder beides leer lassen)')
-      return
+    // Zugang je Kanal zusammenstellen; nur mitschicken, wenn beide Felder gefüllt
+    // (leer = unverändert lassen).
+    let zugang = null
+    if (kanal === 'facebook_seite') {
+      if ((seiteId.trim() && !seiteToken.trim()) || (!seiteId.trim() && seiteToken.trim())) {
+        toast.error('Bitte Seiten-ID UND Token angeben (oder beides leer lassen)'); return
+      }
+      if (seiteId.trim() && seiteToken.trim())
+        zugang = { page_id: seiteId.trim(), page_token: seiteToken.trim() }
+    } else if (kanal === 'instagram') {
+      if ((igUserId.trim() && !igToken.trim()) || (!igUserId.trim() && igToken.trim())) {
+        toast.error('Bitte Konto-ID UND Token angeben (oder beides leer lassen)'); return
+      }
+      if (igUserId.trim() && igToken.trim())
+        zugang = { ig_user_id: igUserId.trim(), ig_token: igToken.trim() }
     }
     setSaving(true)
     try {
       await onSave({
         name: name.trim(), kanal, stil_prompt: stil.trim() || null,
         bild_format: bildFormat, bild_filter: bildFilter,
-        // nur mitschicken, wenn neu eingegeben — sonst bleiben die Daten unverändert
-        zugang: (seiteId.trim() && seiteToken.trim())
-          ? { page_id: seiteId.trim(), page_token: seiteToken.trim() } : null,
+        zugang,
       })
     } finally { setSaving(false) }
   }
@@ -294,6 +317,36 @@ function ProfilForm({ profil, onSave, onCancel }) {
             <p className="text-[11px] text-neutral-500">
               Anleitung: FACEBOOK-SEITE-ANBINDEN.md im Projektordner — Meta-App im
               Entwicklermodus genügt, kein App-Review nötig.
+            </p>
+            {profil?.has_zugang && (
+              <button type="button" onClick={verbindungTesten} disabled={testeVerb}
+                className="text-xs px-3 py-1.5 rounded-lg border border-neutral-200 bg-surface text-neutral-600 hover:border-primary-300 flex items-center gap-1.5">
+                {testeVerb && <Loader2 size={12} className="animate-spin" />} Verbindung testen
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {kanal === 'instagram' && (
+        <div className="rounded-lg border border-primary-100 bg-primary-50/40 p-3 space-y-2">
+          <p className="text-xs font-medium text-neutral-700">
+            Direktanbindung — automatisches Posten &amp; Planen
+            {profil?.has_zugang && (
+              <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">verbunden</span>
+            )}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input value={igUserId} onChange={e => setIgUserId(e.target.value)}
+              placeholder={profil?.has_zugang ? 'Instagram-Konto-ID (leer = unverändert)' : 'Instagram-Konto-ID'}
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-200" />
+            <input value={igToken} onChange={e => setIgToken(e.target.value)} type="password"
+              placeholder={profil?.has_zugang ? 'Access-Token (leer = unverändert)' : 'Access-Token'}
+              className="w-full px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-200" />
+          </div>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-[11px] text-neutral-500">
+              Anleitung: INSTAGRAM-ANBINDEN.md im Projektordner — Professionell-Konto
+              mit einer Facebook-Seite verknüpft, gleiche Meta-App wie bei der FB-Seite.
             </p>
             {profil?.has_zugang && (
               <button type="button" onClick={verbindungTesten} disabled={testeVerb}
