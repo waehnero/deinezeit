@@ -117,6 +117,7 @@ def create_profil(
     daten = body.model_dump()
     zugang = daten.pop("zugang", None)
     p = SocialProfil(owner_user_id=current_user.id, **daten)
+    zugang = {k: v for k, v in (zugang or {}).items() if v}  # leere Felder weglassen
     if zugang:
         p.zugang_enc = social_publish.encrypt_secret(json.dumps(zugang))
     db.add(p)
@@ -137,7 +138,8 @@ def update_profil(
     zugang = daten.pop("zugang", None)
     for key, value in daten.items():
         setattr(p, key, value)
-    if zugang:  # None = unverändert lassen
+    zugang = {k: v for k, v in (zugang or {}).items() if v}  # leere Felder weglassen
+    if zugang:  # leer = unverändert lassen
         p.zugang_enc = social_publish.encrypt_secret(json.dumps(zugang))
     db.commit()
     db.refresh(p)

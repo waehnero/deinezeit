@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import os
 from app.core.config import settings
-from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup
+from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich
 from app.api import settings as settings_api
 from app.services import storage_service
 from app.api.system import record_activity
@@ -87,6 +87,9 @@ app.include_router(mailimport.router, prefix="/api",
 app.include_router(gdpr.router, prefix="/api")
 app.include_router(postecke.router, prefix="/api",
                    dependencies=[_Dep(_rm("postecke"))])
+# Öffentlicher, token-gesicherter Medien-Abruf (für Instagram) — bewusst OHNE
+# Auth-/Modul-Sperre; der signierte Kurzzeit-Token ist die Berechtigung.
+app.include_router(oeffentlich.router, prefix="/api")
 
 
 # ── Aktivitäts-Middleware: letzte Aktivität pro Benutzer tracken ──────────────

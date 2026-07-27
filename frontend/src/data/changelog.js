@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.35',
+    day: '27',
+    month: 'Juli',
+    year: '2026',
+    features: [
+      'Instagram direkt veröffentlichen und planen — Einzel-Foto, Foto-Serie (Carousel) und Reels (Video); Konto im Profil verbinden und testen.',
+    ],
+    updates: [
+      'Einrichtungshilfe und Anleitung für die Instagram-Anbindung (Professionell-Konto, Konto-ID + Access-Token).',
+    ],
+  },
+  {
     version: '1.12.34',
     day: '26',
     month: 'Juli',

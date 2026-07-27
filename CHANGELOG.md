@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.35] – 2026-07-27 – Postecke: Instagram-Direktveröffentlichung
+
+### Neu
+- Instagram direkt veröffentlichen und planen — Einzel-Foto, Foto-Serie (Carousel) und Reels (Video); Konto im Profil verbinden und testen.
+
+### Aktualisierungen
+- Einrichtungshilfe und Anleitung für die Instagram-Anbindung (Professionell-Konto, Konto-ID + Access-Token).
+
+---
+
 ## [1.12.34] – 2026-07-26 – Postecke: Video-Beiträge & Einrichtungshilfe je Kanal
 
 ### Neu
