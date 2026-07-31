@@ -11,7 +11,7 @@ from app.models.user import User, UserRole
 from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
 from app.models.masterdata import EntityRecord, EntityType
 from app.services.ki import load_ki_settings, call_ki
-from app.models.invoice import InvoicePosition
+from app.models.invoice import Invoice, InvoicePosition
 from app.schemas.zeiterfassung import (
     TimeEntryFieldCreate, TimeEntryFieldUpdate, TimeEntryFieldResponse,
     UpdateTimeEntryFieldSortOrders,
@@ -273,9 +273,19 @@ STATUS_LABELS = {
 
 
 def _is_billed(db: Session, entry_id: UUID) -> bool:
-    """True, wenn eine Belegposition auf den Zeiteintrag verweist (abgerechnet)."""
-    return db.query(InvoicePosition).filter(
-        InvoicePosition.time_entry_id == entry_id
+    """
+    True, wenn eine Position eines **gültigen** Belegs auf den Zeiteintrag
+    verweist (abgerechnet).
+
+    Positionen stornierter Belege zählen nicht: Nach dem Storno ist die
+    Leistung wieder offen, der Eintrag darf also erneut bearbeitet und
+    fakturiert werden.
+    """
+    return db.query(InvoicePosition).join(
+        Invoice, Invoice.id == InvoicePosition.invoice_id
+    ).filter(
+        InvoicePosition.time_entry_id == entry_id,
+        Invoice.status != "storniert",
     ).count() > 0
 
 

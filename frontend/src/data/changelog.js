@@ -4,6 +4,23 @@
  */
 export const changelog = [
   {
+    version: '1.12.36',
+    day: '01',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Freigegebene Stunden lassen sich wieder in Belege übernehmen und werden dabei automatisch als abgerechnet markiert',
+      'Nach dem Storno eines Belegs stehen die darauf abgerechneten Stunden erneut zur Verrechnung bereit',
+    ],
+    updates: [
+      'Der Buchhaltungs-Export (BMD) funktioniert wieder und enthält jetzt auch Gutschriften',
+      'Gutschriften werden korrekt als Umsatzminderung übergeben statt als Umsatz',
+      'Der ermäßigte Steuersatz 13 % erhält einen eigenen Steuercode statt bisher 20 %',
+      'Das Verkaufsbuch zeigt den Kundennamen an',
+      'Die in den Einstellungen gewählte PDF-Vorlage wird bei neuen Belegen tatsächlich verwendet',
+    ],
+  },
+  {
     version: '1.12.35',
     day: '27',
     month: 'Juli',

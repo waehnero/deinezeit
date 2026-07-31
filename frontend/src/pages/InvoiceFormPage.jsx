@@ -161,9 +161,20 @@ function TimeEntryPicker({ contactId, onAdd }) {
             {loading ? (
               <div className="flex-1 flex items-center justify-center py-8"><RefreshCw size={20} className="animate-spin text-neutral-400" /></div>
             ) : entries.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-8 text-neutral-400">
+              <div className="flex-1 flex flex-col items-center justify-center py-8 px-6 text-neutral-400">
                 <Clock size={28} className="mb-2 opacity-30" />
                 <p className="text-sm">Keine offenen Zeiteinträge gefunden</p>
+                {/* Erklärt die Auswahlregeln — eine leere Liste ist sonst nicht
+                    von einem Fehler zu unterscheiden. */}
+                <p className="text-xs mt-3 max-w-md text-center leading-relaxed">
+                  Angezeigt werden nur abgeschlossene, verrechenbare Zeiteinträge
+                  mit dem Status <strong className="text-neutral-500">„Freigegeben“</strong>,
+                  die noch auf keinem Beleg stehen.
+                  {contactId && ' Außerdem ist nach dem Kontakt des Belegs gefiltert.'}
+                </p>
+                <p className="text-xs mt-1 text-neutral-300">
+                  Freigeben lassen sich Einträge in der Zeiterfassung über das Status-Symbol.
+                </p>
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto divide-y border rounded-lg">
@@ -215,6 +226,10 @@ export default function InvoiceFormPage() {
   const [outroText, setOutroText] = useState('')
   const [notes, setNotes] = useState('')
   const [taxMode, setTaxMode] = useState('per_position')
+  // PDF-Vorlage: bei neuen Belegen aus den Belegeinstellungen (default_template),
+  // bei bestehenden die am Beleg gespeicherte — vorher war hier fix die 1,
+  // dadurch waren die Vorlagen 2–5 nicht erreichbar.
+  const [templateId, setTemplateId] = useState(1)
   const [positions, setPositions] = useState([{ ...EMPTY_POSITION }])
   const [nextNumber, setNextNumber] = useState('')
   const [saving, setSaving] = useState(false)
@@ -236,6 +251,7 @@ export default function InvoiceFormPage() {
         setOutroText(s['default_outro_' + docType] || '')
         if (s.default_payment_days) setDueDate(addDays(today(), parseInt(s.default_payment_days)))
         if (s.default_tax_rate) setPositions([{ ...EMPTY_POSITION, tax_rate: String(s.default_tax_rate) }])
+        if (s.default_template) setTemplateId(Number(s.default_template) || 1)
       }
     }).catch(() => {})
   }, [docType]) // eslint-disable-line
@@ -260,6 +276,7 @@ export default function InvoiceFormPage() {
       setDate(inv.date); setDueDate(inv.due_date || ''); setReference(inv.reference || '')
       setIntroText(inv.intro_text || ''); setOutroText(inv.outro_text || ''); setNotes(inv.notes || '')
       setTaxMode(inv.tax_mode)
+      setTemplateId(inv.template_id || 1)
       setIsRecurring(!!inv.is_recurring_template)
       if (inv.recurring_interval) setRecurringInterval(inv.recurring_interval)
       if (inv.recurring_next) setRecurringNext(inv.recurring_next)
@@ -292,7 +309,7 @@ export default function InvoiceFormPage() {
         doc_type: docType, contact_id: contactId || null, title: title || null,
         date, due_date: dueDate || null, reference: reference || null,
         intro_text: introText || null, outro_text: outroText || null, notes: notes || null,
-        tax_mode: taxMode, template_id: 1,
+        tax_mode: taxMode, template_id: templateId,
         // Wiederkehrend nur bei Rechnung
         is_recurring_template: docType === 'rechnung' ? isRecurring : false,
         recurring_interval: (docType === 'rechnung' && isRecurring) ? recurringInterval : null,

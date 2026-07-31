@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.36] – 2026-08-01 – Verkauf: Buchhaltung und Zeitabrechnung
+
+### Neu
+- Freigegebene Stunden lassen sich wieder in Belege übernehmen und werden dabei automatisch als abgerechnet markiert
+- Nach dem Storno eines Belegs stehen die darauf abgerechneten Stunden erneut zur Verrechnung bereit
+
+### Aktualisierungen
+- Der Buchhaltungs-Export (BMD) funktioniert wieder und enthält jetzt auch Gutschriften
+- Gutschriften werden korrekt als Umsatzminderung übergeben statt als Umsatz
+- Der ermäßigte Steuersatz 13 % erhält einen eigenen Steuercode statt bisher 20 %
+- Das Verkaufsbuch zeigt den Kundennamen an
+- Die in den Einstellungen gewählte PDF-Vorlage wird bei neuen Belegen tatsächlich verwendet
+
+---
+
 ## [1.12.35] – 2026-07-27 – Postecke: Instagram-Direktveröffentlichung
 
 ### Neu
