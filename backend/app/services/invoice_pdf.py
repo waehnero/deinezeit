@@ -184,12 +184,47 @@ def _fmt_amount(n, currency: str = "EUR") -> str:
         return "—"
 
 
-def _tax_breakdown(positions, tax_mode: str) -> list[dict]:
-    """Berechnet MwSt.-Aufschlüsselung nach Steuersatz."""
+def _leistungszeile(invoice, fmt) -> tuple:
+    """
+    Beschriftung und Wert für die Liefer-/Leistungsangabe auf dem Beleg.
+
+    Ist ein Bis-Datum gesetzt, wird daraus ein Leistungszeitraum. Fehlt das
+    Leistungsdatum ganz (Altbestand — das Feld war früher über kein Eingabe-
+    feld erreichbar), tritt ersatzweise das Belegdatum ein, damit die
+    Pflichtangabe nach § 11 Abs. 1 Z 4 UStG nicht einfach fehlt.
+    """
+    von = getattr(invoice, "delivery_date", None) or invoice.date
+    bis = getattr(invoice, "delivery_date_to", None)
+    if bis and bis != von:
+        return ("Leistungszeitraum", f"{fmt(von)} – {fmt(bis)}")
+    return ("Leistungsdatum", fmt(von))
+
+
+def _tax_breakdown(positions, tax_mode: str, tax_total=None) -> list[dict]:
+    """
+    MwSt.-Aufschlüsselung nach Steuersatz.
+
+    Zwei Dinge sind hier wichtig:
+
+    1. **Textzeilen zählen nicht mit.** Eine Textzeile hat keinen Steuersatz
+       und landete früher im Sammeltopf „Reverse Charge" — auf dem Beleg
+       erschien dadurch eine erfundene RC-Zeile samt Reverse-Charge-Hinweis.
+
+    2. **Die Summe der Zeilen ergibt exakt ``tax_total``.** Der Beleg zeigt
+       Nettosumme und Gesamtsumme aus den gespeicherten Feldern. Würde die
+       Aufschlüsselung unabhängig davon gerechnet, ergäbe Netto + MwSt. auf
+       Altbelegen (die je Position gerundet wurden) nicht die Gesamtsumme.
+       Eine Restdifferenz von wenigen Cent wird deshalb der größten Steuerzeile
+       zugeschlagen. Ausgestellte Belege behalten so ihren Betrag und bleiben
+       trotzdem in sich stimmig.
+    """
     if tax_mode == "kleinunternehmer":
         return []
+
     buckets: dict[str, Decimal] = {}
     for p in positions:
+        if getattr(p, "pos_type", "item") == "text":
+            continue
         rate = p.tax_rate
         if rate is None:
             key = "RC"
@@ -197,6 +232,7 @@ def _tax_breakdown(positions, tax_mode: str) -> list[dict]:
             key = str(int(rate)) if rate == int(rate) else str(rate)
         net = p.line_total or Decimal("0")
         buckets[key] = buckets.get(key, Decimal("0")) + net
+
     result = []
     for rate_key, net in sorted(buckets.items()):
         if rate_key == "RC":
@@ -207,6 +243,15 @@ def _tax_breakdown(positions, tax_mode: str) -> list[dict]:
             tax = (net * pct / 100).quantize(Decimal("0.01"))
             label = f"MwSt. {rate_key} %"
         result.append({"label": label, "net": net, "tax": tax})
+
+    # Restdifferenz zur gespeicherten Steuersumme ausgleichen
+    if tax_total is not None and result:
+        summe = sum((z["tax"] for z in result), Decimal("0"))
+        differenz = Decimal(str(tax_total)) - summe
+        if differenz:
+            groesste = max(result, key=lambda z: abs(z["tax"]))
+            groesste["tax"] += differenz
+
     return result
 
 
@@ -331,7 +376,7 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     watermark  = STATUS_WATERMARKS.get(invoice.status, "")
 
     tax_mode   = invoice.tax_mode
-    breakdown  = _tax_breakdown(positions, tax_mode)
+    breakdown  = _tax_breakdown(positions, tax_mode, invoice.tax_total)
     pos_html   = _positions_html(positions, tax_mode)
 
     # Fußzeile (alle Vorlagen): Bankverbindung, UID, Firmenbuch, Gericht etc.
@@ -380,7 +425,8 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     if invoice.number:     meta_rows.append(("Nummer",        invoice.number))
     if invoice.date:       meta_rows.append(("Datum",         _fmt_date(invoice.date)))
     if invoice.due_date:   meta_rows.append(("Zahlungsziel",  _fmt_date(invoice.due_date)))
-    if invoice.delivery_date: meta_rows.append(("Lieferdatum", _fmt_date(invoice.delivery_date)))
+    if invoice.delivery_date:
+        meta_rows.append(_leistungszeile(invoice, _fmt_date))
     if invoice.reference:  meta_rows.append(("Referenz",      invoice.reference))
 
     meta_html = "".join(
@@ -475,7 +521,8 @@ def _t1(**kw) -> str:
         rc_uid = (rc.data or {}).get("uid", "")
         if rc_uid:
             meta_rows.append(("USt.-ID:", rc_uid))
-    meta_rows.append(("Leistungsdatum:", _fmt_date_long(getattr(invoice, "delivery_date", None) or invoice.date)))
+    _label, _wert = _leistungszeile(invoice, _fmt_date_long)
+    meta_rows.append((_label + ":", _wert))
     if getattr(invoice, "due_date", None):
         meta_rows.append(("Zahlungsziel:", _fmt_date_long(invoice.due_date)))
     meta_html = "".join(

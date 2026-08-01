@@ -60,6 +60,10 @@ def _create_child(db, tpl, doc_date: date):
         contact_id=tpl.contact_id, project_id=tpl.project_id,
         title=tpl.title, date=doc_date,
         reference=tpl.reference,
+        # Leistungsdatum: der Termin dieser Serienrechnung. Die Vorlage trägt
+        # ein altes Datum, das hier nichts zu suchen hat — das Leistungsdatum
+        # ist Pflichtangabe und muss zum erzeugten Beleg passen.
+        delivery_date=doc_date,
         intro_text=tpl.intro_text, outro_text=tpl.outro_text, notes=tpl.notes,
         tax_mode=tpl.tax_mode, currency=tpl.currency, template_id=tpl.template_id,
         status="entwurf",

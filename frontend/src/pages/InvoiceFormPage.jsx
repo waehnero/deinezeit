@@ -230,6 +230,13 @@ export default function InvoiceFormPage() {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(today())
   const [dueDate, setDueDate] = useState(addDays(today(), 30))
+  // Liefer-/Leistungsdatum (Pflicht bei Rechnung und Gutschrift, § 11 UStG).
+  // Mit Bis-Datum wird daraus ein Leistungszeitraum.
+  const [deliveryDate, setDeliveryDate] = useState(today())
+  const [deliveryDateTo, setDeliveryDateTo] = useState('')
+  const [istZeitraum, setIstZeitraum] = useState(false)
+  // Gepflegte Steuersätze aus den Verkaufseinstellungen
+  const [taxRates, setTaxRates] = useState([])
   const [reference, setReference] = useState('')
   const [introText, setIntroText] = useState('')
   const [outroText, setOutroText] = useState('')
@@ -255,11 +262,16 @@ export default function InvoiceFormPage() {
   useEffect(() => {
     invoiceApi.getSettings().then(res => {
       const s = res.data
+      if (Array.isArray(s.tax_rates)) setTaxRates(s.tax_rates.filter(t => t.aktiv))
       if (isNew) {
         setIntroText(s['default_intro_' + docType] || '')
         setOutroText(s['default_outro_' + docType] || '')
         if (s.default_payment_days) setDueDate(addDays(today(), parseInt(s.default_payment_days)))
-        if (s.default_tax_rate) setPositions([{ ...EMPTY_POSITION, tax_rate: String(s.default_tax_rate) }])
+        // Vorbelegter Steuersatz: bevorzugt der als Standard markierte Satz
+        // aus der gepflegten Liste, sonst der alte Einzelwert.
+        const standard = (s.tax_rates || []).find(t => t.standard && t.aktiv)
+        const satz = standard ? standard.satz : s.default_tax_rate
+        if (satz != null) setPositions([{ ...EMPTY_POSITION, tax_rate: String(satz) }])
         if (s.default_template) setTemplateId(Number(s.default_template) || 1)
       }
     }).catch(() => {})
@@ -287,6 +299,9 @@ export default function InvoiceFormPage() {
           .catch(() => {})
       }
       setDate(inv.date); setDueDate(inv.due_date || ''); setReference(inv.reference || '')
+      setDeliveryDate(inv.delivery_date || inv.date)
+      setDeliveryDateTo(inv.delivery_date_to || '')
+      setIstZeitraum(!!inv.delivery_date_to)
       setIntroText(inv.intro_text || ''); setOutroText(inv.outro_text || ''); setNotes(inv.notes || '')
       setTaxMode(inv.tax_mode)
       setTemplateId(inv.template_id || 1)
@@ -325,6 +340,8 @@ export default function InvoiceFormPage() {
         doc_type: docType, contact_id: contactId || null, title: title || null,
         project_id: projectId || null, currency,
         date, due_date: dueDate || null, reference: reference || null,
+        delivery_date: deliveryDate || null,
+        delivery_date_to: (istZeitraum && deliveryDateTo) ? deliveryDateTo : null,
         intro_text: introText || null, outro_text: outroText || null, notes: notes || null,
         tax_mode: taxMode, template_id: templateId,
         // Wiederkehrend nur bei Rechnung
@@ -488,6 +505,32 @@ export default function InvoiceFormPage() {
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
               </div>
             )}
+            {/* Pflichtangabe nach § 11 Abs. 1 Z 4 UStG — wird beim Ausstellen
+                verlangt, am Entwurf noch nicht. */}
+            <div className={istZeitraum ? 'md:col-span-2' : ''}>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-neutral-700">
+                  {istZeitraum ? 'Leistungszeitraum' : 'Liefer-/Leistungsdatum'}
+                  {['rechnung', 'gutschrift'].includes(docType) && <span className="text-red-500"> *</span>}
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-neutral-500 cursor-pointer">
+                  <input type="checkbox" checked={istZeitraum} className="w-3.5 h-3.5 rounded"
+                    onChange={e => {
+                      setIstZeitraum(e.target.checked)
+                      if (e.target.checked && !deliveryDateTo) setDeliveryDateTo(deliveryDate || date)
+                    }} />
+                  Zeitraum
+                </label>
+              </div>
+              <div className={istZeitraum ? 'grid grid-cols-2 gap-2' : ''}>
+                <input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+                {istZeitraum && (
+                  <input type="date" value={deliveryDateTo} onChange={e => setDeliveryDateTo(e.target.value)}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+                )}
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Referenz</label>
               <input value={reference} onChange={e => setReference(e.target.value)} placeholder="optional" className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
@@ -580,7 +623,7 @@ export default function InvoiceFormPage() {
           <div className="mb-3"><ArticleSearch onSelect={art => addPosition(art)} /></div>
           <div className="space-y-2">
             {positions.map((pos, i) => (
-              <PositionRow key={i} pos={pos} index={i} taxMode={taxMode}
+              <PositionRow key={i} pos={pos} index={i} taxMode={taxMode} taxRates={taxRates}
                 onChange={(field, val) => updatePosition(i, field, val)} onRemove={() => removePosition(i)} />
             ))}
           </div>
@@ -684,7 +727,7 @@ function AuditPanel({ invoiceId }) {
   )
 }
 
-function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
+function PositionRow({ pos, index, taxMode, taxRates = [], onChange, onRemove }) {
   const lineTotal = calcLine(pos)
   return (
     <div className="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
@@ -707,10 +750,20 @@ function PositionRow({ pos, index, taxMode, onChange, onRemove }) {
         </div>
         {taxMode !== 'kleinunternehmer' && (
           <div className="col-span-1 md:col-span-1">
+            {/* Sätze kommen aus den Verkaufseinstellungen — früher fest
+                verdrahtet, dadurch war z.B. 13 % gar nicht erfassbar. */}
             <select value={pos.tax_rate} onChange={e => onChange('tax_rate', e.target.value)}
               className="w-full border border-neutral-200 rounded px-1 py-1.5 text-sm bg-surface">
-              <option value="20">20%</option><option value="10">10%</option>
-              <option value="0">0%</option><option value="">RC</option>
+              {taxRates.map(t => (
+                <option key={t.satz} value={String(t.satz)} title={t.bezeichnung}>{t.satz}%</option>
+              ))}
+              {/* Ein am Beleg gespeicherter Satz, der nicht mehr gepflegt ist,
+                  darf nicht stillschweigend verschwinden. */}
+              {pos.tax_rate !== '' && pos.tax_rate != null
+                && !taxRates.some(t => String(t.satz) === String(pos.tax_rate)) && (
+                <option value={String(pos.tax_rate)}>{pos.tax_rate}%</option>
+              )}
+              <option value="">RC</option>
             </select>
           </div>
         )}

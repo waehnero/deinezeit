@@ -1711,6 +1711,9 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
   // wirksamen Auslöser kommen vom Backend (auch wenn noch nichts gespeichert
   // ist). Ein Vorgabewert hier würde den echten beim Speichern überschreiben.
   const [archiveTriggers, setArchiveTriggers] = useState([])
+  // Steuersätze — ebenfalls ohne eigenen Vorgabewert, die wirksamen Sätze
+  // liefert das Backend mit (services/tax_rates.py).
+  const [taxRates, setTaxRates] = useState([])
 
   // Bankfelder aus Kontakt-Daten erkennen (sucht nach IBAN/BIC/Bank in allen Feldern)
   function extractBankFromContact(data) {
@@ -1745,6 +1748,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
       setPaymentDays(s.default_payment_days || 30)
       setKleinunternehmerText(typeof s.kleinunternehmer_text === 'string' ? s.kleinunternehmer_text.replace(/^"|"$/g, '') : '')
       if (Array.isArray(s.archive_triggers)) setArchiveTriggers(s.archive_triggers)
+      if (Array.isArray(s.tax_rates)) setTaxRates(s.tax_rates)
       const contact = contactRes.data?.contact
       if (contact?.data) {
         const fc = extractBankFromContact(contact.data)
@@ -1766,6 +1770,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         invoiceApi.updateSetting('default_payment_days', Number(paymentDays)),
         invoiceApi.updateSetting('kleinunternehmer_text', kleinunternehmerText),
         invoiceApi.updateSetting('archive_triggers', archiveTriggers),
+        invoiceApi.updateSetting('tax_rates', taxRates),
         showCustomEditor && invoiceApi.updateSetting('custom_template_css', customCss),
       ].filter(Boolean))
       toast.success('Verkaufseinstellungen gespeichert')
@@ -1832,6 +1837,59 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
           ))}
         </div>
       </div>
+      <hr className="border-gray-100" />
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Steuersätze</h3>
+        <p className="text-xs text-neutral-500 mb-4">
+          Diese Sätze stehen im Belegformular zur Auswahl. Der USt-Code wandert in den
+          Buchhaltungs-Export — welche Codes gelten, sagt dir deine Steuerberatung.
+          Reverse Charge ist kein Satz und steht im Formular immer zur Verfügung.
+        </p>
+        <div className="space-y-2">
+          <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-xs font-medium text-neutral-500">
+            <span className="col-span-2">Satz %</span>
+            <span className="col-span-4">Bezeichnung</span>
+            <span className="col-span-2">USt-Code</span>
+            <span className="col-span-2">Aktiv</span>
+            <span className="col-span-2">Standard</span>
+          </div>
+          {taxRates.map((t, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-center">
+              <input type="number" step="0.1" value={t.satz}
+                onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, satz: Number(e.target.value) } : x))}
+                className="col-span-2 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+              <input value={t.bezeichnung || ''}
+                onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, bezeichnung: e.target.value } : x))}
+                className="col-span-4 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm" />
+              <input value={t.ust_code || ''}
+                onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, ust_code: e.target.value } : x))}
+                className="col-span-2 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm font-mono" />
+              <label className="col-span-2 flex items-center gap-1.5 text-xs text-neutral-600">
+                <input type="checkbox" checked={!!t.aktiv} className="w-4 h-4 rounded"
+                  onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, aktiv: e.target.checked } : x))} />
+                wählbar
+              </label>
+              <div className="col-span-2 flex items-center justify-between gap-1">
+                <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                  {/* Nur ein Standardsatz — er belegt neue Positionen vor. */}
+                  <input type="radio" name="standardsatz" checked={!!t.standard} className="w-4 h-4"
+                    onChange={() => setTaxRates(l => l.map((x, j) => ({ ...x, standard: j === i })))} />
+                  Standard
+                </label>
+                <button type="button" title="Satz entfernen"
+                  onClick={() => setTaxRates(l => l.filter((_, j) => j !== i))}
+                  className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button type="button"
+          onClick={() => setTaxRates(l => [...l, { satz: 0, bezeichnung: '', ust_code: '', aktiv: true, standard: false }])}
+          className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:underline">
+          <Plus size={14} /> Steuersatz hinzufügen
+        </button>
+      </div>
+
       <hr className="border-gray-100" />
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">PDF-Vorlage</h3>

@@ -42,7 +42,12 @@ class Invoice(Base):
     title = Column(String(300), nullable=True)
     date = Column(Date, nullable=False)
     due_date = Column(Date, nullable=True)
+    # Liefer-/Leistungsdatum (Pflichtangabe § 11 Abs. 1 Z 4 UStG). Ist
+    # delivery_date_to gesetzt, handelt es sich um einen Leistungszeitraum
+    # von delivery_date bis delivery_date_to — nötig für Zeitabrechnung
+    # und Wartungsverträge.
     delivery_date = Column(Date, nullable=True)
+    delivery_date_to = Column(Date, nullable=True)
     reference = Column(String(200), nullable=True)
     intro_text = Column(Text, nullable=True)
     outro_text = Column(Text, nullable=True)

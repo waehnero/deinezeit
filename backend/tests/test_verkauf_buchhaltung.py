@@ -42,6 +42,8 @@ def _create_invoice(client, contact_id=None, doc_type="rechnung", **extra):
         "contact_id": str(contact_id) if contact_id else None,
         "title": extra.pop("title", "Projekt Juli"),
         "date": extra.pop("date", "2026-07-06"),
+        # Pflichtangabe seit 0043 — ohne sie schlägt das Finalisieren fehl
+        "delivery_date": extra.pop("delivery_date", "2026-07-06"),
         "positions": extra.pop("positions", [{
             "pos_type": "item", "description": "Beratung",
             "quantity": "2", "unit_price": "100", "tax_rate": "20",

@@ -72,6 +72,7 @@ class InvoiceCreate(BaseModel):
     date: date
     due_date: Optional[date] = None
     delivery_date: Optional[date] = None
+    delivery_date_to: Optional[date] = None
     reference: Optional[str] = None
     intro_text: Optional[str] = None
     outro_text: Optional[str] = None
@@ -102,6 +103,7 @@ class InvoiceUpdate(BaseModel):
     date: date
     due_date: Optional[date] = None
     delivery_date: Optional[date] = None
+    delivery_date_to: Optional[date] = None
     reference: Optional[str] = None
     intro_text: Optional[str] = None
     outro_text: Optional[str] = None
@@ -131,6 +133,7 @@ class InvoiceResponse(BaseModel):
     date: date
     due_date: Optional[date] = None
     delivery_date: Optional[date] = None
+    delivery_date_to: Optional[date] = None
     reference: Optional[str] = None
     intro_text: Optional[str] = None
     outro_text: Optional[str] = None

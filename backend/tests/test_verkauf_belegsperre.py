@@ -46,6 +46,8 @@ def _create_invoice(client, contact_id=None, doc_type="rechnung", **extra):
         "contact_id": str(contact_id) if contact_id else None,
         "title": extra.pop("title", "Projekt Juli"),
         "date": extra.pop("date", "2026-07-06"),
+        # Pflichtangabe seit 0043 — ohne sie schlägt das Finalisieren fehl
+        "delivery_date": extra.pop("delivery_date", "2026-07-06"),
         "positions": extra.pop("positions", [dict(STANDARD_POSITION)]),
     }
     payload.update(extra)
@@ -80,6 +82,7 @@ def _put(client, invoice_id, **felder):
         "contact_id": felder.pop("contact_id", None),
         "title": felder.pop("title", "Projekt Juli"),
         "date": felder.pop("date", "2026-07-06"),
+        "delivery_date": felder.pop("delivery_date", "2026-07-06"),
         "positions": felder.pop("positions", [dict(STANDARD_POSITION)]),
     }
     body.update(felder)
@@ -256,6 +259,8 @@ def test_unveraenderte_uebermittlung_ist_keine_aenderung(auth_client, db_session
         "contact_id": aktuell["contact_id"],
         "title": aktuell["title"],
         "date": aktuell["date"],
+        "delivery_date": aktuell["delivery_date"],
+        "delivery_date_to": aktuell["delivery_date_to"],
         "tax_mode": aktuell["tax_mode"],
         "currency": aktuell["currency"],
         "template_id": aktuell["template_id"],
