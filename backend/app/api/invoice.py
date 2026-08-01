@@ -12,7 +12,8 @@ from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
-                                 InvoiceNumberSequence, InvoiceSettings)
+                                 InvoiceNumberSequence, InvoiceSettings,
+                                 InvoiceAuditLog)
 from app.models.settings import Setting
 from app.models.email_template import EmailTemplate
 from app.models.masterdata import EntityRecord
@@ -25,7 +26,7 @@ from app.schemas.invoice import (
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
     InvoiceBookFilter, InvoiceSettingsUpdate, NextNumberResponse,
     InvoicePositionResponse, InvoiceAttachmentResponse,
-    InvoiceDuplicateRequest,
+    InvoiceDuplicateRequest, InvoiceAuditEntry,
 )
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
@@ -124,6 +125,149 @@ def _sync_time_entry_status(db: Session, invoice: Invoice) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Nummernvergabe, Änderungsprotokoll und Belegsperre
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _ensure_number(db: Session, invoice: Invoice) -> bool:
+    """
+    Vergibt die Belegnummer, sobald der Beleg den Entwurf verlässt.
+
+    Entwürfe bleiben nummernlos — sonst hinterlässt jeder verworfene Entwurf
+    eine Lücke im Nummernkreis (§ 11 Abs. 1 Z 3 UStG / § 131 BAO). Gibt True
+    zurück, wenn eine Nummer neu vergeben wurde. Kein Commit.
+    """
+    if invoice.number:
+        return False
+    jahr = (invoice.date or datetime.now().date()).year
+    sequence, number = _next_number(db, invoice.doc_type, jahr)
+    invoice.year = jahr
+    invoice.sequence = sequence
+    invoice.number = number
+    return True
+
+
+def _audit(db: Session, invoice: Invoice, action: str, *,
+           changes: dict = None, note: str = None, user_email: str = None) -> None:
+    """Schreibt einen Eintrag ins Änderungsprotokoll. Kein Commit."""
+    db.add(InvoiceAuditLog(
+        invoice_id=invoice.id,
+        action=action,
+        changes=changes or None,
+        note=note,
+        changed_by=user_email,
+    ))
+
+
+def _finalize(db: Session, invoice: Invoice) -> bool:
+    """
+    Sammelvorgang für „Beleg verlässt den Entwurf".
+
+    Nummer vergeben, Empfängerdaten einfrieren, Zeiteinträge nachziehen — in
+    dieser Reihenfolge, damit die Nummer feststeht, bevor das Archiv-PDF
+    erzeugt wird. Gibt True zurück, wenn eine Nummer neu vergeben wurde.
+    Den Protokolleintrag schreibt der Aufrufer, weil nur er den Anlass kennt.
+    Kein Commit.
+    """
+    neue_nummer = _ensure_number(db, invoice)
+    ensure_recipient_snapshot(db, invoice)
+    _sync_time_entry_status(db, invoice)
+    return neue_nummer
+
+
+def _audit_changes(alter_status: str, invoice: Invoice, neue_nummer: bool) -> dict:
+    """Baut das Änderungs-Dict für einen Statuswechsel."""
+    changes = {"status": {"alt": alter_status, "neu": invoice.status}}
+    if neue_nummer:
+        changes["number"] = {"alt": None, "neu": invoice.number}
+    return changes
+
+
+# Felder, die nach dem Finalisieren nicht mehr geändert werden dürfen.
+# Maßstab: Alles, was auf dem Beleg gedruckt wird oder die Buchung bestimmt.
+# Das PDF wird bei jedem Abruf neu erzeugt — eine Änderung an diesen Feldern
+# würde den bereits versendeten Beleg rückwirkend verändern.
+GESPERRTE_FELDER = {
+    "date":          "Belegdatum",
+    "due_date":      "Zahlungsziel",
+    "delivery_date": "Liefer-/Leistungsdatum",
+    "contact_id":    "Empfänger",
+    "title":         "Titel / Betreff",
+    "reference":     "Referenz",
+    "intro_text":    "Einleitungstext",
+    "outro_text":    "Schlusstext",
+    "tax_mode":      "MwSt.-Modus",
+    "currency":      "Währung",
+    "template_id":   "PDF-Vorlage",
+}
+# Weiterhin änderbar, weil nicht Bestandteil des gedruckten Belegs:
+#   notes (interne Notiz), project_id (Zuordnung), Anhänge und Verträge.
+
+
+def _positions_fingerprint(positions) -> list:
+    """
+    Vergleichbare Darstellung der Positionen inklusive Reihenfolge.
+
+    Zahlen laufen über Decimal.normalize(), damit "2" und "2.0000" als gleich
+    gelten — sonst meldet die Sperre eine Änderung, wo keine ist.
+    """
+    from decimal import Decimal as _D
+
+    def zahl(v):
+        return None if v is None else str(_D(str(v)).normalize())
+
+    def text(v):
+        return None if v is None else str(v)
+
+    return [
+        (
+            i, text(p.pos_type), text(p.description), text(p.detail),
+            zahl(p.quantity), text(p.unit), zahl(p.unit_price),
+            zahl(p.discount_pct), zahl(p.tax_rate),
+            text(p.account_nr), text(p.article_id), text(p.time_entry_id),
+        )
+        for i, p in enumerate(positions)
+    ]
+
+
+def _pruefe_belegsperre(inv: Invoice, body) -> dict:
+    """
+    Prüft eine Änderung an einem finalisierten Beleg.
+
+    Gibt die erlaubten Änderungen als Protokoll-Dict zurück oder wirft 400 mit
+    Klartext, welche Felder gesperrt sind. Korrekturen laufen über Storno und
+    Neuausstellung — so halten es sevDesk, lexware, BMD und myfactory auch.
+    """
+    verletzt = []
+    for feld, label in GESPERRTE_FELDER.items():
+        alt = getattr(inv, feld, None)
+        neu = getattr(body, feld, None)
+        if (alt or None) != (neu or None):
+            verletzt.append(label)
+
+    if _positions_fingerprint(inv.positions) != _positions_fingerprint(body.positions):
+        verletzt.append("Positionen")
+
+    if verletzt:
+        raise HTTPException(
+            400,
+            f"Der Beleg ist finalisiert — {', '.join(verletzt)} "
+            f"{'sind' if len(verletzt) > 1 else 'ist'} nicht mehr änderbar. "
+            "Für eine inhaltliche Korrektur den Beleg stornieren und neu "
+            "ausstellen. Änderbar bleiben die interne Notiz und die "
+            "Projektzuordnung.",
+        )
+
+    # Erlaubte Änderungen fürs Protokoll festhalten
+    aenderungen = {}
+    for feld in ("notes", "project_id"):
+        alt, neu = getattr(inv, feld, None), getattr(body, feld, None)
+        if (alt or None) != (neu or None):
+            aenderungen[feld] = {"alt": str(alt) if alt else None,
+                                 "neu": str(neu) if neu else None}
+    return aenderungen
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CRUD
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -210,13 +354,9 @@ async def create_invoice(
     if body.doc_type not in TYPE_PREFIX:
         raise HTTPException(400, f"Ungültiger doc_type: {body.doc_type}")
 
-    year = body.date.year
-    sequence, number = _next_number(db, body.doc_type, year)
-
+    # Bewusst OHNE Nummer: Der Beleg entsteht als Entwurf, die Nummer fällt
+    # erst beim Finalisieren (siehe _ensure_number).
     data = body.model_dump(exclude={"positions"})
-    data["year"] = year
-    data["sequence"] = sequence
-    data["number"] = number
     data["created_by"] = current_user.email
     data["updated_by"] = current_user.email
 
@@ -330,13 +470,23 @@ async def update_number_sequence(
             setting = InvoiceSettings(key=fmt_key, value=body["format"])
             db.add(setting)
 
-    # Zählerstand setzen
+    # Zählerstand setzen — nur aufwärts.
+    # Ein Zurücksetzen würde eine bereits vergebene Nummer ein zweites Mal
+    # erzeugen; der UNIQUE-Index auf invoices.number bricht dann mit einem
+    # unverständlichen Serverfehler ab.
     if "last_sequence" in body:
         new_seq = int(body["last_sequence"])
         if new_seq < 0:
             raise HTTPException(400, "Zählerstand darf nicht negativ sein")
         seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
         if seq:
+            if new_seq < seq.last_sequence:
+                raise HTTPException(
+                    400,
+                    f"Der Zählerstand kann nur erhöht werden (aktuell "
+                    f"{seq.last_sequence}). Ein Zurücksetzen würde eine bereits "
+                    f"vergebene Belegnummer erneut erzeugen.",
+                )
             seq.last_sequence = new_seq
         else:
             seq = InvoiceNumberSequence(doc_type=doc_type, year=y, last_sequence=new_seq)
@@ -370,7 +520,13 @@ async def get_invoice_settings(
     _: User = Depends(get_current_user),
 ):
     """Gibt alle Belegeinstellungen als Dict {key: value} zurück."""
-    return {r.key: r.value for r in db.query(InvoiceSettings).all()}
+    werte = {r.key: r.value for r in db.query(InvoiceSettings).all()}
+    # Die WIRKSAMEN Archiv-Auslöser mitliefern, auch wenn nichts gespeichert
+    # ist. Sonst müsste die Oberfläche einen eigenen Vorgabewert vorhalten —
+    # und würde ihn beim nächsten Speichern über den echten schreiben.
+    from app.services.invoice_archive import get_archive_triggers
+    werte.setdefault("archive_triggers", get_archive_triggers(db))
+    return werte
 
 
 @router.put("/settings/{key}")
@@ -672,6 +828,26 @@ async def get_invoice(
     return inv
 
 
+@router.get("/{invoice_id}/audit", response_model=List[InvoiceAuditEntry])
+async def get_invoice_audit(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Änderungsprotokoll eines Belegs, neueste Änderung zuerst.
+
+    Protokolliert wird ab dem Finalisieren — am Entwurf wird laufend
+    gearbeitet, das wäre nur Rauschen.
+    """
+    if not db.query(Invoice.id).filter(Invoice.id == invoice_id).first():
+        raise HTTPException(404, "Beleg nicht gefunden")
+    return (db.query(InvoiceAuditLog)
+            .filter(InvoiceAuditLog.invoice_id == invoice_id)
+            .order_by(InvoiceAuditLog.changed_at.desc())
+            .all())
+
+
 @router.get("/{invoice_id}/pdf")
 async def download_invoice_pdf(
     invoice_id: UUID,
@@ -724,23 +900,34 @@ async def update_invoice(
 ):
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
-        raise HTTPException(404, "Rechnung nicht gefunden")
+        raise HTTPException(404, "Beleg nicht gefunden")
     if inv.status == "storniert":
-        raise HTTPException(400, "Stornierte Rechnungen können nicht bearbeitet werden")
+        raise HTTPException(400, "Stornierte Belege können nicht bearbeitet werden")
 
-    old_contact_id = inv.contact_id
+    # ── Finalisierter Beleg: nur noch Nicht-Gedrucktes änderbar ──────────────
+    if inv.status != "entwurf":
+        erlaubte_aenderungen = _pruefe_belegsperre(inv, body)   # wirft 400 bei Verstoß
+
+        inv.notes = body.notes
+        inv.project_id = body.project_id
+        inv.updated_by = current_user.email
+        # Altbestand ohne Snapshot nachziehen (Empfänger ist gesperrt, ein
+        # force-Neuaufbau kommt daher nicht mehr vor)
+        ensure_recipient_snapshot(db, inv)
+
+        if erlaubte_aenderungen:
+            _audit(db, inv, "bearbeitet", changes=erlaubte_aenderungen,
+                   user_email=current_user.email)
+
+        db.commit()
+        db.refresh(inv)
+        return inv
+
+    # ── Entwurf: frei bearbeitbar ────────────────────────────────────────────
     update_data = body.model_dump(exclude={"positions"})
     for k, v in update_data.items():
         setattr(inv, k, v)
     inv.updated_by = current_user.email
-
-    # Finalisierter Beleg: Kontakt getauscht → Snapshot neu einfrieren;
-    # fehlender Snapshot (Altbestand) → nachziehen
-    if inv.status != "entwurf":
-        ensure_recipient_snapshot(db, inv, force=(inv.contact_id != old_contact_id))
-
-    # Zeiteinträge, die VOR der Änderung am Beleg hingen
-    alte_zeit_ids = _time_entry_ids(inv)
 
     # Positionen ersetzen
     db.query(InvoicePosition).filter(InvoicePosition.invoice_id == invoice_id).delete()
@@ -752,17 +939,8 @@ async def update_invoice(
     db.flush()
     db.refresh(inv)
     _calc_totals(inv)
-
-    # Zeiteinträge nachziehen. Beim Bearbeiten eines bereits finalisierten
-    # Belegs geschah das bisher gar nicht: Nachträglich übernommene Stunden
-    # blieben "freigegeben" und wären im Übernahme-Dialog erneut angeboten
-    # worden — also doppelt verrechenbar.
-    if inv.status != "entwurf":
-        # entfernte Zeitpositionen wieder freigeben …
-        _set_time_entry_status(db, alte_zeit_ids - _time_entry_ids(inv), "freigegeben")
-    # … verbliebene und neue auf den Belegstatus ziehen
-    _sync_time_entry_status(db, inv)
-
+    # Zeiteinträge bleiben am Entwurf bewusst unangetastet — sie werden erst
+    # beim Finalisieren auf 'abgerechnet' gezogen (_sync_time_entry_status).
     db.commit()
     db.refresh(inv)
     return inv
@@ -776,9 +954,16 @@ async def delete_invoice(
 ):
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
-        raise HTTPException(404, "Rechnung nicht gefunden")
-    if inv.status not in ("entwurf", "storniert"):
-        raise HTTPException(400, "Nur Entwürfe oder stornierte Dokumente können gelöscht werden")
+        raise HTTPException(404, "Beleg nicht gefunden")
+    # Nur Entwürfe. Ein stornierter Beleg wurde ausgestellt und unterliegt der
+    # Aufbewahrungspflicht (§ 132 BAO) — er bleibt erhalten. Entwürfe haben
+    # keine Nummer, ihr Löschen reißt daher auch keine Lücke mehr.
+    if inv.status != "entwurf":
+        raise HTTPException(
+            400,
+            "Nur Entwürfe können gelöscht werden. Ausgestellte Belege — auch "
+            "stornierte — unterliegen der Aufbewahrungspflicht.",
+        )
     db.delete(inv)
     db.commit()
 
@@ -801,12 +986,24 @@ async def cancel_invoice(
         raise HTTPException(400, "Bereits storniert")
     if inv.doc_type != "rechnung":
         raise HTTPException(400, "Nur Rechnungen können storniert werden")
+    if inv.status == "entwurf":
+        raise HTTPException(
+            400,
+            "Entwürfe werden gelöscht, nicht storniert — sie wurden nie "
+            "ausgestellt und tragen noch keine Belegnummer.",
+        )
 
+    alter_status = inv.status
     ensure_recipient_snapshot(db, inv)
     inv.status = "storniert"
     inv.cancel_mode = body.cancel_mode
     inv.updated_by = current_user.email
     _sync_time_entry_status(db, inv)   # Storno → Zeiten wieder freigeben
+    _audit(db, inv, "storniert",
+           changes={"status": {"alt": alter_status, "neu": "storniert"}},
+           note=("Storno mit Gutschrift" if body.cancel_mode == "with_credit"
+                 else "Storno ohne Gegenbuchung"),
+           user_email=current_user.email)
 
     credit_note = None
     if body.cancel_mode == "with_credit":
@@ -835,6 +1032,10 @@ async def cancel_invoice(
         db.add(credit_note)
         db.flush()
         ensure_recipient_snapshot(db, credit_note)
+        _audit(db, credit_note, "finalisiert",
+               changes={"number": {"alt": None, "neu": credit_note.number}},
+               note=f"Gutschrift zum Storno von {inv.number}",
+               user_email=current_user.email)
 
         for orig_pos in inv.positions:
             pos = InvoicePosition(
@@ -871,13 +1072,25 @@ async def mark_paid(
 ):
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
-        raise HTTPException(404, "Rechnung nicht gefunden")
-    ensure_recipient_snapshot(db, inv)
+        raise HTTPException(404, "Beleg nicht gefunden")
+    # Bisher ohne jede Prüfung: So ließ sich auch ein Entwurf oder ein Angebot
+    # als bezahlt markieren.
+    if inv.doc_type not in ("rechnung", "gutschrift"):
+        raise HTTPException(400, "Nur Rechnungen und Gutschriften können bezahlt werden")
+    if inv.status == "storniert":
+        raise HTTPException(400, "Stornierte Belege können nicht bezahlt werden")
+
+    alter_status = inv.status
     inv.status = "bezahlt"
     inv.paid_at = body.paid_at
     inv.paid_amount = body.paid_amount or inv.total
     inv.updated_by = current_user.email
-    _sync_time_entry_status(db, inv)
+    neue_nummer = _finalize(db, inv)
+    _audit(db, inv, "bezahlt",
+           changes=_audit_changes(alter_status, inv, neue_nummer),
+           note=f"Zahlungseingang {body.paid_at:%d.%m.%Y} über "
+                f"{float(inv.paid_amount or 0):.2f} {inv.currency}",
+           user_email=current_user.email)
     db.flush()
     archive_invoice_pdf(db, inv, "bezahlt")   # ggf. PDF ins Datacenter archivieren
     db.commit()
@@ -919,13 +1132,15 @@ async def set_status(
     if new_status not in allowed.get(inv.status, []):
         raise HTTPException(400, f"Statuswechsel von '{inv.status}' nach '{new_status}' nicht erlaubt")
 
-    # Beim Finalisieren (Entwurf wird verlassen) Empfängerdaten einfrieren
-    if inv.status == "entwurf" and new_status != "entwurf":
-        ensure_recipient_snapshot(db, inv)
-
+    alter_status = inv.status
     inv.status = new_status
     inv.updated_by = current_user.email
-    _sync_time_entry_status(db, inv)   # Entwurf verlassen → Zeiten abgerechnet
+    # Verlässt der Beleg den Entwurf, fällt hier die Belegnummer, der
+    # Empfänger wird eingefroren und die Zeiteinträge gelten als abgerechnet.
+    neue_nummer = _finalize(db, inv)
+    _audit(db, inv, "finalisiert" if neue_nummer else "status",
+           changes=_audit_changes(alter_status, inv, neue_nummer),
+           user_email=current_user.email)
     db.flush()
     # Archivierung nur für die statusbezogenen Auslöser
     if new_status in ("gesendet", "angenommen", "abgelehnt"):
@@ -948,18 +1163,15 @@ async def convert_to_ab(
     if offer.doc_type != "angebot":
         raise HTTPException(400, "Nur Angebote können in eine AB umgewandelt werden")
 
-    year = datetime.now().date().year
-    sequence, number = _next_number(db, "auftragsbestaetigung", year)
-
     # Standard-Texte für AB laden
     intro_setting = db.query(InvoiceSettings).filter_by(key="default_intro_auftragsbestaetigung").first()
     outro_setting = db.query(InvoiceSettings).filter_by(key="default_outro_auftragsbestaetigung").first()
     intro = (intro_setting.value.strip('"') if intro_setting and isinstance(intro_setting.value, str) else "") or offer.intro_text or ""
     outro = (outro_setting.value.strip('"') if outro_setting and isinstance(outro_setting.value, str) else "") or offer.outro_text or ""
 
+    # Die AB entsteht als Entwurf und bekommt ihre Nummer erst beim Finalisieren
     ab = Invoice(
         doc_type="auftragsbestaetigung",
-        number=number, year=year, sequence=sequence,
         contact_id=offer.contact_id, project_id=offer.project_id,
         related_invoice_id=offer.id,
         title=offer.title, date=datetime.now().date(),
@@ -979,8 +1191,14 @@ async def convert_to_ab(
             unit_price=orig_pos.unit_price, discount_pct=orig_pos.discount_pct,
             tax_rate=orig_pos.tax_rate,
         ))
-    ensure_recipient_snapshot(db, offer)  # verlässt 'entwurf' → einfrieren
+    # Das Angebot verlässt den Entwurf → Nummer, Snapshot, Protokoll
+    alter_status = offer.status
     offer.status = "angenommen"
+    neue_nummer = _finalize(db, offer)
+    _audit(db, offer, "finalisiert" if neue_nummer else "status",
+           changes=_audit_changes(alter_status, offer, neue_nummer),
+           note="In Auftragsbestätigung umgewandelt", user_email=current_user.email)
+
     db.flush()
     db.refresh(ab)
     _calc_totals(ab)
@@ -1002,14 +1220,9 @@ async def convert_to_invoice(
     if offer.doc_type not in ("angebot", "auftragsbestaetigung"):
         raise HTTPException(400, "Nur Angebote oder Auftragsbestätigungen können umgewandelt werden")
 
-    year = datetime.now().date().year
-    sequence, number = _next_number(db, "rechnung", year)
-
+    # Die Rechnung entsteht als Entwurf — Nummer erst beim Finalisieren
     invoice = Invoice(
         doc_type="rechnung",
-        number=number,
-        year=year,
-        sequence=sequence,
         contact_id=offer.contact_id,
         project_id=offer.project_id,
         related_invoice_id=offer.id,
@@ -1042,8 +1255,14 @@ async def convert_to_invoice(
         )
         db.add(pos)
 
-    ensure_recipient_snapshot(db, offer)  # verlässt 'entwurf' → einfrieren
+    # Angebot/AB verlässt den Entwurf → Nummer, Snapshot, Protokoll
+    alter_status = offer.status
     offer.status = "angenommen"
+    neue_nummer = _finalize(db, offer)
+    _audit(db, offer, "finalisiert" if neue_nummer else "status",
+           changes=_audit_changes(alter_status, offer, neue_nummer),
+           note="In Rechnung umgewandelt", user_email=current_user.email)
+
     db.flush()
     db.refresh(invoice)
     _calc_totals(invoice)
@@ -1068,12 +1287,9 @@ async def duplicate_invoice(
     if not src:
         raise HTTPException(404, "Beleg nicht gefunden")
 
-    year = datetime.now().date().year
-    sequence, number = _next_number(db, src.doc_type, year)
-
+    # Das Duplikat ist ein Entwurf und bekommt seine Nummer erst beim Finalisieren
     dup = Invoice(
         doc_type=src.doc_type,
-        number=number, year=year, sequence=sequence,
         date=datetime.now().date(),
         tax_mode=src.tax_mode,
         currency=src.currency,
@@ -1318,10 +1534,16 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
     doc_label    = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
     company_name = settings_d.get("company_name", "DeineZeit")
 
+    # Nummer VOR der PDF-Erzeugung vergeben: Ein Entwurf ist nummernlos, und
+    # der Beleg geht mit dem Versand ohnehin aus dem Entwurf. Ohne diesen
+    # Schritt stünde auf dem versendeten PDF keine Belegnummer.
+    _ensure_number(db, inv)
+    db.flush()
+
     pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
                               sender_contact, recipient_contact)
 
-    filename = f"{inv.number.replace('/', '-')}.pdf"
+    filename = f"{(inv.number or 'beleg').replace('/', '-')}.pdf"
 
     # Platzhalter für Vorlagen
     contact_name = ""
@@ -1401,10 +1623,13 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
 
     # Status auf "gesendet" setzen (außer bereits bezahlt/storniert/angenommen/abgelehnt)
     if inv.status not in ("bezahlt", "storniert", "angenommen", "abgelehnt"):
-        ensure_recipient_snapshot(db, inv)
+        alter_status = inv.status
         inv.status = "gesendet"
         inv.updated_by = current_user_email
-        _sync_time_entry_status(db, inv)
+        neue_nummer = _finalize(db, inv)
+        _audit(db, inv, "finalisiert" if neue_nummer else "status",
+               changes=_audit_changes(alter_status, inv, neue_nummer),
+               note=f"Per E-Mail an {to_email}", user_email=current_user_email)
         db.add(inv)
 
     # Bei aktiviertem Auslöser PDF ins Datacenter archivieren (E-Mail-Versand)

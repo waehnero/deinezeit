@@ -19,9 +19,13 @@ class Invoice(Base):
 
     # Typ & Nummer
     doc_type = Column(String(20), nullable=False)           # rechnung | angebot | gutschrift | lieferschein
-    number = Column(String(50), nullable=False, unique=True)
-    year = Column(Integer, nullable=False)
-    sequence = Column(Integer, nullable=False)
+    # Nummer, Jahr und laufende Nummer werden erst beim Finalisieren vergeben
+    # (Beleg verlässt 'entwurf'). Entwürfe bleiben nummernlos, damit ein
+    # verworfener Entwurf keine Lücke im Nummernkreis hinterlässt
+    # (§ 11 Abs. 1 Z 3 UStG / § 131 BAO). NULL ist vom UNIQUE-Index ausgenommen.
+    number = Column(String(50), nullable=True, unique=True)
+    year = Column(Integer, nullable=True)
+    sequence = Column(Integer, nullable=True)
 
     # Bezüge
     contact_id = Column(UUID(as_uuid=True), nullable=True)          # entity_records.id
@@ -150,6 +154,32 @@ class InvoiceNumberSequence(Base):
     doc_type = Column(String(20), nullable=False)
     year = Column(Integer, nullable=False)
     last_sequence = Column(Integer, nullable=False, default=0)
+
+
+class InvoiceAuditLog(Base):
+    """
+    Änderungsprotokoll je Beleg (Nachvollziehbarkeit / § 131 BAO).
+
+    Eine Zeile je Vorgang. Die einzelnen Feldänderungen liegen als JSONB in
+    ``changes`` im Format ``{"feld": {"alt": ..., "neu": ...}, ...}``.
+    Aufbau bewusst analog zu :class:`GdprDeletionLog`.
+
+    Protokolliert wird ab dem Finalisieren — an einem Entwurf wird
+    naturgemäß laufend gearbeitet, das erzeugt nur Rauschen.
+    """
+    __tablename__ = "invoice_audit_log"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    invoice_id = Column(UUID(as_uuid=True),
+                        ForeignKey("invoices.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    # finalisiert | status | bezahlt | storniert | bearbeitet | nummer
+    action = Column(String(30), nullable=False)
+    changes = Column(JSONB, nullable=True)
+    note = Column(String(500), nullable=True)
+    changed_by = Column(String(200), nullable=True)
+    changed_at = Column(DateTime(timezone=True), nullable=False,
+                        default=lambda: datetime.now(timezone.utc))
 
 
 class InvoiceSettings(Base):

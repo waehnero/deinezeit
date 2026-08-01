@@ -142,8 +142,15 @@ def test_mark_paid_erzeugt_snapshot_fuer_altbestand(auth_client, db_session):
     assert resp.json()["recipient_snapshot"] is not None
 
 
-def test_kontakt_tausch_auf_finalisiertem_beleg_erneuert_snapshot(auth_client, db_session):
-    """Wird auf einem finalisierten Beleg der Kontakt getauscht, wird neu eingefroren."""
+def test_kontakt_tausch_auf_finalisiertem_beleg_abgelehnt(auth_client, db_session):
+    """
+    Auf einem finalisierten Beleg lässt sich der Empfänger nicht mehr tauschen.
+
+    Früher wurde der Snapshot in diesem Fall neu eingefroren. Seit der
+    Belegsperre ist der Empfänger ein gesperrtes Feld — der bereits versendete
+    Beleg soll nachträglich keinen anderen Empfänger bekommen. Korrekturen
+    laufen über Storno und Neuausstellung.
+    """
     kontakt_a = _make_kontakt(db_session, display_name="Firma A")
     kontakt_b = _make_kontakt(db_session, display_name="Firma B",
                               data={"adresse": "Weg 2", "plz": "1010", "ort": "Wien"})
@@ -151,7 +158,6 @@ def test_kontakt_tausch_auf_finalisiertem_beleg_erneuert_snapshot(auth_client, d
     auth_client.post(f"/api/invoices/{inv['id']}/set-status", json={"status": "offen"})
 
     resp = auth_client.put(f"/api/invoices/{inv['id']}", json={
-        "doc_type": "rechnung",
         "contact_id": str(kontakt_b.id),
         "date": "2026-07-06",
         "positions": [{
@@ -159,9 +165,12 @@ def test_kontakt_tausch_auf_finalisiertem_beleg_erneuert_snapshot(auth_client, d
             "quantity": "2", "unit_price": "100", "tax_rate": "20",
         }],
     })
-    assert resp.status_code == 200, resp.text
-    snap = resp.json()["recipient_snapshot"]
-    assert snap["display_name"] == "Firma B"
+    assert resp.status_code == 400
+    assert "Empfänger" in resp.json()["detail"]
+
+    # Der eingefrorene Empfänger bleibt unverändert
+    snap = auth_client.get(f"/api/invoices/{inv['id']}").json()["recipient_snapshot"]
+    assert snap["display_name"] == "Firma A"
 
 
 def test_storno_mit_gutschrift_kopiert_snapshot(auth_client, db_session):

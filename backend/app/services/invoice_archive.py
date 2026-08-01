@@ -22,8 +22,13 @@ DOC_TYPE_FOLDER = {
     "lieferschein":         "Lieferscheine",
 }
 
-# Auslöser, falls in den Einstellungen (noch) nichts hinterlegt ist
-DEFAULT_TRIGGERS = ["email"]
+# Auslöser, falls in den Einstellungen (noch) nichts hinterlegt ist.
+#
+# Bewusst großzügig: Jeder ausgestellte Beleg gehört archiviert, unabhängig
+# vom Versandweg. Der frühere Vorgabewert ["email"] legte einen ausgedruckten
+# oder per Post verschickten Beleg nirgends ab — beim Monatsabschluss fehlte
+# er dann. Wer weniger möchte, hakt in den Verkaufseinstellungen ab.
+DEFAULT_TRIGGERS = ["email", "gesendet", "bezahlt", "storniert"]
 
 # Menschlich lesbare Labels der Auslöser (für die Einstellungen-UI referenziert)
 TRIGGER_LABELS = {
@@ -45,6 +50,28 @@ def get_archive_triggers(db) -> list:
     return DEFAULT_TRIGGERS
 
 
+def _protokoll(db, invoice, note: str) -> None:
+    """
+    Hält das Ergebnis der Archivierung im Änderungsprotokoll des Belegs fest.
+
+    Ohne diesen Vermerk ist ein Ausfall unsichtbar: Die Archivierung schluckt
+    bewusst jeden Fehler, damit ein Statuswechsel nicht daran scheitert — und
+    fiel dadurch unbemerkt wochenlang aus. Als ausführender Benutzer gilt der
+    Bearbeiter des auslösenden Vorgangs (``updated_by``).
+    """
+    try:
+        from app.models.invoice import InvoiceAuditLog
+        db.add(InvoiceAuditLog(
+            invoice_id=invoice.id,
+            action="archiviert",
+            note=note[:500],
+            changed_by=getattr(invoice, "updated_by", None),
+        ))
+        db.flush()
+    except Exception as e:      # Protokollieren darf selbst nichts kaputt machen
+        print(f"[WARN] Archiv-Protokolleintrag fehlgeschlagen: {e}")
+
+
 def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
     """
     Erzeugt bei aktiviertem Auslöser ein PDF des Belegs und legt es im Datacenter
@@ -52,12 +79,24 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
 
     Fehler beim Archivieren dürfen den auslösenden Vorgang (z.B. Statuswechsel)
     NICHT scheitern lassen – daher wird alles defensiv behandelt und im Zweifel
-    ``False`` zurückgegeben. Das Attachment wird via ``db.flush()`` in die laufende
-    Transaktion des Aufrufers eingefügt (der Aufrufer committet).
+    ``False`` zurückgegeben. Damit ein Ausfall trotzdem auffällt, wird jeder
+    Versuch im Änderungsprotokoll des Belegs vermerkt.
+
+    Nicht vermerkt wird der Fall „Auslöser nicht aktiviert" — das ist eine
+    bewusste Einstellung und kein Vorfall; sonst stünde bei abgeschalteter
+    Archivierung nach jedem Statuswechsel ein Eintrag im Protokoll.
+
+    Das Attachment wird via ``db.flush()`` in die laufende Transaktion des
+    Aufrufers eingefügt (der Aufrufer committet).
     """
-    if not invoice or not getattr(invoice, "contact_id", None):
+    if not invoice:
         return False
     if trigger not in get_archive_triggers(db):
+        return False
+    if not getattr(invoice, "contact_id", None):
+        _protokoll(db, invoice,
+                   "Archivierung übersprungen — der Beleg hat keinen Kontakt, "
+                   "damit fehlt der Ablageort im Datacenter.")
         return False
 
     from app.models.masterdata import EntityRecord
@@ -72,6 +111,8 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
                                  sender_contact, recipient_contact)
     except Exception as e:
         print(f"[WARN] Archiv-PDF konnte nicht erzeugt werden ({getattr(invoice, 'number', '?')}): {e}")
+        _protokoll(db, invoice, f"Archivierung fehlgeschlagen — das PDF konnte "
+                                f"nicht erzeugt werden: {e}")
         return False
 
     folder = DOC_TYPE_FOLDER.get(invoice.doc_type, "Belege")
@@ -91,6 +132,8 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
         storage_service.upload_file(storage_key, pdf_bytes, "application/pdf", db=db, backend=backend)
     except Exception as e:
         print(f"[WARN] Archiv-Upload fehlgeschlagen ({invoice.number}): {e}")
+        _protokoll(db, invoice, f"Archivierung fehlgeschlagen — der Speicher "
+                                f"({backend}) hat die Datei nicht angenommen: {e}")
         return False
 
     rec = db.query(EntityRecord).filter(EntityRecord.id == invoice.contact_id).first()
@@ -100,10 +143,13 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
         entity_type="kontakte", entity_id=invoice.contact_id,
         type="file", storage_key=storage_key, storage_provider=backend,
         filename=filename, filesize=len(pdf_bytes), mimetype="application/pdf",
-        display_name=f"{invoice.number} · {ts}",
+        display_name=f"{invoice.number or 'Beleg'} · {ts}",
         contact_id=invoice.contact_id, contact_name=contact_name,
         folder=folder,
     )
     db.add(att)
     db.flush()
+    _protokoll(db, invoice,
+               f"PDF im Datacenter abgelegt: {contact_name or 'Kontakt'} › "
+               f"{folder} › {filename} (Auslöser: {TRIGGER_LABELS.get(trigger, trigger)})")
     return True

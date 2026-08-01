@@ -4,7 +4,8 @@ import { invoiceApi, masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search,
-  RefreshCw, FileText, Clock, Download, Eye, Repeat, Paperclip, X as XIcon
+  RefreshCw, FileText, Clock, Download, Eye, Repeat, Paperclip, X as XIcon,
+  Lock, History
 } from 'lucide-react'
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -218,6 +219,14 @@ export default function InvoiceFormPage() {
   const [docType, setDocType] = useState(searchParams.get('type') || 'rechnung')
   const [contactId, setContactId] = useState(null)
   const [contactLabel, setContactLabel] = useState('')
+  // Belegstatus steuert die Sperre: Ein finalisierter Beleg (Status ≠ Entwurf)
+  // darf inhaltlich nicht mehr verändert werden — das PDF wird bei jedem
+  // Abruf neu erzeugt und würde sich sonst rückwirkend ändern.
+  const [status, setStatus] = useState('entwurf')
+  const [number, setNumber] = useState(null)
+  // Nur durchgereicht, damit Speichern sie nicht verliert
+  const [projectId, setProjectId] = useState(null)
+  const [currency, setCurrency] = useState('EUR')
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(today())
   const [dueDate, setDueDate] = useState(addDays(today(), 30))
@@ -256,10 +265,12 @@ export default function InvoiceFormPage() {
     }).catch(() => {})
   }, [docType]) // eslint-disable-line
 
+  // Vorschau der künftigen Nummer — auch für gespeicherte Entwürfe, die noch
+  // keine haben (die Nummer fällt erst beim Finalisieren).
   useEffect(() => {
-    if (!isNew) return
+    if (!isNew && number) return
     invoiceApi.nextNumber(docType).then(res => setNextNumber(res.data.preview)).catch(() => {})
-  }, [docType, isNew])
+  }, [docType, isNew, number])
 
   useEffect(() => {
     if (isNew) return
@@ -267,6 +278,8 @@ export default function InvoiceFormPage() {
     invoiceApi.get(id).then(res => {
       const inv = res.data
       setDocType(inv.doc_type); setContactId(inv.contact_id); setTitle(inv.title || '')
+      setStatus(inv.status); setNumber(inv.number)
+      setProjectId(inv.project_id || null); setCurrency(inv.currency || 'EUR')
       // Kontaktname laden
       if (inv.contact_id) {
         masterdataApi.getRecord('kontakte', inv.contact_id)
@@ -299,6 +312,9 @@ export default function InvoiceFormPage() {
     setPositions(p => [...p, ...entries.map(e => ({ ...EMPTY_POSITION, pos_type: 'time_entry', description: e.description || 'Zeitaufwand', quantity: String(e.duration_hours), unit: 'h', unit_price: '0', time_entry_id: e.id }))])
   }
 
+  // Ausgestellter Beleg: inhaltlich gesperrt (nur die interne Notiz bleibt offen)
+  const gesperrt = !isNew && status !== 'entwurf'
+
   const { subtotal, taxTotal, total } = calcTotals(positions, taxMode)
 
   async function handleSave() {
@@ -307,6 +323,7 @@ export default function InvoiceFormPage() {
     try {
       const payload = {
         doc_type: docType, contact_id: contactId || null, title: title || null,
+        project_id: projectId || null, currency,
         date, due_date: dueDate || null, reference: reference || null,
         intro_text: introText || null, outro_text: outroText || null, notes: notes || null,
         tax_mode: taxMode, template_id: templateId,
@@ -374,7 +391,13 @@ export default function InvoiceFormPage() {
           <button onClick={() => navigate('/invoices')} className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500"><ArrowLeft size={18} /></button>
           <div>
             <h1 className="text-xl font-semibold text-neutral-900">{isNew ? 'Neue ' + DOC_TYPE_LABELS[docType] : DOC_TYPE_LABELS[docType] + ' bearbeiten'}</h1>
-            {isNew && nextNumber && <p className="text-sm text-neutral-400 mt-0.5">Nummer: {nextNumber}</p>}
+            {number
+              ? <p className="text-sm text-neutral-400 mt-0.5">Nummer: {number}</p>
+              : nextNumber && (
+                  <p className="text-sm text-neutral-400 mt-0.5">
+                    Entwurf — Nummer <span className="font-medium text-neutral-500">{nextNumber}</span> wird beim Finalisieren vergeben
+                  </p>
+                )}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
@@ -406,13 +429,33 @@ export default function InvoiceFormPage() {
               </button>
             </>
           )}
-          <button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
-            {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />} Speichern
+          <button onClick={handleSave} disabled={saving}
+            title={gesperrt ? 'Speichert die interne Notiz' : undefined}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
+            {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
+            {gesperrt ? 'Notiz speichern' : 'Speichern'}
           </button>
         </div>
       </div>
 
       <div className="space-y-5">
+        {gesperrt && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <Lock size={16} className="text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-sm text-amber-900">
+              <p className="font-semibold">Beleg ist ausgestellt und inhaltlich gesperrt</p>
+              <p className="mt-1 text-amber-800 leading-relaxed">
+                Positionen, Beträge, Empfänger, Datum und alle gedruckten Texte lassen sich
+                nicht mehr ändern — das PDF wird bei jedem Abruf neu erzeugt und würde sich
+                sonst rückwirkend verändern. Für eine inhaltliche Korrektur den Beleg
+                <strong> stornieren</strong> und neu ausstellen.
+                Änderbar bleibt die interne Notiz.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <fieldset disabled={gesperrt} className="space-y-5 min-w-0 disabled:opacity-60">
         {isNew && (
           <div className="bg-surface border border-neutral-200 rounded-xl p-5">
             <h2 className="text-sm font-semibold text-neutral-700 mb-3">Dokumenttyp</h2>
@@ -554,13 +597,89 @@ export default function InvoiceFormPage() {
           </div>
         </div>
 
+        </fieldset>
+
+        {/* Bewusst AUSSERHALB des fieldset: Die interne Notiz steht nicht auf
+            dem Beleg und bleibt daher auch nach dem Finalisieren änderbar. */}
         <div className="bg-surface border border-neutral-200 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-neutral-700 mb-3">Interne Notiz</h2>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
             placeholder="Wird nicht auf dem Dokument gedruckt"
             className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" />
         </div>
+
+        {!isNew && gesperrt && <AuditPanel invoiceId={id} />}
       </div>
+    </div>
+  )
+}
+
+const AUDIT_LABELS = {
+  finalisiert: 'Ausgestellt',
+  status:      'Status geändert',
+  bezahlt:     'Als bezahlt markiert',
+  storniert:   'Storniert',
+  bearbeitet:  'Bearbeitet',
+  archiviert:  'Archivierung',
+}
+
+const FELD_LABELS = {
+  status: 'Status', number: 'Belegnummer', notes: 'Interne Notiz',
+  project_id: 'Projekt',
+}
+
+function AuditPanel({ invoiceId }) {
+  const [eintraege, setEintraege] = useState([])
+  const [offen, setOffen] = useState(false)
+  const [geladen, setGeladen] = useState(false)
+
+  useEffect(() => {
+    if (!offen || geladen) return
+    invoiceApi.getAudit(invoiceId)
+      .then(res => { setEintraege(res.data); setGeladen(true) })
+      .catch(() => toast.error('Protokoll konnte nicht geladen werden'))
+  }, [offen, geladen, invoiceId])
+
+  return (
+    <div className="bg-surface border border-neutral-200 rounded-xl p-5">
+      <button type="button" onClick={() => setOffen(o => !o)}
+        className="flex items-center gap-2 text-sm font-semibold text-neutral-700">
+        <History size={15} className="text-neutral-500" />
+        Änderungsprotokoll
+        <span className="text-xs font-normal text-neutral-400">
+          {offen ? 'ausblenden' : 'anzeigen'}
+        </span>
+      </button>
+
+      {offen && (
+        <div className="mt-4">
+          {eintraege.length === 0 ? (
+            <p className="text-sm text-neutral-400">Noch keine Einträge.</p>
+          ) : (
+            <ol className="space-y-3 border-l border-neutral-200 pl-4">
+              {eintraege.map(e => (
+                <li key={e.id} className="relative">
+                  <span className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-neutral-300" />
+                  <p className="text-sm text-neutral-800">
+                    {AUDIT_LABELS[e.action] || e.action}
+                    <span className="text-xs text-neutral-400 ml-2">
+                      {new Date(e.changed_at).toLocaleString('de-AT')}
+                      {e.changed_by && ' · ' + e.changed_by}
+                    </span>
+                  </p>
+                  {e.note && <p className="text-xs text-neutral-500 mt-0.5">{e.note}</p>}
+                  {e.changes && Object.entries(e.changes).map(([feld, w]) => (
+                    <p key={feld} className="text-xs text-neutral-500 mt-0.5">
+                      {FELD_LABELS[feld] || feld}: <span className="line-through">{w.alt ?? '—'}</span>
+                      {' → '}<span className="text-neutral-700">{w.neu ?? '—'}</span>
+                    </p>
+                  ))}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
     </div>
   )
 }

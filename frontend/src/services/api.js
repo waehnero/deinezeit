@@ -240,6 +240,9 @@ export const invoiceApi = {
   // Zeiteinträge
   unbilledEntries: (params) => api.get('/invoices/time-entries/unbilled', { params }),
 
+  // Änderungsprotokoll
+  getAudit:       (id) => api.get(`/invoices/${id}/audit`),
+
   // Rechnungsbuch
   book:           (params) => api.get('/invoices/book/list', { params }),
   bookCsv:        (params) => api.get('/invoices/book/csv', { params, responseType: 'blob' }),
