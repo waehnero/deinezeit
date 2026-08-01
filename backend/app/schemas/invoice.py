@@ -17,6 +17,7 @@ class InvoicePositionBase(BaseModel):
     unit_price: Decimal = Decimal("0")
     discount_pct: Optional[Decimal] = None
     tax_rate: Optional[Decimal] = None
+    account_nr: Optional[str] = None        # Erlöskonto, leer = Standard-Erlöskonto
     article_id: Optional[UUID] = None
     time_entry_id: Optional[UUID] = None
 

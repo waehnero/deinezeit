@@ -110,6 +110,11 @@ class InvoicePosition(Base):
     tax_rate = Column(Numeric(5, 2), nullable=True)                  # None = reverse charge
     line_total = Column(Numeric(12, 2), nullable=False, default=Decimal("0"))
 
+    # Erlöskonto dieser Position (überschreibt das Standard-Erlöskonto beim
+    # Buchhaltungs-Export). Die Spalte existiert seit Migration 0013, fehlte
+    # aber im Modell — dadurch scheiterte der BMD-Export mit AttributeError.
+    account_nr = Column(String(20), nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     invoice = relationship("Invoice", back_populates="positions")

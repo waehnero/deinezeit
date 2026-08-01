@@ -89,6 +89,40 @@ def _calc_totals(invoice: Invoice) -> None:
     invoice.total = subtotal + tax_total
 
 
+def _set_time_entry_status(db: Session, entry_ids, neuer_status: str) -> None:
+    """Setzt den Status der angegebenen Zeiteinträge. Kein Commit."""
+    ids = [i for i in entry_ids if i]
+    if not ids:
+        return
+    from app.models.zeiterfassung import TimeEntry
+    db.query(TimeEntry).filter(TimeEntry.id.in_(ids)).update(
+        {TimeEntry.status: neuer_status}, synchronize_session=False)
+
+
+def _time_entry_ids(invoice: Invoice) -> set:
+    """Zeiteinträge, die aktuell über Positionen am Beleg hängen."""
+    return {p.time_entry_id for p in invoice.positions if p.time_entry_id}
+
+
+def _sync_time_entry_status(db: Session, invoice: Invoice) -> None:
+    """
+    Hält den Status der verknüpften Zeiteinträge am Beleg ausgerichtet.
+
+    * Beleg ist noch Entwurf → nichts tun. Die Stunden bleiben bewusst offen,
+      ein verworfener Entwurf soll sie nicht blockieren.
+    * Beleg verlässt den Entwurf → Zeiteinträge werden ``abgerechnet``.
+    * Beleg wird storniert → Zeiteinträge werden wieder ``freigegeben``,
+      die Leistung ist dann erneut zu fakturieren.
+
+    Die Entwurfs-Regel steckt bewusst hier und nicht bei den Aufrufern, damit
+    sie an einer einzigen Stelle gilt. Kein Commit — der Aufrufer committet.
+    """
+    if invoice.status == "entwurf":
+        return
+    neuer_status = "freigegeben" if invoice.status == "storniert" else "abgerechnet"
+    _set_time_entry_status(db, _time_entry_ids(invoice), neuer_status)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CRUD
 # ─────────────────────────────────────────────────────────────────────────────
@@ -451,14 +485,18 @@ async def get_book_list(
     total_tax = sum(Decimal(str(i.tax_total or 0)) for i in invoices)
     total_gross = sum(Decimal(str(i.total or 0)) for i in invoices)
 
+    # Kontaktnamen gesammelt laden (statt einer Abfrage je Beleg) und den
+    # gepflegten Anzeigenamen verwenden — die Keys 'name'/'firma' gibt es in
+    # den Stammdaten-Feldern nicht, die Spalte blieb dadurch immer leer.
+    contact_ids = list({inv.contact_id for inv in invoices if inv.contact_id})
+    contact_map: dict = {}
+    if contact_ids:
+        for r in db.query(EntityRecord).filter(EntityRecord.id.in_(contact_ids)).all():
+            contact_map[r.id] = r.display_name or ""
+
     rows = []
     for inv in invoices:
-        contact_name = None
-        if inv.contact_id:
-            rec = db.query(EntityRecord).filter(EntityRecord.id == inv.contact_id).first()
-            if rec:
-                d = rec.data or {}
-                contact_name = d.get("name") or d.get("firma") or d.get("vorname", "")
+        contact_name = contact_map.get(inv.contact_id) if inv.contact_id else None
         rows.append({
             "id": str(inv.id),
             "number": inv.number,
@@ -701,6 +739,9 @@ async def update_invoice(
     if inv.status != "entwurf":
         ensure_recipient_snapshot(db, inv, force=(inv.contact_id != old_contact_id))
 
+    # Zeiteinträge, die VOR der Änderung am Beleg hingen
+    alte_zeit_ids = _time_entry_ids(inv)
+
     # Positionen ersetzen
     db.query(InvoicePosition).filter(InvoicePosition.invoice_id == invoice_id).delete()
     for i, pos_data in enumerate(body.positions):
@@ -711,6 +752,17 @@ async def update_invoice(
     db.flush()
     db.refresh(inv)
     _calc_totals(inv)
+
+    # Zeiteinträge nachziehen. Beim Bearbeiten eines bereits finalisierten
+    # Belegs geschah das bisher gar nicht: Nachträglich übernommene Stunden
+    # blieben "freigegeben" und wären im Übernahme-Dialog erneut angeboten
+    # worden — also doppelt verrechenbar.
+    if inv.status != "entwurf":
+        # entfernte Zeitpositionen wieder freigeben …
+        _set_time_entry_status(db, alte_zeit_ids - _time_entry_ids(inv), "freigegeben")
+    # … verbliebene und neue auf den Belegstatus ziehen
+    _sync_time_entry_status(db, inv)
+
     db.commit()
     db.refresh(inv)
     return inv
@@ -754,6 +806,7 @@ async def cancel_invoice(
     inv.status = "storniert"
     inv.cancel_mode = body.cancel_mode
     inv.updated_by = current_user.email
+    _sync_time_entry_status(db, inv)   # Storno → Zeiten wieder freigeben
 
     credit_note = None
     if body.cancel_mode == "with_credit":
@@ -824,6 +877,7 @@ async def mark_paid(
     inv.paid_at = body.paid_at
     inv.paid_amount = body.paid_amount or inv.total
     inv.updated_by = current_user.email
+    _sync_time_entry_status(db, inv)
     db.flush()
     archive_invoice_pdf(db, inv, "bezahlt")   # ggf. PDF ins Datacenter archivieren
     db.commit()
@@ -871,6 +925,7 @@ async def set_status(
 
     inv.status = new_status
     inv.updated_by = current_user.email
+    _sync_time_entry_status(db, inv)   # Entwurf verlassen → Zeiten abgerechnet
     db.flush()
     # Archivierung nur für die statusbezogenen Auslöser
     if new_status in ("gesendet", "angenommen", "abgelehnt"):
@@ -1349,6 +1404,7 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
         ensure_recipient_snapshot(db, inv)
         inv.status = "gesendet"
         inv.updated_by = current_user_email
+        _sync_time_entry_status(db, inv)
         db.add(inv)
 
     # Bei aktiviertem Auslöser PDF ins Datacenter archivieren (E-Mail-Versand)
@@ -1491,21 +1547,89 @@ async def get_unbilled_time_entries(
     contact_id: Optional[UUID] = Query(None),
     project_id: Optional[UUID] = Query(None),
     search: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     """
-    Gibt alle abgeschlossenen, noch nicht verrechneten Zeiteinträge zurück.
+    Gibt die verrechenbaren, noch nicht fakturierten Zeiteinträge zurück.
 
-    Filterlogik:
-    - contact_id: Sucht zuerst per UUID-Spalte. Falls keine Treffer,
-      fällt zurück auf Textvergleich mit contact_name (weil ältere
-      Einträge contact_id=null haben können).
-    - project_id: Analog, mit Fallback auf project_name.
-    - search: Freitextsuche über Beschreibung, Kontakt- und Projektname.
+    Ein Eintrag erscheint hier, wenn er
+      * abgeschlossen ist (``ended_at`` gesetzt — laufende Timer zählen nicht),
+      * als verrechenbar markiert ist (``billable``),
+      * den Status ``freigegeben`` hat (erst nach der Freigabe darf fakturiert
+        werden — siehe Abrechnungs-Workflow in ``models/zeiterfassung.py``) und
+      * auf keinem gültigen Beleg liegt.
+
+    Positionen **stornierter** Belege zählen dabei nicht: Wird eine Rechnung
+    storniert, sollen die darauf abgerechneten Stunden wieder fakturierbar sein.
     """
     from app.models.zeiterfassung import TimeEntry
-    from sqlalchemy import not_, or_ as _or_
 
+    # Zeiteinträge, die bereits auf einem gültigen (nicht stornierten) Beleg liegen
+    billed_subq = (
+        db.query(InvoicePosition.time_entry_id)
+        .join(Invoice, Invoice.id == InvoicePosition.invoice_id)
+        .filter(InvoicePosition.time_entry_id.isnot(None),
+                Invoice.status != "storniert")
+    )
 
-    # Bereits verrechnete Einträge
+    q = db.query(TimeEntry).filter(
+        TimeEntry.ended_at.isnot(None),
+        TimeEntry.billable.is_(True),
+        TimeEntry.status == "freigegeben",
+        TimeEntry.id.notin_(billed_subq),
+    )
+
+    # Kontakt-/Projektfilter mit Namens-Rückfall:
+    # Nicht jeder Zeiteintrag trägt eine contact_id/project_id — Einträge aus
+    # „KI nachtragen" und älterer Erfassung haben nur den Namen. Ohne diesen
+    # Rückfall verschwinden sie aus dem Übernahme-Dialog, sobald am Beleg ein
+    # Kontakt gewählt ist. Verglichen wird der Anzeigename exakt (aber ohne
+    # Rücksicht auf Groß-/Kleinschreibung), damit „Muster GmbH“ nicht auch
+    # „Mustermann GmbH“ einsammelt.
+    def _mit_namensrueckfall(query, ziel_id, id_spalte, name_spalte):
+        rec = db.query(EntityRecord).filter(EntityRecord.id == ziel_id).first()
+        name = (rec.display_name or "").strip() if rec else ""
+        bedingungen = [id_spalte == ziel_id]
+        if name:
+            bedingungen.append(and_(id_spalte.is_(None), name_spalte.ilike(name)))
+        return query.filter(or_(*bedingungen))
+
+    if contact_id:
+        q = _mit_namensrueckfall(q, contact_id, TimeEntry.contact_id, TimeEntry.contact_name)
+    if project_id:
+        q = _mit_namensrueckfall(q, project_id, TimeEntry.project_id, TimeEntry.project_name)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(or_(
+            TimeEntry.note.ilike(like),
+            TimeEntry.contact_name.ilike(like),
+            TimeEntry.project_name.ilike(like),
+            TimeEntry.task_title.ilike(like),
+        ))
+
+    entries = q.order_by(TimeEntry.started_at.desc()).limit(limit).all()
+
+    result = []
+    for e in entries:
+        minuten = e.duration_minutes or 0
+        result.append({
+            "id":               str(e.id),
+            "started_at":       e.started_at.isoformat() if e.started_at else None,
+            "ended_at":         e.ended_at.isoformat() if e.ended_at else None,
+            "duration_minutes": minuten,
+            "duration_hours":   round(minuten / 60, 2),
+            "description":      e.note or e.task_title or "Zeitaufwand",
+            "note":             e.note or "",
+            # Das Frontend liest `contact`/`project`; die *_name-Schlüssel
+            # bleiben für ältere Aufrufer zusätzlich erhalten.
+            "contact":          e.contact_name or "",
+            "project":          e.project_name or "",
+            "contact_name":     e.contact_name or "",
+            "project_name":     e.project_name or "",
+            "contact_id":       str(e.contact_id) if e.contact_id else None,
+            "project_id":       str(e.project_id) if e.project_id else None,
+            "billable":         e.billable,
+        })
+    return result

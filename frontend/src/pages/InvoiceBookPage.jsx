@@ -15,6 +15,9 @@ function fmtEuro(n) {
 const THIS_YEAR = new Date().getFullYear()
 const THIS_MONTH = new Date().getMonth() + 1
 
+// Belegarten, die in der Buchhaltung ankommen (siehe accounting.py)
+const BUCHUNGSRELEVANT = ['rechnung', 'gutschrift']
+
 function periodOptions() {
   const opts = [{ value: '', label: 'Alle Zeiträume' }]
   // Jahres-Optionen
@@ -145,16 +148,19 @@ export default function InvoiceBookPage() {
               <button
                 onClick={async () => {
                   try {
+                    // Der Typfilter oben dient der Ansicht. Für die Buchhaltung
+                    // zählen nur Rechnungen und Gutschriften — ist etwas anderes
+                    // gewählt (z.B. Angebote), werden bewusst beide exportiert.
                     const params = { ...parsePeriod(period) }
-                    if (docType) params.doc_type = docType
+                    if (BUCHUNGSRELEVANT.includes(docType)) params.doc_type = docType
                     const res = await accountingApi.exportBmd(params)
                     const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
                     const a = document.createElement('a'); a.href = url; a.download = `bmd_export.csv`; a.click()
                     URL.revokeObjectURL(url)
-                  } catch { toast.error('BMD-Export-Fehler') }
+                  } catch (e) { toast.error(e.response?.data?.detail || 'BMD-Export-Fehler') }
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm border border-primary-200 text-primary-700 rounded-lg hover:bg-primary-50"
-                title="BMD Buchungsjournal exportieren"
+                title="Rechnungen und Gutschriften als BMD-Buchungsjournal exportieren"
               >
                 <Download size={14} /> BMD Export
               </button>

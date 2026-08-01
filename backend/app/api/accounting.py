@@ -6,6 +6,7 @@ Buchhaltungs-API
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
@@ -131,10 +132,18 @@ async def set_default_erloes(
 # Spalten: Datum; Belegnummer; Text; Konto; Gegenkonto; Betrag; USt-Code; USt-Betrag; Währung
 BMD_UST_CODES = {
     "20": "U20",
+    "13": "U13",   # ermäßigter Satz (Beherbergung, Kultur, Ab-Hof-Verkauf …)
     "10": "U10",
     "0":  "U00",
     None: "URC",   # Reverse Charge
 }
+
+# Buchungsrelevante Belegarten. Angebot, Auftragsbestätigung und Lieferschein
+# sind keine Umsätze und dürfen nie in der Buchhaltung landen.
+BOOKABLE_DOC_TYPES = ("rechnung", "gutschrift")
+
+# Buchungstext, wenn am Beleg kein Titel gepflegt ist
+DOC_TYPE_TEXT = {"rechnung": "Rechnung", "gutschrift": "Gutschrift"}
 
 
 def _get_contact_nr(db: Session, contact_id, contact_typ: str) -> str:
@@ -171,27 +180,46 @@ def _debitor_konto(db: Session) -> str:
 async def export_bmd(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
-    doc_type: Optional[str] = Query("rechnung"),
+    # Leer = alle buchungsrelevanten Belegarten (Rechnung UND Gutschrift).
+    # Stand hier früher auf "rechnung" — dadurch fehlten Gutschriften im Export.
+    doc_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     """
-    Exportiert Rechnungen als BMD-Buchungsjournal (CSV, Semikolon-getrennt).
+    Exportiert die buchungsrelevanten Belege als BMD-Buchungsjournal
+    (CSV, Semikolon-getrennt).
 
-    Format je Buchungszeile (eine pro USt-Satz pro Rechnung):
+    Format je Buchungszeile (eine pro Erlöskonto und USt-Satz pro Beleg):
     Datum; Belegnummer; Buchungstext; Erlöskonto; Debitorenkonto/Debitornr;
     Nettobetrag; USt-Code; USt-Betrag; Währung; Rechnungsnummer; Kontaktname
+
+    Umfang: **Rechnungen und Gutschriften**. Ohne ``doc_type`` werden beide
+    exportiert — Gutschriften wurden bisher übersehen, weil der Vorgabewert
+    auf "rechnung" stand.
+
+    Stornierte Belege werden nur dann exportiert, wenn zum Storno eine
+    Gutschrift erzeugt wurde (``cancel_mode = with_credit``): Dann sind beide
+    Belege gebucht und heben einander auf. Beim reinen Status-Storno
+    (``status_only``) gab es keine Buchung, der Beleg bleibt außen vor.
     """
+    if doc_type and doc_type not in BOOKABLE_DOC_TYPES:
+        raise HTTPException(
+            400,
+            f"'{doc_type}' ist nicht buchungsrelevant. Für die Buchhaltung "
+            f"kommen nur {' und '.join(BOOKABLE_DOC_TYPES)} in Frage.",
+        )
+
     q = db.query(Invoice).filter(
         Invoice.is_recurring_template == False,
-        Invoice.status.notin_(["entwurf", "storniert"]),
+        Invoice.doc_type.in_([doc_type] if doc_type else list(BOOKABLE_DOC_TYPES)),
+        Invoice.status != "entwurf",
+        or_(Invoice.status != "storniert", Invoice.cancel_mode == "with_credit"),
     )
     if date_from:
         q = q.filter(Invoice.date >= date_from)
     if date_to:
         q = q.filter(Invoice.date <= date_to)
-    if doc_type:
-        q = q.filter(Invoice.doc_type == doc_type)
     invoices = q.order_by(Invoice.date.asc(), Invoice.number.asc()).all()
 
     default_erloes = _default_erloes_konto(db)
@@ -240,22 +268,30 @@ async def export_bmd(
         for (erloes_konto, ust_code), amounts in ust_groups.items():
             net = amounts["net"]
             tax = amounts["tax"]
-            gross = net + tax
 
-            # Gutschriften als negative Beträge
-            sign = -1 if inv.doc_type == "gutschrift" else 1
+            # Gutschriften wirken immer umsatzmindernd.
+            # Wichtig: Storno-Gutschriften tragen bereits negative Mengen und
+            # damit negative Beträge. Ein zusätzliches Umdrehen des Vorzeichens
+            # hätte sie wieder positiv gemacht — die Gutschrift wäre als Umsatz
+            # gebucht worden. Deshalb wird der Betrag nicht gedreht, sondern
+            # auf negativ normiert (greift auch bei manuell erfassten
+            # Gutschriften mit positiven Beträgen).
+            if inv.doc_type == "gutschrift":
+                net = -abs(net)
+                tax = -abs(tax)
+            gross = net + tax
 
             writer.writerow([
                 inv.date.strftime("%d.%m.%Y"),
                 inv.number,
-                inv.title or f"Rechnung {inv.number}",
+                inv.title or f"{DOC_TYPE_TEXT.get(inv.doc_type, 'Beleg')} {inv.number}",
                 erloes_konto,
                 default_debitor,
                 debitor_nr,
-                f"{float(net * sign):.2f}".replace(".", ","),
+                f"{float(net):.2f}".replace(".", ","),
                 ust_code,
-                f"{float(tax * sign):.2f}".replace(".", ","),
-                f"{float(gross * sign):.2f}".replace(".", ","),
+                f"{float(tax):.2f}".replace(".", ","),
+                f"{float(gross):.2f}".replace(".", ","),
                 inv.currency or "EUR",
                 inv.number,
                 contact_name,
