@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.12.37] – 2026-08-01 – Verkauf: Belegsperre, Nummernkreis und Änderungsprotokoll
+
+### Neu
+- Ausgestellte Belege sind inhaltlich gesperrt — Positionen, Beträge, Empfänger und gedruckte Texte bleiben unverändert; Korrekturen laufen über Storno und Neuausstellung
+- Änderungsprotokoll je Beleg: wer wann was geändert hat, direkt am Beleg einsehbar
+- Belegnummern werden erst beim Ausstellen vergeben — ein verworfener Entwurf hinterlässt keine Lücke mehr im Nummernkreis
+
+### Aktualisierungen
+- Die PDF-Archivierung ins Datacenter ist ab Werk für jeden ausgestellten Beleg aktiv, nicht mehr nur beim E-Mail-Versand
+- Jeder Archivierungsversuch wird am Beleg vermerkt — mit Ablageort bei Erfolg und mit Grund bei Fehlschlag
+- Der Zählerstand eines Nummernkreises lässt sich nur noch erhöhen, nie zurücksetzen
+- Ausgestellte und stornierte Belege können nicht mehr gelöscht werden (Aufbewahrungspflicht)
+- Angebote und Entwürfe lassen sich nicht mehr versehentlich als bezahlt markieren
+- Die Projektzuordnung eines Belegs geht beim Speichern nicht mehr verloren
+
+---
+
 ## [1.12.36] – 2026-08-01 – Verkauf: Buchhaltung und Zeitabrechnung
 
 ### Neu

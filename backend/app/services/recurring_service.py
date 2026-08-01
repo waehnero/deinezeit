@@ -50,14 +50,13 @@ def advance(d: date, interval: str) -> date:
 def _create_child(db, tpl, doc_date: date):
     """Legt einen Rechnungs-Entwurf aus der Vorlage an (Positionen inklusive)."""
     from app.models.invoice import Invoice, InvoicePosition
-    from app.api.invoice import _next_number, _calc_totals
+    from app.api.invoice import _calc_totals
 
-    year = doc_date.year
-    sequence, number = _next_number(db, "rechnung", year)
-
+    # Der erzeugte Beleg ist ein Entwurf und bleibt nummernlos, bis er
+    # finalisiert wird. Andernfalls würde jede nicht verschickte Serienrechnung
+    # eine Nummer verbrauchen und eine Lücke im Nummernkreis hinterlassen.
     child = Invoice(
         doc_type="rechnung",
-        number=number, year=year, sequence=sequence,
         contact_id=tpl.contact_id, project_id=tpl.project_id,
         title=tpl.title, date=doc_date,
         reference=tpl.reference,

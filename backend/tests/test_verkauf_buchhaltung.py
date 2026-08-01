@@ -349,11 +349,14 @@ def test_zeiteintrag_wird_beim_finalisieren_abgerechnet(auth_client, db_session,
     assert eintrag.status == "abgerechnet"
 
 
-def test_zeiteintrag_bei_nachtraeglicher_uebernahme_abgerechnet(auth_client, db_session, test_user):
+def test_zeitposition_auf_finalisiertem_beleg_abgelehnt(auth_client, db_session, test_user):
     """
-    Wird ein bereits finalisierter Beleg bearbeitet und dabei ein Zeiteintrag
-    ergänzt, muss dieser ebenfalls auf 'abgerechnet' gehen — sonst würde er im
-    Übernahme-Dialog erneut auftauchen und ließe sich doppelt verrechnen.
+    Nachträglich Stunden auf einen ausgestellten Beleg zu buchen ist seit der
+    Belegsperre nicht mehr möglich.
+
+    Vorher war das erlaubt und der Zeiteintrag blieb dabei 'freigegeben' —
+    er wäre im Übernahme-Dialog erneut angeboten und damit doppelt verrechnet
+    worden. Die Sperre schließt diese Lücke an der Wurzel.
     """
     kontakt = _make_kontakt(db_session)
     eintrag = _make_time_entry(db_session, test_user, contact=kontakt)
@@ -362,46 +365,18 @@ def test_zeiteintrag_bei_nachtraeglicher_uebernahme_abgerechnet(auth_client, db_
     _finalisieren(auth_client, inv["id"])
 
     resp = auth_client.put(f"/api/invoices/{inv['id']}", json={
-        "doc_type": "rechnung", "contact_id": str(kontakt.id),
-        "date": "2026-07-06",
+        "contact_id": str(kontakt.id), "date": "2026-07-06",
         "positions": [{
             "pos_type": "time_entry", "description": "Zeitaufwand",
             "quantity": "2", "unit": "h", "unit_price": "100", "tax_rate": "20",
             "time_entry_id": str(eintrag.id),
         }],
     })
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 400
+    assert "Positionen" in resp.json()["detail"]
 
     db_session.refresh(eintrag)
-    assert eintrag.status == "abgerechnet"
-    assert auth_client.get("/api/invoices/time-entries/unbilled").json() == []
-
-
-def test_entfernte_zeitposition_gibt_eintrag_wieder_frei(auth_client, db_session, test_user):
-    """Wird die Zeitposition aus dem Beleg entfernt, ist die Leistung wieder offen."""
-    kontakt = _make_kontakt(db_session)
-    eintrag = _make_time_entry(db_session, test_user, contact=kontakt)
-
-    inv = _create_invoice(auth_client, kontakt.id, positions=[{
-        "pos_type": "time_entry", "description": "Zeitaufwand", "quantity": "2",
-        "unit": "h", "unit_price": "100", "tax_rate": "20",
-        "time_entry_id": str(eintrag.id),
-    }])
-    _finalisieren(auth_client, inv["id"])
-    db_session.refresh(eintrag)
-    assert eintrag.status == "abgerechnet"
-
-    # Zeitposition durch eine gewöhnliche Position ersetzen
-    resp = auth_client.put(f"/api/invoices/{inv['id']}", json={
-        "doc_type": "rechnung", "contact_id": str(kontakt.id),
-        "date": "2026-07-06",
-        "positions": [{"pos_type": "item", "description": "Pauschale",
-                       "quantity": "1", "unit_price": "200", "tax_rate": "20"}],
-    })
-    assert resp.status_code == 200, resp.text
-
-    db_session.refresh(eintrag)
-    assert eintrag.status == "freigegeben"
+    assert eintrag.status == "freigegeben"     # unangetastet, weiter verrechenbar
 
 
 def test_entwurf_laesst_zeiteintrag_offen(auth_client, db_session, test_user):

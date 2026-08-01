@@ -1707,7 +1707,10 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
   const [paymentDays, setPaymentDays] = useState(30)
   const [kleinunternehmerText, setKleinunternehmerText] = useState('')
   const [contactHint, setContactHint] = useState('')  // Info ob Bankdaten aus Kontakt kamen
-  const [archiveTriggers, setArchiveTriggers] = useState(['email'])  // PDF-Archivierung ins Datacenter
+  // PDF-Archivierung ins Datacenter. Bewusst OHNE eigenen Vorgabewert — die
+  // wirksamen Auslöser kommen vom Backend (auch wenn noch nichts gespeichert
+  // ist). Ein Vorgabewert hier würde den echten beim Speichern überschreiben.
+  const [archiveTriggers, setArchiveTriggers] = useState([])
 
   // Bankfelder aus Kontakt-Daten erkennen (sucht nach IBAN/BIC/Bank in allen Feldern)
   function extractBankFromContact(data) {

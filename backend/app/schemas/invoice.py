@@ -87,15 +87,42 @@ class InvoiceCreate(BaseModel):
     recurring_action: Optional[str] = None
     recurring_end: Optional[date] = None
 
-class InvoiceUpdate(InvoiceCreate):
-    pass
+class InvoiceUpdate(BaseModel):
+    """
+    Beleg bearbeiten.
+
+    Bewusst OHNE ``doc_type``: Die Belegart bestimmt den Nummernkreis. Ließe
+    sie sich nachträglich ändern, würde aus RE-2026-001 ein „Angebot" mit
+    Rechnungsnummer. Für eine andere Belegart wird ein neuer Beleg angelegt.
+    """
+    contact_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
+    related_invoice_id: Optional[UUID] = None
+    title: Optional[str] = None
+    date: date
+    due_date: Optional[date] = None
+    delivery_date: Optional[date] = None
+    reference: Optional[str] = None
+    intro_text: Optional[str] = None
+    outro_text: Optional[str] = None
+    notes: Optional[str] = None
+    tax_mode: str = "per_position"
+    currency: str = "EUR"
+    template_id: int = 1
+    positions: List[InvoicePositionCreate] = []
+    is_recurring_template: bool = False
+    recurring_interval: Optional[str] = None
+    recurring_next: Optional[date] = None
+    recurring_action: Optional[str] = None
+    recurring_end: Optional[date] = None
 
 class InvoiceResponse(BaseModel):
     id: UUID
     doc_type: str
-    number: str
-    year: int
-    sequence: int
+    # Entwürfe haben noch keine Nummer — sie fällt beim Finalisieren
+    number: Optional[str] = None
+    year: Optional[int] = None
+    sequence: Optional[int] = None
     contact_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     related_invoice_id: Optional[UUID] = None
@@ -137,7 +164,7 @@ class InvoiceResponse(BaseModel):
 class InvoiceListItem(BaseModel):
     id: UUID
     doc_type: str
-    number: str
+    number: Optional[str] = None            # None = Entwurf, Nummer noch nicht vergeben
     date: date
     due_date: Optional[date] = None
     contact_id: Optional[UUID] = None
@@ -201,3 +228,17 @@ class NextNumberResponse(BaseModel):
     year: int
     next_sequence: int
     preview: str                            # "RE-2026-001"
+
+
+# ── Änderungsprotokoll ────────────────────────────────────────────────────────
+
+class InvoiceAuditEntry(BaseModel):
+    id: UUID
+    action: str
+    changes: Optional[dict] = None
+    note: Optional[str] = None
+    changed_by: Optional[str] = None
+    changed_at: datetime
+
+    class Config:
+        from_attributes = True

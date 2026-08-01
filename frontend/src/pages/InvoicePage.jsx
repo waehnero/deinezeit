@@ -18,6 +18,10 @@ function fmtDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+// Entwürfe tragen noch keine Belegnummer — sie fällt erst beim Finalisieren.
+function belegNr(inv) {
+  return inv?.number || 'Entwurf'
+}
 function fmtEuro(n) {
   if (n === null || n === undefined) return '—'
   return Number(n).toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
@@ -119,7 +123,7 @@ export default function InvoicePage() {
   async function handleConvertToAb(invoice) {
     try {
       const res = await invoiceApi.convertToAb(invoice.id)
-      toast.success(`Auftragsbestätigung ${res.data.number} erstellt`)
+      toast.success('Auftragsbestätigung als Entwurf erstellt')
       navigate(`/invoices/${res.data.id}`)
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
@@ -127,13 +131,13 @@ export default function InvoicePage() {
   async function handleConvertToInvoice(invoice) {
     try {
       const res = await invoiceApi.convertToInvoice(invoice.id)
-      toast.success(`Rechnung ${res.data.number} erstellt`)
+      toast.success('Rechnung als Entwurf erstellt')
       navigate(`/invoices/${res.data.id}`)
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
 
   async function handleDelete(invoice) {
-    if (!window.confirm(`${invoice.number} wirklich löschen?`)) return
+    if (!window.confirm(`${belegNr(invoice)} wirklich löschen?`)) return
     try {
       await invoiceApi.delete(invoice.id); toast.success('Gelöscht'); load()
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
@@ -142,7 +146,7 @@ export default function InvoicePage() {
   async function handleDuplicate(invoice, opts) {
     try {
       const res = await invoiceApi.duplicate(invoice.id, opts)
-      toast.success(`Dupliziert als ${res.data.number}`)
+      toast.success('Als neuer Entwurf dupliziert')
       setDuplicateDialog(null)
       navigate(`/invoices/${res.data.id}/edit`)
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
@@ -250,7 +254,9 @@ export default function InvoicePage() {
                     <span className="inline-flex items-center gap-1.5">
                       {inv.recurring_source_id && <Repeat size={13} className="text-violet-500 shrink-0" title="Automatisch aus wiederkehrender Vorlage erzeugt" />}
                       {inv.is_recurring_template && <Repeat size={13} className="text-violet-600 shrink-0" title="Wiederkehrende Vorlage" />}
-                      {inv.number}
+                      {inv.number
+                        ? inv.number
+                        : <span className="text-neutral-400 italic" title="Die Belegnummer wird beim Finalisieren vergeben">Entwurf</span>}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-neutral-600 hidden md:table-cell whitespace-nowrap">{fmtDate(inv.date)}</td>
@@ -780,7 +786,7 @@ function SendDialog({ invoices, onClose, onSent }) {
             <div className="bg-neutral-50 rounded-lg p-3 mb-4 max-h-40 overflow-y-auto divide-y">
               {invoices.map(inv => (
                 <div key={inv.id} className="py-2 flex items-center justify-between text-sm">
-                  <span className="font-medium text-neutral-700">{inv.number}</span>
+                  <span className="font-medium text-neutral-700">{belegNr(inv)}</span>
                   <span className="text-neutral-500 text-xs truncate max-w-[200px]">{inv.title || '—'}</span>
                 </div>
               ))}

@@ -22,11 +22,31 @@ def _admin_client(client, admin_user):
     return client
 
 
-def test_get_settings_initial_leer(auth_client):
-    """Ohne gespeicherte Werte liefert GET /settings/all ein leeres Dict."""
+def test_get_settings_initial_nur_wirksame_archiv_ausloeser(auth_client):
+    """
+    Ohne gespeicherte Werte kommt nur ein Eintrag zurück: die WIRKSAMEN
+    Archiv-Auslöser.
+
+    Sie werden bewusst immer mitgeliefert, damit die Oberfläche keinen eigenen
+    Vorgabewert vorhalten muss — sonst schreibt sie ihn beim nächsten Speichern
+    über den echten. Genau das ist vorher passiert.
+    """
+    from app.services.invoice_archive import DEFAULT_TRIGGERS
+
     resp = auth_client.get("/api/invoices/settings/all")
     assert resp.status_code == 200
-    assert resp.json() == {}
+    assert resp.json() == {"archive_triggers": DEFAULT_TRIGGERS}
+
+
+def test_gespeicherte_archiv_ausloeser_haben_vorrang(auth_client, admin_user, db_session):
+    """Ist etwas hinterlegt, gewinnt der gespeicherte Wert über den Vorgabewert."""
+    from app.models.invoice import InvoiceSettings
+
+    db_session.add(InvoiceSettings(key="archive_triggers", value=["bezahlt"]))
+    db_session.commit()
+
+    daten = auth_client.get("/api/invoices/settings/all").json()
+    assert daten["archive_triggers"] == ["bezahlt"]
 
 
 def test_put_setting_erfordert_admin(auth_client):

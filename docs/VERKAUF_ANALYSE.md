@@ -13,10 +13,21 @@
 > | Etappe | Branch | Status |
 > |---|---|---|
 > | 1 — Reparieren | `fix/verkauf-kritische-fehler` | ✅ umgesetzt (A-1, A-2, A-3, A-4, A-12, A-13 + Tests) |
-> | 2 — Rechtssicherheit | `feature/verkauf-belegsperre` | offen |
+> | 2a — Belegsperre & Nummernkreis | `feature/verkauf-belegsperre` | ✅ umgesetzt (A-7, A-8, A-9, A-10, A-11, A-17a, B-4 + Tests) |
+> | 2b — Leistungsdatum & Steuer | offen | B-1, B-2, A-5, A-6 |
 > | 3 — Zahlungen & Mahnwesen | `feature/verkauf-zahlungen` | offen |
 > | 4 — Monatsabschluss | `feature/verkauf-monatsabschluss` | offen |
 > | 5 — E-Rechnung & Komfort | — | offen |
+>
+> **Entscheidungen aus Etappe 2a** (Oliver): Gesperrt wird alles, was auf dem
+> Beleg gedruckt wird oder die Buchung bestimmt — änderbar bleiben nur interne
+> Notiz und Projektzuordnung. Belegnummer fällt beim Finalisieren. Protokoll
+> mit Ansicht am Beleg, erst ab dem Finalisieren.
+>
+> **Offene Punkte für 2b:** Der Einstellungs-Schlüssel `tax_rates` liegt in der
+> Datenbank, wird aber nirgends im Code gelesen — vor A-5 klären, ob das ein
+> angefangener Ansatz war. Zeiteinträge können weiterhin ohne `contact_id`
+> entstehen (nur Name); der Namens-Rückfall fängt das ab, sauber ist es nicht.
 
 > **Der folgende Befund-Teil beschreibt den Zustand bei der Prüfung (31.07.2026),
 > also VOR Etappe 1.** Er bleibt bewusst unverändert als Referenz stehen.

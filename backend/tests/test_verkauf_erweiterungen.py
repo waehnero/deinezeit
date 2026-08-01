@@ -62,7 +62,9 @@ def test_duplicate_uebernimmt_positionen_und_kontakt(auth_client, db_session):
     assert resp.status_code == 200, resp.text
     dup = resp.json()
     assert dup["id"] != inv["id"]
-    assert dup["number"] != inv["number"]
+    # Beide sind Entwürfe und tragen daher noch keine Nummer — die fällt erst
+    # beim Finalisieren.
+    assert dup["number"] is None
     assert dup["status"] == "entwurf"
     assert dup["contact_id"] == inv["contact_id"]
     assert len(dup["positions"]) == len(inv["positions"])
@@ -193,3 +195,51 @@ def test_archive_gating_ohne_kontakt(db_session):
     db_session.add(inv)
     db_session.commit()
     assert invoice_archive.archive_invoice_pdf(db_session, inv, "email") is False
+
+
+def test_archive_vorgabe_deckt_jeden_ausgestellten_beleg_ab():
+    """
+    Der Vorgabewert lautete früher nur ["email"] — ein ausgedruckter oder per
+    Post verschickter Beleg wurde damit nirgends abgelegt und fehlte beim
+    Monatsabschluss.
+    """
+    assert set(invoice_archive.DEFAULT_TRIGGERS) == {"email", "gesendet", "bezahlt", "storniert"}
+
+
+def test_archive_ohne_kontakt_hinterlaesst_protokolleintrag(db_session):
+    """
+    Ein übersprungener Archivierungsversuch muss sichtbar sein. Die Funktion
+    schluckt bewusst jeden Fehler, damit der auslösende Vorgang nicht scheitert
+    — ohne Vermerk fällt die Archivierung dadurch unbemerkt aus.
+    """
+    from app.models.invoice import InvoiceAuditLog
+
+    inv = Invoice(doc_type="rechnung", number="RE-2026-998", year=2026, sequence=998,
+                  date=date(2026, 7, 6), contact_id=None, updated_by="chef@firma.at")
+    db_session.add(inv)
+    db_session.commit()
+
+    assert invoice_archive.archive_invoice_pdf(db_session, inv, "gesendet") is False
+
+    eintraege = db_session.query(InvoiceAuditLog).filter_by(invoice_id=inv.id).all()
+    assert len(eintraege) == 1
+    assert eintraege[0].action == "archiviert"
+    assert "kein" in eintraege[0].note.lower()
+    assert eintraege[0].changed_by == "chef@firma.at"
+
+
+def test_archive_ohne_aktiven_ausloeser_protokolliert_nicht(db_session):
+    """
+    Abgeschaltete Archivierung ist eine Einstellung, kein Vorfall — sonst stünde
+    nach jedem Statuswechsel ein Eintrag im Protokoll.
+    """
+    from app.models.invoice import InvoiceAuditLog
+
+    db_session.add(InvoiceSettings(key="archive_triggers", value=["email"]))
+    inv = Invoice(doc_type="rechnung", number="RE-2026-997", year=2026, sequence=997,
+                  date=date(2026, 7, 6), contact_id=None)
+    db_session.add(inv)
+    db_session.commit()
+
+    assert invoice_archive.archive_invoice_pdf(db_session, inv, "gesendet") is False
+    assert db_session.query(InvoiceAuditLog).filter_by(invoice_id=inv.id).count() == 0
