@@ -103,12 +103,14 @@ def test_bmd_export_laeuft_und_enthaelt_die_rechnung(auth_client, db_session):
     """Regression A-1: griff früher auf das nicht gemappte Feld `account_nr` zu."""
     kontakt = _make_kontakt(db_session)
     inv = _create_invoice(auth_client, kontakt.id)
-    _finalisieren(auth_client, inv["id"])
+    # Die Nummer fällt erst beim Finalisieren — in der Anlage-Antwort steht
+    # daher noch None.
+    final = _finalisieren(auth_client, inv["id"])
 
     zeilen = _export_zeilen(auth_client)
     assert len(zeilen) == 1
     z = zeilen[0]
-    assert z["Belegnummer"] == inv["number"]
+    assert z["Belegnummer"] == final["number"] == "RE-2026-001"
     assert z["Nettobetrag"] == "200,00"
     assert z["USt-Betrag"] == "40,00"
     assert z["Bruttobetrag"] == "240,00"
@@ -214,10 +216,10 @@ def test_bmd_export_filtert_nach_zeitraum(auth_client, db_session):
     juni = _create_invoice(auth_client, kontakt.id, date="2026-06-15")
     juli = _create_invoice(auth_client, kontakt.id, date="2026-07-15")
     _finalisieren(auth_client, juni["id"])
-    _finalisieren(auth_client, juli["id"])
+    juli_final = _finalisieren(auth_client, juli["id"])
 
     zeilen = _export_zeilen(auth_client, date_from="2026-07-01", date_to="2026-07-31")
-    assert [z["Belegnummer"] for z in zeilen] == [juli["number"]]
+    assert [z["Belegnummer"] for z in zeilen] == [juli_final["number"]]
 
 
 # ── A-12: Kontaktname im Belegbuch ────────────────────────────────────────────

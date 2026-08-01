@@ -54,6 +54,20 @@ def _create_invoice(client, contact_id=None, doc_type="rechnung", **extra):
     return resp.json()
 
 
+def _als_admin(client):
+    """
+    Setzt den Admin-Token am Client.
+
+    Belege löschen und Nummernkreise ändern sind Admin-Vorgänge
+    (``require_admin``) — der Standard-Testbenutzer ist ein Mitarbeiter.
+    """
+    resp = client.post("/api/auth/login", json={
+        "email": "admin@deinezeit.local", "password": TEST_USER_PASSWORD})
+    assert resp.status_code == 200, f"Admin-Login fehlgeschlagen: {resp.text}"
+    client.headers.update({"Authorization": f"Bearer {resp.json()['access_token']}"})
+    return client
+
+
 def _finalisieren(client, invoice_id, status="offen"):
     resp = client.post(f"/api/invoices/{invoice_id}/set-status", json={"status": status})
     assert resp.status_code == 200, resp.text
@@ -90,12 +104,13 @@ def test_finalisieren_vergibt_die_nummer(auth_client, db_session):
     assert final["sequence"] == 1
 
 
-def test_geloeschter_entwurf_reisst_keine_luecke(auth_client, db_session):
+def test_geloeschter_entwurf_reisst_keine_luecke(auth_client, db_session, admin_user):
     """
     Kern von A-10: Früher verbrauchte jeder Entwurf sofort eine Nummer. Wurde er
     gelöscht, fehlte sie im Nummernkreis — § 11 Abs. 1 Z 3 UStG verlangt aber
     eine fortlaufende Nummer.
     """
+    _als_admin(auth_client)          # Löschen ist Admin-Sache
     kontakt = _make_kontakt(db_session)
     verworfen = _create_invoice(auth_client, kontakt.id)
     assert auth_client.delete(f"/api/invoices/{verworfen['id']}").status_code == 204
@@ -152,9 +167,7 @@ def test_wiederkehrende_erzeugung_bleibt_nummernlos(auth_client, db_session):
 # ── A-11: Zählerstand nur aufwärts ────────────────────────────────────────────
 
 def test_zaehler_laesst_sich_nicht_zuruecksetzen(auth_client, db_session, admin_user):
-    token = auth_client.post("/api/auth/login", json={
-        "email": "admin@deinezeit.local", "password": TEST_USER_PASSWORD}).json()["access_token"]
-    auth_client.headers.update({"Authorization": f"Bearer {token}"})
+    _als_admin(auth_client)
 
     inv = _create_invoice(auth_client, _make_kontakt(db_session).id)
     _finalisieren(auth_client, inv["id"])          # Zähler steht auf 1
@@ -269,7 +282,9 @@ def test_belegart_laesst_sich_nicht_umbiegen(auth_client, db_session):
 
 # ── Lebenszyklus: Löschen und Stornieren ──────────────────────────────────────
 
-def test_ausgestellter_beleg_nicht_loeschbar(auth_client, db_session):
+def test_ausgestellter_beleg_nicht_loeschbar(auth_client, db_session, admin_user):
+    """Auch der Admin kommt nicht an einen ausgestellten Beleg."""
+    _als_admin(auth_client)
     inv = _create_invoice(auth_client, _make_kontakt(db_session).id)
     _finalisieren(auth_client, inv["id"])
 
@@ -278,8 +293,9 @@ def test_ausgestellter_beleg_nicht_loeschbar(auth_client, db_session):
     assert "Aufbewahrungspflicht" in resp.json()["detail"]
 
 
-def test_stornierter_beleg_nicht_loeschbar(auth_client, db_session):
+def test_stornierter_beleg_nicht_loeschbar(auth_client, db_session, admin_user):
     """Auch nach dem Storno bleibt der Beleg erhalten (§ 132 BAO)."""
+    _als_admin(auth_client)
     inv = _create_invoice(auth_client, _make_kontakt(db_session).id)
     _finalisieren(auth_client, inv["id"])
     auth_client.post(f"/api/invoices/{inv['id']}/cancel", json={"cancel_mode": "status_only"})
@@ -356,8 +372,15 @@ def test_protokoll_neueste_zuerst(auth_client, db_session):
     auth_client.post(f"/api/invoices/{inv['id']}/set-status", json={"status": "gesendet"})
 
     eintraege = auth_client.get(f"/api/invoices/{inv['id']}/audit").json()
-    assert len(eintraege) == 2
-    assert eintraege[0]["changes"]["status"]["neu"] == "gesendet"
+
+    # Der Wechsel auf 'gesendet' ist zugleich ein Archiv-Auslöser und
+    # hinterlässt deshalb einen zusätzlichen Eintrag. Statt auf eine feste
+    # Anzahl zu prüfen, wird hier die Sortierung geprüft — darum geht es.
+    zeiten = [e["changed_at"] for e in eintraege]
+    assert zeiten == sorted(zeiten, reverse=True)
+
+    status_eintraege = [e for e in eintraege if e["action"] == "status"]
+    assert status_eintraege[0]["changes"]["status"]["neu"] == "gesendet"
 
 
 def test_protokoll_unbekannter_beleg_404(auth_client, db_session):
