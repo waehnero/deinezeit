@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '1.12.38',
+    day: '01',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Liefer-/Leistungsdatum am Beleg, wahlweise als Zeitraum — Pflichtangabe beim Ausstellen von Rechnungen und Gutschriften (§ 11 UStG)',
+      'Steuersätze sind in den Verkaufseinstellungen pflegbar: Prozentsatz, Bezeichnung und USt-Code für die Buchhaltung — der ermäßigte Satz von 13 % ist damit erfassbar',
+    ],
+    updates: [
+      'Die Umsatzsteuer wird je Steuersatz gerundet statt je Position — Netto plus Steuer ergibt auf jedem Beleg exakt die Gesamtsumme',
+      'Textzeilen ohne Betrag erzeugen auf dem Beleg keine irrtümliche Reverse-Charge-Zeile mehr',
+      'Ein nicht gepflegter Steuersatz wird im Buchhaltungs-Export nicht mehr stillschweigend als Normalsatz gebucht',
+      'Gutschriften, Umwandlungen und Serienrechnungen übernehmen den Leistungszeitraum des Ursprungsbelegs',
+    ],
+  },
+  {
     version: '1.12.37',
     day: '01',
     month: 'August',

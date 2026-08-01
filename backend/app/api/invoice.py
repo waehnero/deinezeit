@@ -68,12 +68,28 @@ def _next_number(db: Session, doc_type: str, year: int) -> tuple[int, str]:
 
 
 def _calc_totals(invoice: Invoice) -> None:
-    """Positionen neu berechnen und Summen auf Invoice schreiben."""
+    """
+    Positionen neu berechnen und Summen auf den Beleg schreiben.
+
+    Die Steuer wird **je Steuersatz** summiert und dann einmal gerundet.
+    Vorher wurde je Position gerundet — bei mehreren Positionen wich die
+    gespeicherte Summe dadurch um Cent von der MwSt.-Aufschlüsselung auf dem
+    PDF ab, und auf dem gedruckten Beleg ergab Netto + MwSt. nicht die
+    Gesamtsumme. Kaufmännisch korrekt ist: je Satz summieren, dann runden.
+
+    Textzeilen tragen nichts zur Summe bei (der PDF- und der BMD-Export
+    überspringen sie ebenfalls).
+    """
     from decimal import Decimal
+    from collections import defaultdict
+
     subtotal = Decimal("0")
-    tax_total = Decimal("0")
+    netto_je_satz: dict = defaultdict(lambda: Decimal("0"))
 
     for pos in invoice.positions:
+        if pos.pos_type == "text":
+            pos.line_total = Decimal("0")
+            continue
         qty = pos.quantity or Decimal("0")
         price = pos.unit_price or Decimal("0")
         base = qty * price
@@ -82,8 +98,13 @@ def _calc_totals(invoice: Invoice) -> None:
         base = base.quantize(Decimal("0.01"))
         pos.line_total = base
         subtotal += base
-        if invoice.tax_mode != "kleinunternehmer" and pos.tax_rate is not None:
-            tax_total += (base * pos.tax_rate / 100).quantize(Decimal("0.01"))
+        if pos.tax_rate is not None:
+            netto_je_satz[pos.tax_rate] += base
+
+    tax_total = Decimal("0")
+    if invoice.tax_mode != "kleinunternehmer":
+        for satz, netto in netto_je_satz.items():
+            tax_total += (netto * satz / 100).quantize(Decimal("0.01"))
 
     invoice.subtotal = subtotal
     invoice.tax_total = tax_total
@@ -158,6 +179,34 @@ def _audit(db: Session, invoice: Invoice, action: str, *,
     ))
 
 
+def _pruefe_pflichtangaben(invoice: Invoice) -> None:
+    """
+    Prüft die Pflichtangaben, bevor ein Beleg ausgestellt wird.
+
+    Das Liefer-/Leistungsdatum ist nach § 11 Abs. 1 Z 4 UStG Pflicht — fehlt
+    es, verliert der Empfänger den Vorsteuerabzug. Geprüft wird bewusst erst
+    beim Ausstellen und nicht schon beim Speichern: Am Entwurf soll man
+    arbeiten können, auch wenn das Leistungsdatum noch nicht feststeht.
+
+    Nur Rechnungen und Gutschriften sind betroffen; Angebot, Auftrags-
+    bestätigung und Lieferschein rechnen nichts ab.
+    """
+    if invoice.doc_type not in ("rechnung", "gutschrift"):
+        return
+    if invoice.delivery_date:
+        if invoice.delivery_date_to and invoice.delivery_date_to < invoice.delivery_date:
+            raise HTTPException(
+                400, "Der Leistungszeitraum endet vor seinem Beginn — bitte die "
+                     "beiden Daten prüfen.")
+        return
+    raise HTTPException(
+        400,
+        "Das Liefer-/Leistungsdatum fehlt. Es ist eine Pflichtangabe nach "
+        "§ 11 Abs. 1 Z 4 UStG — ohne sie verliert der Empfänger den "
+        "Vorsteuerabzug. Bitte im Beleg ergänzen und erneut ausstellen.",
+    )
+
+
 def _finalize(db: Session, invoice: Invoice) -> bool:
     """
     Sammelvorgang für „Beleg verlässt den Entwurf".
@@ -168,6 +217,7 @@ def _finalize(db: Session, invoice: Invoice) -> bool:
     Den Protokolleintrag schreibt der Aufrufer, weil nur er den Anlass kennt.
     Kein Commit.
     """
+    _pruefe_pflichtangaben(invoice)
     neue_nummer = _ensure_number(db, invoice)
     ensure_recipient_snapshot(db, invoice)
     _sync_time_entry_status(db, invoice)
@@ -187,9 +237,10 @@ def _audit_changes(alter_status: str, invoice: Invoice, neue_nummer: bool) -> di
 # Das PDF wird bei jedem Abruf neu erzeugt — eine Änderung an diesen Feldern
 # würde den bereits versendeten Beleg rückwirkend verändern.
 GESPERRTE_FELDER = {
-    "date":          "Belegdatum",
-    "due_date":      "Zahlungsziel",
-    "delivery_date": "Liefer-/Leistungsdatum",
+    "date":             "Belegdatum",
+    "due_date":         "Zahlungsziel",
+    "delivery_date":    "Liefer-/Leistungsdatum",
+    "delivery_date_to": "Ende des Leistungszeitraums",
     "contact_id":    "Empfänger",
     "title":         "Titel / Betreff",
     "reference":     "Referenz",
@@ -525,7 +576,11 @@ async def get_invoice_settings(
     # ist. Sonst müsste die Oberfläche einen eigenen Vorgabewert vorhalten —
     # und würde ihn beim nächsten Speichern über den echten schreiben.
     from app.services.invoice_archive import get_archive_triggers
+    from app.services import tax_rates as tax_rates_service
     werte.setdefault("archive_triggers", get_archive_triggers(db))
+    # Dasselbe für die Steuersätze: Die Oberfläche soll die wirksamen Sätze
+    # anzeigen, ohne eine eigene Kopie der Vorgabewerte vorzuhalten.
+    werte["tax_rates"] = tax_rates_service.as_json(tax_rates_service.get_tax_rates(db))
     return werte
 
 
@@ -1019,6 +1074,13 @@ async def cancel_invoice(
             related_invoice_id=inv.id,
             title=f"Gutschrift zu {inv.number}",
             date=datetime.now().date(),
+            # Die Gutschrift betrifft dieselbe Leistung — Zeitraum mitnehmen,
+            # sonst fehlt der Pflichtangabe nach § 11 Abs. 1 Z 4 UStG die
+            # Grundlage. Altbelege haben noch kein Leistungsdatum (das Feld war
+            # über kein Eingabefeld erreichbar); dann tritt das Belegdatum ein,
+            # denn am Storno einer alten Rechnung darf das nicht scheitern.
+            delivery_date=inv.delivery_date or inv.date,
+            delivery_date_to=inv.delivery_date_to,
             tax_mode=inv.tax_mode,
             currency=inv.currency,
             template_id=inv.template_id,
@@ -1080,6 +1142,8 @@ async def mark_paid(
     if inv.status == "storniert":
         raise HTTPException(400, "Stornierte Belege können nicht bezahlt werden")
 
+    _pruefe_pflichtangaben(inv)      # prüfen, bevor der Beleg verändert wird
+
     alter_status = inv.status
     inv.status = "bezahlt"
     inv.paid_at = body.paid_at
@@ -1132,6 +1196,12 @@ async def set_status(
     if new_status not in allowed.get(inv.status, []):
         raise HTTPException(400, f"Statuswechsel von '{inv.status}' nach '{new_status}' nicht erlaubt")
 
+    # Pflichtangaben prüfen, BEVOR etwas geändert wird. Andernfalls bliebe bei
+    # einem Abbruch ein halb geänderter Beleg in der Sitzung zurück — in der
+    # Produktion rollt db.close() das zwar zurück, aber sich darauf zu
+    # verlassen ist brüchig.
+    _pruefe_pflichtangaben(inv)
+
     alter_status = inv.status
     inv.status = new_status
     inv.updated_by = current_user.email
@@ -1175,6 +1245,7 @@ async def convert_to_ab(
         contact_id=offer.contact_id, project_id=offer.project_id,
         related_invoice_id=offer.id,
         title=offer.title, date=datetime.now().date(),
+        delivery_date=offer.delivery_date, delivery_date_to=offer.delivery_date_to,
         tax_mode=offer.tax_mode, currency=offer.currency,
         template_id=offer.template_id,
         intro_text=intro, outro_text=outro,
@@ -1228,6 +1299,7 @@ async def convert_to_invoice(
         related_invoice_id=offer.id,
         title=offer.title,
         date=datetime.now().date(),
+        delivery_date=offer.delivery_date, delivery_date_to=offer.delivery_date_to,
         tax_mode=offer.tax_mode,
         currency=offer.currency,
         template_id=offer.template_id,
@@ -1291,6 +1363,9 @@ async def duplicate_invoice(
     dup = Invoice(
         doc_type=src.doc_type,
         date=datetime.now().date(),
+        # Leistungsdatum NICHT übernehmen: Das Duplikat betrifft eine neue
+        # Leistung; ein mitkopiertes altes Datum wäre schlicht falsch.
+        delivery_date=datetime.now().date(),
         tax_mode=src.tax_mode,
         currency=src.currency,
         template_id=src.template_id,
@@ -1533,6 +1608,10 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
 
     doc_label    = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
     company_name = settings_d.get("company_name", "DeineZeit")
+
+    # Pflichtangaben VOR dem Versand prüfen — sonst geht der Beleg raus und
+    # scheitert erst danach am Statuswechsel.
+    _pruefe_pflichtangaben(inv)
 
     # Nummer VOR der PDF-Erzeugung vergeben: Ein Entwurf ist nummernlos, und
     # der Beleg geht mit dem Versand ohnehin aus dem Entwurf. Ohne diesen

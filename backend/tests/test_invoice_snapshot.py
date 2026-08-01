@@ -47,6 +47,7 @@ def _create_invoice(client, contact_id, doc_type="rechnung"):
         "doc_type": doc_type,
         "contact_id": str(contact_id),
         "date": "2026-07-06",
+        "delivery_date": "2026-07-06",
         "positions": [{
             "pos_type": "item", "description": "Beratung",
             "quantity": "2", "unit_price": "100", "tax_rate": "20",

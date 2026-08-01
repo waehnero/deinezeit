@@ -22,20 +22,24 @@ def _admin_client(client, admin_user):
     return client
 
 
-def test_get_settings_initial_nur_wirksame_archiv_ausloeser(auth_client):
+def test_get_settings_initial_nur_wirksame_vorgabewerte(auth_client):
     """
-    Ohne gespeicherte Werte kommt nur ein Eintrag zurück: die WIRKSAMEN
-    Archiv-Auslöser.
+    Ohne gespeicherte Werte kommen genau die Einstellungen zurück, für die es
+    wirksame Vorgaben gibt: Archiv-Auslöser und Steuersätze.
 
-    Sie werden bewusst immer mitgeliefert, damit die Oberfläche keinen eigenen
-    Vorgabewert vorhalten muss — sonst schreibt sie ihn beim nächsten Speichern
-    über den echten. Genau das ist vorher passiert.
+    Beide werden bewusst immer mitgeliefert, damit die Oberfläche keine eigene
+    Kopie der Vorgabewerte vorhalten muss — sonst schreibt sie diese beim
+    nächsten Speichern über die echten. Genau das ist bei den Archiv-Auslösern
+    vorher passiert.
     """
     from app.services.invoice_archive import DEFAULT_TRIGGERS
 
     resp = auth_client.get("/api/invoices/settings/all")
     assert resp.status_code == 200
-    assert resp.json() == {"archive_triggers": DEFAULT_TRIGGERS}
+    daten = resp.json()
+    assert set(daten.keys()) == {"archive_triggers", "tax_rates"}
+    assert daten["archive_triggers"] == DEFAULT_TRIGGERS
+    assert [s["satz"] for s in daten["tax_rates"]] == [20, 13, 10, 0]
 
 
 def test_gespeicherte_archiv_ausloeser_haben_vorrang(auth_client, admin_user, db_session):

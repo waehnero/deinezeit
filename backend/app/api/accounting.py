@@ -21,6 +21,7 @@ from app.models.accounting import AccountingAccount
 from app.models.invoice import Invoice, InvoicePosition, InvoiceSettings
 from app.models.masterdata import EntityRecord
 from app.models.settings import Setting
+from app.services import tax_rates as tax_rates_service
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/accounting", tags=["Buchhaltung"])
@@ -130,13 +131,11 @@ async def set_default_erloes(
 
 # BMD NTCS / Classic Buchungsjournal-Format
 # Spalten: Datum; Belegnummer; Text; Konto; Gegenkonto; Betrag; USt-Code; USt-Betrag; Währung
-BMD_UST_CODES = {
-    "20": "U20",
-    "13": "U13",   # ermäßigter Satz (Beherbergung, Kultur, Ab-Hof-Verkauf …)
-    "10": "U10",
-    "0":  "U00",
-    None: "URC",   # Reverse Charge
-}
+#
+# Die USt-Codes stehen nicht mehr hier, sondern werden je Steuersatz in den
+# Verkaufseinstellungen gepflegt (services/tax_rates.py). Grund: BMD-Codes sind
+# kanzleiabhängig, und die frühere Tabelle fiel bei unbekannten Sätzen still
+# auf "U20" zurück — ein 13-%-Umsatz wurde damit als 20 % gebucht.
 
 # Buchungsrelevante Belegarten. Angebot, Auftragsbestätigung und Lieferschein
 # sind keine Umsätze und dürfen nie in der Buchhaltung landen.
@@ -224,6 +223,7 @@ async def export_bmd(
 
     default_erloes = _default_erloes_konto(db)
     default_debitor = _debitor_konto(db)
+    steuersaetze = tax_rates_service.get_tax_rates(db)
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
@@ -255,8 +255,10 @@ async def export_bmd(
                 continue
             net = pos.line_total or Decimal("0")
             rate = pos.tax_rate
-            rate_key = str(int(rate)) if rate is not None and rate == int(rate) else (str(rate) if rate is not None else None)
-            ust_code = BMD_UST_CODES.get(rate_key, "U20") if inv.tax_mode != "kleinunternehmer" else "U00"
+            if inv.tax_mode == "kleinunternehmer":
+                ust_code = tax_rates_service.ust_code_for(steuersaetze, 0)
+            else:
+                ust_code = tax_rates_service.ust_code_for(steuersaetze, rate)
 
             # Erlöskonto: aus Position > Artikel > Default
             erloes_konto = pos.account_nr or default_erloes
