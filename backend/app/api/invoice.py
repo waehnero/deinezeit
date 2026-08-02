@@ -9,11 +9,11 @@ import io
 import json
 
 from app.db.base import get_db
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_module
 from app.models.user import User
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
                                  InvoiceNumberSequence, InvoiceSettings,
-                                 InvoiceAuditLog)
+                                 InvoiceAuditLog, InvoicePayment)
 from app.models.settings import Setting
 from app.models.email_template import EmailTemplate
 from app.models.masterdata import EntityRecord
@@ -27,6 +27,8 @@ from app.schemas.invoice import (
     InvoiceBookFilter, InvoiceSettingsUpdate, NextNumberResponse,
     InvoicePositionResponse, InvoiceAttachmentResponse,
     InvoiceDuplicateRequest, InvoiceAuditEntry,
+    InvoicePaymentCreate, InvoicePaymentResponse, InvoicePaymentState,
+    OpenItem, OpenItemsByContact, OpenItemsResponse,
 )
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
@@ -177,6 +179,71 @@ def _audit(db: Session, invoice: Invoice, action: str, *,
         note=note,
         changed_by=user_email,
     ))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Zahlungen
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Status, die ein Zahlungseingang nicht überschreiben darf
+ZAHLUNG_UNBERUEHRT = ("entwurf", "storniert", "angenommen", "abgelehnt")
+
+
+def _zahlstand(invoice: Invoice) -> tuple:
+    """
+    Gibt (Summe der Zahlungen, offener Betrag, überzahlt?) zurück.
+
+    Vorzeichen bleiben erhalten: Eine Gutschrift hat eine negative Summe, ihre
+    Rückzahlung wird ebenfalls negativ erfasst. Der offene Betrag ist damit für
+    beide Belegarten schlicht ``total - gezahlt``.
+    """
+    from decimal import Decimal
+    gezahlt = sum((Decimal(str(z.amount or 0)) for z in invoice.payments), Decimal("0"))
+    gesamt = Decimal(str(invoice.total or 0))
+    offen = (gesamt - gezahlt).quantize(Decimal("0.01"))
+    # Überzahlt heißt: über das Ziel hinausgeschossen — bei einer Rechnung
+    # wurde zu viel überwiesen, bei einer Gutschrift zu viel erstattet.
+    ueberzahlt = (offen < 0) if gesamt >= 0 else (offen > 0)
+    return gezahlt, offen, ueberzahlt
+
+
+def _recalc_payment_status(db: Session, invoice: Invoice) -> None:
+    """
+    Leitet Zahlstand und Status aus den erfassten Zahlungen ab.
+
+    ``paid_at``/``paid_amount`` am Beleg werden dabei als Zwischenspeicher
+    mitgeführt (Datum der letzten Zahlung, Summe aller Zahlungen), damit PDF,
+    Export und DSGVO-Auswertung unverändert weiterarbeiten.
+
+    Entwürfe, stornierte, angenommene und abgelehnte Belege behalten ihren
+    Status — dort hat ein Zahlungseingang nichts verloren. Kein Commit.
+    """
+    from decimal import Decimal
+
+    gezahlt, offen, _ = _zahlstand(invoice)
+    invoice.paid_amount = gezahlt if invoice.payments else None
+    invoice.paid_at = max((z.paid_at for z in invoice.payments), default=None)
+
+    if invoice.status in ZAHLUNG_UNBERUEHRT:
+        return
+
+    if not invoice.payments:
+        # Alle Zahlungen entfernt → zurück auf offen bzw. überfällig.
+        # Dass der Beleg zuvor „gesendet" war, lässt sich nicht rekonstruieren.
+        invoice.status = "ueberfaellig" if _ist_ueberfaellig(invoice) else "offen"
+    elif abs(offen) < Decimal("0.01"):
+        invoice.status = "bezahlt"
+    elif (offen < 0) if Decimal(str(invoice.total or 0)) >= 0 else (offen > 0):
+        invoice.status = "bezahlt"          # überzahlt gilt als beglichen
+    else:
+        invoice.status = "teilbezahlt"
+
+
+def _ist_ueberfaellig(invoice: Invoice, stichtag: date = None) -> bool:
+    """Zahlungsziel überschritten und noch etwas offen?"""
+    if not invoice.due_date:
+        return False
+    return invoice.due_date < (stichtag or date.today())
 
 
 def _pruefe_pflichtangaben(invoice: Invoice) -> None:
@@ -680,7 +747,7 @@ def _book_query(db: Session, date_from: Optional[date], date_to: Optional[date],
     return q.order_by(Invoice.date, Invoice.number)
 
 
-@router.get("/book/list")
+@router.get("/book/list", dependencies=[Depends(require_module("buchhaltung"))])
 async def get_book_list(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -734,7 +801,7 @@ async def get_book_list(
     }
 
 
-@router.get("/book/csv")
+@router.get("/book/csv", dependencies=[Depends(require_module("buchhaltung"))])
 async def get_book_csv(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -771,7 +838,7 @@ async def get_book_csv(
     )
 
 
-@router.get("/book/pdf")
+@router.get("/book/pdf", dependencies=[Depends(require_module("buchhaltung"))])
 async def get_book_pdf(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -869,6 +936,233 @@ async def get_book_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=belegbuch.pdf"},
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Offene Posten
+#
+# Muss VOR "/{invoice_id}" stehen, sonst schluckt die Detailroute den Pfad.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Fälligkeitsstaffel — die übliche Einteilung in Debitorenauswertungen
+BUCKETS = [
+    ("nicht_faellig", "Nicht fällig"),
+    ("b1_30",         "1–30 Tage"),
+    ("b31_60",        "31–60 Tage"),
+    ("b61_90",        "61–90 Tage"),
+    ("b90_plus",      "über 90 Tage"),
+]
+
+
+def _bucket_fuer(tage: int) -> str:
+    if tage <= 0:
+        return "nicht_faellig"
+    if tage <= 30:
+        return "b1_30"
+    if tage <= 60:
+        return "b31_60"
+    if tage <= 90:
+        return "b61_90"
+    return "b90_plus"
+
+
+@router.get("/open-items", response_model=OpenItemsResponse, dependencies=[Depends(require_module("buchhaltung"))])
+async def get_open_items(
+    contact_id: Optional[UUID] = Query(None),
+    stichtag: Optional[date] = Query(None, description="Standard: heute"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Offene-Posten-Liste mit Fälligkeitsstaffel.
+
+    Die Standardauswertung der Debitorenbuchhaltung: Welche ausgestellten
+    Belege sind noch nicht (vollständig) beglichen, wie lange schon, und wie
+    verteilt sich das auf die Kunden.
+
+    Enthalten sind Rechnungen und Gutschriften, die ausgestellt und nicht
+    storniert sind und bei denen noch etwas offen ist. Entwürfe, Angebote,
+    Auftragsbestätigungen und Lieferscheine sind keine Forderungen.
+    """
+    from decimal import Decimal
+
+    heute = stichtag or date.today()
+
+    q = db.query(Invoice).filter(
+        Invoice.is_recurring_template == False,
+        Invoice.doc_type.in_(["rechnung", "gutschrift"]),
+        Invoice.status.notin_(["entwurf", "storniert"]),
+    )
+    if contact_id:
+        q = q.filter(Invoice.contact_id == contact_id)
+    belege = q.order_by(Invoice.due_date.asc().nullslast(), Invoice.date.asc()).all()
+
+    kontakt_ids = list({b.contact_id for b in belege if b.contact_id})
+    kontakt_map = {}
+    if kontakt_ids:
+        for r in db.query(EntityRecord).filter(EntityRecord.id.in_(kontakt_ids)).all():
+            kontakt_map[r.id] = r.display_name or ""
+
+    items, summen_je_kontakt = [], {}
+    buckets = {schluessel: Decimal("0") for schluessel, _ in BUCKETS}
+    gesamt_offen = Decimal("0")
+
+    for b in belege:
+        gezahlt, offen, _ueber = _zahlstand(b)
+        if abs(offen) < Decimal("0.01"):
+            continue                      # beglichen — kein offener Posten
+
+        tage = (heute - b.due_date).days if b.due_date else 0
+        bucket = _bucket_fuer(tage)
+        buckets[bucket] += offen
+        gesamt_offen += offen
+
+        eintrag = summen_je_kontakt.setdefault(
+            b.contact_id, {"contact_id": b.contact_id,
+                           "contact_name": kontakt_map.get(b.contact_id),
+                           "open_amount": Decimal("0"), "count": 0})
+        eintrag["open_amount"] += offen
+        eintrag["count"] += 1
+
+        items.append(OpenItem(
+            id=b.id, number=b.number, doc_type=b.doc_type, date=b.date,
+            due_date=b.due_date, contact_id=b.contact_id,
+            contact_name=kontakt_map.get(b.contact_id), title=b.title,
+            total=b.total, paid_total=gezahlt, open_amount=offen,
+            status=b.status, days_overdue=max(0, tage), bucket=bucket,
+        ))
+
+    return OpenItemsResponse(
+        items=items,
+        by_contact=sorted(
+            (OpenItemsByContact(**e) for e in summen_je_kontakt.values()),
+            key=lambda e: abs(e.open_amount), reverse=True),
+        buckets={k: float(v) for k, v in buckets.items()},
+        total_open=gesamt_offen,
+        count=len(items),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Zahlungseingänge
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _zahlstand_antwort(invoice: Invoice) -> InvoicePaymentState:
+    gezahlt, offen, ueberzahlt = _zahlstand(invoice)
+    return InvoicePaymentState(
+        invoice_id=invoice.id, status=invoice.status, total=invoice.total,
+        paid_total=gezahlt, open_amount=offen, overpaid=ueberzahlt,
+        payments=[InvoicePaymentResponse.model_validate(z) for z in invoice.payments],
+    )
+
+
+@router.get("/{invoice_id}/payments", response_model=InvoicePaymentState)
+async def list_payments(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Zahlungseingänge eines Belegs samt Zahlstand."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    return _zahlstand_antwort(inv)
+
+
+@router.post("/{invoice_id}/payments", response_model=InvoicePaymentState)
+async def add_payment(
+    invoice_id: UUID,
+    body: InvoicePaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Erfasst einen Zahlungseingang.
+
+    Mehrere Zahlungen je Beleg sind ausdrücklich vorgesehen (Teil- und
+    Ratenzahlung). Eine Überzahlung wird angenommen und gekennzeichnet statt
+    abgelehnt — sie kommt vor, und das System darf daran nicht scheitern.
+    """
+    from decimal import Decimal
+
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    if inv.doc_type not in ("rechnung", "gutschrift"):
+        raise HTTPException(400, "Nur Rechnungen und Gutschriften können bezahlt werden")
+    if inv.status == "entwurf":
+        raise HTTPException(400, "Ein Entwurf ist noch nicht ausgestellt — "
+                                 "er kann keine Zahlung haben.")
+    if inv.status == "storniert":
+        raise HTTPException(400, "Stornierte Belege können keine Zahlung erhalten")
+    if Decimal(str(body.amount)) == 0:
+        raise HTTPException(400, "Der Zahlbetrag darf nicht null sein")
+
+    zahlung = InvoicePayment(
+        invoice_id=inv.id, paid_at=body.paid_at, amount=body.amount,
+        method=body.method, reference=body.reference, note=body.note,
+        created_by=current_user.email,
+    )
+    db.add(zahlung)
+    db.flush()
+    db.refresh(inv)
+
+    alter_status = inv.status
+    _recalc_payment_status(db, inv)
+    inv.updated_by = current_user.email
+
+    _, offen, ueberzahlt = _zahlstand(inv)
+    hinweis = " — Überzahlung" if ueberzahlt else ""
+    _audit(db, inv, "zahlung",
+           changes={"status": {"alt": alter_status, "neu": inv.status}}
+                   if alter_status != inv.status else None,
+           note=f"Zahlung {body.paid_at:%d.%m.%Y} über "
+                f"{float(body.amount):.2f} {inv.currency}, offen "
+                f"{float(offen):.2f}{hinweis}",
+           user_email=current_user.email)
+
+    db.flush()
+    archive_invoice_pdf(db, inv, "bezahlt") if inv.status == "bezahlt" else None
+    db.commit()
+    db.refresh(inv)
+    return _zahlstand_antwort(inv)
+
+
+@router.delete("/payments/{payment_id}", response_model=InvoicePaymentState)
+async def delete_payment(
+    payment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Nimmt einen Zahlungseingang zurück (Fehleingabe).
+
+    Der Belegstatus wird danach neu abgeleitet. Wird die letzte Zahlung
+    entfernt, gilt der Beleg wieder als offen bzw. überfällig.
+    """
+    zahlung = db.query(InvoicePayment).filter(InvoicePayment.id == payment_id).first()
+    if not zahlung:
+        raise HTTPException(404, "Zahlung nicht gefunden")
+
+    inv = db.query(Invoice).filter(Invoice.id == zahlung.invoice_id).first()
+    beschreibung = (f"Zahlung vom {zahlung.paid_at:%d.%m.%Y} über "
+                    f"{float(zahlung.amount):.2f} zurückgenommen")
+
+    db.delete(zahlung)
+    db.flush()
+    db.refresh(inv)
+
+    alter_status = inv.status
+    _recalc_payment_status(db, inv)
+    inv.updated_by = current_user.email
+    _audit(db, inv, "zahlung",
+           changes={"status": {"alt": alter_status, "neu": inv.status}}
+                   if alter_status != inv.status else None,
+           note=beschreibung, user_email=current_user.email)
+
+    db.commit()
+    db.refresh(inv)
+    return _zahlstand_antwort(inv)
 
 
 @router.get("/{invoice_id}", response_model=InvoiceResponse)
@@ -1145,15 +1439,31 @@ async def mark_paid(
     _pruefe_pflichtangaben(inv)      # prüfen, bevor der Beleg verändert wird
 
     alter_status = inv.status
-    inv.status = "bezahlt"
-    inv.paid_at = body.paid_at
-    inv.paid_amount = body.paid_amount or inv.total
-    inv.updated_by = current_user.email
     neue_nummer = _finalize(db, inv)
+    # Ein Entwurf verlässt hiermit den Entwurfsstatus. Ohne diesen Schritt
+    # bliebe er "entwurf" — und _recalc_payment_status lässt Entwürfe bewusst
+    # unangetastet, der Beleg würde also nie auf "bezahlt" wechseln.
+    if inv.status == "entwurf":
+        inv.status = "offen"
+
+    # Als vollständig bezahlt markieren heißt jetzt: den offenen Restbetrag als
+    # Zahlung erfassen. Damit steht auch dieser Weg im Zahlungsjournal, statt
+    # nur zwei Felder am Beleg zu setzen.
+    _, offen, _ = _zahlstand(inv)
+    betrag = body.paid_amount if body.paid_amount is not None else offen
+    db.add(InvoicePayment(
+        invoice_id=inv.id, paid_at=body.paid_at, amount=betrag,
+        note="Als bezahlt markiert", created_by=current_user.email,
+    ))
+    db.flush()
+    db.refresh(inv)
+
+    _recalc_payment_status(db, inv)
+    inv.updated_by = current_user.email
     _audit(db, inv, "bezahlt",
            changes=_audit_changes(alter_status, inv, neue_nummer),
            note=f"Zahlungseingang {body.paid_at:%d.%m.%Y} über "
-                f"{float(inv.paid_amount or 0):.2f} {inv.currency}",
+                f"{float(betrag):.2f} {inv.currency}",
            user_email=current_user.email)
     db.flush()
     archive_invoice_pdf(db, inv, "bezahlt")   # ggf. PDF ins Datacenter archivieren
@@ -1184,10 +1494,14 @@ async def set_status(
         raise HTTPException(400, "Stornierte Dokumente können nicht geändert werden")
 
     new_status = body.get("status")
+    # Zahlungsbedingte Status (teilbezahlt/bezahlt) entstehen über die
+    # Zahlungserfassung, nicht über diesen Endpunkt — deshalb stehen sie hier
+    # nur als Ziel für den Sonderfall „ohne Zahlung als erledigt markieren".
     allowed = {
         "entwurf":      ["offen", "gesendet"],
         "offen":        ["gesendet", "bezahlt"],
         "gesendet":     ["offen", "bezahlt", "angenommen", "abgelehnt"],
+        "teilbezahlt":  ["bezahlt", "ueberfaellig"],
         "angenommen":   ["bezahlt"],
         "abgelehnt":    [],
         "bezahlt":      [],

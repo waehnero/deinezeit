@@ -4,6 +4,24 @@
  */
 export const changelog = [
   {
+    version: '1.12.39',
+    day: '02',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Zahlungen je Beleg erfassen — Teil- und Ratenzahlungen mit Zahlungsart und Verwendungszweck; eine falsch erfasste Zahlung lässt sich zurücknehmen',
+      'Neue Übersicht „Offene Posten" mit Fälligkeitsstaffel und Summierung je Kunde',
+      'Neues Modulrecht „Buchhaltung" — schaltet Verkaufsbuch, offene Posten und den Buchhaltungs-Export frei',
+      'Fällige, noch nicht beglichene Rechnungen werden automatisch als überfällig gekennzeichnet',
+    ],
+    updates: [
+      'Neuer Belegstatus „Teilbezahlt" — eine angezahlte Rechnung gilt nicht mehr einfach als offen',
+      '„Als bezahlt markieren" wird ebenfalls als Zahlung erfasst und ist damit nachvollziehbar',
+      'Überzahlungen werden angenommen und ausgewiesen statt abgelehnt',
+      'Jede Zahlung und jeder Fälligkeitswechsel steht im Änderungsprotokoll des Belegs',
+    ],
+  },
+  {
     version: '1.12.38',
     day: '01',
     month: 'August',

@@ -5,13 +5,14 @@ import Fab from '../components/Fab'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 import RichTextEditor from '../components/RichTextEditor'
 import toast from 'react-hot-toast'
 import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
   MoreHorizontal, Book, RotateCcw, Mail, MailCheck, MailX,
-  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat
+  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet
 } from 'lucide-react'
 
 function fmtDate(d) {
@@ -43,6 +44,7 @@ const STATUS_BADGE = {
   entwurf:      { label: 'Entwurf',    cls: 'bg-neutral-100 text-neutral-600' },
   gesendet:     { label: 'Gesendet',   cls: 'bg-blue-100 text-blue-700' },
   offen:        { label: 'Offen',      cls: 'bg-amber-100 text-amber-700' },
+  teilbezahlt:  { label: 'Teilbezahlt', cls: 'bg-lime-100 text-lime-800' },
   bezahlt:      { label: 'Bezahlt',    cls: 'bg-green-100 text-green-700' },
   ueberfaellig: { label: 'Überfällig', cls: 'bg-red-100 text-red-700' },
   storniert:    { label: 'Storniert',  cls: 'bg-neutral-200 text-neutral-500 line-through' },
@@ -62,6 +64,9 @@ function DocTypeBadge({ type }) {
 
 export default function InvoicePage() {
   const navigate = useNavigate()
+  const { hasModule } = useAuth()
+  // Zusatzrecht: schaltet Verkaufsbuch und offene Posten frei
+  const hatBuchhaltung = hasModule('buchhaltung')
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('')
@@ -105,12 +110,7 @@ export default function InvoicePage() {
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
 
-  async function handleMarkPaid(invoice, paidAt) {
-    try {
-      await invoiceApi.markPaid(invoice.id, { paid_at: paidAt })
-      toast.success('Als bezahlt markiert'); setPaidDialog(null); load()
-    } catch { toast.error('Fehler') }
-  }
+  // Zahlungen werden im PaidDialog erfasst; die Liste wird danach neu geladen.
 
   async function handleSetStatus(invoice, status) {
     const labels = { offen: 'Als offen markiert', gesendet: 'Als gesendet markiert', angenommen: 'Als angenommen markiert', abgelehnt: 'Als abgelehnt markiert' }
@@ -170,10 +170,20 @@ export default function InvoicePage() {
             </button>
           )}
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/invoices/book')}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-              <Book size={15} /> Verkaufsbuch
-            </button>
+            {/* Auswertungen hängen am Zusatzrecht "Buchhaltung" — wer Belege
+                schreiben darf, muss nicht zwangsläufig Zahlen und Export sehen. */}
+            {hatBuchhaltung && (
+              <>
+                <button onClick={() => navigate('/invoices/open-items')}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
+                  <Wallet size={15} /> Offene Posten
+                </button>
+                <button onClick={() => navigate('/invoices/book')}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
+                  <Book size={15} /> Verkaufsbuch
+                </button>
+              </>
+            )}
             <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
               className="flex-1 hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
               <Plus size={15} /> Neu erstellen
@@ -332,8 +342,8 @@ export default function InvoicePage() {
           onConfirm={mode => handleCancel(cancelDialog, mode)} />
       )}
       {paidDialog && (
-        <PaidDialog invoice={paidDialog} onClose={() => setPaidDialog(null)}
-          onConfirm={paidAt => handleMarkPaid(paidDialog, paidAt)} />
+        <PaidDialog invoice={paidDialog} onClose={() => { setPaidDialog(null); load() }}
+          onConfirm={() => load()} />
       )}
       {duplicateDialog && (
         <DuplicateDialog invoice={duplicateDialog} onClose={() => setDuplicateDialog(null)}
@@ -399,9 +409,11 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
           <Clock size={14} /> Als offen markieren
         </button>
       )}
-      {['offen', 'gesendet', 'ueberfaellig'].includes(status) && (isRe || isGs) && (
+      {/* Auch bei 'bezahlt' erreichbar — eine falsch erfasste Zahlung muss
+          sich zurücknehmen lassen. */}
+      {['offen', 'gesendet', 'ueberfaellig', 'teilbezahlt', 'bezahlt'].includes(status) && (isRe || isGs) && (
         <button onClick={onPaid} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-green-600">
-          <CheckCircle2 size={14} /> Als bezahlt markieren
+          <Wallet size={14} /> Zahlungen…
         </button>
       )}
       {isAn && status === 'gesendet' && (
@@ -434,7 +446,7 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
         </>
       )}
 
-      {isRe && !['storniert', 'bezahlt'].includes(status) && (
+      {isRe && !['storniert', 'bezahlt', 'entwurf'].includes(status) && (
         <>
           <div className="border-t border-neutral-100 my-1" />
           <button onClick={onCancel} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-red-500">
@@ -481,18 +493,132 @@ function CancelDialog({ invoice, onClose, onConfirm }) {
   )
 }
 
+const ZAHLARTEN = [
+  ['bank', 'Überweisung'], ['bar', 'Bar'], ['karte', 'Karte'],
+  ['lastschrift', 'Lastschrift'], ['verrechnung', 'Verrechnung'], ['sonstige', 'Sonstige'],
+]
+
+/**
+ * Zahlungen eines Belegs erfassen und einsehen.
+ *
+ * Ersetzt das frühere einmalige „Als bezahlt markieren": Teil- und
+ * Ratenzahlungen sind jetzt abbildbar, und eine Fehleingabe lässt sich
+ * zurücknehmen.
+ */
 function PaidDialog({ invoice, onClose, onConfirm }) {
+  const [stand, setStand] = useState(null)
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10))
+  const [betrag, setBetrag] = useState('')
+  const [zahlart, setZahlart] = useState('bank')
+  const [verwendung, setVerwendung] = useState('')
+  const [laeuft, setLaeuft] = useState(false)
+
+  const laden = useCallback(async () => {
+    try {
+      const res = await invoiceApi.listPayments(invoice.id)
+      setStand(res.data)
+      setBetrag(Number(res.data.open_amount).toFixed(2))
+    } catch { toast.error('Zahlungen konnten nicht geladen werden') }
+  }, [invoice.id])
+
+  useEffect(() => { laden() }, [laden])
+
+  async function erfassen() {
+    if (!betrag || Number(betrag) === 0) { toast.error('Bitte einen Betrag angeben'); return }
+    setLaeuft(true)
+    try {
+      const res = await invoiceApi.addPayment(invoice.id, {
+        paid_at: paidAt, amount: betrag, method: zahlart,
+        reference: verwendung || null,
+      })
+      setStand(res.data)
+      setBetrag(Number(res.data.open_amount).toFixed(2))
+      setVerwendung('')
+      toast.success(res.data.status === 'bezahlt' ? 'Beleg ist beglichen' : 'Zahlung erfasst')
+      onConfirm?.()
+    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler beim Erfassen') }
+    finally { setLaeuft(false) }
+  }
+
+  async function zuruecknehmen(id) {
+    if (!window.confirm('Diese Zahlung wirklich zurücknehmen?')) return
+    try {
+      const res = await invoiceApi.deletePayment(id)
+      setStand(res.data)
+      setBetrag(Number(res.data.open_amount).toFixed(2))
+      toast.success('Zahlung zurückgenommen')
+      onConfirm?.()
+    } catch { toast.error('Fehler') }
+  }
+
+  const offen = Number(stand?.open_amount ?? 0)
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 sheet-safe">
-      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm">
-        <h2 className="text-base font-semibold mb-4">Als bezahlt markieren</h2>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsdatum</label>
-        <input type="date" value={paidAt} onChange={e => setPaidAt(e.target.value)}
-          className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm mb-4" />
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-          <button onClick={() => onConfirm(paidAt)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Speichern</button>
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-6 w-full max-w-lg">
+        <h2 className="text-base font-semibold mb-1">Zahlungen zu {belegNr(invoice)}</h2>
+
+        {stand && (
+          <div className="flex items-center gap-4 text-sm mb-4 pb-3 border-b">
+            <span className="text-neutral-500">Gesamt <strong className="text-neutral-800">{fmtEuro(stand.total)}</strong></span>
+            <span className="text-neutral-500">Bezahlt <strong className="text-neutral-800">{fmtEuro(stand.paid_total)}</strong></span>
+            <span className={offen === 0 ? 'text-green-600' : stand.overpaid ? 'text-amber-600' : 'text-red-600'}>
+              {stand.overpaid ? 'Überzahlt ' : 'Offen '}
+              <strong>{fmtEuro(Math.abs(offen))}</strong>
+            </span>
+          </div>
+        )}
+
+        {stand?.payments?.length > 0 && (
+          <div className="mb-4 divide-y border rounded-lg">
+            {stand.payments.map(z => (
+              <div key={z.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                <div>
+                  <span className="font-medium text-neutral-800">{fmtEuro(z.amount)}</span>
+                  <span className="text-neutral-400 ml-2">
+                    {fmtDate(z.paid_at)}
+                    {z.method && ' · ' + (ZAHLARTEN.find(a => a[0] === z.method)?.[1] || z.method)}
+                    {z.reference && ' · ' + z.reference}
+                  </span>
+                </div>
+                <button onClick={() => zuruecknehmen(z.id)} title="Zahlung zurücknehmen"
+                  className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsdatum</label>
+            <input type="date" value={paidAt} onChange={e => setPaidAt(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Betrag</label>
+            <input type="number" step="0.01" value={betrag} onChange={e => setBetrag(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm text-right" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsart</label>
+            <select value={zahlart} onChange={e => setZahlart(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+              {ZAHLARTEN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Verwendungszweck</label>
+            <input value={verwendung} onChange={e => setVerwendung(e.target.value)} placeholder="optional"
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-5">
+          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Schließen</button>
+          <button onClick={erfassen} disabled={laeuft}
+            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60">
+            Zahlung erfassen
+          </button>
         </div>
       </div>
     </div>

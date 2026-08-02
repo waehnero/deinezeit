@@ -15,7 +15,8 @@
 > | 1 — Reparieren | `fix/verkauf-kritische-fehler` | ✅ umgesetzt (A-1, A-2, A-3, A-4, A-12, A-13 + Tests) |
 > | 2a — Belegsperre & Nummernkreis | `feature/verkauf-belegsperre` | ✅ umgesetzt (A-7, A-8, A-9, A-10, A-11, A-17a, B-4 + Tests) |
 > | 2b — Leistungsdatum & Steuer | `feature/verkauf-leistungsdatum-steuer` | ✅ umgesetzt (B-1, B-2, A-5, A-6, A-15 teilweise + Tests) |
-> | 3 — Zahlungen & Mahnwesen | `feature/verkauf-zahlungen` | offen |
+> | 3a — Zahlungen & offene Posten | `feature/verkauf-zahlungen` | ✅ umgesetzt (C-2, C-3, A-17b + Tests) |
+> | 3b — Mahnwesen & Skonto | offen | C-1, C-9 |
 > | 4 — Monatsabschluss | `feature/verkauf-monatsabschluss` | offen |
 > | 5 — E-Rechnung & Komfort | — | offen |
 >

@@ -664,6 +664,7 @@ const AUDIT_LABELS = {
   storniert:   'Storniert',
   bearbeitet:  'Bearbeitet',
   archiviert:  'Archivierung',
+  zahlung:     'Zahlung',
 }
 
 const FELD_LABELS = {

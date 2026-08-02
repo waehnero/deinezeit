@@ -233,6 +233,72 @@ class NextNumberResponse(BaseModel):
     preview: str                            # "RE-2026-001"
 
 
+# ── Zahlungen ─────────────────────────────────────────────────────────────────
+
+class InvoicePaymentCreate(BaseModel):
+    paid_at: date
+    amount: Decimal
+    method: Optional[str] = None       # bank | bar | karte | lastschrift | verrechnung | sonstige
+    reference: Optional[str] = None
+    note: Optional[str] = None
+
+class InvoicePaymentResponse(BaseModel):
+    id: UUID
+    invoice_id: UUID
+    paid_at: date
+    amount: Decimal
+    method: Optional[str] = None
+    reference: Optional[str] = None
+    note: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class InvoicePaymentState(BaseModel):
+    """Zahlstand eines Belegs — nach jeder Zahlungsänderung zurückgegeben."""
+    invoice_id: UUID
+    status: str
+    total: Decimal
+    paid_total: Decimal
+    open_amount: Decimal               # negativ = überzahlt
+    overpaid: bool
+    payments: List[InvoicePaymentResponse] = []
+
+
+# ── Offene Posten ─────────────────────────────────────────────────────────────
+
+class OpenItem(BaseModel):
+    id: UUID
+    number: Optional[str] = None
+    doc_type: str
+    date: date
+    due_date: Optional[date] = None
+    contact_id: Optional[UUID] = None
+    contact_name: Optional[str] = None
+    title: Optional[str] = None
+    total: Decimal
+    paid_total: Decimal
+    open_amount: Decimal
+    status: str
+    days_overdue: int                  # 0 = noch nicht fällig
+    bucket: str                        # nicht_faellig | b1_30 | b31_60 | b61_90 | b90_plus
+
+class OpenItemsByContact(BaseModel):
+    contact_id: Optional[UUID] = None
+    contact_name: Optional[str] = None
+    open_amount: Decimal
+    count: int
+
+class OpenItemsResponse(BaseModel):
+    items: List[OpenItem] = []
+    by_contact: List[OpenItemsByContact] = []
+    buckets: dict                      # {"nicht_faellig": 0.0, "b1_30": …}
+    total_open: Decimal
+    count: int
+
+
 # ── Änderungsprotokoll ────────────────────────────────────────────────────────
 
 class InvoiceAuditEntry(BaseModel):
