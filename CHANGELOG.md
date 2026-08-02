@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.12.39] – 2026-08-02 – Verkauf: Zahlungen, offene Posten und Modulrecht Buchhaltung
+
+### Neu
+- Zahlungen je Beleg erfassen — Teil- und Ratenzahlungen mit Zahlungsart und Verwendungszweck; eine falsch erfasste Zahlung lässt sich zurücknehmen
+- Neue Übersicht „Offene Posten" mit Fälligkeitsstaffel und Summierung je Kunde
+- Neues Modulrecht „Buchhaltung" — schaltet Verkaufsbuch, offene Posten und den Buchhaltungs-Export frei
+- Fällige, noch nicht beglichene Rechnungen werden automatisch als überfällig gekennzeichnet
+
+### Aktualisierungen
+- Neuer Belegstatus „Teilbezahlt" — eine angezahlte Rechnung gilt nicht mehr einfach als offen
+- „Als bezahlt markieren" wird ebenfalls als Zahlung erfasst und ist damit nachvollziehbar
+- Überzahlungen werden angenommen und ausgewiesen statt abgelehnt
+- Jede Zahlung und jeder Fälligkeitswechsel steht im Änderungsprotokoll des Belegs
+
+---
+
 ## [1.12.38] – 2026-08-01 – Verkauf: Leistungsdatum, Steuersätze und Rundung
 
 ### Neu

@@ -18,6 +18,10 @@ Wichtige Querbezüge (bewusst NICHT gesperrt):
   - Datacenter: Datei-Anhänge je Datensatz (AttachmentPanel in anderen
     Modulen) bleiben offen — nur die Datacenter-Übersicht (/all, /stats)
     erfordert das Modul 'datacenter'.
+  - Buchhaltung ist ein ZUSATZ zu Verkauf, kein eigenständiger Bereich:
+    Verkaufsbuch, offene Posten, Kontenplan und Buchhaltungs-Export
+    erfordern 'verkauf' UND 'buchhaltung'. Wer Belege schreiben darf, muss
+    nicht zwangsläufig die Auswertungen und den Export sehen.
 """
 from app.models.user import User, UserRole
 
@@ -28,6 +32,7 @@ MODULES = (
     ("aufgaben",      "Aufgaben"),
     ("projekte",      "Projekte"),
     ("verkauf",       "Verkauf"),
+    ("buchhaltung",   "Buchhaltung"),
     ("postecke",      "Postecke"),
     ("stammdaten",    "Stammdaten"),
     ("datacenter",    "Datacenter"),

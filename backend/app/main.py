@@ -77,7 +77,7 @@ app.include_router(system.router, prefix="/api")
 app.include_router(invoice.router, prefix="/api",
                    dependencies=[_Dep(_rm("verkauf"))])
 app.include_router(accounting.router, prefix="/api",
-                   dependencies=[_Dep(_rm("verkauf"))])
+                   dependencies=[_Dep(_rm("verkauf")), _Dep(_rm("buchhaltung"))])
 app.include_router(projektplan.router, prefix="/api",
                    dependencies=[_Dep(_rm("projekte"))])
 app.include_router(aufgaben.router, prefix="/api",
@@ -127,6 +127,12 @@ async def startup_event():
         start_recurring_worker()
     except Exception as e:
         print(f"[WARN] Wiederkehr-Worker konnte nicht gestartet werden: {e}")
+    # Fällige, unbeglichene Rechnungen auf "überfällig" setzen; in Tests deaktiviert
+    try:
+        from app.services.overdue_service import start_overdue_worker
+        start_overdue_worker()
+    except Exception as e:
+        print(f"[WARN] Fälligkeits-Worker konnte nicht gestartet werden: {e}")
     # Postecke: geplante Posts mit Direktanbindung automatisch veröffentlichen
     try:
         from app.services.social_publish import start_postecke_worker

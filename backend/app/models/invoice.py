@@ -62,9 +62,13 @@ class Invoice(Base):
     total = Column(Numeric(12, 2), nullable=False, default=Decimal("0"))
     currency = Column(String(3), nullable=False, default="EUR")
 
-    # Status: entwurf | gesendet | offen | bezahlt | ueberfaellig | storniert | angenommen | abgelehnt
+    # Status: entwurf | gesendet | offen | teilbezahlt | bezahlt | ueberfaellig
+    #         | storniert | angenommen | abgelehnt
     status = Column(String(30), nullable=False, default="entwurf")
     cancel_mode = Column(String(20), nullable=True)         # status_only | with_credit
+    # Abgeleitet aus invoice_payments: Datum der letzten Zahlung und Summe
+    # aller Zahlungen. Bewusst als Zwischenspeicher am Beleg belassen, damit
+    # PDF, Export und DSGVO-Auswertung unverändert weiterarbeiten.
     paid_at = Column(Date, nullable=True)
     paid_amount = Column(Numeric(12, 2), nullable=True)
 
@@ -91,6 +95,9 @@ class Invoice(Base):
                              cascade="all, delete-orphan", order_by="InvoicePosition.sort_order")
     attachments = relationship("InvoiceAttachment", back_populates="invoice",
                                cascade="all, delete-orphan")
+    payments = relationship("InvoicePayment", back_populates="invoice",
+                            cascade="all, delete-orphan",
+                            order_by="InvoicePayment.paid_at")
     related_invoice = relationship("Invoice", foreign_keys=[related_invoice_id], remote_side="Invoice.id")
     recurring_instances = relationship("Invoice", foreign_keys=[recurring_source_id], remote_side="Invoice.id")
 
@@ -159,6 +166,32 @@ class InvoiceNumberSequence(Base):
     doc_type = Column(String(20), nullable=False)
     year = Column(Integer, nullable=False)
     last_sequence = Column(Integer, nullable=False, default=0)
+
+
+class InvoicePayment(Base):
+    """
+    Ein Zahlungseingang zu einem Beleg.
+
+    Ersetzt die früheren Einzelfelder ``paid_at``/``paid_amount``, mit denen
+    genau eine Zahlung abbildbar war — Teilzahlung, Ratenzahlung, Überzahlung
+    und selbst die Korrektur eines Tippfehlers im Zahldatum waren unmöglich.
+    """
+    __tablename__ = "invoice_payments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    invoice_id = Column(UUID(as_uuid=True),
+                        ForeignKey("invoices.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    paid_at = Column(Date, nullable=False, index=True)
+    amount = Column(Numeric(12, 2), nullable=False)
+    # bank | bar | karte | lastschrift | verrechnung | sonstige
+    method = Column(String(20), nullable=True)
+    reference = Column(String(200), nullable=True)   # Verwendungszweck, Beleg-Nr. der Bank
+    note = Column(String(500), nullable=True)
+    created_by = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    invoice = relationship("Invoice", back_populates="payments")
 
 
 class InvoiceAuditLog(Base):

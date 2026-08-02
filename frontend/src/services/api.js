@@ -243,6 +243,12 @@ export const invoiceApi = {
   // Änderungsprotokoll
   getAudit:       (id) => api.get(`/invoices/${id}/audit`),
 
+  // Zahlungen & offene Posten
+  listPayments:   (id) => api.get(`/invoices/${id}/payments`),
+  addPayment:     (id, data) => api.post(`/invoices/${id}/payments`, data),
+  deletePayment:  (paymentId) => api.delete(`/invoices/payments/${paymentId}`),
+  openItems:      (params) => api.get('/invoices/open-items', { params }),
+
   // Rechnungsbuch
   book:           (params) => api.get('/invoices/book/list', { params }),
   bookCsv:        (params) => api.get('/invoices/book/csv', { params, responseType: 'blob' }),

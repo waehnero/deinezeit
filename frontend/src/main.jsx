@@ -24,6 +24,7 @@ import DatacenterPage from './pages/DatacenterPage'
 import InvoicePage from './pages/InvoicePage'
 import InvoiceFormPage from './pages/InvoiceFormPage'
 import InvoiceBookPage from './pages/InvoiceBookPage'
+import OpenItemsPage from './pages/OpenItemsPage'
 import ProjektplanPage from './pages/ProjektplanPage'
 import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
 import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
@@ -96,7 +97,8 @@ function App() {
                       {/* Rechnungsmodul */}
                       <Route path="/invoices"            element={<ModuleRoute module="verkauf"><InvoicePage /></ModuleRoute>} />
                       <Route path="/invoices/new"        element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
-                      <Route path="/invoices/book"       element={<ModuleRoute module="verkauf"><InvoiceBookPage /></ModuleRoute>} />
+                      <Route path="/invoices/book"       element={<ModuleRoute module="buchhaltung"><InvoiceBookPage /></ModuleRoute>} />
+                      <Route path="/invoices/open-items" element={<ModuleRoute module="buchhaltung"><OpenItemsPage /></ModuleRoute>} />
                       <Route path="/invoices/:id"        element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       <Route path="/invoices/:id/edit"   element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       {/* Feldverwaltung & Einstellungen: nur Admin */}

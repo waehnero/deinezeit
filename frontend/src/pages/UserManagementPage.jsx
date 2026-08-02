@@ -105,6 +105,9 @@ const ALL_MODULES = [
   { key: 'aufgaben',      label: 'Aufgaben' },
   { key: 'projekte',      label: 'Projekte' },
   { key: 'verkauf',       label: 'Verkauf' },
+  // Zusatz zu Verkauf: schaltet Verkaufsbuch, offene Posten und den
+  // Buchhaltungs-Export frei. Ohne 'verkauf' wirkungslos.
+  { key: 'buchhaltung',   label: 'Buchhaltung' },
   { key: 'postecke',      label: 'Postecke' },
   { key: 'stammdaten',    label: 'Stammdaten' },
   { key: 'datacenter',    label: 'Datacenter' },
