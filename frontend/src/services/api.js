@@ -275,6 +275,15 @@ export const invoiceApi = {
   updateNumberSequence: (docType, data) => api.put(`/invoices/number-sequences/${docType}`, data),
 }
 
+export const periodApi = {
+  list:       (jahr) => api.get('/periods', { params: jahr ? { jahr } : {} }),
+  check:      (jahr, monat) => api.get(`/periods/${jahr}/${monat}/check`),
+  close:      (jahr, monat) => api.post(`/periods/${jahr}/${monat}/close`),
+  reopen:     (jahr, monat, grund) => api.post(`/periods/${jahr}/${monat}/reopen`, { grund }),
+  package:    (jahr, monat) => api.get(`/periods/${jahr}/${monat}/package`, { responseType: 'blob' }),
+  handovers:  (jahr, monat) => api.get(`/periods/${jahr}/${monat}/handovers`),
+}
+
 export const accountingApi = {
   listAccounts:       (params) => api.get('/accounting/accounts', { params }),
   createAccount:      (data)   => api.post('/accounting/accounts', data),

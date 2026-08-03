@@ -6,6 +6,7 @@ from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
                                 InvoiceNumberSequence, InvoiceSettings,
                                 InvoiceAuditLog, InvoicePayment)
 from app.models.accounting import AccountingAccount
+from app.models.period import AccountingPeriod, PeriodHandover
 from app.models.projektplan import PlanningProject, Task, TaskDependency, Milestone, ProjectTaskField, ChecklistItem
 from app.models.aufgaben import Todo
 from app.models.mailimport import MailAccount, MailTaskSuggestion

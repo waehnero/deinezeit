@@ -21,6 +21,7 @@ from app.services.invoice_pdf import generate_pdf, generate_html_preview
 from app.services.invoice_snapshot import (ensure_recipient_snapshot,
                                            snapshot_as_contact)
 from app.services.invoice_archive import archive_invoice_pdf
+from app.services import period_service
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -247,6 +248,18 @@ def _ist_ueberfaellig(invoice: Invoice, stichtag: date = None) -> bool:
     return invoice.due_date < (stichtag or date.today())
 
 
+def _pruefe_periode(db: Session, invoice: Invoice, vorgang: str = "geändert") -> None:
+    """
+    Wirft 400, wenn das Belegdatum in einem abgeschlossenen Monat liegt.
+
+    Ohne diese Sperre wäre der Monatsabschluss wirkungslos: Man könnte nach der
+    Übergabe an die Buchhaltung weiter Belege in den Monat buchen, und die
+    übergebenen Zahlen stimmten nicht mehr.
+    """
+    from app.services.period_service import pruefe_periode_offen
+    pruefe_periode_offen(db, invoice.date, vorgang)
+
+
 def _pruefe_pflichtangaben(invoice: Invoice) -> None:
     """
     Prüft die Pflichtangaben, bevor ein Beleg ausgestellt wird.
@@ -286,6 +299,7 @@ def _finalize(db: Session, invoice: Invoice) -> bool:
     Kein Commit.
     """
     _pruefe_pflichtangaben(invoice)
+    _pruefe_periode(db, invoice, "ausgestellt")
     neue_nummer = _ensure_number(db, invoice)
     ensure_recipient_snapshot(db, invoice)
     _sync_time_entry_status(db, invoice)
@@ -472,6 +486,9 @@ async def create_invoice(
 ):
     if body.doc_type not in TYPE_PREFIX:
         raise HTTPException(400, f"Ungültiger doc_type: {body.doc_type}")
+
+    if body.date and period_service.ist_gesperrt(db, body.date):
+        period_service.pruefe_periode_offen(db, body.date, "angelegt")
 
     # Bewusst OHNE Nummer: Der Beleg entsteht als Entwurf, die Nummer fällt
     # erst beim Finalisieren (siehe _ensure_number).
@@ -1476,6 +1493,10 @@ async def update_invoice(
         raise HTTPException(404, "Beleg nicht gefunden")
     if inv.status == "storniert":
         raise HTTPException(400, "Stornierte Belege können nicht bearbeitet werden")
+    # Beide Daten prüfen: aus einem abgeschlossenen Monat heraus- und in
+    # einen hineinzubuchen ist gleichermaßen gesperrt.
+    _pruefe_periode(db, inv)
+    period_service.pruefe_periode_offen(db, body.date, "angelegt")
 
     # ── Finalisierter Beleg: nur noch Nicht-Gedrucktes änderbar ──────────────
     if inv.status != "entwurf":
@@ -1565,6 +1586,8 @@ async def cancel_invoice(
             "Entwürfe werden gelöscht, nicht storniert — sie wurden nie "
             "ausgestellt und tragen noch keine Belegnummer.",
         )
+
+    _pruefe_periode(db, inv, "storniert")
 
     alter_status = inv.status
     ensure_recipient_snapshot(db, inv)

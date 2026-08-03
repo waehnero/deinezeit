@@ -12,7 +12,8 @@ import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
   MoreHorizontal, Book, RotateCcw, Mail, MailCheck, MailX,
-  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet
+  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet,
+  CalendarCheck
 } from 'lucide-react'
 
 function fmtDate(d) {
@@ -181,6 +182,10 @@ export default function InvoicePage() {
                 <button onClick={() => navigate('/invoices/book')}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
                   <Book size={15} /> Verkaufsbuch
+                </button>
+                <button onClick={() => navigate('/invoices/abschluss')}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
+                  <CalendarCheck size={15} /> Monatsabschluss
                 </button>
               </>
             )}

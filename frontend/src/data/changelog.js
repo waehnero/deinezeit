@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '1.12.41',
+    day: '03',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Monatsabschluss: Monat prüfen, abschließen und damit gegen nachträgliche Änderungen sperren — offene Entwürfe verhindern den Abschluss',
+      'Übergabepaket als ZIP mit Buchungsjournal, Belegjournal, Umsatzsteuer-Aufstellung, offenen Posten und jedem Beleg als PDF, samt Prüfsumme je Datei',
+      'Übergabe-Historie je Monat: wer wann welches Paket erstellt hat, mit Prüfsumme als Nachweis',
+    ],
+    updates: [
+      'Ein abgeschlossener Monat lässt sich nur von einem Admin und nur mit Begründung wieder öffnen; der Abschluss bleibt dabei dokumentiert',
+      'Zahlungseingänge bleiben auch in abgeschlossenen Monaten erfassbar — sie ändern nichts am Belegjournal',
+      'Das Paket weist aus, dass es die Verkaufsseite abdeckt: Eingangsrechnungen und Vorsteuer sind gesondert beizubringen',
+    ],
+  },
+  {
     version: '1.12.40',
     day: '03',
     month: 'August',
