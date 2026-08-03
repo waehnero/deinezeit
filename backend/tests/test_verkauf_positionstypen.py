@@ -17,8 +17,38 @@ import csv
 import io
 from decimal import Decimal
 
+import pytest
+
 from app.models.masterdata import EntityType, EntityRecord
 from app.services import positionen as positionen_service
+
+
+# Die Bildtests brauchen einen Objektspeicher. In der CI gibt es kein MinIO
+# (nur einen Postgres-Dienst), deshalb wird der Speicher hier in-memory
+# gestubbt — sonst laufen die Uploads in eine Namensauflösung ins Leere.
+# Gleiches Muster wie in test_postecke.py.
+#
+# Der Mimetype wird bewusst mitgespeichert: Die PDF-Einbettung baut daraus die
+# Data-URL, ein pauschales "application/octet-stream" würde das Bild im Beleg
+# unbrauchbar machen. Ein unbekannter Schlüssel wirft, damit der Test für den
+# toten Bildverweis den echten Fehlerpfad trifft.
+@pytest.fixture(autouse=True)
+def _speicher_in_memory(monkeypatch):
+    ablage = {}
+
+    def _upload(key, data, mimetype=None, db=None, backend=None):
+        ablage[key] = (data, mimetype or "application/octet-stream")
+
+    def _download(key, db=None, backend=None):
+        if key not in ablage:
+            raise FileNotFoundError(key)
+        return ablage[key]
+
+    monkeypatch.setattr("app.services.storage_service.upload_file", _upload)
+    monkeypatch.setattr("app.services.storage_service.download_file", _download)
+    monkeypatch.setattr("app.services.storage_service.delete_file",
+                        lambda key, db=None, backend=None: ablage.pop(key, None))
+    return ablage
 
 
 # ── Hilfen ────────────────────────────────────────────────────────────────────
