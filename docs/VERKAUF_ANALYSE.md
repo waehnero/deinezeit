@@ -17,7 +17,8 @@
 > | 2b — Leistungsdatum & Steuer | `feature/verkauf-leistungsdatum-steuer` | ✅ umgesetzt (B-1, B-2, A-5, A-6, A-15 teilweise + Tests) |
 > | 3a — Zahlungen & offene Posten | `feature/verkauf-zahlungen` | ✅ umgesetzt (C-2, C-3, A-17b + Tests) |
 > | 3b — Mahnwesen & Skonto | offen | C-1, C-9 |
-> | 4 — Monatsabschluss | `feature/verkauf-monatsabschluss` | offen |
+> | 4a — Erlöskonto & UVA | `feature/verkauf-uva` | ✅ umgesetzt (A-16, C-7 + Tests) |
+> | 4b — Periodenabschluss & Übergabepaket | offen | C-6, C-8, Übergabe-Historie |
 > | 5 — E-Rechnung & Komfort | — | offen |
 >
 > **Entscheidungen aus Etappe 2a** (Oliver): Gesperrt wird alles, was auf dem

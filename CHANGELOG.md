@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.40] – 2026-08-03 – Verkauf: Umsatzsteuer-Auswertung und Erlöskonto je Position
+
+### Neu
+- Umsatzsteuer-Auswertung im Verkaufsbuch — Bemessungsgrundlage und Steuer je Kennzahl des Formulars U30, dazu ein Ausdruck zum Übertragen ins Finanzamts-Portal
+- Erlöskonto je Belegposition: wird vom Artikel übernommen und bleibt änderbar — der Buchhaltungs-Export trennt die Umsätze damit nach Erlösarten
+- Steuerland in den Firmendaten; bestimmt Steuersätze und Aufbau der Umsatzsteuer-Auswertung
+
+### Aktualisierungen
+- Die Auswertung weist ausdrücklich aus, dass sie nur die Umsatzseite enthält — Vorsteuer und innergemeinschaftliche Erwerbe erfasst DeineZeit nicht und sind vor der Abgabe zu ergänzen
+- UVA-Kennzahl je Steuersatz pflegbar, vorbelegt mit 022 (20 %), 029 (10 %) und 006 (13 %)
+- Das Verkaufsbuch lädt beim Öffnen, statt auf einen Knopfdruck zu warten
+
+---
+
 ## [1.12.39] – 2026-08-02 – Verkauf: Zahlungen, offene Posten und Modulrecht Buchhaltung
 
 ### Neu

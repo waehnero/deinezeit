@@ -68,6 +68,9 @@ function TabAllgemein({ settings, onSaved }) {
   const { updateSettings } = useSettings()
   const [companyName,    setCompanyName]    = useState(settings.company_name || '')
   const [appSubtitle,    setAppSubtitle]    = useState(settings.app_subtitle || '')
+  // Steuerland — ausgebaut ist derzeit nur Österreich. Das Kennzeichen steht
+  // trotzdem hier, damit die Meldelogik daran hängt statt an einer Annahme.
+  const [companyCountry, setCompanyCountry] = useState(settings.company_country || 'AT')
   const [saving,         setSaving]         = useState(false)
   const [logoUploading,  setLogoUploading]  = useState(false)
   const [favUploading,   setFavUploading]   = useState(false)
@@ -110,7 +113,7 @@ function TabAllgemein({ settings, onSaved }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await settingsApi.update({ company_name: companyName, app_subtitle: appSubtitle })
+      await settingsApi.update({ company_name: companyName, app_subtitle: appSubtitle, company_country: companyCountry })
       toast.success('Einstellungen gespeichert')
       onSaved()
     } catch { toast.error('Fehler beim Speichern') }
@@ -201,6 +204,12 @@ function TabAllgemein({ settings, onSaved }) {
           </Field>
           <Field label="Untertitel" hint="Kurze Beschreibung unter dem Firmennamen">
             <Input value={appSubtitle} onChange={setAppSubtitle} placeholder="Zeiterfassung & Stammdaten" />
+          </Field>
+          <Field label="Steuerland" hint="Bestimmt Steuersätze und Aufbau der Umsatzsteuer-Auswertung. Derzeit ist nur Österreich ausgebaut.">
+            <select value={companyCountry} onChange={e => setCompanyCountry(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+              <option value="AT">Österreich</option>
+            </select>
           </Field>
         </div>
         <div className="flex justify-end">
@@ -1848,8 +1857,9 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         <div className="space-y-2">
           <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-xs font-medium text-neutral-500">
             <span className="col-span-2">Satz %</span>
-            <span className="col-span-4">Bezeichnung</span>
+            <span className="col-span-3">Bezeichnung</span>
             <span className="col-span-2">USt-Code</span>
+            <span className="col-span-1">UVA-KZ</span>
             <span className="col-span-2">Aktiv</span>
             <span className="col-span-2">Standard</span>
           </div>
@@ -1860,10 +1870,15 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
                 className="col-span-2 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
               <input value={t.bezeichnung || ''}
                 onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, bezeichnung: e.target.value } : x))}
-                className="col-span-4 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm" />
+                className="col-span-3 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm" />
               <input value={t.ust_code || ''}
                 onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, ust_code: e.target.value } : x))}
                 className="col-span-2 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm font-mono" />
+              {/* Kennzahl im Formular U30 — leer lassen, wenn unklar; die
+                  Auswertung weist solche Zeilen als „nicht zugeordnet" aus. */}
+              <input value={t.uva_kz || ''} placeholder="—" title="Kennzahl im UVA-Formular U30"
+                onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, uva_kz: e.target.value } : x))}
+                className="col-span-1 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm font-mono text-center" />
               <label className="col-span-2 flex items-center gap-1.5 text-xs text-neutral-600">
                 <input type="checkbox" checked={!!t.aktiv} className="w-4 h-4 rounded"
                   onChange={e => setTaxRates(l => l.map((x, j) => j === i ? { ...x, aktiv: e.target.checked } : x))} />

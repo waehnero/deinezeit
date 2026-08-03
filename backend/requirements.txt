@@ -16,7 +16,7 @@ python-multipart==0.0.32
 # 2FA (TOTP)
 pyotp==2.9.0
 qrcode[pil]==7.4.2
-Pillow==10.4.0
+Pillow==12.3.0            # 22 Meldungen, u.a. PYSEC-2026-165, -2249…-3496
 
 # WebAuthn / Passkeys
 webauthn==2.1.0
@@ -27,14 +27,14 @@ pydantic-settings==2.3.4
 email-validator==2.2.0
 
 # Hilfsbibliotheken
-python-dotenv==1.0.1
+python-dotenv==1.2.2      # PYSEC-2026-2270
 httpx==0.27.0
-requests==2.32.3
+requests==2.34.2          # PYSEC-2026-1872, PYSEC-2026-2275
 
 # PDF-Generierung
-weasyprint==62.3
+weasyprint==62.3          # siehe Hinweis am Dateiende
 pydyf==0.10.0
-Jinja2==3.1.4
+Jinja2==3.1.6             # PYSEC-2026-1471, -1472, -1475
 slowapi==0.1.9
 limits==3.6.0
 
@@ -43,3 +43,24 @@ minio==7.2.7
 
 # E-Mail-Vorschau (Datacenter)
 extract-msg==0.55.0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bewusst NICHT aktualisiert (Stand August 2026) — pip-audit meldet sie weiter
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# weasyprint 62.3 → 69.0  (PYSEC-2026-2034; PYSEC-2026-3412 ohne Fix)
+#   Sieben Hauptversionen Sprung an der PDF-Erzeugung. Rechnungen, Berichte,
+#   Aufgaben-Ausdrucke und die DSGVO-Auskunft hängen daran. Das Layout kann
+#   sich verschieben, und kein Test prüft das Aussehen eines PDF. Gehört in
+#   einen eigenen Branch mit Sichtprüfung aller fünf Belegvorlagen.
+#
+# starlette 0.37.2 → 1.3.x  (8 Meldungen)
+#   Erzwingt fastapi 0.111 → 0.141 und dadurch pydantic 2.8 → 2.12. Vier
+#   große Sprünge gleichzeitig; bricht etwas, ist die Ursache kaum
+#   einzugrenzen. Ebenfalls eigener Branch.
+#
+# ecdsa 0.19.2  (PYSEC-2026-1325, kein Fix verfügbar)
+#   Transitive Abhängigkeit von python-jose. Betrifft eine Seitenkanal-
+#   Schwäche, die das Projekt ausdrücklich als außerhalb seines Umfangs
+#   führt. Da wir python-jose[cryptography] verwenden, läuft die eigentliche
+#   Signaturprüfung über die cryptography-Bibliothek, nicht über ecdsa.

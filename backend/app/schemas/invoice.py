@@ -299,6 +299,28 @@ class OpenItemsResponse(BaseModel):
     count: int
 
 
+# ── Umsatzsteuer-Voranmeldung ─────────────────────────────────────────────────
+
+class UvaZeile(BaseModel):
+    kennzahl: str                      # "022", "029", "006" … leer = nicht zugeordnet
+    bezeichnung: str
+    satz: Optional[Decimal] = None     # None = Reverse Charge
+    bemessungsgrundlage: Decimal
+    steuer: Decimal
+    zugeordnet: bool                   # False → Kennzahl fehlt, muss gepflegt werden
+
+class UvaResponse(BaseModel):
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    country: str = "AT"                # Steuerland der Firma
+    country_supported: bool = True     # False → Formular für dieses Land fehlt
+    zeilen: List[UvaZeile] = []
+    kz_000: Decimal                    # Gesamtbetrag der Bemessungsgrundlage
+    steuer_gesamt: Decimal
+    beleg_anzahl: int
+    hinweise: List[str] = []
+
+
 # ── Änderungsprotokoll ────────────────────────────────────────────────────────
 
 class InvoiceAuditEntry(BaseModel):
