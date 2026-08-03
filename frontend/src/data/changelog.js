@@ -4,6 +4,25 @@
  */
 export const changelog = [
   {
+    version: '1.12.42',
+    day: '03',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Belege lassen sich gliedern: Überschrift eröffnet eine Gruppe, Freitext erläutert, Zwischensumme fasst die Gruppe zusammen',
+      'Rabattzeile auf eine Gruppe — als fester Betrag oder in Prozent; bei gemischten Steuersätzen wird der Rabatt anteilig verteilt',
+      'Bild je Position: nach dem Hochladen eine von drei Druckgrößen wählen (3, 6 oder 10 cm); erscheint in Vorschau und PDF',
+      'Positionen lassen sich mit Pfeiltasten umsortieren',
+    ],
+    updates: [
+      'Der MwSt.-Modus „Ein Satz für alle" wirkt jetzt tatsächlich — er war bisher wählbar, ohne etwas zu bewirken',
+      'Fehlt bei Belegen über 10.000 Euro die UID des Empfängers, wird das am Beleg und im Monatsabschluss vermerkt',
+      'Das Verkaufsbuch liefert bei einem Fehler keine HTML-Datei mehr unter dem Namen einer PDF-Datei',
+      'Beim Massenversand bleiben bereits verschickte Belege erhalten, auch wenn ein späterer Versand scheitert',
+      'Die Abschlusszeile der Positionstabelle heißt „Nettosumme" statt „Zwischensumme" — der Begriff ist jetzt den Gruppensummen vorbehalten',
+    ],
+  },
+  {
     version: '1.12.41',
     day: '03',
     month: 'August',

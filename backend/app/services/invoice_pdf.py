@@ -221,16 +221,16 @@ def _tax_breakdown(positions, tax_mode: str, tax_total=None) -> list[dict]:
     if tax_mode == "kleinunternehmer":
         return []
 
+    # Über das gemeinsame Modul: Rabattzeilen werden dabei anteilig auf die
+    # Steuersätze ihrer Gruppe verteilt, Überschriften, Freitext und
+    # Zwischensummen bleiben außen vor. Würde hier eigenständig gerechnet,
+    # landete ein Gruppenrabatt (der selbst keinen Satz trägt) im
+    # Reverse-Charge-Topf.
+    from app.services.positionen import netto_je_satz
+
     buckets: dict[str, Decimal] = {}
-    for p in positions:
-        if getattr(p, "pos_type", "item") == "text":
-            continue
-        rate = p.tax_rate
-        if rate is None:
-            key = "RC"
-        else:
-            key = str(int(rate)) if rate == int(rate) else str(rate)
-        net = p.line_total or Decimal("0")
+    for rate, net in netto_je_satz(list(positions), tax_mode).items():
+        key = "RC" if rate is None else (str(int(rate)) if rate == int(rate) else str(rate))
         buckets[key] = buckets.get(key, Decimal("0")) + net
 
     result = []
@@ -255,11 +255,48 @@ def _tax_breakdown(positions, tax_mode: str, tax_total=None) -> list[dict]:
     return result
 
 
-def _positions_html(positions, tax_mode: str) -> str:
+def _bild_zeile(p, spalten: int, db=None) -> str:
+    """
+    Bildzeile unter einer Position — leer, wenn kein Bild hinterlegt ist.
+
+    Die Breite steckt fest in der Größe, die beim Hochladen gewählt wurde; die
+    Datei liegt bereits in dieser Auflösung vor. Als Data-URL eingebettet, weil
+    WeasyPrint den Objektspeicher nicht selbst auflösen kann.
+    """
+    schluessel = getattr(p, "image_key", None)
+    if not schluessel:
+        return ""
+    from app.services.position_image import als_datenurl, breite_mm
+    quelle = als_datenurl(db, schluessel)
+    if not quelle:
+        return ""      # fehlendes Bild darf keinen Beleg verhindern
+    mm = breite_mm(getattr(p, "image_size", None) or "mittel")
+    return (f'<tr class="pos-bild"><td colspan="{spalten}">'
+            f'<img src="{quelle}" style="width:{mm}mm;max-width:100%;'
+            f'display:block;margin:3px 0;" /></td></tr>')
+
+
+def _positions_html(positions, tax_mode: str, db=None) -> str:
     rows = ""
     for p in positions:
-        if p.pos_type == "text":
+        _t = getattr(p, "pos_type", "item") or "item"
+        if _t == "heading":
+            rows += (f'<tr class="pos-head"><td colspan="5">'
+                     f'<b>{p.description}</b></td></tr>')
+            continue
+        if _t == "text":
             rows += f'<tr class="pos-text"><td colspan="5">{p.description}</td></tr>'
+            continue
+        if _t == "subtotal":
+            rows += (f'<tr class="pos-sub"><td colspan="4">'
+                     f'{p.description or "Zwischensumme"}</td>'
+                     f'<td class="pos-num"><b>{_fmt_amount(p.line_total, "")}</b></td></tr>')
+            continue
+        if _t == "discount":
+            hinweis = f" ({float(p.discount_pct):.0f} %)" if p.discount_pct else ""
+            rows += (f'<tr class="pos-disc"><td colspan="4">'
+                     f'{p.description or "Rabatt"}{hinweis}</td>'
+                     f'<td class="pos-num">{_fmt_amount(p.line_total, "")}</td></tr>')
             continue
         qty   = float(p.quantity or 0)
         price = float(p.unit_price or 0)
@@ -270,6 +307,7 @@ def _positions_html(positions, tax_mode: str) -> str:
         if tax_mode != "kleinunternehmer":
             tax_cell = "RC" if tax_r is None else f"{int(tax_r) if tax_r == int(tax_r) else tax_r} %"
 
+        bild_row = _bild_zeile(p, 5, db)
         detail_row = ""
         if p.detail:
             detail_row = f'<tr class="pos-detail"><td colspan="5"><span>{p.detail}</span></td></tr>'
@@ -358,7 +396,7 @@ table.totals .grand-total td { font-size: 11pt; font-weight: 700; border-top: 1.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _build_html(invoice, positions, settings: dict, inv_settings: dict,
-                sender_contact, recipient_contact, template_id: int) -> str:
+                sender_contact, recipient_contact, template_id: int, db=None) -> str:
     """Gibt vollständiges HTML-Dokument zurück."""
 
     # Custom-CSS aus Einstellungen anhängen
@@ -377,7 +415,7 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
 
     tax_mode   = invoice.tax_mode
     breakdown  = _tax_breakdown(positions, tax_mode, invoice.tax_total)
-    pos_html   = _positions_html(positions, tax_mode)
+    pos_html   = _positions_html(positions, tax_mode, db)
 
     # Fußzeile (alle Vorlagen): Bankverbindung, UID, Firmenbuch, Gericht etc.
     # primär aus dem verknüpften Firmen-Kontakt, Bank-Fallback aus Belegeinstellungen
@@ -460,6 +498,9 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
         breakdown=breakdown,
         tax_mode=tax_mode,
         bank=bank,
+        # Datenbanksitzung: Vorlagen 2–5 bauen ihre Positionszeilen selbst und
+        # brauchen sie, um Positionsbilder aus dem Objektspeicher zu laden.
+        db=db,
         sender_contact=sender_contact,
         recipient_contact=recipient_contact,
     )
@@ -537,8 +578,23 @@ def _t1(**kw) -> str:
     ncols      = 5 if show_tax else 4
     rows = ""
     for p in positions:
-        if getattr(p, "pos_type", "item") == "text":
-            rows += f'<tr class="grp"><td colspan="{ncols}">{p.description}</td></tr>'
+        _t = getattr(p, "pos_type", "item") or "item"
+        if _t == "heading":
+            rows += f'<tr class="grp"><td colspan="{ncols}"><b>{p.description}</b></td></tr>'
+            continue
+        if _t == "text":
+            rows += f'<tr class="detail"><td colspan="{ncols}">{p.description}</td></tr>'
+            continue
+        if _t == "subtotal":
+            rows += (f'<tr class="item"><td colspan="{ncols - 1}"><b>'
+                     f'{p.description or "Zwischensumme"}</b></td>'
+                     f'<td class="num total"><b>{_fmt_amount(p.line_total, currency)}</b></td></tr>')
+            continue
+        if _t == "discount":
+            hinweis = f" ({float(p.discount_pct):.0f} %)" if p.discount_pct else ""
+            rows += (f'<tr class="item"><td colspan="{ncols - 1}">'
+                     f'{p.description or "Rabatt"}{hinweis}</td>'
+                     f'<td class="num total">{_fmt_amount(p.line_total, currency)}</td></tr>')
             continue
         qty    = float(p.quantity or 0)
         anzahl = f"{qty:g} {p.unit or ''}".strip()
@@ -557,6 +613,7 @@ def _t1(**kw) -> str:
         </tr>"""
         if getattr(p, "detail", None):
             rows += f'<tr class="detail"><td colspan="{ncols}">{p.detail}</td></tr>'
+        rows += _bild_zeile(p, ncols, kw.get("db"))
 
     tax_th = '<th class="num">MWST.</th>' if show_tax else ""
     positions_html = f"""
@@ -571,7 +628,11 @@ def _t1(**kw) -> str:
       <tbody>
         {rows}
         <tr class="zwischensumme">
-          <td colspan="{ncols - 1}" style="font-weight:600;">Zwischensumme</td>
+          <!-- Abschlusszeile der Positionstabelle: die Nettosumme des ganzen
+               Belegs. Hieß früher „Zwischensumme" — seit es den Positionstyp
+               Zwischensumme für Gruppen gibt, wäre derselbe Begriff für zwei
+               verschiedene Dinge auf einem Beleg verwirrend. -->
+          <td colspan="{ncols - 1}" style="font-weight:600;">Nettosumme</td>
           <td class="num" style="font-weight:600;">{_fmt_amount(invoice.subtotal, currency)}</td>
         </tr>
       </tbody>
@@ -827,7 +888,7 @@ table.totals .grand-total td {{ color: var(--primary); }}
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
-                 sender_contact=None, recipient_contact=None) -> bytes:
+                 sender_contact=None, recipient_contact=None, db=None) -> bytes:
     """Gibt PDF-Bytes zurück."""
     # Vorlage: zuerst aus inv_settings (globale Einstellung), dann aus Rechnung, Fallback 1
     default_tpl = inv_settings.get("default_template", 1)
@@ -842,6 +903,7 @@ def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
         sender_contact=sender_contact,
         recipient_contact=recipient_contact,
         template_id=template_id,
+        db=db,
     )
     buf = io.BytesIO()
     WeasyprintHTML(string=html, base_url="/").write_pdf(buf)
@@ -850,7 +912,7 @@ def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
 
 def generate_html_preview(invoice, positions, settings: dict, inv_settings: dict,
                            sender_contact=None, recipient_contact=None,
-                           template_id: Optional[int] = None) -> str:
+                           template_id: Optional[int] = None, db=None) -> str:
     """Gibt HTML-String zurück (für Vorschau im Browser).
     template_id: optionaler Override — sonst globale Einstellung / Rechnung / Fallback 1."""
     if template_id is None:
@@ -866,6 +928,7 @@ def generate_html_preview(invoice, positions, settings: dict, inv_settings: dict
         sender_contact=sender_contact,
         recipient_contact=recipient_contact,
         template_id=template_id,
+        db=db,
     )
     # Browser-Vorschau: Die @page-Ränder gelten nur beim PDF-Druck (WeasyPrint).
     # Für die Anzeige im Browser wird ein A4-Blatt mit denselben Rändern simuliert.

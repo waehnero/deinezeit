@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search,
   RefreshCw, FileText, Clock, Download, Eye, Repeat, Paperclip, X as XIcon,
-  Lock, History
+  Lock, History, ChevronUp, ChevronDown, Image as ImageIcon
 } from 'lucide-react'
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -18,14 +18,70 @@ function calcLine(pos) {
   const disc = parseFloat(pos.discount_pct) || 0
   return Math.round(qty * price * (1 - disc / 100) * 100) / 100
 }
+// Zeilen, die nur der Gliederung dienen (siehe backend/app/services/positionen.py)
+const GLIEDERUNG = ['heading', 'text', 'subtotal']
+
+/** Index, ab dem die Gruppe der Zeile bei `index` zählt. */
+function gruppeAb(positions, index) {
+  for (let i = index - 1; i >= 0; i--) {
+    if (['heading', 'subtotal'].includes(positions[i].pos_type)) return i + 1
+  }
+  return 0
+}
+
+/** Nettosumme der laufenden Gruppe — Grundlage für Rabatt und Zwischensumme. */
+function gruppenSumme(positions, ab, bis, mitRabatt = false) {
+  let s = 0
+  for (let i = ab; i < bis; i++) {
+    const p = positions[i]
+    if (GLIEDERUNG.includes(p.pos_type)) continue
+    if (p.pos_type === 'discount') { if (mitRabatt) s += calcZeile(positions, i); continue }
+    s += calcLine(p)
+  }
+  return Math.round(s * 100) / 100
+}
+
+/** Betrag einer beliebigen Zeile — Rabatt und Zwischensumme brauchen Kontext. */
+function calcZeile(positions, index) {
+  const p = positions[index]
+  const typ = p.pos_type || 'item'
+  if (typ === 'heading' || typ === 'text') return 0
+  const ab = gruppeAb(positions, index)
+  if (typ === 'subtotal') return gruppenSumme(positions, ab, index, true)
+  if (typ === 'discount') {
+    const basis = gruppenSumme(positions, ab, index)
+    const betrag = p.discount_pct
+      ? Math.round(basis * parseFloat(p.discount_pct)) / 100
+      : parseFloat(p.unit_price) || 0
+    return -Math.min(Math.max(betrag, 0), Math.max(basis, 0))
+  }
+  return calcLine(p)
+}
+
 function calcTotals(positions, taxMode) {
   let subtotal = 0, taxTotal = 0
-  for (const p of positions) {
-    const line = calcLine(p)
+  positions.forEach((p, i) => {
+    const typ = p.pos_type || 'item'
+    if (GLIEDERUNG.includes(typ)) return
+    const line = calcZeile(positions, i)
     subtotal += line
-    if (taxMode !== 'kleinunternehmer' && p.tax_rate != null && p.tax_rate !== '')
+    if (taxMode === 'kleinunternehmer') return
+    if (typ === 'discount') {
+      // Anteilig auf die Sätze der Gruppe — wie im Backend
+      const ab = gruppeAb(positions, i)
+      const basis = gruppenSumme(positions, ab, i)
+      if (basis <= 0) return
+      for (let j = ab; j < i; j++) {
+        const q = positions[j]
+        if (GLIEDERUNG.includes(q.pos_type) || q.pos_type === 'discount') continue
+        if (q.tax_rate == null || q.tax_rate === '') continue
+        taxTotal += (line * calcLine(q) / basis) * parseFloat(q.tax_rate) / 100
+      }
+      return
+    }
+    if (p.tax_rate != null && p.tax_rate !== '')
       taxTotal += line * parseFloat(p.tax_rate) / 100
-  }
+  })
   return {
     subtotal: Math.round(subtotal * 100) / 100,
     taxTotal: Math.round(taxTotal * 100) / 100,
@@ -324,6 +380,23 @@ export default function InvoiceFormPage() {
 
   function addPosition(override = {}) { setPositions(p => [...p, { ...EMPTY_POSITION, ...override }]) }
   function removePosition(i) { setPositions(p => p.filter((_, idx) => idx !== i)) }
+  /**
+   * Zeile um eine Stelle verschieben.
+   *
+   * Reine Anzeigereihenfolge — das Backend übernimmt beim Speichern den Index
+   * der Liste als sort_order. Wichtig: Zwischensumme und Rabatt rechnen nach
+   * Position, ihre Beträge ändern sich beim Verschieben also mit. Das ist
+   * gewollt und wird sofort sichtbar, weil die Summen aus dem Array kommen.
+   */
+  function movePosition(i, richtung) {
+    const ziel = i + richtung
+    setPositions(p => {
+      if (ziel < 0 || ziel >= p.length) return p
+      const neu = [...p]
+      ;[neu[i], neu[ziel]] = [neu[ziel], neu[i]]
+      return neu
+    })
+  }
   function updatePosition(i, field, value) { setPositions(p => p.map((pos, idx) => idx === i ? { ...pos, [field]: value } : pos)) }
   function addTimeEntries(entries) {
     setPositions(p => [...p, ...entries.map(e => ({ ...EMPTY_POSITION, pos_type: 'time_entry', description: e.description || 'Zeitaufwand', quantity: String(e.duration_hours), unit: 'h', unit_price: '0', time_entry_id: e.id }))])
@@ -358,6 +431,9 @@ export default function InvoiceFormPage() {
           discount_pct: p.discount_pct !== '' ? parseFloat(p.discount_pct) : null,
           tax_rate: p.tax_rate !== '' ? parseFloat(p.tax_rate) : null,
           account_nr: p.account_nr || null,
+          // Bild reist als Feld mit — Positionen werden beim Speichern gelöscht
+          // und neu angelegt, ein Anhang könnte sich sonst nirgends festhalten.
+          image_key: p.image_key || null, image_size: p.image_size || null,
           article_id: p.article_id || null, time_entry_id: p.time_entry_id || null,
         })),
       }
@@ -540,11 +616,37 @@ export default function InvoiceFormPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">MwSt.-Modus</label>
-              <select value={taxMode} onChange={e => setTaxMode(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+              <select value={taxMode}
+                onChange={e => {
+                  const modus = e.target.value
+                  setTaxMode(modus)
+                  // „Ein Satz für alle": den Satz der ersten Position auf alle
+                  // übertragen, damit die Auswahl sofort wirkt statt erst beim
+                  // Speichern. Das Backend erzwingt dieselbe Regel nochmals.
+                  if (modus === 'single_rate') {
+                    const erster = positions.find(p => p.tax_rate !== '' && p.tax_rate != null)?.tax_rate
+                    if (erster != null) setPositions(l => l.map(p => ({ ...p, tax_rate: erster })))
+                  }
+                }}
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
                 <option value="per_position">Pro Position wählbar</option>
                 <option value="single_rate">Ein Satz für alle</option>
                 <option value="kleinunternehmer">Kleinunternehmer (keine MwSt.)</option>
               </select>
+              {taxMode === 'single_rate' && (
+                <div className="mt-2">
+                  <label className="block text-xs text-neutral-500 mb-1">Steuersatz für alle Positionen</label>
+                  <select
+                    value={positions.find(p => p.tax_rate !== '' && p.tax_rate != null)?.tax_rate ?? ''}
+                    onChange={e => setPositions(l => l.map(p => ({ ...p, tax_rate: e.target.value })))}
+                    className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+                    {taxRates.map(t => (
+                      <option key={t.satz} value={String(t.satz)}>{t.satz}% — {t.bezeichnung}</option>
+                    ))}
+                    <option value="">Reverse Charge</option>
+                  </select>
+                </div>
+              )}
             </div>
           </div>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -627,12 +729,35 @@ export default function InvoiceFormPage() {
           <div className="space-y-2">
             {positions.map((pos, i) => (
               <PositionRow key={i} pos={pos} index={i} taxMode={taxMode} taxRates={taxRates}
+                betrag={calcZeile(positions, i)}
+                istErste={i === 0} istLetzte={i === positions.length - 1}
+                onMove={richtung => movePosition(i, richtung)}
                 onChange={(field, val) => updatePosition(i, field, val)} onRemove={() => removePosition(i)} />
             ))}
           </div>
-          <button type="button" onClick={() => addPosition()} className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:underline">
-            <Plus size={14} /> Position hinzufügen
-          </button>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button type="button" onClick={() => addPosition()} className="flex items-center gap-1.5 text-sm text-primary-600 hover:underline">
+              <Plus size={14} /> Position
+            </button>
+            {/* Gliederung: Überschrift eröffnet eine Gruppe, Freitext nicht —
+                eine erläuternde Zeile soll eine Gruppe nicht zerreißen. */}
+            <button type="button" onClick={() => addPosition({ pos_type: 'heading', description: 'Neue Gruppe', quantity: '0', unit_price: '0', tax_rate: '' })}
+              className="flex items-center gap-1.5 text-sm text-neutral-600 hover:underline">
+              <Plus size={14} /> Überschrift
+            </button>
+            <button type="button" onClick={() => addPosition({ pos_type: 'text', description: '', quantity: '0', unit_price: '0', tax_rate: '' })}
+              className="flex items-center gap-1.5 text-sm text-neutral-600 hover:underline">
+              <Plus size={14} /> Freitext
+            </button>
+            <button type="button" onClick={() => addPosition({ pos_type: 'subtotal', description: 'Zwischensumme', quantity: '0', unit_price: '0', tax_rate: '' })}
+              className="flex items-center gap-1.5 text-sm text-neutral-600 hover:underline">
+              <Plus size={14} /> Zwischensumme
+            </button>
+            <button type="button" onClick={() => addPosition({ pos_type: 'discount', description: 'Rabatt', quantity: '1', unit_price: '0', tax_rate: '' })}
+              className="flex items-center gap-1.5 text-sm text-neutral-600 hover:underline">
+              <Plus size={14} /> Rabatt
+            </button>
+          </div>
           <div className="mt-5 border-t pt-4 flex justify-end">
             <div className="w-64 space-y-1.5 text-sm">
               <div className="flex justify-between text-neutral-600"><span>Netto</span><span>{fmtEuro(subtotal)}</span></div>
@@ -668,6 +793,7 @@ const AUDIT_LABELS = {
   bearbeitet:  'Bearbeitet',
   archiviert:  'Archivierung',
   zahlung:     'Zahlung',
+  hinweis:     'Hinweis',
 }
 
 const FELD_LABELS = {
@@ -731,7 +857,171 @@ function AuditPanel({ invoiceId }) {
   )
 }
 
-function PositionRow({ pos, index, taxMode, taxRates = [], onChange, onRemove }) {
+// Muss zu backend/app/services/position_image.py passen
+const BILDGROESSEN = [
+  ['klein',  'Klein',  '3 cm'],
+  ['mittel', 'Mittel', '6 cm'],
+  ['gross',  'Groß',   '10 cm'],
+]
+
+/**
+ * Bild einer Position.
+ *
+ * Ablauf wie besprochen: Datei wählen, dann eine der drei Größen — erst diese
+ * Wahl löst den Upload aus. Das Bild wird dabei serverseitig auf die Größe
+ * verkleinert und nur so gespeichert; eine andere Größe heißt neu hochladen.
+ */
+function PositionImage({ pos, onChange }) {
+  const [datei, setDatei] = useState(null)
+  const [laeuft, setLaeuft] = useState(false)
+  const [vorschau, setVorschau] = useState(null)
+
+  // Das Bild kann NICHT direkt als <img src="/api/..."> geladen werden: Ein
+  // img-Tag schickt keinen Anmelde-Token mit, der Endpunkt antwortet dann mit
+  // 401 und der Browser zeigt ein kaputtes Bild. Deshalb per fetch holen und
+  // als Objekt-URL einhängen — dasselbe Muster wie bei den Verträgen.
+  useEffect(() => {
+    if (!pos.image_key) { setVorschau(null); return }
+    let url = null
+    let abgebrochen = false
+    ;(async () => {
+      try {
+        const token = localStorage.getItem('access_token')
+        const res = await fetch(invoiceApi.positionImageUrl(pos.image_key),
+                                { headers: { Authorization: 'Bearer ' + token } })
+        if (!res.ok) throw new Error(res.status)
+        const blob = await res.blob()
+        if (abgebrochen) return
+        url = URL.createObjectURL(blob)
+        setVorschau(url)
+      } catch { setVorschau(null) }
+    })()
+    return () => { abgebrochen = true; if (url) URL.revokeObjectURL(url) }
+  }, [pos.image_key])
+
+  async function hochladen(groesse) {
+    setLaeuft(true)
+    try {
+      const res = await invoiceApi.uploadPositionImage(datei, groesse)
+      onChange('image_key', res.data.image_key)
+      onChange('image_size', res.data.image_size)
+      setDatei(null)
+      toast.success('Bild hinterlegt')
+    } catch (e) { toast.error(e.response?.data?.detail || 'Upload fehlgeschlagen') }
+    finally { setLaeuft(false) }
+  }
+
+  if (pos.image_key) {
+    const label = BILDGROESSEN.find(g => g[0] === pos.image_size)
+    return (
+      <div className="mt-2 flex items-center gap-2">
+        {vorschau
+          ? <img src={vorschau} alt=""
+              className="h-12 w-12 object-cover rounded border border-neutral-200" />
+          : <span className="h-12 w-12 rounded border border-neutral-200 bg-neutral-50 flex items-center justify-center text-neutral-300">
+              <ImageIcon size={16} />
+            </span>}
+        <span className="text-xs text-neutral-500">
+          Bild · {label ? `${label[1]} (${label[2]})` : pos.image_size}
+        </span>
+        <button type="button" title="Bild entfernen"
+          onClick={() => { onChange('image_key', null); onChange('image_size', null) }}
+          className="p-1 text-neutral-400 hover:text-red-500"><XIcon size={13} /></button>
+      </div>
+    )
+  }
+
+  if (datei) {
+    return (
+      <div className="mt-2 flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-neutral-600 truncate max-w-[12rem]">{datei.name}</span>
+        <span className="text-xs text-neutral-500">— Größe wählen:</span>
+        {BILDGROESSEN.map(([wert, name, breite]) => (
+          <button key={wert} type="button" disabled={laeuft} onClick={() => hochladen(wert)}
+            className="px-2 py-1 text-xs border border-neutral-200 rounded hover:bg-neutral-50 disabled:opacity-50">
+            {name} <span className="text-neutral-400">{breite}</span>
+          </button>
+        ))}
+        <button type="button" onClick={() => setDatei(null)}
+          className="p-1 text-neutral-400 hover:text-red-500"><XIcon size={13} /></button>
+      </div>
+    )
+  }
+
+  return (
+    <label className="mt-2 inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-primary-600 cursor-pointer">
+      <ImageIcon size={13} /> Bild hinzufügen
+      <input type="file" accept="image/*" className="hidden"
+        onChange={e => { if (e.target.files?.[0]) setDatei(e.target.files[0]); e.target.value = '' }} />
+    </label>
+  )
+}
+
+/** Hoch/Runter zum Umsortieren — an den Enden abgeblendet statt versteckt,
+ *  damit die Zeilen nicht unterschiedlich breit werden. */
+function MoveButtons({ istErste, istLetzte, onMove }) {
+  return (
+    <span className="flex flex-col leading-none">
+      <button type="button" onClick={() => onMove(-1)} disabled={istErste}
+        title="Nach oben" className="p-0.5 text-neutral-400 hover:text-primary-600 disabled:opacity-20">
+        <ChevronUp size={13} />
+      </button>
+      <button type="button" onClick={() => onMove(1)} disabled={istLetzte}
+        title="Nach unten" className="p-0.5 text-neutral-400 hover:text-primary-600 disabled:opacity-20">
+        <ChevronDown size={13} />
+      </button>
+    </span>
+  )
+}
+
+function PositionRow({ pos, index, taxMode, taxRates = [], betrag,
+                      istErste, istLetzte, onMove, onChange, onRemove }) {
+  const typ = pos.pos_type || 'item'
+
+  // Gliederungszeilen brauchen nur ein Textfeld — Menge, Preis und Steuersatz
+  // wären dort sinnlos und würden zum Ausfüllen einladen.
+  if (['heading', 'text', 'subtotal', 'discount'].includes(typ)) {
+    const stil = {
+      heading:  { label: 'Überschrift',   klasse: 'bg-neutral-100 font-semibold', platzhalter: 'Bezeichnung der Gruppe' },
+      text:     { label: 'Freitext',      klasse: 'bg-neutral-50 text-neutral-600', platzhalter: 'Erläuternder Text' },
+      subtotal: { label: 'Zwischensumme', klasse: 'bg-neutral-100', platzhalter: 'Beschriftung' },
+      discount: { label: 'Rabatt',        klasse: 'bg-amber-50', platzhalter: 'Bezeichnung des Rabatts' },
+    }[typ]
+    return (
+      <div className={`border border-neutral-200 rounded-lg p-3 ${stil.klasse}`}>
+        <div className="flex items-center gap-2">
+          <MoveButtons istErste={istErste} istLetzte={istLetzte} onMove={onMove} />
+          <span className="text-xs text-neutral-500 w-24 shrink-0">{stil.label}</span>
+          <input value={pos.description} onChange={e => onChange('description', e.target.value)}
+            placeholder={stil.platzhalter}
+            className="flex-1 border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface" />
+          {typ === 'discount' && (
+            <>
+              <input type="number" step="0.01" value={pos.discount_pct ?? ''}
+                onChange={e => onChange('discount_pct', e.target.value)} placeholder="%"
+                title="Prozent der Gruppe — leer lassen für einen festen Betrag"
+                className="w-16 border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface text-right" />
+              <input type="number" step="0.01" value={pos.unit_price}
+                onChange={e => onChange('unit_price', e.target.value)} placeholder="Betrag"
+                disabled={!!pos.discount_pct}
+                className="w-24 border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface text-right disabled:opacity-40" />
+            </>
+          )}
+          {['subtotal', 'discount'].includes(typ) && (
+            <span className="text-sm font-medium text-neutral-800 w-28 text-right">{fmtEuro(betrag)}</span>
+          )}
+          <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
+        </div>
+        {typ === 'discount' && (
+          <p className="text-xs text-neutral-500 mt-1.5 ml-26">
+            Wirkt auf die Positionen seit der letzten Überschrift oder Zwischensumme
+            und wird anteilig auf deren Steuersätze verteilt.
+          </p>
+        )}
+      </div>
+    )
+  }
+
   const lineTotal = calcLine(pos)
   return (
     <div className="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
@@ -752,7 +1042,9 @@ function PositionRow({ pos, index, taxMode, taxRates = [], onChange, onRemove })
           <input type="number" step="0.01" value={pos.unit_price} onChange={e => onChange('unit_price', e.target.value)} placeholder="Preis"
             className="w-full border border-neutral-200 rounded px-2 py-1.5 text-sm bg-surface text-right" />
         </div>
-        {taxMode !== 'kleinunternehmer' && (
+        {/* Bei „Ein Satz für alle" steuert das Feld oben im Kopf — hier wäre es
+            irreführend, weil eine Änderung je Zeile ohnehin überschrieben wird. */}
+        {taxMode === 'per_position' && (
           <div className="col-span-1 md:col-span-1">
             {/* Sätze kommen aus den Verkaufseinstellungen — früher fest
                 verdrahtet, dadurch war z.B. 13 % gar nicht erfassbar. */}
@@ -774,7 +1066,8 @@ function PositionRow({ pos, index, taxMode, taxRates = [], onChange, onRemove })
         <div className="col-span-1 md:col-span-1 flex items-center justify-end">
           <span className="text-sm font-medium text-neutral-800">{fmtEuro(lineTotal)}</span>
         </div>
-        <div className="col-span-1 md:col-span-1 flex items-center justify-center">
+        <div className="col-span-1 md:col-span-1 flex items-center justify-center gap-0.5">
+          <MoveButtons istErste={istErste} istLetzte={istLetzte} onMove={onMove} />
           <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
         </div>
       </div>
@@ -787,6 +1080,7 @@ function PositionRow({ pos, index, taxMode, taxRates = [], onChange, onRemove })
           placeholder="Erlöskonto" title="Leer = Standard-Erlöskonto"
           className="w-28 border border-neutral-100 rounded px-2 py-1 text-xs bg-surface text-neutral-500 font-mono" />
       </div>
+      <PositionImage pos={pos} onChange={onChange} />
     </div>
   )
 }

@@ -133,24 +133,28 @@ _worker_started = False
 
 def _worker_loop():
     from app.db.base import SessionLocal
-    # Erststart kurz verzögern, dann täglich prüfen (Schleife wacht stündlich auf)
     last_run_day = None
+    # Kurz nach dem Start einmal laufen, danach stündlich aufwachen. Vorher
+    # verging bis zur ersten Prüfung eine volle Stunde — fällige Serienbelege
+    # entstanden nach einem Neustart entsprechend spät.
+    time.sleep(60)
     while True:
-        time.sleep(3600)  # stündlich aufwachen
         try:
             heute = date.today()
-            if last_run_day == heute:
-                continue
-            db = SessionLocal()
-            try:
-                n = materialize_due_recurring(db, heute)
-                if n:
-                    print(f"[INFO] Wiederkehrend: {n} Rechnungs-Entwurf/-Entwürfe erstellt")
-                last_run_day = heute
-            finally:
-                db.close()
+            # Bewusst kein "continue": Das würde das Warten am Schleifenende
+            # überspringen und den Thread heißlaufen lassen.
+            if last_run_day != heute:
+                db = SessionLocal()
+                try:
+                    n = materialize_due_recurring(db, heute)
+                    if n:
+                        print(f"[INFO] Wiederkehrend: {n} Rechnungs-Entwurf/-Entwürfe erstellt")
+                    last_run_day = heute
+                finally:
+                    db.close()
         except Exception as e:
             print(f"[WARN] Wiederkehrend-Worker: {e}")
+        time.sleep(3600)  # stündlich aufwachen
 
 
 def start_recurring_worker():

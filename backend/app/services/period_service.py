@@ -120,6 +120,24 @@ def pruefliste(db: Session, jahr: int, monat: int) -> dict:
         "belege": [{"id": str(b.id), "titel": b.number or "(ohne Nummer)"} for b in ohne_kontakt],
     })
 
+    # UID des Empfängers ab 10.000 € — Pflichtangabe, aber nicht bei jedem
+    # Empfänger vorhanden (Privatpersonen haben keine). Daher Hinweis.
+    from app.api.invoice import _uid_fehlt, UID_SCHWELLE
+    ohne_uid = [b for b in im_monat.filter(Invoice.status != "entwurf").all()
+                if _uid_fehlt(db, b)]
+    punkte.append({
+        "schluessel": "uid_fehlt",
+        "titel": f"UID ab {float(UID_SCHWELLE):.0f} €",
+        "art": "hinweis",
+        "erfuellt": not ohne_uid,
+        "anzahl": len(ohne_uid),
+        "text": ("Keine Belege über der Schwelle ohne UID." if not ohne_uid else
+                 f"{len(ohne_uid)} Beleg(e) über {float(UID_SCHWELLE):.0f} € ohne "
+                 "UID des Empfängers. Bei unternehmerischen Empfängern ist sie "
+                 "nach § 11 Abs. 1 Z 2 UStG Pflicht; Privatpersonen haben keine."),
+        "belege": [{"id": str(b.id), "titel": b.number or "(ohne Nummer)"} for b in ohne_uid],
+    })
+
     # Kennzahlen, die für die Umsatzsteuer-Aufstellung fehlen
     saetze = tax_rates_service.get_tax_rates(db)
     offene_kz = [s for s in saetze if s["aktiv"] and not s["uva_kz"]]
@@ -297,7 +315,8 @@ async def paket_bauen(db: Session, jahr: int, monat: int, benutzer) -> tuple:
         name = f"belege/{_sicherer_name(beleg.number or str(beleg.id)[:8])}.pdf"
         try:
             s, i, absender, empfaenger = _load_pdf_context(db, beleg)
-            dateien[name] = generate_pdf(beleg, beleg.positions, s, i, absender, empfaenger)
+            dateien[name] = generate_pdf(beleg, beleg.positions, s, i, absender,
+                                         empfaenger, db=db)
         except Exception as e:
             dateien[name.replace(".pdf", "_FEHLER.txt")] = f"{e}\n".encode("utf-8")
 

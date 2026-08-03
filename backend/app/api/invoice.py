@@ -5,6 +5,7 @@ from sqlalchemy import and_, or_, func, extract
 from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import date, datetime, timezone
+from decimal import Decimal
 import io
 import json
 
@@ -71,6 +72,11 @@ def _next_number(db: Session, doc_type: str, year: int) -> tuple[int, str]:
     return seq.last_sequence, number
 
 
+from app.services.positionen import (WERTZEILEN, gruppen_netto as _gruppen_netto,
+                                      rabatt_verteilen as _rabatt_verteilen,
+                                      rabattbetrag as _rabattbetrag, typ as _postyp)
+
+
 def _calc_totals(invoice: Invoice) -> None:
     """
     Positionen neu berechnen und Summen auf den Beleg schreiben.
@@ -84,16 +90,59 @@ def _calc_totals(invoice: Invoice) -> None:
     Textzeilen tragen nichts zur Summe bei (der PDF- und der BMD-Export
     überspringen sie ebenfalls).
     """
-    from decimal import Decimal
     from collections import defaultdict
 
+    # „Ein Satz für alle": Der erste gepflegte Steuersatz gilt für jede
+    # Position. Die Regel steckt bewusst hier und nicht nur im Formular —
+    # der Modus war bis dahin wirkungslos und verhielt sich wie „pro Position",
+    # der Benutzer wählte also etwas aus, das nichts tat.
+    if invoice.tax_mode == "single_rate":
+        gepflegte = [p.tax_rate for p in invoice.positions
+                     if (p.pos_type or "item") in WERTZEILEN and p.tax_rate is not None]
+        if gepflegte:
+            for pos in invoice.positions:
+                if (pos.pos_type or "item") in WERTZEILEN:
+                    pos.tax_rate = gepflegte[0]
+
+    positionen = list(invoice.positions)
     subtotal = Decimal("0")
     netto_je_satz: dict = defaultdict(lambda: Decimal("0"))
+    gruppe_ab = 0          # Index, ab dem die laufende Gruppe zählt
 
-    for pos in invoice.positions:
-        if pos.pos_type == "text":
+    for i, pos in enumerate(positionen):
+        typ = pos.pos_type or "item"
+
+        # Überschrift und Freitext tragen keinen Betrag. Nur die Überschrift
+        # eröffnet eine Gruppe — eine erläuternde Textzeile mitten in einer
+        # Gruppe soll sie nicht zerreißen.
+        if typ in ("text", "heading"):
             pos.line_total = Decimal("0")
+            if typ == "heading":
+                gruppe_ab = i + 1
             continue
+
+        # Zwischensumme: Anzeigewert der laufenden Gruppe, danach neue Gruppe.
+        # Rabattzeilen der Gruppe zählen mit — die Zwischensumme soll zeigen,
+        # was die Gruppe tatsächlich kostet.
+        if typ == "subtotal":
+            pos.line_total = sum(
+                (p.line_total or Decimal("0")) for p in positionen[gruppe_ab:i]
+                if (p.pos_type or "item") not in ("text", "heading", "subtotal"))
+            gruppe_ab = i + 1
+            continue
+
+        # Rabattzeile: fester Betrag oder Prozent der laufenden Gruppe.
+        if typ == "discount":
+            gruppe_je_satz = _gruppen_netto(positionen, gruppe_ab, i)
+            basis = sum(gruppe_je_satz.values(), Decimal("0"))
+            betrag = _rabattbetrag(pos, basis)
+            pos.line_total = -betrag
+            subtotal -= betrag
+            for satz, anteil in _rabatt_verteilen(gruppe_je_satz, basis, betrag).items():
+                netto_je_satz[satz] -= anteil
+            continue
+
+        # Gewöhnliche Position
         qty = pos.quantity or Decimal("0")
         price = pos.unit_price or Decimal("0")
         base = qty * price
@@ -288,6 +337,30 @@ def _pruefe_pflichtangaben(invoice: Invoice) -> None:
     )
 
 
+UID_SCHWELLE = Decimal("10000")
+
+
+def _uid_fehlt(db: Session, invoice: Invoice) -> bool:
+    """
+    Fehlt die UID des Empfängers, obwohl sie Pflichtangabe wäre?
+
+    Ab 10.000 € Rechnungsbetrag verlangt § 11 Abs. 1 Z 2 UStG die UID des
+    Leistungsempfängers. Das wird bewusst **nicht** blockiert: Der Empfänger
+    kann eine Privatperson ohne UID sein, dann gibt es nichts einzutragen.
+    Gemeldet wird es trotzdem — am Beleg im Protokoll und in der Prüfliste des
+    Monatsabschlusses, wo es vor der Übergabe auffällt.
+    """
+    if invoice.doc_type not in ("rechnung", "gutschrift"):
+        return False
+    if abs(Decimal(str(invoice.total or 0))) <= UID_SCHWELLE:
+        return False
+    quelle = (invoice.recipient_snapshot or {}).get("data") if invoice.recipient_snapshot else None
+    if quelle is None and invoice.contact_id:
+        rec = db.query(EntityRecord).filter(EntityRecord.id == invoice.contact_id).first()
+        quelle = (rec.data or {}) if rec else {}
+    return not (quelle or {}).get("uid", "").strip()
+
+
 def _finalize(db: Session, invoice: Invoice) -> bool:
     """
     Sammelvorgang für „Beleg verlässt den Entwurf".
@@ -303,6 +376,16 @@ def _finalize(db: Session, invoice: Invoice) -> bool:
     neue_nummer = _ensure_number(db, invoice)
     ensure_recipient_snapshot(db, invoice)
     _sync_time_entry_status(db, invoice)
+
+    # Fehlende UID über der Schwelle blockiert nicht, wird aber am Beleg
+    # vermerkt — sonst fällt es niemandem auf.
+    if _uid_fehlt(db, invoice):
+        _audit(db, invoice, "hinweis",
+               note=f"UID des Empfängers fehlt. Ab "
+                    f"{float(UID_SCHWELLE):.0f} € Rechnungsbetrag ist sie nach "
+                    f"§ 11 Abs. 1 Z 2 UStG Pflichtangabe — ohne sie verliert ein "
+                    f"unternehmerischer Empfänger den Vorsteuerabzug.",
+               user_email=invoice.updated_by)
     return neue_nummer
 
 
@@ -941,19 +1024,72 @@ async def get_book_pdf(
     try:
         import weasyprint
         pdf_bytes = weasyprint.HTML(string=html).write_pdf()
-    except Exception:
-        # Fallback: HTML als Datei zurückgeben wenn WeasyPrint nicht verfügbar
-        return Response(
-            content=html.encode("utf-8"),
-            media_type="text/html",
-            headers={"Content-Disposition": "inline; filename=belegbuch.html"},
-        )
+    except Exception as e:
+        # Kein HTML-Rückfall mehr: Der Browser lud die Datei als
+        # „belegbuch.pdf" herunter und bekam HTML — der Fehler fiel erst beim
+        # Öffnen auf, und dann sah es nach einer kaputten Datei aus statt nach
+        # einem Serverproblem.
+        raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {e}")
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=belegbuch.pdf"},
     )
+
+
+@router.post("/positions/image")
+async def upload_position_image(
+    size: str = Query("mittel", description="klein | mittel | gross"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Nimmt ein Bild für eine Belegposition entgegen und verkleinert es sofort
+    auf die gewählte Druckgröße.
+
+    Bewusst **nicht** an eine Position gebunden: Positionen werden beim
+    Speichern gelöscht und neu angelegt, haben also keine dauerhafte Kennung.
+    Zurück kommt der Speicher-Schlüssel, den das Formular als Feld der Position
+    mitführt — genau wie das Erlöskonto.
+    """
+    from app.services import position_image, storage_service
+
+    if file.content_type and file.content_type not in position_image.ERLAUBTE_TYPEN:
+        raise HTTPException(400, f"Dateityp {file.content_type} wird nicht unterstützt. "
+                                 f"Erlaubt sind JPEG, PNG, WebP und GIF.")
+    rohdaten = await file.read()
+    if len(rohdaten) > position_image.MAX_UPLOAD:
+        raise HTTPException(400, "Bild zu groß (max. 15 MB)")
+
+    daten, mime, endung = position_image.verkleinern(rohdaten, size)
+    schluessel = position_image.speicher_schluessel(endung)
+    try:
+        storage_service.upload_file(schluessel, daten, mime, db=db)
+    except Exception as exc:
+        raise HTTPException(500, f"Speicher-Fehler: {exc}")
+
+    return {"image_key": schluessel, "image_size": size,
+            "breite_mm": position_image.breite_mm(size), "bytes": len(daten)}
+
+
+@router.get("/positions/image")
+async def get_position_image(
+    key: str = Query(..., description="Speicher-Schlüssel aus dem Upload"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Liefert ein Positionsbild aus — für die Vorschau im Formular."""
+    from app.services import storage_service
+    if not key.startswith("belege/positionsbilder/"):
+        raise HTTPException(400, "Ungültiger Bildschlüssel")
+    try:
+        daten, mime = storage_service.download_file(key, db=db)
+    except Exception:
+        raise HTTPException(404, "Bild nicht gefunden")
+    return Response(content=daten, media_type=mime or "image/jpeg",
+                    headers={"Cache-Control": "private, max-age=3600"})
 
 
 @router.get("/uva", response_model=UvaResponse,
@@ -1452,7 +1588,7 @@ async def download_invoice_pdf(
     settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
     try:
         pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
-                                 sender_contact, recipient_contact)
+                                 sender_contact, recipient_contact, db=db)
     except Exception as e:
         raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {str(e)}")
 
@@ -1477,7 +1613,7 @@ async def preview_invoice_html(
 
     settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
     html = generate_html_preview(inv, inv.positions, settings_d, inv_settings_d,
-                                 sender_contact, recipient_contact)
+                                 sender_contact, recipient_contact, db=db)
     return Response(content=html, media_type="text/html")
 
 
@@ -2181,7 +2317,7 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
     db.flush()
 
     pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
-                              sender_contact, recipient_contact)
+                              sender_contact, recipient_contact, db=db)
 
     filename = f"{(inv.number or 'beleg').replace('/', '-')}.pdf"
 
@@ -2360,14 +2496,18 @@ async def bulk_send_email(
                              "error": "Keine E-Mail-Adresse im Kontakt"})
             continue
 
+        # Je Beleg committen statt einmal am Ende: Sonst reißt ein Fehler beim
+        # fünften Beleg die Statusänderungen der vier davor mit — obwohl deren
+        # E-Mails längst raus sind. Ein Rollback holt keine E-Mail zurück.
         try:
             _send_invoice_email(inv, db, settings_d, inv_settings_d,
                                  sender_contact, recipient_contact, to_email, current_user.email)
+            db.commit()
             results.append({"id": str(inv_id), "number": inv.number, "ok": True, "to": to_email})
         except Exception as e:
+            db.rollback()
             results.append({"id": str(inv_id), "number": inv.number, "ok": False, "error": str(e)})
 
-    db.commit()
     sent = sum(1 for r in results if r["ok"])
     return {"sent": sent, "total": len(ids), "results": results}
 

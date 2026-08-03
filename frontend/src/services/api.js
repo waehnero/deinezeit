@@ -243,6 +243,15 @@ export const invoiceApi = {
   // Änderungsprotokoll
   getAudit:       (id) => api.get(`/invoices/${id}/audit`),
 
+  // Positionsbilder
+  uploadPositionImage: (file, size) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/invoices/positions/image?size=${size}`, form,
+                    { headers: { 'Content-Type': undefined } })
+  },
+  positionImageUrl: (key) => `/api/invoices/positions/image?key=${encodeURIComponent(key)}`,
+
   // Zahlungen & offene Posten
   listPayments:   (id) => api.get(`/invoices/${id}/payments`),
   addPayment:     (id, data) => api.post(`/invoices/${id}/payments`, data),

@@ -131,6 +131,12 @@ class InvoicePosition(Base):
     # aber im Modell — dadurch scheiterte der BMD-Export mit AttributeError.
     account_nr = Column(String(20), nullable=True)
 
+    # Bild zur Position. Der Speicher-Schlüssel steht hier und nicht in einer
+    # eigenen Tabelle, weil Positionen beim Speichern gelöscht und neu angelegt
+    # werden — sie haben keine dauerhafte Kennung, an der ein Anhang hinge.
+    image_key = Column(String(500), nullable=True)
+    image_size = Column(String(10), nullable=True)      # klein | mittel | gross
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     invoice = relationship("Invoice", back_populates="positions")
