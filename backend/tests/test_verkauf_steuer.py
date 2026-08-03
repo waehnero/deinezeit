@@ -139,7 +139,8 @@ def test_gepflegte_saetze_haben_vorrang(auth_client, db_session):
     daten = auth_client.get("/api/invoices/settings/all").json()
     assert daten["tax_rates"] == [{
         "satz": 19, "bezeichnung": "Deutschland", "ust_code": "D19",
-        "aktiv": True, "standard": True}]
+        # Kennzahl wird nicht geraten — der gespeicherte Eintrag hatte keine
+        "uva_kz": "", "aktiv": True, "standard": True}]
 
 
 def test_unbrauchbarer_gespeicherter_wert_faellt_auf_vorgabe_zurueck(db_session):

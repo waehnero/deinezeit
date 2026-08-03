@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '1.12.40',
+    day: '03',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Umsatzsteuer-Auswertung im Verkaufsbuch — Bemessungsgrundlage und Steuer je Kennzahl des Formulars U30, dazu ein Ausdruck zum Übertragen ins Finanzamts-Portal',
+      'Erlöskonto je Belegposition: wird vom Artikel übernommen und bleibt änderbar — der Buchhaltungs-Export trennt die Umsätze damit nach Erlösarten',
+      'Steuerland in den Firmendaten; bestimmt Steuersätze und Aufbau der Umsatzsteuer-Auswertung',
+    ],
+    updates: [
+      'Die Auswertung weist ausdrücklich aus, dass sie nur die Umsatzseite enthält — Vorsteuer und innergemeinschaftliche Erwerbe erfasst DeineZeit nicht und sind vor der Abgabe zu ergänzen',
+      'UVA-Kennzahl je Steuersatz pflegbar, vorbelegt mit 022 (20 %), 029 (10 %) und 006 (13 %)',
+      'Das Verkaufsbuch lädt beim Öffnen, statt auf einen Knopfdruck zu warten',
+    ],
+  },
+  {
     version: '1.12.39',
     day: '02',
     month: 'August',

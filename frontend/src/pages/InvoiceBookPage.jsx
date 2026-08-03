@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, accountingApi } from '../services/api'
 import toast from 'react-hot-toast'
@@ -65,6 +65,7 @@ export default function InvoiceBookPage() {
   const [period, setPeriod] = useState(`year:${THIS_YEAR}`)
   const [docType, setDocType] = useState('')
   const [data, setData] = useState(null)
+  const [uva, setUva] = useState(null)
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async () => {
@@ -79,7 +80,24 @@ export default function InvoiceBookPage() {
     } finally {
       setLoading(false)
     }
+
+    // Eigener Block: Scheitert die Umsatzsteuer-Auswertung, soll das Verkaufsbuch
+    // trotzdem stehen — und der Fehler benennen, worum es ging, statt in einem
+    // allgemeinen „Fehler beim Laden" unterzugehen.
+    try {
+      // Bewusst OHNE Belegart-Filter: Für die Voranmeldung zählen Rechnungen
+      // und Gutschriften immer zusammen.
+      const uvaRes = await invoiceApi.uva({ ...parsePeriod(period) })
+      setUva(uvaRes.data)
+    } catch (e) {
+      setUva(null)
+      toast.error(e.response?.data?.detail || 'Umsatzsteuer-Auswertung konnte nicht geladen werden')
+    }
   }, [period, docType])
+
+  // Beim Öffnen gleich laden — vorher blieb die Seite leer, bis jemand
+  // „Anzeigen" drückte, und man hielt sie für kaputt.
+  useEffect(() => { load() }, [load])
 
   async function downloadCsv() {
     try {
@@ -225,6 +243,86 @@ export default function InvoiceBookPage() {
               </div>
             ))}
           </div>
+
+          {/* Umsatzsteuer-Auswertung für die Voranmeldung (Formular U30).
+              Wird immer angezeigt, sobald geladen — ein leerer Zeitraum sagt
+              das ausdrücklich, statt den Abschnitt wortlos wegzulassen. */}
+          {uva && uva.zeilen.length === 0 && (
+            <div className="bg-surface border border-neutral-200 rounded-xl p-5 mb-5">
+              <h2 className="text-sm font-semibold text-neutral-700 mb-1">Umsatzsteuer-Auswertung</h2>
+              <p className="text-xs text-neutral-500">
+                Keine umsatzsteuerrelevanten Belege in diesem Zeitraum. Gezählt werden
+                ausgestellte Rechnungen und Gutschriften — Entwürfe und Angebote nicht.
+              </p>
+            </div>
+          )}
+          {uva && uva.zeilen.length > 0 && (
+            <div className="bg-surface border border-neutral-200 rounded-xl p-5 mb-5">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-neutral-700 mb-1">Umsatzsteuer-Auswertung</h2>
+                  <p className="text-xs text-neutral-500">
+                    Aufbereitung für die Voranmeldung — Rechnungen und Gutschriften des
+                    Zeitraums, unabhängig vom Belegart-Filter oben.
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await invoiceApi.uvaPdf({ ...parsePeriod(period) })
+                      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+                      const a = document.createElement('a'); a.href = url
+                      a.download = 'umsatzsteuer.pdf'; a.click(); URL.revokeObjectURL(url)
+                    } catch { toast.error('PDF-Fehler') }
+                  }}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
+                  <Download size={14} /> Ausdruck
+                </button>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-neutral-500 border-b">
+                    <th className="text-left py-2 font-medium">KZ</th>
+                    <th className="text-left py-2 font-medium">Bezeichnung</th>
+                    <th className="text-right py-2 font-medium">Bemessungsgrundlage</th>
+                    <th className="text-right py-2 font-medium">Umsatzsteuer</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {uva.zeilen.map((z, i) => (
+                    <tr key={i}>
+                      <td className="py-2 font-mono text-neutral-700">
+                        {z.kennzahl || <span className="text-amber-600" title="Kennzahl nicht zugeordnet">—</span>}
+                      </td>
+                      <td className="py-2 text-neutral-700">{z.bezeichnung}</td>
+                      <td className="py-2 text-right text-neutral-800">{fmtEuro(z.bemessungsgrundlage)}</td>
+                      <td className="py-2 text-right text-neutral-800">{fmtEuro(z.steuer)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 font-semibold">
+                    <td className="py-2 font-mono text-neutral-700">000</td>
+                    <td className="py-2 text-neutral-700">Gesamtbetrag der Bemessungsgrundlage</td>
+                    <td className="py-2 text-right text-neutral-900">{fmtEuro(uva.kz_000)}</td>
+                    <td className="py-2 text-right text-neutral-900">{fmtEuro(uva.steuer_gesamt)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {uva.hinweise.length > 0 && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+                  {uva.hinweise.map((h, i) => (
+                    <p key={i} className="text-xs text-amber-900">{h}</p>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-neutral-400 mt-3">
+                Aufbereitung, keine Steuerberatung — die Zuordnung von Sonderfällen
+                gehört geprüft, bevor die Zahlen in die Voranmeldung gehen.
+              </p>
+            </div>
+          )}
 
           {/* Tabelle */}
           <div className="bg-surface border border-neutral-200 rounded-xl overflow-hidden">

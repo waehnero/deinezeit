@@ -25,17 +25,45 @@ in :data:`REVERSE_CHARGE_CODE`.
 from decimal import Decimal, InvalidOperation
 
 
-# Österreichische Sätze als Vorgabe (§ 10 UStG)
+# Österreichische Sätze als Vorgabe (§ 10 UStG).
+#
+# uva_kz = Kennzahl im Formular U30 (Umsatzsteuervoranmeldung). Belegt sind
+# 022 (20 %), 029 (10 %) und 006 (13 %). Für steuerfreie Umsätze hängt die
+# Kennzahl vom Sachverhalt ab — Ausfuhr, innergemeinschaftliche Lieferung und
+# Reverse Charge laufen über verschiedene Kennzahlen. Das wird bewusst NICHT
+# geraten, sondern bleibt leer und wird in der Auswertung als „nicht
+# zugeordnet" ausgewiesen, bis die Steuerberatung es einträgt.
 DEFAULT_TAX_RATES = [
     {"satz": 20, "bezeichnung": "Normalsatz",           "ust_code": "U20",
-     "aktiv": True,  "standard": True},
+     "uva_kz": "022", "aktiv": True,  "standard": True},
     {"satz": 13, "bezeichnung": "Ermäßigt (13 %)",      "ust_code": "U13",
-     "aktiv": True,  "standard": False},
+     "uva_kz": "006", "aktiv": True,  "standard": False},
     {"satz": 10, "bezeichnung": "Ermäßigt (10 %)",      "ust_code": "U10",
-     "aktiv": True,  "standard": False},
+     "uva_kz": "029", "aktiv": True,  "standard": False},
     {"satz": 0,  "bezeichnung": "Steuerfrei",           "ust_code": "U00",
-     "aktiv": True,  "standard": False},
+     "uva_kz": "",    "aktiv": True,  "standard": False},
 ]
+
+# Kennzahl für den Gesamtbetrag der Bemessungsgrundlage im Formular U30
+UVA_KZ_GESAMT = "000"
+
+# Steuerland der Firma (Settings-Schlüssel ``company_country``).
+#
+# Ausgebaut ist derzeit ausschließlich Österreich. Das Kennzeichen steht
+# trotzdem schon da, damit die Meldelogik von Anfang an daran hängt statt an
+# einer stillen Annahme — ein zweites Land wäre sonst ein Umbau quer durch das
+# Modul. Andere Meldungen bedeuten andere Formulare, Kennzahlen, Fristen und
+# Übermittlungswege (Deutschland z.B. ELSTER/ERiC mit Zertifikat).
+DEFAULT_COUNTRY = "AT"
+SUPPORTED_COUNTRIES = {"AT": "Österreich"}
+
+
+def get_company_country(db) -> str:
+    """Steuerland der Firma; Vorgabe Österreich."""
+    from app.models.settings import Setting
+    row = db.query(Setting).filter_by(key="company_country").first()
+    wert = (row.value or "").strip().upper() if row else ""
+    return wert or DEFAULT_COUNTRY
 
 REVERSE_CHARGE_CODE = "URC"
 
@@ -60,10 +88,13 @@ def _normalisieren(eintrag) -> dict | None:
         return None
 
     satz_text = str(int(satz)) if satz == int(satz) else str(satz)
+    # uva_kz bewusst OHNE Rückfall: Eine geratene Kennzahl wäre schlimmer als
+    # keine — sie landet ungeprüft in der Voranmeldung.
     return {
         "satz": satz,
         "bezeichnung": str(eintrag.get("bezeichnung") or f"{satz_text} %"),
         "ust_code": str(eintrag.get("ust_code") or f"U{satz_text.zfill(2)}"),
+        "uva_kz": str(eintrag.get("uva_kz") or ""),
         "aktiv": bool(eintrag.get("aktiv", True)),
         "standard": bool(eintrag.get("standard", False)),
     }

@@ -29,6 +29,7 @@ from app.schemas.invoice import (
     InvoiceDuplicateRequest, InvoiceAuditEntry,
     InvoicePaymentCreate, InvoicePaymentResponse, InvoicePaymentState,
     OpenItem, OpenItemsByContact, OpenItemsResponse,
+    UvaZeile, UvaResponse,
 )
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
@@ -936,6 +937,229 @@ async def get_book_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=belegbuch.pdf"},
     )
+
+
+@router.get("/uva", response_model=UvaResponse,
+            dependencies=[Depends(require_module("buchhaltung"))])
+async def get_uva(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Umsatzsteuer-Auswertung für die Voranmeldung (Formular U30).
+
+    Liefert je Steuersatz die Bemessungsgrundlage und den Steuerbetrag, dazu
+    die Kennzahl aus den Verkaufseinstellungen. Belegt sind 022 (20 %),
+    029 (10 %) und 006 (13 %); für steuerfreie Umsätze hängt die Kennzahl vom
+    Sachverhalt ab (Ausfuhr, innergemeinschaftliche Lieferung, Reverse Charge)
+    und wird bewusst nicht geraten — solche Zeilen erscheinen mit dem Vermerk
+    „Kennzahl nicht zugeordnet".
+
+    Enthalten sind Rechnungen und Gutschriften, die ausgestellt und nicht
+    storniert sind. Gutschriften mindern die Bemessungsgrundlage, weil ihre
+    Beträge negativ geführt werden.
+
+    **Das ist eine Aufbereitung, keine Steuerberatung.** Die Zuordnung von
+    Sonderfällen gehört geprüft, bevor die Zahlen in die Voranmeldung gehen.
+    """
+    from decimal import Decimal
+    from collections import defaultdict
+    from app.services import tax_rates as tax_rates_service
+
+    belege = _book_query(db, date_from, date_to, None).filter(
+        Invoice.doc_type.in_(["rechnung", "gutschrift"]),
+        Invoice.is_recurring_template == False,
+        or_(Invoice.status != "storniert", Invoice.cancel_mode == "with_credit"),
+    ).all()
+
+    saetze = tax_rates_service.get_tax_rates(db)
+    kz_je_satz = {s["satz"]: (s["uva_kz"], s["bezeichnung"]) for s in saetze}
+
+    netto_je_satz: dict = defaultdict(lambda: Decimal("0"))
+    rc_netto = Decimal("0")
+
+    for beleg in belege:
+        kleinunternehmer = beleg.tax_mode == "kleinunternehmer"
+        for pos in beleg.positions:
+            if pos.pos_type == "text":
+                continue
+            netto = Decimal(str(pos.line_total or 0))
+            if pos.tax_rate is None:
+                rc_netto += netto            # Reverse Charge: kein Satz am Beleg
+            elif kleinunternehmer:
+                netto_je_satz[Decimal("0")] += netto
+            else:
+                netto_je_satz[Decimal(str(pos.tax_rate))] += netto
+
+    land = tax_rates_service.get_company_country(db)
+    land_unterstuetzt = land in tax_rates_service.SUPPORTED_COUNTRIES
+
+    zeilen, hinweise = [], []
+    kz_gesamt = Decimal("0")
+    steuer_gesamt = Decimal("0")
+
+    if not land_unterstuetzt:
+        hinweise.append(
+            f"Als Steuerland ist „{land}“ eingestellt. Die Kennzahlen unten "
+            f"stammen aus dem österreichischen Formular U30 und passen dann "
+            f"nicht — die Beträge je Steuersatz stimmen, die Zuordnung nicht.")
+
+    # Vollständigkeit: DeineZeit erfasst keine Eingangsrechnungen, damit fehlt
+    # die gesamte Vorsteuerseite der Voranmeldung (KZ 060, 061, 065, 070 ff.).
+    hinweise.append(
+        "Diese Auswertung enthält nur die Umsatzseite. Vorsteuer, Einfuhr"
+        "umsatzsteuer und innergemeinschaftliche Erwerbe erfasst DeineZeit "
+        "nicht — sie sind vor der Abgabe zu ergänzen.")
+
+    for satz in sorted(netto_je_satz, reverse=True):
+        netto = netto_je_satz[satz]
+        steuer = (netto * satz / 100).quantize(Decimal("0.01"))
+        kennzahl, bezeichnung = kz_je_satz.get(satz, ("", f"{satz} %"))
+        zeilen.append(UvaZeile(
+            kennzahl=kennzahl, bezeichnung=bezeichnung, satz=satz,
+            bemessungsgrundlage=netto, steuer=steuer, zugeordnet=bool(kennzahl),
+        ))
+        kz_gesamt += netto
+        steuer_gesamt += steuer
+        if not kennzahl:
+            hinweise.append(
+                f"Für den Steuersatz {bezeichnung} ist keine UVA-Kennzahl "
+                f"hinterlegt — bitte in den Verkaufseinstellungen ergänzen.")
+
+    if rc_netto:
+        zeilen.append(UvaZeile(
+            kennzahl="", bezeichnung="Reverse Charge (Steuerschuld geht über)",
+            satz=None, bemessungsgrundlage=rc_netto, steuer=Decimal("0"),
+            zugeordnet=False,
+        ))
+        kz_gesamt += rc_netto
+        hinweise.append(
+            "Reverse-Charge-Umsätze laufen je nach Sachverhalt über "
+            "unterschiedliche Kennzahlen (z.B. innergemeinschaftliche "
+            "Lieferung oder Bauleistung). Die Zuordnung gehört mit der "
+            "Steuerberatung geklärt.")
+
+    return UvaResponse(
+        date_from=date_from, date_to=date_to,
+        country=land, country_supported=land_unterstuetzt, zeilen=zeilen,
+        kz_000=kz_gesamt, steuer_gesamt=steuer_gesamt,
+        beleg_anzahl=len(belege), hinweise=hinweise,
+    )
+
+
+@router.get("/uva/pdf", dependencies=[Depends(require_module("buchhaltung"))])
+async def get_uva_pdf(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Umsatzsteuer-Auswertung als Ausdruck, Zeile für Zeile nach dem Formular U30.
+
+    Bewusst ein Ausdruck zum Abtippen und **keine** Übermittlung: DeineZeit
+    erfasst keine Eingangsrechnungen, damit fehlt die gesamte Vorsteuerseite
+    der Voranmeldung. Eine Meldung mit Vorsteuer null würde deutlich zu viel
+    Umsatzsteuer ausweisen. Der Ausdruck sagt das an mehreren Stellen deutlich.
+    """
+    from app.services import tax_rates as tax_rates_service
+
+    daten = await get_uva(date_from=date_from, date_to=date_to, db=db, _=current_user)
+    settings = {r.key: r.value for r in db.query(Setting).all()}
+    firma = settings.get("company_name", "") or "—"
+    land = tax_rates_service.SUPPORTED_COUNTRIES.get(daten.country, daten.country)
+
+    def eur(n):
+        return f"{float(n):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def dat(d):
+        return d.strftime("%d.%m.%Y") if d else "—"
+
+    zeitraum = (f"{dat(date_from)} – {dat(date_to)}" if (date_from or date_to)
+                else "Alle Zeiträume")
+
+    zeilen_html = ""
+    for z in daten.zeilen:
+        kz = z.kennzahl or '<span class="offen">nicht zugeordnet</span>'
+        zeilen_html += f"""
+        <tr>
+          <td class="kz">{kz}</td>
+          <td>{z.bezeichnung}</td>
+          <td class="r">{eur(z.bemessungsgrundlage)}</td>
+          <td class="r">{eur(z.steuer)}</td>
+        </tr>"""
+
+    hinweise_html = "".join(f"<li>{h}</li>" for h in daten.hinweise)
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      @page {{ size: A4; margin: 2cm; }}
+      body {{ font-family: Arial, sans-serif; font-size: 10.5pt; color: #222; }}
+      h1 {{ font-size: 15pt; margin: 0 0 2px 0; }}
+      .sub {{ color: #666; font-size: 9pt; margin-bottom: 18px; }}
+      .warn {{ background: #fff4e5; border: 1px solid #f0c48a; border-radius: 4px;
+               padding: 10px 12px; margin-bottom: 18px; font-size: 9pt; }}
+      .warn b {{ display: block; margin-bottom: 3px; }}
+      .warn ul {{ margin: 6px 0 0 16px; padding: 0; }}
+      table {{ width: 100%; border-collapse: collapse; margin-top: 4px; }}
+      th {{ background: #f3f4f6; text-align: left; padding: 6px 8px;
+            border-bottom: 2px solid #d1d5db; font-size: 9pt; }}
+      td {{ padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }}
+      .r {{ text-align: right; }}
+      .kz {{ font-family: "Courier New", monospace; font-weight: bold; width: 3.5cm; }}
+      .offen {{ color: #b45309; font-weight: normal; font-family: Arial; }}
+      tfoot td {{ font-weight: bold; background: #f9fafb; border-top: 2px solid #d1d5db; }}
+      .fuss {{ margin-top: 22px; font-size: 8pt; color: #777; line-height: 1.5; }}
+    </style></head><body>
+      <h1>Umsatzsteuer — Aufstellung der Umsätze</h1>
+      <p class="sub">{firma} &nbsp;|&nbsp; Zeitraum: {zeitraum}
+         &nbsp;|&nbsp; Steuerland: {land}
+         &nbsp;|&nbsp; {daten.beleg_anzahl} Belege
+         &nbsp;|&nbsp; erstellt am {date.today():%d.%m.%Y}</p>
+
+      <div class="warn">
+        <b>Diese Aufstellung ist keine vollständige Umsatzsteuervoranmeldung.</b>
+        Sie enthält ausschließlich die Umsatzseite. Vorsteuer (KZ 060),
+        Einfuhrumsatzsteuer (KZ 061) und innergemeinschaftliche Erwerbe
+        (KZ 070 ff.) werden in DeineZeit nicht erfasst und sind vor der Abgabe
+        zu ergänzen. Die Kennzahlen folgen dem österreichischen Formular U30.
+        {"<ul>" + hinweise_html + "</ul>" if hinweise_html else ""}
+      </div>
+
+      <table>
+        <thead><tr>
+          <th>Kennzahl</th><th>Bezeichnung</th>
+          <th class="r">Bemessungsgrundlage</th><th class="r">Umsatzsteuer</th>
+        </tr></thead>
+        <tbody>{zeilen_html or '<tr><td colspan="4">Keine umsatzsteuerrelevanten Belege im Zeitraum.</td></tr>'}</tbody>
+        <tfoot><tr>
+          <td class="kz">000</td>
+          <td>Gesamtbetrag der Bemessungsgrundlage</td>
+          <td class="r">{eur(daten.kz_000)}</td>
+          <td class="r">{eur(daten.steuer_gesamt)}</td>
+        </tr></tfoot>
+      </table>
+
+      <p class="fuss">
+        Aufbereitung aus den Verkaufsbelegen, keine Steuerberatung. Enthalten sind
+        ausgestellte Rechnungen und Gutschriften; Entwürfe, Angebote,
+        Auftragsbestätigungen und Lieferscheine bleiben unberücksichtigt.
+        Stornierte Belege zählen nur mit, wenn eine Gutschrift dagegensteht.
+        Die Zuordnung der Kennzahlen — besonders bei Ausfuhr, innergemeinschaftlichen
+        Lieferungen und Reverse Charge — gehört mit der Steuerberatung geprüft.
+      </p>
+    </body></html>"""
+
+    try:
+        import weasyprint
+        pdf = weasyprint.HTML(string=html).write_pdf()
+    except Exception as e:
+        raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {e}")
+
+    name = f"umsatzsteuer_{date_from or 'alle'}_{date_to or ''}".rstrip("_")
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'})
 
 
 # ─────────────────────────────────────────────────────────────────────────────

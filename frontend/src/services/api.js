@@ -248,6 +248,8 @@ export const invoiceApi = {
   addPayment:     (id, data) => api.post(`/invoices/${id}/payments`, data),
   deletePayment:  (paymentId) => api.delete(`/invoices/payments/${paymentId}`),
   openItems:      (params) => api.get('/invoices/open-items', { params }),
+  uva:            (params) => api.get('/invoices/uva', { params }),
+  uvaPdf:         (params) => api.get('/invoices/uva/pdf', { params, responseType: 'blob' }),
 
   // Rechnungsbuch
   book:           (params) => api.get('/invoices/book/list', { params }),

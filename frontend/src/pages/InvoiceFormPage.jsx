@@ -101,7 +101,9 @@ function ArticleSearch({ onSelect }) {
           {results.map(r => (
             <button key={r.id} className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 border-b last:border-0"
               onMouseDown={() => {
-                onSelect({ article_id: r.id, description: r.display_name, unit_price: r.data?.preis != null ? String(r.data.preis) : '0', unit: r.data?.einheit || 'Stk', detail: r.data?.beschreibung || '' })
+                // Erlöskonto des Artikels mitnehmen — genau dafür gibt es das
+                // Stammdatenfeld, es wurde bisher nur nie durchgereicht (A-16).
+                onSelect({ article_id: r.id, description: r.display_name, unit_price: r.data?.preis != null ? String(r.data.preis) : '0', unit: r.data?.einheit || 'Stk', detail: r.data?.beschreibung || '', account_nr: r.data?.erloes_konto || null })
                 setSearch(''); setOpen(false)
               }}>
               <p className="font-medium text-neutral-800">{r.display_name}</p>
@@ -355,6 +357,7 @@ export default function InvoiceFormPage() {
           quantity: parseFloat(p.quantity) || 1, unit: p.unit || null, unit_price: parseFloat(p.unit_price) || 0,
           discount_pct: p.discount_pct !== '' ? parseFloat(p.discount_pct) : null,
           tax_rate: p.tax_rate !== '' ? parseFloat(p.tax_rate) : null,
+          account_nr: p.account_nr || null,
           article_id: p.article_id || null, time_entry_id: p.time_entry_id || null,
         })),
       }
@@ -775,8 +778,15 @@ function PositionRow({ pos, index, taxMode, taxRates = [], onChange, onRemove })
           <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
         </div>
       </div>
-      <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
-        className="mt-2 w-full border border-neutral-100 rounded px-2 py-1 text-xs bg-surface text-neutral-500" />
+      <div className="mt-2 flex gap-2">
+        <input value={pos.detail || ''} onChange={e => onChange('detail', e.target.value)} placeholder="Zusatztext (optional)"
+          className="flex-1 border border-neutral-100 rounded px-2 py-1 text-xs bg-surface text-neutral-500" />
+        {/* Erlöskonto: leer = Standard-Erlöskonto aus dem Kontenplan. Wird beim
+            Übernehmen eines Artikels aus dessen Stammdaten vorbelegt. */}
+        <input value={pos.account_nr || ''} onChange={e => onChange('account_nr', e.target.value || null)}
+          placeholder="Erlöskonto" title="Leer = Standard-Erlöskonto"
+          className="w-28 border border-neutral-100 rounded px-2 py-1 text-xs bg-surface text-neutral-500 font-mono" />
+      </div>
     </div>
   )
 }
