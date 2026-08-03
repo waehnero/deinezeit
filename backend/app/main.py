@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import os
 from app.core.config import settings
-from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich
+from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period
 from app.api import settings as settings_api
 from app.services import storage_service
 from app.api.system import record_activity
@@ -77,6 +77,8 @@ app.include_router(system.router, prefix="/api")
 app.include_router(invoice.router, prefix="/api",
                    dependencies=[_Dep(_rm("verkauf"))])
 app.include_router(accounting.router, prefix="/api",
+                   dependencies=[_Dep(_rm("verkauf")), _Dep(_rm("buchhaltung"))])
+app.include_router(period.router, prefix="/api",
                    dependencies=[_Dep(_rm("verkauf")), _Dep(_rm("buchhaltung"))])
 app.include_router(projektplan.router, prefix="/api",
                    dependencies=[_Dep(_rm("projekte"))])

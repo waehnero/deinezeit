@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.41] – 2026-08-03 – Verkauf: Monatsabschluss und Übergabe an die Buchhaltung
+
+### Neu
+- Monatsabschluss: Monat prüfen, abschließen und damit gegen nachträgliche Änderungen sperren — offene Entwürfe verhindern den Abschluss
+- Übergabepaket als ZIP mit Buchungsjournal, Belegjournal, Umsatzsteuer-Aufstellung, offenen Posten und jedem Beleg als PDF, samt Prüfsumme je Datei
+- Übergabe-Historie je Monat: wer wann welches Paket erstellt hat, mit Prüfsumme als Nachweis
+
+### Aktualisierungen
+- Ein abgeschlossener Monat lässt sich nur von einem Admin und nur mit Begründung wieder öffnen; der Abschluss bleibt dabei dokumentiert
+- Zahlungseingänge bleiben auch in abgeschlossenen Monaten erfassbar — sie ändern nichts am Belegjournal
+- Das Paket weist aus, dass es die Verkaufsseite abdeckt: Eingangsrechnungen und Vorsteuer sind gesondert beizubringen
+
+---
+
 ## [1.12.40] – 2026-08-03 – Verkauf: Umsatzsteuer-Auswertung und Erlöskonto je Position
 
 ### Neu

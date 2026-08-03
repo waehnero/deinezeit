@@ -5,7 +5,7 @@ from typing import List
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "DeineZeit"
-    APP_VERSION: str = "1.12.40"
+    APP_VERSION: str = "1.12.41"
     DEBUG: bool = False
 
     # Datenbank
