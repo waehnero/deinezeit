@@ -108,7 +108,7 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
     try:
         settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, invoice)
         pdf_bytes = generate_pdf(invoice, invoice.positions, settings_d, inv_settings_d,
-                                 sender_contact, recipient_contact)
+                                 sender_contact, recipient_contact, db=db)
     except Exception as e:
         print(f"[WARN] Archiv-PDF konnte nicht erzeugt werden ({getattr(invoice, 'number', '?')}): {e}")
         _protokoll(db, invoice, f"Archivierung fehlgeschlagen — das PDF konnte "

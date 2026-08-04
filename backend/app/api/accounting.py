@@ -22,6 +22,7 @@ from app.models.invoice import Invoice, InvoicePosition, InvoiceSettings
 from app.models.masterdata import EntityRecord
 from app.models.settings import Setting
 from app.services import tax_rates as tax_rates_service
+from app.services import positionen as positionen_service
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/accounting", tags=["Buchhaltung"])
@@ -141,6 +142,19 @@ async def set_default_erloes(
 # sind keine Umsätze und dürfen nie in der Buchhaltung landen.
 BOOKABLE_DOC_TYPES = ("rechnung", "gutschrift")
 
+def _gruppe_beginnt(positionen: list, index: int) -> int:
+    """
+    Index, ab dem die Gruppe der Position bei ``index`` zählt.
+
+    Die Gruppe reicht von der letzten Überschrift oder Zwischensumme davor —
+    je nachdem, was zuletzt kam.
+    """
+    for i in range(index - 1, -1, -1):
+        if positionen_service.typ(positionen[i]) in ("heading", "subtotal"):
+            return i + 1
+    return 0
+
+
 # Buchungstext, wenn am Beleg kein Titel gepflegt ist
 DOC_TYPE_TEXT = {"rechnung": "Rechnung", "gutschrift": "Gutschrift"}
 
@@ -251,10 +265,27 @@ async def export_bmd(
         ust_groups: dict = defaultdict(lambda: {"net": Decimal("0"), "tax": Decimal("0")})
 
         for pos in inv.positions:
-            if pos.pos_type == "text":
+            # Überschrift, Freitext und Zwischensumme tragen keinen Umsatz.
+            if positionen_service.typ(pos) in positionen_service.GLIEDERUNG:
                 continue
             net = pos.line_total or Decimal("0")
             rate = pos.tax_rate
+
+            # Rabattzeile: Sie trägt selbst keinen Steuersatz, sondern mindert
+            # die Sätze ihrer Gruppe anteilig. Ohne diese Aufteilung landete
+            # der ganze Rabatt auf einem Konto und einem USt-Code.
+            if positionen_service.typ(pos) == "discount":
+                index = list(inv.positions).index(pos)
+                gruppe_ab = _gruppe_beginnt(list(inv.positions), index)
+                gruppe = positionen_service.gruppen_netto(list(inv.positions), gruppe_ab, index)
+                basis = sum(gruppe.values(), Decimal("0"))
+                for satz, anteil in positionen_service.rabatt_verteilen(
+                        gruppe, basis, -net).items():
+                    code = tax_rates_service.ust_code_for(steuersaetze, satz)
+                    ust_groups[(pos.account_nr or default_erloes, code)]["net"] -= anteil
+                    ust_groups[(pos.account_nr or default_erloes, code)]["tax"] -= (
+                        (anteil * satz / 100).quantize(Decimal("0.01")))
+                continue
             if inv.tax_mode == "kleinunternehmer":
                 ust_code = tax_rates_service.ust_code_for(steuersaetze, 0)
             else:

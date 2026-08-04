@@ -64,22 +64,27 @@ _worker_started = False
 def _worker_loop():
     from app.db.base import SessionLocal
     letzter_lauf = None
+    # Kurz nach dem Start einmal laufen, danach stündlich aufwachen und täglich
+    # arbeiten. Vorher wurde erst nach einer Stunde das erste Mal geprüft — nach
+    # einem Neustart am Monatsersten verzögerte sich der Lauf entsprechend.
+    time.sleep(60)
     while True:
-        time.sleep(3600)                   # stündlich aufwachen, täglich arbeiten
         try:
             heute = date.today()
-            if letzter_lauf == heute:
-                continue
-            db = SessionLocal()
-            try:
-                n = markiere_ueberfaellige(db, heute)
-                if n:
-                    print(f"[INFO] Fälligkeit: {n} Beleg(e) auf überfällig gesetzt")
-                letzter_lauf = heute
-            finally:
-                db.close()
+            # Bewusst kein "continue": Das würde das Warten am Schleifenende
+            # überspringen und den Thread heißlaufen lassen.
+            if letzter_lauf != heute:
+                db = SessionLocal()
+                try:
+                    n = markiere_ueberfaellige(db, heute)
+                    if n:
+                        print(f"[INFO] Fälligkeit: {n} Beleg(e) auf überfällig gesetzt")
+                    letzter_lauf = heute
+                finally:
+                    db.close()
         except Exception as e:
             print(f"[WARN] Fälligkeits-Worker: {e}")
+        time.sleep(3600)
 
 
 def start_overdue_worker():
