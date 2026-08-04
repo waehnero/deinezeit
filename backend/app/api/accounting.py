@@ -189,6 +189,134 @@ def _debitor_konto(db: Session) -> str:
     return acc.nr if acc else "2000"
 
 
+def _ust_gruppen(inv, default_erloes: str, steuersaetze) -> dict:
+    """
+    Buchungsgruppen eines Belegs: ``{(Erlöskonto, USt-Code): {net, tax, rate}}``.
+
+    Eigene Funktion, weil zwei Auswerter sie brauchen — die Buchungszeilen des
+    Belegs und die anteilige Verteilung eines später gewährten Skontos. Der
+    Steuersatz bleibt in der Gruppe stehen, damit der Skonto daraus wieder
+    Netto und Steuer trennen kann.
+    """
+    from decimal import Decimal
+    from collections import defaultdict
+
+    gruppen: dict = defaultdict(lambda: {"net": Decimal("0"), "tax": Decimal("0"),
+                                         "rate": Decimal("0")})
+    positionen = list(inv.positions)
+
+    for pos in positionen:
+        # Überschrift, Freitext und Zwischensumme tragen keinen Umsatz.
+        if positionen_service.typ(pos) in positionen_service.GLIEDERUNG:
+            continue
+        net = pos.line_total or Decimal("0")
+        rate = pos.tax_rate
+        konto = pos.account_nr or default_erloes
+
+        # Rabattzeile: Sie trägt selbst keinen Steuersatz, sondern mindert
+        # die Sätze ihrer Gruppe anteilig. Ohne diese Aufteilung landete
+        # der ganze Rabatt auf einem Konto und einem USt-Code.
+        if positionen_service.typ(pos) == "discount":
+            index = positionen.index(pos)
+            gruppe_ab = _gruppe_beginnt(positionen, index)
+            gruppe = positionen_service.gruppen_netto(positionen, gruppe_ab, index)
+            basis = sum(gruppe.values(), Decimal("0"))
+            for satz, anteil in positionen_service.rabatt_verteilen(
+                    gruppe, basis, -net).items():
+                code = tax_rates_service.ust_code_for(steuersaetze, satz)
+                eintrag = gruppen[(konto, code)]
+                eintrag["net"] -= anteil
+                eintrag["tax"] -= (anteil * satz / 100).quantize(Decimal("0.01"))
+                eintrag["rate"] = Decimal(str(satz or 0))
+            continue
+
+        if inv.tax_mode == "kleinunternehmer":
+            ust_code = tax_rates_service.ust_code_for(steuersaetze, 0)
+        else:
+            ust_code = tax_rates_service.ust_code_for(steuersaetze, rate)
+
+        eintrag = gruppen[(konto, ust_code)]
+        eintrag["net"] += net
+        if inv.tax_mode != "kleinunternehmer" and rate is not None:
+            eintrag["tax"] += (net * rate / 100).quantize(Decimal("0.01"))
+            eintrag["rate"] = Decimal(str(rate))
+    return gruppen
+
+
+def _skonto_zeilen(db: Session, date_from, date_to, default_erloes: str,
+                   default_debitor: str, steuersaetze, doc_type=None) -> list:
+    """
+    Buchungszeilen für gewährte Skonti — datiert auf den **Zahlungseingang**.
+
+    Ein Skonto mindert das Entgelt und erfordert eine Umsatzsteuer-Berichtigung
+    (§ 16 UStG) im Zeitraum der Zahlung. Deshalb hängt die Zeile am
+    Zahlungsdatum und nicht am Belegdatum — die Rechnung kann längst in einem
+    abgeschlossenen Monat liegen.
+
+    Gebucht wird auf **dieselben Erlöskonten und USt-Codes wie der Beleg**,
+    anteilig nach deren Bruttoanteil. Ein pauschales Sammelkonto wäre bequemer,
+    würde aber bei einem Beleg mit zwei Erlöskonten das falsche entlasten.
+    """
+    from decimal import Decimal
+    from app.models.invoice import InvoicePayment
+
+    q = (db.query(InvoicePayment).join(Invoice, Invoice.id == InvoicePayment.invoice_id)
+         .filter(InvoicePayment.payment_type == "skonto",
+                 Invoice.is_recurring_template == False))
+    if doc_type:
+        q = q.filter(Invoice.doc_type == doc_type)
+    if date_from:
+        q = q.filter(InvoicePayment.paid_at >= date_from)
+    if date_to:
+        q = q.filter(InvoicePayment.paid_at <= date_to)
+
+    zeilen = []
+    for zahlung in q.order_by(InvoicePayment.paid_at.asc()).all():
+        inv = zahlung.invoice
+        gruppen = _ust_gruppen(inv, default_erloes, steuersaetze)
+        brutto_je_gruppe = {k: abs(v["net"] + v["tax"]) for k, v in gruppen.items()}
+        gesamt = sum(brutto_je_gruppe.values(), Decimal("0"))
+        if gesamt <= 0:
+            continue
+
+        contact_name, debitor_nr = "", ""
+        if inv.contact_id:
+            rec = db.query(EntityRecord).filter(EntityRecord.id == inv.contact_id).first()
+            if rec:
+                contact_name = rec.display_name or ""
+                debitor_nr = _get_contact_nr(db, inv.contact_id, "debitor")
+
+        # Ein Skonto mindert den Erlös (Rechnung) bzw. erhöht ihn wieder
+        # (Gutschrift). Das Vorzeichen hängt an der Belegart, nicht am Betrag.
+        richtung = Decimal("1") if inv.doc_type == "gutschrift" else Decimal("-1")
+        betrag = abs(Decimal(str(zahlung.amount or 0)))
+        rest = betrag
+        schluessel = list(brutto_je_gruppe)
+
+        for i, key in enumerate(schluessel):
+            anteil = (rest if i == len(schluessel) - 1
+                      else (betrag * brutto_je_gruppe[key] / gesamt).quantize(Decimal("0.01")))
+            rest -= anteil
+            if not anteil:
+                continue
+            satz = gruppen[key]["rate"]
+            netto = (anteil * Decimal("100") / (Decimal("100") + satz)).quantize(Decimal("0.01"))
+            steuer = anteil - netto
+            konto, ust_code = key
+            zeilen.append([
+                zahlung.paid_at.strftime("%d.%m.%Y"),
+                inv.number,
+                f"Skonto {inv.number or ''}".strip(),
+                konto, default_debitor, debitor_nr,
+                f"{float(netto * richtung):.2f}".replace(".", ","),
+                ust_code,
+                f"{float(steuer * richtung):.2f}".replace(".", ","),
+                f"{float(anteil * richtung):.2f}".replace(".", ","),
+                inv.currency or "EUR", inv.number, contact_name,
+            ])
+    return zeilen
+
+
 @router.get("/export/bmd")
 async def export_bmd(
     date_from: Optional[date] = Query(None),
@@ -259,44 +387,11 @@ async def export_bmd(
                 contact_name = rec.display_name or ""
                 debitor_nr = _get_contact_nr(db, inv.contact_id, "debitor")
 
-        # Gruppiere Positionen nach USt-Satz
+        # Buchungsgruppen je Erlöskonto und USt-Code (Erlöskonto: Position >
+        # Artikel > Vorgabe). Die Regel steckt in _ust_gruppen, weil der
+        # Skonto-Durchlauf weiter unten dieselbe Aufteilung braucht.
         from decimal import Decimal
-        from collections import defaultdict
-        ust_groups: dict = defaultdict(lambda: {"net": Decimal("0"), "tax": Decimal("0")})
-
-        for pos in inv.positions:
-            # Überschrift, Freitext und Zwischensumme tragen keinen Umsatz.
-            if positionen_service.typ(pos) in positionen_service.GLIEDERUNG:
-                continue
-            net = pos.line_total or Decimal("0")
-            rate = pos.tax_rate
-
-            # Rabattzeile: Sie trägt selbst keinen Steuersatz, sondern mindert
-            # die Sätze ihrer Gruppe anteilig. Ohne diese Aufteilung landete
-            # der ganze Rabatt auf einem Konto und einem USt-Code.
-            if positionen_service.typ(pos) == "discount":
-                index = list(inv.positions).index(pos)
-                gruppe_ab = _gruppe_beginnt(list(inv.positions), index)
-                gruppe = positionen_service.gruppen_netto(list(inv.positions), gruppe_ab, index)
-                basis = sum(gruppe.values(), Decimal("0"))
-                for satz, anteil in positionen_service.rabatt_verteilen(
-                        gruppe, basis, -net).items():
-                    code = tax_rates_service.ust_code_for(steuersaetze, satz)
-                    ust_groups[(pos.account_nr or default_erloes, code)]["net"] -= anteil
-                    ust_groups[(pos.account_nr or default_erloes, code)]["tax"] -= (
-                        (anteil * satz / 100).quantize(Decimal("0.01")))
-                continue
-            if inv.tax_mode == "kleinunternehmer":
-                ust_code = tax_rates_service.ust_code_for(steuersaetze, 0)
-            else:
-                ust_code = tax_rates_service.ust_code_for(steuersaetze, rate)
-
-            # Erlöskonto: aus Position > Artikel > Default
-            erloes_konto = pos.account_nr or default_erloes
-
-            ust_groups[(erloes_konto, ust_code)]["net"] += net
-            if inv.tax_mode != "kleinunternehmer" and rate is not None:
-                ust_groups[(erloes_konto, ust_code)]["tax"] += (net * rate / 100).quantize(Decimal("0.01"))
+        ust_groups = _ust_gruppen(inv, default_erloes, steuersaetze)
 
         for (erloes_konto, ust_code), amounts in ust_groups.items():
             net = amounts["net"]
@@ -329,6 +424,11 @@ async def export_bmd(
                 inv.number,
                 contact_name,
             ])
+
+    # Gewährte Skonti als eigene Zeilen, datiert auf den Zahlungseingang.
+    for zeile in _skonto_zeilen(db, date_from, date_to, default_erloes,
+                                default_debitor, steuersaetze, doc_type):
+        writer.writerow(zeile)
 
     output.seek(0)
     period = f"{date_from or 'alle'}_{date_to or 'alle'}"

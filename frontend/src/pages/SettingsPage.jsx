@@ -1723,6 +1723,14 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
   // Steuersätze — ebenfalls ohne eigenen Vorgabewert, die wirksamen Sätze
   // liefert das Backend mit (services/tax_rates.py).
   const [taxRates, setTaxRates] = useState([])
+  // Mahnstufen und Zinsparameter, ebenfalls vom Backend vorbelegt
+  // (services/dunning.py). Der Basiszinssatz bleibt bewusst leer, solange er
+  // nicht gepflegt ist — geraten wird er nicht.
+  const [dunningLevels, setDunningLevels] = useState([])
+  const [baseRate, setBaseRate] = useState('')
+  const [surchargeB2b, setSurchargeB2b] = useState('')
+  const [rateB2c, setRateB2c] = useState('')
+  const [interestMode, setInterestMode] = useState('auto')
 
   // Bankfelder aus Kontakt-Daten erkennen (sucht nach IBAN/BIC/Bank in allen Feldern)
   function extractBankFromContact(data) {
@@ -1758,6 +1766,11 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
       setKleinunternehmerText(typeof s.kleinunternehmer_text === 'string' ? s.kleinunternehmer_text.replace(/^"|"$/g, '') : '')
       if (Array.isArray(s.archive_triggers)) setArchiveTriggers(s.archive_triggers)
       if (Array.isArray(s.tax_rates)) setTaxRates(s.tax_rates)
+      if (Array.isArray(s.dunning_levels)) setDunningLevels(s.dunning_levels)
+      setBaseRate(s.dunning_base_rate ?? '')
+      setSurchargeB2b(s.dunning_surcharge_b2b ?? '')
+      setRateB2c(s.dunning_rate_b2c ?? '')
+      setInterestMode(s.dunning_interest_mode || 'auto')
       const contact = contactRes.data?.contact
       if (contact?.data) {
         const fc = extractBankFromContact(contact.data)
@@ -1780,6 +1793,13 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         invoiceApi.updateSetting('kleinunternehmer_text', kleinunternehmerText),
         invoiceApi.updateSetting('archive_triggers', archiveTriggers),
         invoiceApi.updateSetting('tax_rates', taxRates),
+        invoiceApi.updateSetting('dunning_levels', dunningLevels),
+        // Leerer Basiszinssatz bleibt leer: Dann rechnet das Mahnwesen
+        // bewusst keine Verzugszinsen, statt mit 0 % zu tun als wären es keine.
+        invoiceApi.updateSetting('dunning_base_rate', baseRate === '' ? null : Number(baseRate)),
+        invoiceApi.updateSetting('dunning_surcharge_b2b', Number(surchargeB2b || 0)),
+        invoiceApi.updateSetting('dunning_rate_b2c', Number(rateB2c || 0)),
+        invoiceApi.updateSetting('dunning_interest_mode', interestMode),
         showCustomEditor && invoiceApi.updateSetting('custom_template_css', customCss),
       ].filter(Boolean))
       toast.success('Verkaufseinstellungen gespeichert')
@@ -1903,6 +1923,102 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
           className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:underline">
           <Plus size={14} /> Steuersatz hinzufügen
         </button>
+      </div>
+
+      <hr className="border-gray-100" />
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Mahnstufen</h3>
+        <p className="text-xs text-neutral-500 mb-4">
+          Die Wartezeit zählt bei der ersten Stufe ab Fälligkeit, danach ab der vorigen
+          Mahnung. Mahngebühr und Verzugszinsen sind Schadenersatz und nicht
+          umsatzsteuerbar — sie stehen auf dem Mahnschreiben, laufen aber bewusst nicht
+          in Umsatz, UVA oder Buchungsjournal.
+        </p>
+        <div className="space-y-2">
+          <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-xs font-medium text-neutral-500">
+            <span className="col-span-4">Bezeichnung</span>
+            <span className="col-span-2">nach Tagen</span>
+            <span className="col-span-2">Nachfrist</span>
+            <span className="col-span-2">Gebühr €</span>
+            <span className="col-span-2">Zinsen</span>
+          </div>
+          {dunningLevels.map((s, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-center">
+              <input value={s.label || ''}
+                onChange={e => setDunningLevels(l => l.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                className="col-span-4 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm" />
+              <input type="number" min="0" value={s.days_after ?? 0}
+                onChange={e => setDunningLevels(l => l.map((x, j) => j === i ? { ...x, days_after: Number(e.target.value) } : x))}
+                className="col-span-2 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+              <input type="number" min="0" value={s.grace_days ?? 0}
+                onChange={e => setDunningLevels(l => l.map((x, j) => j === i ? { ...x, grace_days: Number(e.target.value) } : x))}
+                className="col-span-2 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+              <input type="number" step="0.01" min="0" value={s.fee ?? 0}
+                onChange={e => setDunningLevels(l => l.map((x, j) => j === i ? { ...x, fee: e.target.value } : x))}
+                className="col-span-2 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+              <div className="col-span-2 flex items-center justify-between gap-1">
+                <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                  <input type="checkbox" checked={!!s.interest} className="w-4 h-4 rounded"
+                    onChange={e => setDunningLevels(l => l.map((x, j) => j === i ? { ...x, interest: e.target.checked } : x))} />
+                  berechnen
+                </label>
+                <button type="button" title="Stufe entfernen"
+                  onClick={() => setDunningLevels(l => l.filter((_, j) => j !== i)
+                                                       .map((x, j) => ({ ...x, level: j + 1 })))}
+                  className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+              </div>
+              <textarea value={s.text || ''} rows={2}
+                placeholder="Text auf dem Mahnschreiben"
+                onChange={e => setDunningLevels(l => l.map((x, j) => j === i ? { ...x, text: e.target.value } : x))}
+                className="col-span-12 border border-neutral-200 rounded-lg px-2 py-1.5 text-sm resize-none mb-1" />
+            </div>
+          ))}
+        </div>
+        <button type="button"
+          onClick={() => setDunningLevels(l => [...l, {
+            level: l.length + 1, label: `${l.length}. Mahnung`, days_after: 14,
+            grace_days: 7, fee: 0, interest: true, text: '',
+          }])}
+          className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:underline">
+          <Plus size={14} /> Mahnstufe hinzufügen
+        </button>
+
+        <h4 className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mt-6 mb-2">Verzugszinsen</h4>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Basiszinssatz %</label>
+            <input type="number" step="0.01" value={baseRate} placeholder="nicht gepflegt"
+              onChange={e => setBaseRate(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Aufschlag B2B %</label>
+            <input type="number" step="0.1" value={surchargeB2b}
+              onChange={e => setSurchargeB2b(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Satz B2C %</label>
+            <input type="number" step="0.1" value={rateB2c}
+              onChange={e => setRateB2c(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Welcher Satz gilt</label>
+            <select value={interestMode} onChange={e => setInterestMode(e.target.value)}
+              className="w-full border border-neutral-200 rounded-lg px-2 py-1.5 text-sm">
+              <option value="auto">automatisch (UID = B2B)</option>
+              <option value="b2b">immer B2B</option>
+              <option value="b2c">immer B2C</option>
+            </select>
+          </div>
+        </div>
+        <p className="text-xs text-neutral-500 mt-2">
+          In Österreich sind es bei Geschäften zwischen Unternehmen 9,2 Prozentpunkte
+          über dem Basiszinssatz (§ 456 UGB), gegenüber Verbrauchern 4 % (§ 1000 ABGB).
+          Der Basiszinssatz ändert sich halbjährlich — solange er hier leer ist, weist
+          das Mahnschreiben bewusst keine Zinsen aus.
+        </p>
       </div>
 
       <hr className="border-gray-100" />

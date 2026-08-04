@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.12.43',
+    day: '04',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Mahnwesen: Mahnlauf mit Vorschau, vierstufige Mahnungen mit Frist, Gebühr und Verzugszinsen, Sammelmahnung je Kunde, Mahnsperre und Mahnhistorie am Beleg',
+      'Skonto je Beleg: Zahlungsbedingung auf dem Beleg, Ausbuchen des Restbetrags mit anteiliger Umsatzsteuer-Berichtigung im Monat der Zahlung',
+    ],
+    updates: [
+      'Umsatzsteuer-Auswertung: Eine Rabattzeile wurde mangels Steuersatz als Reverse-Charge-Umsatz gezählt statt als Minderung der besteuerten Grundlage',
+    ],
+  },
+  {
     version: '1.12.42',
     day: '03',
     month: 'August',

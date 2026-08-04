@@ -16,7 +16,7 @@
 > | 2a — Belegsperre & Nummernkreis | `feature/verkauf-belegsperre` | ✅ umgesetzt (A-7, A-8, A-9, A-10, A-11, A-17a, B-4 + Tests) |
 > | 2b — Leistungsdatum & Steuer | `feature/verkauf-leistungsdatum-steuer` | ✅ umgesetzt (B-1, B-2, A-5, A-6, A-15 teilweise + Tests) |
 > | 3a — Zahlungen & offene Posten | `feature/verkauf-zahlungen` | ✅ umgesetzt (C-2, C-3, A-17b + Tests) |
-> | 3b — Mahnwesen & Skonto | offen | C-1, C-9 |
+> | 3b — Mahnwesen & Skonto | `feature/verkauf-mahnwesen` | ✅ umgesetzt (C-1, C-9 + Tests) |
 > | 4a — Erlöskonto & UVA | `feature/verkauf-uva` | ✅ umgesetzt (A-16, C-7 + Tests) |
 > | 4b — Periodenabschluss & Übergabepaket | `feature/verkauf-monatsabschluss` | ✅ umgesetzt (C-6, C-8, B-5, Übergabe-Historie + Tests) |
 > | Sammelbranch Kleinigkeiten | `fix/verkauf-kleinigkeiten` | ✅ umgesetzt (A-14, A-17e/f/g, B-3) |
@@ -34,12 +34,25 @@
 > wird der größten Steuerzeile zugeschlagen. Leistungsdatum ist Pflicht erst
 > beim Ausstellen, nicht schon beim Speichern des Entwurfs.
 >
+> **Entscheidungen aus Etappe 3b** (Oliver): Mahnungen werden nie automatisch
+> verschickt — der Lauf schlägt vor, der Mensch entscheidet. Mahngebühr und
+> Verzugszinsen sind Schadenersatz und bleiben aus Umsatz, UVA und
+> Buchungsjournal heraus. Die Mahnung bekommt keine Belegnummer, nur eine
+> Stufe. Der Basiszinssatz wird gepflegt statt geraten; fehlt er, weist das
+> Schreiben bewusst keine Zinsen aus. Skonto wirkt im Monat der Zahlung
+> (§ 16 UStG) und bucht anteilig auf die Erlöskonten und Steuersätze des Belegs.
+>
+> **Nebenbefund aus Etappe 3b:** Die UVA-Auswertung hatte eine eigene
+> Positionsschleife und zählte deshalb eine Rabattzeile mangels Steuersatz als
+> Reverse-Charge-Umsatz. Sie läuft jetzt wie PDF und BMD-Export über
+> `services/positionen.py` — es waren also vier Auswerter, nicht drei.
+>
 > **Weiterhin offen:** Zeiteinträge können ohne `contact_id` entstehen (nur
-> Name); der Namens-Rückfall fängt das ab, sauber ist es nicht. Die
-> Positionstypen `discount` und `subtotal` (A-15) sind nach wie vor nicht
-> umgesetzt — nur Textzeilen rechnen jetzt korrekt mit null. Und: 42 bekannte
-> Schwachstellen in sieben Python-Paketen (pip-audit) warten auf ein
-> Abhängigkeits-Update.
+> Name); der Namens-Rückfall fängt das ab, sauber ist es nicht. Ein
+> Aufräumlauf für verwaiste Positionsbilder fehlt (eine gelöschte Position
+> lässt ihre Bilddatei im Speicher zurück). Und: bekannte Schwachstellen in
+> weasyprint, starlette und ecdsa warten auf ein Abhängigkeits-Update — die
+> Begründung der Zurückstellung steht am Ende von `backend/requirements.txt`.
 
 > **Der folgende Befund-Teil beschreibt den Zustand bei der Prüfung (31.07.2026),
 > also VOR Etappe 1.** Er bleibt bewusst unverändert als Referenz stehen.

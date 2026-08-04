@@ -260,6 +260,20 @@ export const invoiceApi = {
   uva:            (params) => api.get('/invoices/uva', { params }),
   uvaPdf:         (params) => api.get('/invoices/uva/pdf', { params, responseType: 'blob' }),
 
+  // Mahnwesen
+  dunningRun:     (params) => api.get('/invoices/dunning/run', { params }),
+  dunningBatch:   (data) => api.post('/invoices/dunning/batch', data),
+  dunningHistory: (id) => api.get(`/invoices/${id}/dunning`),
+  createDunning:  (id, data) => api.post(`/invoices/${id}/dunning`, data),
+  deleteDunning:  (dunningId) => api.delete(`/invoices/dunning/${dunningId}`),
+  dunningBlock:   (id, data) => api.post(`/invoices/${id}/dunning-block`, data),
+  dunningPdf:     (dunningId) => api.get(`/invoices/dunning/${dunningId}/pdf`,
+                                         { responseType: 'blob' }),
+
+  // Skonto
+  skontoPreview:  (id, paid_at) => api.get(`/invoices/${id}/skonto`, { params: { paid_at } }),
+  grantSkonto:    (id, data) => api.post(`/invoices/${id}/skonto`, data),
+
   // Rechnungsbuch
   book:           (params) => api.get('/invoices/book/list', { params }),
   bookCsv:        (params) => api.get('/invoices/book/csv', { params, responseType: 'blob' }),

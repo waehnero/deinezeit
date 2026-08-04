@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search,
   RefreshCw, FileText, Clock, Download, Eye, Repeat, Paperclip, X as XIcon,
-  Lock, History, ChevronUp, ChevronDown, Image as ImageIcon
+  Lock, History, ChevronUp, ChevronDown, Image as ImageIcon, Bell
 } from 'lucide-react'
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -288,6 +288,10 @@ export default function InvoiceFormPage() {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(today())
   const [dueDate, setDueDate] = useState(addDays(today(), 30))
+  // Zahlungsbedingung: "x % Skonto binnen y Tagen". Steht auf dem Beleg und
+  // ist nach dem Ausstellen gesperrt — eine Zusage ändert man nicht nachträglich.
+  const [skontoPercent, setSkontoPercent] = useState('')
+  const [skontoDays, setSkontoDays] = useState('')
   // Liefer-/Leistungsdatum (Pflicht bei Rechnung und Gutschrift, § 11 UStG).
   // Mit Bis-Datum wird daraus ein Leistungszeitraum.
   const [deliveryDate, setDeliveryDate] = useState(today())
@@ -357,6 +361,8 @@ export default function InvoiceFormPage() {
           .catch(() => {})
       }
       setDate(inv.date); setDueDate(inv.due_date || ''); setReference(inv.reference || '')
+      setSkontoPercent(inv.skonto_percent ?? '')
+      setSkontoDays(inv.skonto_days ?? '')
       setDeliveryDate(inv.delivery_date || inv.date)
       setDeliveryDateTo(inv.delivery_date_to || '')
       setIstZeitraum(!!inv.delivery_date_to)
@@ -415,6 +421,8 @@ export default function InvoiceFormPage() {
         doc_type: docType, contact_id: contactId || null, title: title || null,
         project_id: projectId || null, currency,
         date, due_date: dueDate || null, reference: reference || null,
+        skonto_percent: skontoPercent === '' ? null : skontoPercent,
+        skonto_days: skontoDays === '' ? null : parseInt(skontoDays),
         delivery_date: deliveryDate || null,
         delivery_date_to: (istZeitraum && deliveryDateTo) ? deliveryDateTo : null,
         intro_text: introText || null, outro_text: outroText || null, notes: notes || null,
@@ -582,6 +590,24 @@ export default function InvoiceFormPage() {
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsziel</label>
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            )}
+            {docType === 'rechnung' && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Skonto
+                  <span className="text-xs font-normal text-neutral-400 ml-1">optional</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input type="number" step="0.01" min="0" max="100" value={skontoPercent}
+                    onChange={e => setSkontoPercent(e.target.value)} placeholder="2"
+                    className="w-20 border border-neutral-200 rounded-lg px-3 py-2 text-sm text-right" />
+                  <span className="text-sm text-neutral-500">% binnen</span>
+                  <input type="number" min="0" value={skontoDays}
+                    onChange={e => setSkontoDays(e.target.value)} placeholder="10"
+                    className="w-20 border border-neutral-200 rounded-lg px-3 py-2 text-sm text-right" />
+                  <span className="text-sm text-neutral-500">Tagen</span>
+                </div>
               </div>
             )}
             {/* Pflichtangabe nach § 11 Abs. 1 Z 4 UStG — wird beim Ausstellen
@@ -779,6 +805,7 @@ export default function InvoiceFormPage() {
             className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" />
         </div>
 
+        {!isNew && gesperrt && docType === 'rechnung' && <MahnPanel invoiceId={id} />}
         {!isNew && gesperrt && <AuditPanel invoiceId={id} />}
       </div>
     </div>
@@ -793,7 +820,129 @@ const AUDIT_LABELS = {
   bearbeitet:  'Bearbeitet',
   archiviert:  'Archivierung',
   zahlung:     'Zahlung',
+  skonto:      'Skonto',
+  mahnung:     'Mahnwesen',
   hinweis:     'Hinweis',
+}
+
+/**
+ * Mahnhistorie und Mahnsperre am Beleg.
+ *
+ * Die Stufe wird hier bewusst OHNE Wartezeit-Prüfung angeboten („force"):
+ * Wer den Beleg vor sich hat, hat meist einen Grund, früher zu mahnen. Der
+ * Mahnlauf hält sich dagegen strikt an die Fristen. Die Mahnsperre bleibt in
+ * beiden Fällen unantastbar.
+ */
+function MahnPanel({ invoiceId }) {
+  const [eintraege, setEintraege] = useState([])
+  const [beleg, setBeleg] = useState(null)
+  const [laeuft, setLaeuft] = useState(false)
+
+  const laden = useCallback(async () => {
+    try {
+      const [h, b] = await Promise.all([
+        invoiceApi.dunningHistory(invoiceId),
+        invoiceApi.get(invoiceId),
+      ])
+      setEintraege(h.data)
+      setBeleg(b.data)
+    } catch { /* stiller Fehler: das Panel ist Beiwerk, nicht der Beleg */ }
+  }, [invoiceId])
+
+  useEffect(() => { laden() }, [laden])
+
+  async function mahnen() {
+    setLaeuft(true)
+    try {
+      await invoiceApi.createDunning(invoiceId, { force: true })
+      toast.success('Mahnung erstellt')
+      await laden()
+    } catch (e) { toast.error(e.response?.data?.detail || 'Mahnung nicht möglich') }
+    finally { setLaeuft(false) }
+  }
+
+  async function sperreUmschalten() {
+    const sperren = !beleg?.dunning_blocked
+    const grund = sperren ? window.prompt('Grund der Mahnsperre (z.B. Ratenvereinbarung):') : null
+    if (sperren && grund === null) return
+    try {
+      const res = await invoiceApi.dunningBlock(invoiceId, { blocked: sperren, reason: grund })
+      setBeleg(res.data)
+      toast.success(sperren ? 'Mahnsperre gesetzt' : 'Mahnsperre aufgehoben')
+    } catch { toast.error('Die Mahnsperre konnte nicht geändert werden') }
+  }
+
+  async function pdfOeffnen(dunningId) {
+    try {
+      const res = await invoiceApi.dunningPdf(dunningId)
+      window.open(URL.createObjectURL(res.data), '_blank')
+    } catch { toast.error('Das Mahnschreiben konnte nicht erzeugt werden') }
+  }
+
+  async function zuruecknehmen(dunningId) {
+    if (!window.confirm('Diese Mahnung wirklich zurücknehmen? Das verschickte Schreiben holt das nicht zurück.')) return
+    try {
+      const res = await invoiceApi.deleteDunning(dunningId)
+      setEintraege(res.data)
+      await laden()
+      toast.success('Mahnung zurückgenommen')
+    } catch { toast.error('Fehler') }
+  }
+
+  return (
+    <div className="bg-surface border border-neutral-200 rounded-xl p-5">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-700">
+          <Bell size={15} className="text-neutral-500" /> Mahnwesen
+        </h2>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={sperreUmschalten}
+            className="text-xs px-2.5 py-1.5 border border-neutral-200 rounded-lg hover:bg-neutral-50">
+            {beleg?.dunning_blocked ? 'Sperre aufheben' : 'Mahnsperre setzen'}
+          </button>
+          <button type="button" onClick={mahnen} disabled={laeuft || beleg?.dunning_blocked}
+            className="text-xs px-2.5 py-1.5 rounded-lg bg-neutral-800 text-white hover:bg-neutral-900 disabled:opacity-40">
+            Mahnung erstellen
+          </button>
+        </div>
+      </div>
+
+      {beleg?.dunning_blocked && (
+        <p className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Mahngesperrt{beleg.dunning_block_reason ? ` — ${beleg.dunning_block_reason}` : ''}
+        </p>
+      )}
+
+      {eintraege.length === 0 ? (
+        <p className="text-sm text-neutral-400">Noch nicht gemahnt.</p>
+      ) : (
+        <div className="divide-y border border-neutral-200 rounded-lg">
+          {eintraege.map(m => (
+            <div key={m.id} className="flex items-center justify-between px-3 py-2 text-sm">
+              <div>
+                <span className="font-medium text-neutral-800">{m.label || `Stufe ${m.level}`}</span>
+                <span className="text-neutral-400 ml-2">
+                  {new Date(m.dunned_at).toLocaleDateString('de-AT')}
+                  {m.due_date && ` · Frist ${new Date(m.due_date).toLocaleDateString('de-AT')}`}
+                </span>
+                <span className="block text-xs text-neutral-500">
+                  offen {Number(m.open_amount).toFixed(2)}
+                  {Number(m.fee) > 0 && ` · Gebühr ${Number(m.fee).toFixed(2)}`}
+                  {Number(m.interest) > 0 && ` · Zinsen ${Number(m.interest).toFixed(2)}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => pdfOeffnen(m.id)} title="Mahnschreiben öffnen"
+                  className="p-1 text-neutral-400 hover:text-neutral-700"><FileText size={14} /></button>
+                <button type="button" onClick={() => zuruecknehmen(m.id)} title="Mahnung zurücknehmen"
+                  className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 const FELD_LABELS = {

@@ -82,6 +82,9 @@ class InvoiceCreate(BaseModel):
     tax_mode: str = "per_position"
     currency: str = "EUR"
     template_id: int = 1
+    # Zahlungsbedingung: "skonto_percent % bei Zahlung binnen skonto_days Tagen"
+    skonto_percent: Optional[Decimal] = None
+    skonto_days: Optional[int] = None
     positions: List[InvoicePositionCreate] = []
     # Wiederkehrend
     is_recurring_template: bool = False
@@ -113,6 +116,9 @@ class InvoiceUpdate(BaseModel):
     tax_mode: str = "per_position"
     currency: str = "EUR"
     template_id: int = 1
+    # Zahlungsbedingung: "skonto_percent % bei Zahlung binnen skonto_days Tagen"
+    skonto_percent: Optional[Decimal] = None
+    skonto_days: Optional[int] = None
     positions: List[InvoicePositionCreate] = []
     is_recurring_template: bool = False
     recurring_interval: Optional[str] = None
@@ -149,6 +155,12 @@ class InvoiceResponse(BaseModel):
     cancel_mode: Optional[str] = None
     paid_at: Optional[date] = None
     paid_amount: Optional[Decimal] = None
+    skonto_percent: Optional[Decimal] = None
+    skonto_days: Optional[int] = None
+    dunning_blocked: bool = False
+    dunning_block_reason: Optional[str] = None
+    dunning_level: int = 0
+    dunning_last_at: Optional[date] = None
     template_id: int
     is_recurring_template: bool
     recurring_interval: Optional[str] = None
@@ -249,6 +261,7 @@ class InvoicePaymentResponse(BaseModel):
     invoice_id: UUID
     paid_at: date
     amount: Decimal
+    payment_type: str = "zahlung"      # zahlung | skonto
     method: Optional[str] = None
     reference: Optional[str] = None
     note: Optional[str] = None
@@ -321,6 +334,122 @@ class UvaResponse(BaseModel):
     steuer_gesamt: Decimal
     beleg_anzahl: int
     hinweise: List[str] = []
+
+
+# ── Mahnwesen ─────────────────────────────────────────────────────────────────
+
+class DunningLevelConfig(BaseModel):
+    """Eine Mahnstufe aus den Verkaufseinstellungen."""
+    level: int
+    label: str
+    days_after: int = 0        # Stufe 1: Tage nach Fälligkeit, sonst nach der Vorstufe
+    grace_days: int = 0        # im Schreiben gesetzte Nachfrist
+    fee: Decimal = Decimal("0")
+    interest: bool = False
+    text: Optional[str] = None
+
+class DunningCandidate(BaseModel):
+    invoice_id: UUID
+    number: Optional[str] = None
+    date: date
+    due_date: Optional[date] = None
+    title: Optional[str] = None
+    contact_id: Optional[UUID] = None
+    contact_name: Optional[str] = None
+    total: Decimal
+    open_amount: Decimal
+    days_overdue: int
+    current_level: int
+    last_dunned_at: Optional[date] = None
+    next_level: Optional[int] = None
+    next_label: Optional[str] = None
+    fee: Decimal = Decimal("0")
+    interest: Decimal = Decimal("0")
+    interest_rate: Optional[Decimal] = None
+    dunnable: bool
+    reason: Optional[str] = None       # gesetzt, wenn nicht mahnbar
+
+class DunningRunResponse(BaseModel):
+    stichtag: date
+    items: List[DunningCandidate] = []
+    dunnable_count: int = 0
+    levels: List[DunningLevelConfig] = []
+    interest_hint: Optional[str] = None
+
+class DunningCreateRequest(BaseModel):
+    """
+    Mahnung erzeugen. Ohne ``level`` wird die nächste fällige Stufe genommen.
+
+    ``force`` übergeht die Wartezeit — nicht aber eine Mahnsperre. Die Sperre
+    ist eine bewusste Entscheidung und darf nicht versehentlich fallen.
+    """
+    level: Optional[int] = None
+    dunned_at: Optional[date] = None
+    force: bool = False
+    send_email: bool = False
+
+class DunningEntry(BaseModel):
+    id: UUID
+    invoice_id: UUID
+    level: int
+    label: Optional[str] = None
+    dunned_at: date
+    due_date: Optional[date] = None
+    open_amount: Decimal
+    fee: Decimal
+    interest: Decimal
+    interest_rate: Optional[Decimal] = None
+    interest_days: Optional[int] = None
+    batch_id: Optional[UUID] = None
+    sent_at: Optional[datetime] = None
+    sent_to: Optional[str] = None
+    note: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class DunningBlockRequest(BaseModel):
+    blocked: bool
+    reason: Optional[str] = None
+
+class DunningBatchRequest(BaseModel):
+    """Sammelmahnlauf über eine Auswahl von Belegen."""
+    invoice_ids: List[UUID] = []
+    dunned_at: Optional[date] = None
+    force: bool = False
+
+
+# ── Skonto ────────────────────────────────────────────────────────────────────
+
+class SkontoZeile(BaseModel):
+    satz: Optional[Decimal] = None     # None = Reverse Charge
+    brutto: Decimal
+    netto: Decimal                     # Entgeltminderung
+    steuer: Decimal                    # Steuerberichtigung § 16 UStG
+
+class SkontoVorschau(BaseModel):
+    invoice_id: UUID
+    skonto_percent: Optional[Decimal] = None
+    skonto_days: Optional[int] = None
+    frist_ende: Optional[date] = None
+    in_frist: bool = False
+    betrag: Decimal = Decimal("0")     # Skonto laut Vereinbarung
+    open_amount: Decimal = Decimal("0")
+    zeilen: List[SkontoZeile] = []
+    hinweis: Optional[str] = None
+
+class SkontoRequest(BaseModel):
+    """
+    Restbetrag als Skonto ausbuchen.
+
+    ``paid_at`` ist das Datum des Zahlungseingangs — daran hängt die
+    Umsatzsteuer-Berichtigung, nicht am Rechnungsdatum.
+    """
+    paid_at: date
+    amount: Optional[Decimal] = None   # ohne Angabe: der offene Restbetrag
+    note: Optional[str] = None
 
 
 # ── Änderungsprotokoll ────────────────────────────────────────────────────────
