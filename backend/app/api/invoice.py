@@ -14,7 +14,7 @@ from app.api.deps import get_current_user, require_admin, require_module
 from app.models.user import User
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
                                  InvoiceNumberSequence, InvoiceSettings,
-                                 InvoiceAuditLog, InvoicePayment)
+                                 InvoiceAuditLog, InvoicePayment, InvoiceDunning)
 from app.models.settings import Setting
 from app.models.email_template import EmailTemplate
 from app.models.masterdata import EntityRecord
@@ -23,6 +23,9 @@ from app.services.invoice_snapshot import (ensure_recipient_snapshot,
                                            snapshot_as_contact)
 from app.services.invoice_archive import archive_invoice_pdf
 from app.services import period_service
+from app.services import positionen as positionen_service
+from app.services import skonto as skonto_service
+from app.services import dunning as dunning_service
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -32,6 +35,9 @@ from app.schemas.invoice import (
     InvoicePaymentCreate, InvoicePaymentResponse, InvoicePaymentState,
     OpenItem, OpenItemsByContact, OpenItemsResponse,
     UvaZeile, UvaResponse,
+    DunningCandidate, DunningRunResponse, DunningCreateRequest, DunningEntry,
+    DunningBlockRequest, DunningBatchRequest, DunningLevelConfig,
+    SkontoVorschau, SkontoZeile, SkontoRequest,
 )
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
@@ -414,6 +420,10 @@ GESPERRTE_FELDER = {
     "tax_mode":      "MwSt.-Modus",
     "currency":      "Währung",
     "template_id":   "PDF-Vorlage",
+    # Die Skonto-Bedingung steht auf dem Beleg und ist Teil der Vereinbarung
+    # mit dem Kunden — nachträglich änderbar wäre sie eine stille Zusage.
+    "skonto_percent": "Skontosatz",
+    "skonto_days":    "Skontofrist",
 }
 # Weiterhin änderbar, weil nicht Bestandteil des gedruckten Belegs:
 #   notes (interne Notiz), project_id (Zuordnung), Anhänge und Verträge.
@@ -749,6 +759,15 @@ async def get_invoice_settings(
     # Dasselbe für die Steuersätze: Die Oberfläche soll die wirksamen Sätze
     # anzeigen, ohne eine eigene Kopie der Vorgabewerte vorzuhalten.
     werte["tax_rates"] = tax_rates_service.as_json(tax_rates_service.get_tax_rates(db))
+    # Ebenso die Mahnstufen und die Zinsparameter: Die Oberfläche soll die
+    # wirksamen Werte zeigen, nicht eine zweite Kopie der Vorgaben pflegen.
+    werte["dunning_levels"] = dunning_service.get_levels(db)
+    zins = dunning_service.get_zins_einstellungen(db)
+    werte.setdefault("dunning_base_rate",
+                     None if zins["basiszinssatz"] is None else float(zins["basiszinssatz"]))
+    werte.setdefault("dunning_surcharge_b2b", float(zins["aufschlag_b2b"]))
+    werte.setdefault("dunning_rate_b2c", float(zins["zins_b2c"]))
+    werte.setdefault("dunning_interest_mode", zins["modus"])
     return werte
 
 
@@ -1134,17 +1153,36 @@ async def get_uva(
     rc_netto = Decimal("0")
 
     for beleg in belege:
-        kleinunternehmer = beleg.tax_mode == "kleinunternehmer"
-        for pos in beleg.positions:
-            if pos.pos_type == "text":
-                continue
-            netto = Decimal(str(pos.line_total or 0))
-            if pos.tax_rate is None:
+        if beleg.tax_mode == "kleinunternehmer":
+            # Unecht steuerbefreit: kein Satz, kein Steuerbetrag. Die
+            # Bemessungsgrundlage ist die gespeicherte Nettosumme.
+            netto_je_satz[Decimal("0")] += Decimal(str(beleg.subtotal or 0))
+            continue
+        # Über den Positionen-Dienst statt über eine eigene Schleife: Nur er
+        # kennt die Gliederungszeilen und verteilt eine Rabattzeile anteilig
+        # auf die Sätze ihrer Gruppe. Die frühere Schleife hier zählte einen
+        # Rabatt mangels Steuersatz als Reverse-Charge-Umsatz — die
+        # Bemessungsgrundlage war damit auf beiden Seiten falsch.
+        for satz, netto in positionen_service.netto_je_satz(
+                list(beleg.positions), beleg.tax_mode).items():
+            if satz is None:
                 rc_netto += netto            # Reverse Charge: kein Satz am Beleg
-            elif kleinunternehmer:
-                netto_je_satz[Decimal("0")] += netto
             else:
-                netto_je_satz[Decimal(str(pos.tax_rate))] += netto
+                netto_je_satz[Decimal(str(satz))] += netto
+
+    # Skonto mindert das Entgelt im Monat der Zahlung (§ 16 UStG) — nicht im
+    # Monat der Rechnung. Deshalb hängt die Korrektur am Zahlungsdatum und
+    # kommt hier als eigener Posten dazu, statt den Beleg rückwirkend zu ändern.
+    # Der Steuerbetrag wird weiter unten aus der Bemessungsgrundlage gerechnet;
+    # die geminderte Grundlage ergibt damit automatisch die berichtigte Steuer.
+    korrektur = skonto_service.korrektur_je_satz(db, date_from, date_to)
+    skonto_gesamt = Decimal("0")
+    for satz, wert in korrektur["netto"].items():
+        if satz is None:
+            rc_netto += wert
+        else:
+            netto_je_satz[Decimal(str(satz))] += wert
+        skonto_gesamt += wert
 
     land = tax_rates_service.get_company_country(db)
     land_unterstuetzt = land in tax_rates_service.SUPPORTED_COUNTRIES
@@ -1165,6 +1203,13 @@ async def get_uva(
         "Diese Auswertung enthält nur die Umsatzseite. Vorsteuer, Einfuhr"
         "umsatzsteuer und innergemeinschaftliche Erwerbe erfasst DeineZeit "
         "nicht — sie sind vor der Abgabe zu ergänzen.")
+
+    if skonto_gesamt:
+        hinweise.append(
+            f"Enthalten ist eine Entgeltminderung aus gewährten Skonti von "
+            f"{float(-skonto_gesamt):.2f} netto (§ 16 UStG). Sie wirkt im "
+            f"Monat der Zahlung — die zugehörigen Rechnungen können aus einem "
+            f"früheren Zeitraum stammen.")
 
     for satz in sorted(netto_je_satz, reverse=True):
         netto = netto_je_satz[satz]
@@ -1537,6 +1582,354 @@ async def delete_payment(
                    if alter_status != inv.status else None,
            note=beschreibung, user_email=current_user.email)
 
+    db.commit()
+    db.refresh(inv)
+    return _zahlstand_antwort(inv)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mahnwesen
+#
+# Die Reihenfolge der Routen ist hier wichtig: Alles unter „/dunning/…" muss
+# VOR „/{invoice_id}" stehen, sonst schluckt der Platzhalter den festen Pfad.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _kontakt(db: Session, contact_id):
+    if not contact_id:
+        return None
+    return db.query(EntityRecord).filter(EntityRecord.id == contact_id).first()
+
+
+@router.get("/dunning/run", response_model=DunningRunResponse)
+async def dunning_run(
+    stichtag: Optional[date] = Query(None, description="Standard: heute"),
+    contact_id: Optional[UUID] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Mahnlauf-Vorschau: was wäre heute zu mahnen.
+
+    Verschickt wird hier nichts. Die Liste enthält bewusst auch die nicht
+    mahnbaren Belege samt Begründung — sonst rätselt man, warum eine Rechnung
+    fehlt, die man erwartet hätte.
+    """
+    daten = dunning_service.kandidaten(db, stichtag, contact_id)
+    return DunningRunResponse(
+        stichtag=daten["stichtag"],
+        items=[DunningCandidate(**z) for z in daten["items"]],
+        dunnable_count=daten["dunnable_count"],
+        levels=[DunningLevelConfig(**s) for s in daten["levels"]],
+        interest_hint=daten["interest_hint"],
+    )
+
+
+def _mahnung_erzeugen(db: Session, inv: Invoice, level: Optional[int],
+                      stichtag: date, force: bool, benutzer: str,
+                      batch_id=None) -> InvoiceDunning:
+    """
+    Gemeinsamer Kern von Einzel- und Sammelmahnung.
+
+    Wirft 400 mit einer Begründung, wenn nicht gemahnt werden darf. Die
+    Mahnsperre ist auch mit ``force`` nicht zu übergehen: Sie wurde bewusst
+    gesetzt, ein Sammellauf darf sie nicht versehentlich aushebeln.
+    """
+    if inv.doc_type != "rechnung":
+        raise HTTPException(400, "Nur Rechnungen können gemahnt werden")
+    if inv.status in ("entwurf", "storniert"):
+        raise HTTPException(400, "Entwürfe und stornierte Belege werden nicht gemahnt")
+
+    kontakt = _kontakt(db, inv.contact_id)
+    grund = dunning_service.sperrgrund(inv, dunning_service.kontakt_gesperrt(kontakt))
+    if grund:
+        raise HTTPException(400, grund)
+
+    _, offen, _ = _zahlstand(inv)
+    if offen <= Decimal("0.00"):
+        raise HTTPException(400, "Der Beleg ist beglichen — es gibt nichts zu mahnen")
+
+    stufen = dunning_service.get_levels(db)
+    if level is None:
+        stufe = dunning_service.naechste_stufe(inv, stufen)
+        if stufe is None:
+            raise HTTPException(400, "Alle Mahnstufen sind ausgeschöpft")
+    else:
+        stufe = next((s for s in stufen if s["level"] == level), None)
+        if stufe is None:
+            raise HTTPException(400, f"Mahnstufe {level} ist nicht eingerichtet")
+
+    if not force:
+        ab = dunning_service.mahnbar_ab(inv, stufe)
+        if ab is None:
+            raise HTTPException(400, "Ohne Zahlungsziel gibt es keinen Verzug — "
+                                     "bitte zuerst ein Zahlungsziel hinterlegen.")
+        if ab > stichtag:
+            raise HTTPException(400, f"Diese Mahnstufe ist erst ab "
+                                     f"{ab:%d.%m.%Y} an der Reihe.")
+
+    eintrag = dunning_service.mahnung_anlegen(
+        db, inv, stufe, stichtag=stichtag, benutzer=benutzer,
+        batch_id=batch_id, kontakt=kontakt)
+
+    bezeichnung = stufe.get("label") or f"Stufe {stufe['level']}"
+    _audit(db, inv, "mahnung",
+           note=f"{bezeichnung} erstellt — offen "
+                f"{float(eintrag.open_amount):.2f} {inv.currency}, Gebühr "
+                f"{float(eintrag.fee):.2f}, Zinsen {float(eintrag.interest):.2f}",
+           user_email=benutzer)
+    return eintrag
+
+
+@router.post("/dunning/batch", response_model=List[DunningEntry])
+async def dunning_batch(
+    body: DunningBatchRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Sammelmahnlauf über eine Auswahl von Belegen.
+
+    Belege desselben Kunden teilen sich eine ``batch_id`` — daraus entsteht das
+    Sammelschreiben. Ein einzelner abgelehnter Beleg (Sperre, Wartezeit) lässt
+    den Lauf NICHT scheitern: Er wird übersprungen, der Rest läuft durch.
+    Andernfalls müsste man den Lauf nach jedem Sonderfall neu zusammenstellen.
+    """
+    stichtag = body.dunned_at or date.today()
+    if not body.invoice_ids:
+        raise HTTPException(400, "Keine Belege ausgewählt")
+
+    belege = db.query(Invoice).filter(Invoice.id.in_(body.invoice_ids)).all()
+    batch_je_kontakt: dict = {}
+    ergebnis = []
+
+    for inv in belege:
+        schluessel = inv.contact_id or inv.id
+        batch_id = batch_je_kontakt.setdefault(schluessel, uuid4())
+        try:
+            ergebnis.append(_mahnung_erzeugen(
+                db, inv, None, stichtag, body.force, current_user.email, batch_id))
+        except HTTPException:
+            continue                    # Begründung steht im Mahnlauf
+
+    if not ergebnis:
+        raise HTTPException(400, "Kein einziger der gewählten Belege war mahnbar")
+    db.commit()
+    return ergebnis
+
+
+@router.get("/dunning/{dunning_id}/pdf")
+async def dunning_pdf(
+    dunning_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Mahnschreiben als PDF. Bei einer Sammelmahnung stehen alle Belege des Laufs drauf."""
+    from app.services.dunning_pdf import generate_dunning_pdf
+
+    eintrag = db.query(InvoiceDunning).filter(InvoiceDunning.id == dunning_id).first()
+    if not eintrag:
+        raise HTTPException(404, "Mahnung nicht gefunden")
+
+    pdf_bytes, dateiname = generate_dunning_pdf(db, eintrag)
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{dateiname}"'})
+
+
+@router.delete("/dunning/{dunning_id}", response_model=List[DunningEntry])
+async def dunning_zuruecknehmen(
+    dunning_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Nimmt eine Mahnung zurück (Fehleingabe) und setzt die Stufe auf den
+    verbliebenen Höchststand zurück.
+
+    Das Schreiben selbst ist damit natürlich nicht zurückgeholt — der Vorgang
+    bleibt deshalb im Änderungsprotokoll stehen.
+    """
+    eintrag = db.query(InvoiceDunning).filter(InvoiceDunning.id == dunning_id).first()
+    if not eintrag:
+        raise HTTPException(404, "Mahnung nicht gefunden")
+
+    inv = db.query(Invoice).filter(Invoice.id == eintrag.invoice_id).first()
+    beschreibung = (f"{eintrag.label or f'Stufe {eintrag.level}'} vom "
+                    f"{eintrag.dunned_at:%d.%m.%Y} zurückgenommen")
+    db.delete(eintrag)
+    db.flush()
+    db.refresh(inv)
+
+    rest = sorted(inv.dunnings, key=lambda d: d.level)
+    inv.dunning_level = rest[-1].level if rest else 0
+    inv.dunning_last_at = max((d.dunned_at for d in rest), default=None)
+    _audit(db, inv, "mahnung", note=beschreibung, user_email=current_user.email)
+
+    db.commit()
+    db.refresh(inv)
+    return sorted(inv.dunnings, key=lambda d: d.level)
+
+
+@router.get("/{invoice_id}/dunning", response_model=List[DunningEntry])
+async def dunning_historie(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Mahnhistorie eines Belegs."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    return sorted(inv.dunnings, key=lambda d: d.level)
+
+
+@router.post("/{invoice_id}/dunning", response_model=DunningEntry)
+async def dunning_anlegen(
+    invoice_id: UUID,
+    body: DunningCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Erzeugt eine Mahnung zu einem einzelnen Beleg."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    eintrag = _mahnung_erzeugen(db, inv, body.level, body.dunned_at or date.today(),
+                                body.force, current_user.email)
+    db.commit()
+    db.refresh(eintrag)
+    return eintrag
+
+
+@router.post("/{invoice_id}/dunning-block", response_model=InvoiceResponse)
+async def dunning_sperre(
+    invoice_id: UUID,
+    body: DunningBlockRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Setzt oder löst die Mahnsperre für einen Beleg (Ratenvereinbarung,
+    strittige Forderung, Klärung mit dem Kunden).
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    inv.dunning_blocked = bool(body.blocked)
+    inv.dunning_block_reason = body.reason if body.blocked else None
+    inv.updated_by = current_user.email
+    _audit(db, inv, "mahnung",
+           note=(f"Mahnsperre gesetzt: {body.reason or 'ohne Begründung'}"
+                 if body.blocked else "Mahnsperre aufgehoben"),
+           user_email=current_user.email)
+    db.commit()
+    db.refresh(inv)
+    return inv
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Skonto
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{invoice_id}/skonto", response_model=SkontoVorschau)
+async def skonto_vorschau(
+    invoice_id: UUID,
+    paid_at: Optional[date] = Query(None, description="Zahlungsdatum; Standard: heute"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Was ein Skonto zum angegebenen Zahlungsdatum bedeuten würde — Betrag,
+    Aufteilung auf die Steuersätze und die daraus folgende Steuerberichtigung.
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    datum = paid_at or date.today()
+    _, offen, _ = _zahlstand(inv)
+    betrag = skonto_service.betrag(inv)
+    frist = skonto_service.frist_ende(inv)
+    innerhalb = skonto_service.in_frist(inv, datum)
+
+    hinweis = None
+    if not skonto_service.vereinbart(inv):
+        hinweis = "Für diesen Beleg ist kein Skonto vereinbart."
+    elif not innerhalb:
+        hinweis = (f"Die Skontofrist endete am {frist:%d.%m.%Y} — ein Abzug "
+                   f"wäre eine freiwillige Zusage." if frist else None)
+
+    return SkontoVorschau(
+        invoice_id=inv.id, skonto_percent=inv.skonto_percent,
+        skonto_days=inv.skonto_days, frist_ende=frist, in_frist=innerhalb,
+        betrag=betrag, open_amount=offen,
+        zeilen=[SkontoZeile(**z) for z in skonto_service.aufteilung(inv, betrag)],
+        hinweis=hinweis,
+    )
+
+
+@router.post("/{invoice_id}/skonto", response_model=InvoicePaymentState)
+async def skonto_ausbuchen(
+    invoice_id: UUID,
+    body: SkontoRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Bucht den Restbetrag als gewährten Skonto aus.
+
+    Der Eintrag landet in ``invoice_payments`` mit ``payment_type='skonto'`` und
+    dem **Zahlungsdatum** — daran hängt die Umsatzsteuer-Berichtigung nach
+    § 16 UStG. Ohne Betragsangabe wird genau der offene Rest ausgebucht; das
+    ist der Normalfall, wenn der Kunde gekürzt überwiesen hat.
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    if inv.doc_type not in ("rechnung", "gutschrift"):
+        raise HTTPException(400, "Skonto gibt es nur auf Rechnungen und Gutschriften")
+    if inv.status in ("entwurf", "storniert"):
+        raise HTTPException(400, "Der Beleg ist nicht ausgestellt oder storniert")
+
+    # Die Berichtigung wirkt im Monat der Zahlung — ist der zu, darf hier
+    # nichts mehr entstehen.
+    period_service.pruefe_periode_offen(db, body.paid_at, "gebucht")
+
+    _, offen, _ = _zahlstand(inv)
+    betrag = Decimal(str(body.amount)) if body.amount is not None else offen
+    if betrag <= 0:
+        raise HTTPException(400, "Der Skontobetrag muss größer als null sein")
+    if betrag > offen:
+        raise HTTPException(400, f"Der Skonto ({float(betrag):.2f}) übersteigt den "
+                                 f"offenen Betrag ({float(offen):.2f})")
+
+    zahlung = InvoicePayment(
+        invoice_id=inv.id, paid_at=body.paid_at, amount=betrag,
+        payment_type="skonto", method="verrechnung",
+        note=body.note or "Skontoabzug", created_by=current_user.email,
+    )
+    db.add(zahlung)
+    db.flush()
+    db.refresh(inv)
+
+    alter_status = inv.status
+    _recalc_payment_status(db, inv)
+    inv.updated_by = current_user.email
+
+    aufteilung = skonto_service.aufteilung(inv, betrag)
+    steuer = sum((z["steuer"] for z in aufteilung), Decimal("0"))
+    _audit(db, inv, "skonto",
+           changes={"status": {"alt": alter_status, "neu": inv.status}}
+                   if alter_status != inv.status else None,
+           note=f"Skonto {float(betrag):.2f} {inv.currency} zum "
+                f"{body.paid_at:%d.%m.%Y} ausgebucht — davon "
+                f"{float(steuer):.2f} Umsatzsteuer-Berichtigung (§ 16 UStG)",
+           user_email=current_user.email)
+
+    db.flush()
+    if inv.status == "bezahlt":
+        archive_invoice_pdf(db, inv, "bezahlt")
     db.commit()
     db.refresh(inv)
     return _zahlstand_antwort(inv)

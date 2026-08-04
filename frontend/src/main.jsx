@@ -26,6 +26,7 @@ import InvoiceFormPage from './pages/InvoiceFormPage'
 import InvoiceBookPage from './pages/InvoiceBookPage'
 import OpenItemsPage from './pages/OpenItemsPage'
 import MonatsabschlussPage from './pages/MonatsabschlussPage'
+import MahnlaufPage from './pages/MahnlaufPage'
 import ProjektplanPage from './pages/ProjektplanPage'
 import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
 import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
@@ -101,6 +102,9 @@ function App() {
                       <Route path="/invoices/book"       element={<ModuleRoute module="buchhaltung"><InvoiceBookPage /></ModuleRoute>} />
                       <Route path="/invoices/open-items" element={<ModuleRoute module="buchhaltung"><OpenItemsPage /></ModuleRoute>} />
                       <Route path="/invoices/abschluss"  element={<ModuleRoute module="buchhaltung"><MonatsabschlussPage /></ModuleRoute>} />
+                      {/* Mahnwesen gehört zum Verkauf, nicht zur Buchhaltung:
+                          Forderungen treibt ein, wer verkauft hat. */}
+                      <Route path="/invoices/mahnlauf"   element={<ModuleRoute module="verkauf"><MahnlaufPage /></ModuleRoute>} />
                       <Route path="/invoices/:id"        element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       <Route path="/invoices/:id/edit"   element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       {/* Feldverwaltung & Einstellungen: nur Admin */}

@@ -25,21 +25,33 @@ def _admin_client(client, admin_user):
 def test_get_settings_initial_nur_wirksame_vorgabewerte(auth_client):
     """
     Ohne gespeicherte Werte kommen genau die Einstellungen zurück, für die es
-    wirksame Vorgaben gibt: Archiv-Auslöser und Steuersätze.
+    wirksame Vorgaben gibt: Archiv-Auslöser, Steuersätze und das Mahnwesen.
 
-    Beide werden bewusst immer mitgeliefert, damit die Oberfläche keine eigene
+    Sie werden bewusst immer mitgeliefert, damit die Oberfläche keine eigene
     Kopie der Vorgabewerte vorhalten muss — sonst schreibt sie diese beim
     nächsten Speichern über die echten. Genau das ist bei den Archiv-Auslösern
     vorher passiert.
+
+    Wächst diese Liste, ist das kein Fehler — aber es gehört bemerkt: Jeder
+    Eintrag hier ist ein Wert, den die Oberfläche NICHT selbst kennen darf.
     """
     from app.services.invoice_archive import DEFAULT_TRIGGERS
 
     resp = auth_client.get("/api/invoices/settings/all")
     assert resp.status_code == 200
     daten = resp.json()
-    assert set(daten.keys()) == {"archive_triggers", "tax_rates"}
+    assert set(daten.keys()) == {
+        "archive_triggers", "tax_rates",
+        "dunning_levels", "dunning_base_rate", "dunning_surcharge_b2b",
+        "dunning_rate_b2c", "dunning_interest_mode",
+    }
     assert daten["archive_triggers"] == DEFAULT_TRIGGERS
     assert [s["satz"] for s in daten["tax_rates"]] == [20, 13, 10, 0]
+    assert [s["level"] for s in daten["dunning_levels"]] == [1, 2, 3, 4]
+    # Der Basiszinssatz wird nicht geraten: Er bleibt leer, bis er gepflegt ist.
+    assert daten["dunning_base_rate"] is None
+    assert daten["dunning_surcharge_b2b"] == 9.2
+    assert daten["dunning_rate_b2c"] == 4.0
 
 
 def test_gespeicherte_archiv_ausloeser_haben_vorrang(auth_client, admin_user, db_session):

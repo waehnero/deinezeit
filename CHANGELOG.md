@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.12.43] – 2026-08-04 – Verkauf: Mahnwesen und Skonto
+
+### Neu
+- Mahnwesen: Mahnlauf mit Vorschau, vierstufige Mahnungen mit Frist, Gebühr und Verzugszinsen, Sammelmahnung je Kunde, Mahnsperre und Mahnhistorie am Beleg
+- Skonto je Beleg: Zahlungsbedingung auf dem Beleg, Ausbuchen des Restbetrags mit anteiliger Umsatzsteuer-Berichtigung im Monat der Zahlung
+
+### Aktualisierungen
+- Umsatzsteuer-Auswertung: Eine Rabattzeile wurde mangels Steuersatz als Reverse-Charge-Umsatz gezählt statt als Minderung der besteuerten Grundlage
+
+---
+
 ## [1.12.42] – 2026-08-03 – Verkauf: Gliederung, Rabatte und Bilder in Belegen
 
 ### Neu

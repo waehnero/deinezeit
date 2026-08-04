@@ -13,7 +13,7 @@ import {
   CheckCircle2, Clock, XCircle, Send, Eye,
   MoreHorizontal, Book, RotateCcw, Mail, MailCheck, MailX,
   Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet,
-  CalendarCheck
+  CalendarCheck, Bell
 } from 'lucide-react'
 
 function fmtDate(d) {
@@ -171,6 +171,12 @@ export default function InvoicePage() {
             </button>
           )}
           <div className="flex items-center gap-2">
+            {/* Mahnwesen bewusst OHNE Buchhaltungsrecht: Forderungen treibt
+                ein, wer verkauft hat. */}
+            <button onClick={() => navigate('/invoices/mahnlauf')}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
+              <Bell size={15} /> Mahnlauf
+            </button>
             {/* Auswertungen hängen am Zusatzrecht "Buchhaltung" — wer Belege
                 schreiben darf, muss nicht zwangsläufig Zahlen und Export sehen. */}
             {hatBuchhaltung && (
@@ -517,6 +523,7 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
   const [zahlart, setZahlart] = useState('bank')
   const [verwendung, setVerwendung] = useState('')
   const [laeuft, setLaeuft] = useState(false)
+  const [skonto, setSkonto] = useState(null)
 
   const laden = useCallback(async () => {
     try {
@@ -527,6 +534,33 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
   }, [invoice.id])
 
   useEffect(() => { laden() }, [laden])
+
+  // Skonto-Vorschau hängt am Zahlungsdatum: Ob die Frist gewahrt ist,
+  // entscheidet der Tag des Eingangs, nicht der Tag der Erfassung.
+  useEffect(() => {
+    let abgebrochen = false
+    invoiceApi.skontoPreview(invoice.id, paidAt)
+      .then(res => { if (!abgebrochen) setSkonto(res.data) })
+      .catch(() => { if (!abgebrochen) setSkonto(null) })
+    return () => { abgebrochen = true }
+  }, [invoice.id, paidAt])
+
+  async function skontoAusbuchen() {
+    const rest = Number(stand?.open_amount ?? 0)
+    if (!window.confirm(
+      `${fmtEuro(rest)} als Skonto ausbuchen?\n\n` +
+      `Das mindert das Entgelt und berichtigt die Umsatzsteuer zum ${fmtDate(paidAt)} ` +
+      `(§ 16 UStG). Die Rechnung selbst bleibt unverändert.`)) return
+    setLaeuft(true)
+    try {
+      const res = await invoiceApi.grantSkonto(invoice.id, { paid_at: paidAt })
+      setStand(res.data)
+      setBetrag('0.00')
+      toast.success('Skonto ausgebucht')
+      onConfirm?.()
+    } catch (e) { toast.error(e.response?.data?.detail || 'Skonto konnte nicht ausgebucht werden') }
+    finally { setLaeuft(false) }
+  }
 
   async function erfassen() {
     if (!betrag || Number(betrag) === 0) { toast.error('Bitte einen Betrag angeben'); return }
@@ -580,9 +614,13 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
               <div key={z.id} className="flex items-center justify-between px-3 py-2 text-sm">
                 <div>
                   <span className="font-medium text-neutral-800">{fmtEuro(z.amount)}</span>
+                  {z.payment_type === 'skonto' && (
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[11px] bg-amber-100 text-amber-700">Skonto</span>
+                  )}
                   <span className="text-neutral-400 ml-2">
                     {fmtDate(z.paid_at)}
-                    {z.method && ' · ' + (ZAHLARTEN.find(a => a[0] === z.method)?.[1] || z.method)}
+                    {z.payment_type !== 'skonto' && z.method &&
+                      ' · ' + (ZAHLARTEN.find(a => a[0] === z.method)?.[1] || z.method)}
                     {z.reference && ' · ' + z.reference}
                   </span>
                 </div>
@@ -590,6 +628,30 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
                   className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Skonto: eigener Vorgang, nicht als Zahlung getarnt. Der Hinweis
+            nennt die Steuerwirkung, damit klar ist, was hier passiert. */}
+        {skonto?.skonto_percent && offen > 0 && (
+          <div className={`mb-4 rounded-lg border px-3 py-2.5 text-sm ${
+            skonto.in_frist ? 'border-green-200 bg-green-50' : 'border-neutral-200 bg-neutral-50'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium text-neutral-800">
+                  {Number(skonto.skonto_percent)} % Skonto
+                  <span className="text-neutral-500 font-normal">
+                    {' '}· vereinbart {fmtEuro(skonto.betrag)}
+                    {skonto.frist_ende && ` · Frist bis ${fmtDate(skonto.frist_ende)}`}
+                  </span>
+                </p>
+                {skonto.hinweis && <p className="text-xs text-neutral-500 mt-0.5">{skonto.hinweis}</p>}
+              </div>
+              <button onClick={skontoAusbuchen} disabled={laeuft}
+                className="shrink-0 px-3 py-1.5 text-xs border border-neutral-300 rounded-lg bg-surface hover:bg-neutral-50 disabled:opacity-60">
+                Rest {fmtEuro(offen)} ausbuchen
+              </button>
+            </div>
           </div>
         )}
 

@@ -72,6 +72,20 @@ class Invoice(Base):
     paid_at = Column(Date, nullable=True)
     paid_amount = Column(Numeric(12, 2), nullable=True)
 
+    # Skonto-Bedingung: "skonto_percent % bei Zahlung binnen skonto_days Tagen".
+    # Am Beleg gespeichert und nicht nur als Einstellung, weil die Bedingung
+    # Teil der Vereinbarung mit dem Kunden ist — sie darf sich nicht rückwirkend
+    # ändern, wenn die Vorgabe später angepasst wird.
+    skonto_percent = Column(Numeric(5, 2), nullable=True)
+    skonto_days = Column(Integer, nullable=True)
+
+    # Mahnwesen. Stufe und Datum sind Zwischenspeicher aus invoice_dunnings,
+    # damit Listen und Mahnlauf nicht je Beleg die Historie laden müssen.
+    dunning_blocked = Column(Boolean, nullable=False, default=False)
+    dunning_block_reason = Column(String(300), nullable=True)
+    dunning_level = Column(Integer, nullable=False, default=0)
+    dunning_last_at = Column(Date, nullable=True)
+
     # PDF-Vorlage (1–5)
     template_id = Column(Integer, nullable=False, default=1)
 
@@ -98,6 +112,9 @@ class Invoice(Base):
     payments = relationship("InvoicePayment", back_populates="invoice",
                             cascade="all, delete-orphan",
                             order_by="InvoicePayment.paid_at")
+    dunnings = relationship("InvoiceDunning", back_populates="invoice",
+                            cascade="all, delete-orphan",
+                            order_by="InvoiceDunning.level")
     related_invoice = relationship("Invoice", foreign_keys=[related_invoice_id], remote_side="Invoice.id")
     recurring_instances = relationship("Invoice", foreign_keys=[recurring_source_id], remote_side="Invoice.id")
 
@@ -190,6 +207,13 @@ class InvoicePayment(Base):
                         nullable=False, index=True)
     paid_at = Column(Date, nullable=False, index=True)
     amount = Column(Numeric(12, 2), nullable=False)
+    # zahlung | skonto
+    #
+    # Ein gewährter Skonto schließt den Beleg wie eine Zahlung, ist aber keine:
+    # Er mindert das Entgelt und zieht eine Umsatzsteuer-Berichtigung nach
+    # § 16 UStG nach sich — und zwar im Monat der Zahlung, nicht im Monat der
+    # Rechnung. Buchhaltung und UVA müssen ihn deshalb erkennen können.
+    payment_type = Column(String(20), nullable=False, default="zahlung")
     # bank | bar | karte | lastschrift | verrechnung | sonstige
     method = Column(String(20), nullable=True)
     reference = Column(String(200), nullable=True)   # Verwendungszweck, Beleg-Nr. der Bank
@@ -198,6 +222,46 @@ class InvoicePayment(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     invoice = relationship("Invoice", back_populates="payments")
+
+
+class InvoiceDunning(Base):
+    """
+    Eine verschickte Mahnung zu einem Beleg.
+
+    **Alle Beträge sind eingefroren.** Offener Betrag, Gebühr und Zinsen halten
+    den Stand zum Mahnzeitpunkt fest — eine Woche später eintreffende
+    Teilzahlung darf nicht rückwirkend verändern, was im Schreiben stand.
+
+    Gebühr und Zinsen sind Schadenersatz und **nicht umsatzsteuerbar**. Sie
+    stehen deshalb bewusst hier und nicht als Belegposition: Eine Position
+    landete im Erlös, in der UVA und im Buchungsjournal und würde die
+    Umsatzsteuer verfälschen.
+    """
+    __tablename__ = "invoice_dunnings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    invoice_id = Column(UUID(as_uuid=True),
+                        ForeignKey("invoices.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    level = Column(Integer, nullable=False)              # 1 = Zahlungserinnerung, 2 = 1. Mahnung …
+    label = Column(String(100), nullable=True)           # Bezeichnung der Stufe zum Zeitpunkt
+    dunned_at = Column(Date, nullable=False, index=True)
+    due_date = Column(Date, nullable=True)               # gesetzte Nachfrist
+    open_amount = Column(Numeric(12, 2), nullable=False, default=Decimal("0"))
+    fee = Column(Numeric(12, 2), nullable=False, default=Decimal("0"))
+    interest = Column(Numeric(12, 2), nullable=False, default=Decimal("0"))
+    interest_rate = Column(Numeric(6, 3), nullable=True)  # verwendeter Jahreszinssatz
+    interest_days = Column(Integer, nullable=True)
+    # Sammelmahnung: mehrere Belege eines Kunden auf einem Schreiben teilen
+    # sich eine batch_id.
+    batch_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    sent_to = Column(String(300), nullable=True)
+    note = Column(String(500), nullable=True)
+    created_by = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    invoice = relationship("Invoice", back_populates="dunnings")
 
 
 class InvoiceAuditLog(Base):
@@ -217,7 +281,8 @@ class InvoiceAuditLog(Base):
     invoice_id = Column(UUID(as_uuid=True),
                         ForeignKey("invoices.id", ondelete="CASCADE"),
                         nullable=False, index=True)
-    # finalisiert | status | bezahlt | storniert | bearbeitet | nummer
+    # finalisiert | status | bezahlt | zahlung | skonto | mahnung | storniert
+    # | bearbeitet | nummer | archiviert
     action = Column(String(30), nullable=False)
     changes = Column(JSONB, nullable=True)
     note = Column(String(500), nullable=True)

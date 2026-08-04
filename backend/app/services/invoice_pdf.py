@@ -200,6 +200,28 @@ def _leistungszeile(invoice, fmt) -> tuple:
     return ("Leistungsdatum", fmt(von))
 
 
+def _skonto_zeile(invoice, fmt) -> tuple:
+    """
+    Zahlungsbedingung für den Beleg — oder ``None``, wenn kein Skonto vereinbart ist.
+
+    Die Bedingung MUSS auf dem Beleg stehen: Ein Kunde, der Skonto zieht, muss
+    sich auf eine schriftliche Zusage berufen können, und wir müssen die
+    Entgeltminderung später begründen können.
+    """
+    from decimal import Decimal as _D
+    if not getattr(invoice, "skonto_percent", None):
+        return None
+    prozent = f"{float(_D(str(invoice.skonto_percent))):.2f}".rstrip("0").rstrip(".")
+    prozent = prozent.replace(".", ",")
+    tage = getattr(invoice, "skonto_days", None)
+    if tage and invoice.date:
+        from datetime import timedelta
+        ende = invoice.date + timedelta(days=int(tage))
+        return ("Zahlungsbedingung",
+                f"{prozent} % Skonto bei Zahlung bis {fmt(ende)} ({int(tage)} Tage)")
+    return ("Zahlungsbedingung", f"{prozent} % Skonto bei Zahlung binnen Frist")
+
+
 def _tax_breakdown(positions, tax_mode: str, tax_total=None) -> list[dict]:
     """
     MwSt.-Aufschlüsselung nach Steuersatz.
@@ -465,6 +487,8 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     if invoice.due_date:   meta_rows.append(("Zahlungsziel",  _fmt_date(invoice.due_date)))
     if invoice.delivery_date:
         meta_rows.append(_leistungszeile(invoice, _fmt_date))
+    _skonto = _skonto_zeile(invoice, _fmt_date)
+    if _skonto:            meta_rows.append(_skonto)
     if invoice.reference:  meta_rows.append(("Referenz",      invoice.reference))
 
     meta_html = "".join(
@@ -566,6 +590,9 @@ def _t1(**kw) -> str:
     meta_rows.append((_label + ":", _wert))
     if getattr(invoice, "due_date", None):
         meta_rows.append(("Zahlungsziel:", _fmt_date_long(invoice.due_date)))
+    _skonto = _skonto_zeile(invoice, _fmt_date_long)
+    if _skonto:
+        meta_rows.append((_skonto[0] + ":", _skonto[1]))
     meta_html = "".join(
         f'<tr><td class="m-label">{k}</td><td class="m-value">{v}</td></tr>'
         for k, v in meta_rows
