@@ -22,6 +22,7 @@
 > | Sammelbranch Kleinigkeiten | `fix/verkauf-kleinigkeiten` | ✅ umgesetzt (A-14, A-17e/f/g, B-3) |
 > | Positionstypen & Gliederung | `feature/verkauf-positionstypen` | ✅ umgesetzt (A-15 + Umsortieren) |
 > | 5 — E-Rechnung & Komfort | — | offen |
+> | 6 — Buchhaltung als eigener Bereich | offen | eigener Menüpunkt, Verkauf behält die Belegarbeit |
 >
 > **Entscheidungen aus Etappe 2a** (Oliver): Gesperrt wird alles, was auf dem
 > Beleg gedruckt wird oder die Buchung bestimmt — änderbar bleiben nur interne
@@ -41,6 +42,18 @@
 > Stufe. Der Basiszinssatz wird gepflegt statt geraten; fehlt er, weist das
 > Schreiben bewusst keine Zinsen aus. Skonto wirkt im Monat der Zahlung
 > (§ 16 UStG) und bucht anteilig auf die Erlöskonten und Steuersätze des Belegs.
+>
+> **Beschluss zur Trennung (Oliver, 06.08.2026):** Buchhaltung bekommt einen
+> **eigenen Menüpunkt** — Offene Posten, Mahnlauf, Verkaufsbuch, UVA,
+> Monatsabschluss und Export ziehen dorthin, Verkauf behält die Belegarbeit.
+> Anlass: `buchhaltung` war das einzige Modulrecht ohne Menüeintrag, weshalb
+> seine Funktionen als Knopfreihe im Kopf von Verkauf hingen. Umgesetzt wird
+> das als eigene Etappe 6.
+>
+> **Zweiter Nebenbefund aus 3b:** Der Mahnlauf hing zunächst nur am Recht
+> `verkauf` — er zeigt aber dieselben offenen Beträge wie die OP-Liste, deren
+> Sperre damit umgehbar war. Alle Mahn-Endpunkte verlangen jetzt zusätzlich
+> `buchhaltung`.
 >
 > **Nebenbefund aus Etappe 3b:** Die UVA-Auswertung hatte eine eigene
 > Positionsschleife und zählte deshalb eine Rabattzeile mangels Steuersatz als

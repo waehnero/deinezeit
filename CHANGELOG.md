@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.12.43] – 2026-08-04 – Verkauf: Mahnwesen und Skonto
+## [1.12.44] – 2026-08-06 – Verkauf: Mahnwesen und Skonto
 
 ### Neu
 - Mahnwesen: Mahnlauf mit Vorschau, vierstufige Mahnungen mit Frist, Gebühr und Verzugszinsen, Sammelmahnung je Kunde, Mahnsperre und Mahnhistorie am Beleg
@@ -8,6 +8,7 @@
 
 ### Aktualisierungen
 - Umsatzsteuer-Auswertung: Eine Rabattzeile wurde mangels Steuersatz als Reverse-Charge-Umsatz gezählt statt als Minderung der besteuerten Grundlage
+- Mahnlauf und Mahnungen setzen das Zusatzrecht „Buchhaltung" voraus — sie zeigen dieselben offenen Beträge wie die Offene-Posten-Liste
 
 ---
 

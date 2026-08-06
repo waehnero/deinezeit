@@ -649,6 +649,27 @@ def test_zinsberechnung_ist_taggenau():
     ) == Decimal("0.00")
 
 
+def test_mahnwesen_verlangt_das_modul_buchhaltung(client, db_session, test_user):
+    """
+    Der Mahnlauf zeigt dieselben Zahlen wie die Offene-Posten-Liste: welcher
+    Kunde schuldet wie viel seit wann. Ohne dasselbe Zusatzrecht stünde deren
+    Sperre nur auf dem Papier — man käme über den Mahnlauf an die Daten.
+    """
+    from tests.conftest import TEST_USER_EMAIL, TEST_USER_PASSWORD
+
+    test_user.allowed_modules = ["verkauf"]        # Verkauf ja, Buchhaltung nein
+    db_session.commit()
+
+    token = client.post("/api/auth/login", json={
+        "email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD}).json()["access_token"]
+    kopf = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/api/invoices", headers=kopf).status_code == 200      # Belege: ja
+    assert client.get("/api/invoices/dunning/run", headers=kopf).status_code == 403
+    assert client.post("/api/invoices/dunning/batch", headers=kopf,
+                       json={"invoice_ids": []}).status_code == 403
+
+
 def test_skontoaufteilung_ohne_grundlage_bleibt_leer():
     class Leer:
         tax_mode = "per_position"

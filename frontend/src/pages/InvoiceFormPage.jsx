@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { invoiceApi, masterdataApi } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search,
@@ -273,6 +274,10 @@ export default function InvoiceFormPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const isNew = !id || id === 'new'
+  // Das Mahn-Panel hängt am Zusatzrecht: Ohne das Recht antworten die
+  // Endpunkte mit 403, das Panel bliebe leer.
+  const { hasModule } = useAuth()
+  const hatBuchhaltung = hasModule('buchhaltung')
 
   const [docType, setDocType] = useState(searchParams.get('type') || 'rechnung')
   const [contactId, setContactId] = useState(null)
@@ -805,7 +810,7 @@ export default function InvoiceFormPage() {
             className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" />
         </div>
 
-        {!isNew && gesperrt && docType === 'rechnung' && <MahnPanel invoiceId={id} />}
+        {!isNew && gesperrt && docType === 'rechnung' && hatBuchhaltung && <MahnPanel invoiceId={id} />}
         {!isNew && gesperrt && <AuditPanel invoiceId={id} />}
       </div>
     </div>

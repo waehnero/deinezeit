@@ -4,8 +4,8 @@
  */
 export const changelog = [
   {
-    version: '1.12.43',
-    day: '04',
+    version: '1.12.44',
+    day: '06',
     month: 'August',
     year: '2026',
     features: [
@@ -14,6 +14,7 @@ export const changelog = [
     ],
     updates: [
       'Umsatzsteuer-Auswertung: Eine Rabattzeile wurde mangels Steuersatz als Reverse-Charge-Umsatz gezählt statt als Minderung der besteuerten Grundlage',
+      'Mahnlauf und Mahnungen setzen das Zusatzrecht „Buchhaltung“ voraus — sie zeigen dieselben offenen Beträge wie die Offene-Posten-Liste',
     ],
   },
   {

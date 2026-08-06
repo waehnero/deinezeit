@@ -1592,6 +1592,12 @@ async def delete_payment(
 #
 # Die Reihenfolge der Routen ist hier wichtig: Alles unter „/dunning/…" muss
 # VOR „/{invoice_id}" stehen, sonst schluckt der Platzhalter den festen Pfad.
+#
+# Sämtliche Mahn-Endpunkte hängen am Zusatzrecht „Buchhaltung" — genau wie die
+# Offene-Posten-Liste. Der Mahnlauf zeigt dieselben Zahlen: welcher Kunde
+# schuldet wie viel seit wann. Wäre er ohne das Recht erreichbar, stünde die
+# Sperre der OP-Liste nur auf dem Papier.
+MAHN_RECHT = [Depends(require_module("buchhaltung"))]
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _kontakt(db: Session, contact_id):
@@ -1600,7 +1606,7 @@ def _kontakt(db: Session, contact_id):
     return db.query(EntityRecord).filter(EntityRecord.id == contact_id).first()
 
 
-@router.get("/dunning/run", response_model=DunningRunResponse)
+@router.get("/dunning/run", response_model=DunningRunResponse, dependencies=MAHN_RECHT)
 async def dunning_run(
     stichtag: Optional[date] = Query(None, description="Standard: heute"),
     contact_id: Optional[UUID] = Query(None),
@@ -1680,7 +1686,7 @@ def _mahnung_erzeugen(db: Session, inv: Invoice, level: Optional[int],
     return eintrag
 
 
-@router.post("/dunning/batch", response_model=List[DunningEntry])
+@router.post("/dunning/batch", response_model=List[DunningEntry], dependencies=MAHN_RECHT)
 async def dunning_batch(
     body: DunningBatchRequest,
     db: Session = Depends(get_db),
@@ -1717,7 +1723,7 @@ async def dunning_batch(
     return ergebnis
 
 
-@router.get("/dunning/{dunning_id}/pdf")
+@router.get("/dunning/{dunning_id}/pdf", dependencies=MAHN_RECHT)
 async def dunning_pdf(
     dunning_id: UUID,
     db: Session = Depends(get_db),
@@ -1735,7 +1741,7 @@ async def dunning_pdf(
                     headers={"Content-Disposition": f'inline; filename="{dateiname}"'})
 
 
-@router.delete("/dunning/{dunning_id}", response_model=List[DunningEntry])
+@router.delete("/dunning/{dunning_id}", response_model=List[DunningEntry], dependencies=MAHN_RECHT)
 async def dunning_zuruecknehmen(
     dunning_id: UUID,
     db: Session = Depends(get_db),
@@ -1769,7 +1775,7 @@ async def dunning_zuruecknehmen(
     return sorted(inv.dunnings, key=lambda d: d.level)
 
 
-@router.get("/{invoice_id}/dunning", response_model=List[DunningEntry])
+@router.get("/{invoice_id}/dunning", response_model=List[DunningEntry], dependencies=MAHN_RECHT)
 async def dunning_historie(
     invoice_id: UUID,
     db: Session = Depends(get_db),
@@ -1782,7 +1788,7 @@ async def dunning_historie(
     return sorted(inv.dunnings, key=lambda d: d.level)
 
 
-@router.post("/{invoice_id}/dunning", response_model=DunningEntry)
+@router.post("/{invoice_id}/dunning", response_model=DunningEntry, dependencies=MAHN_RECHT)
 async def dunning_anlegen(
     invoice_id: UUID,
     body: DunningCreateRequest,
@@ -1801,7 +1807,7 @@ async def dunning_anlegen(
     return eintrag
 
 
-@router.post("/{invoice_id}/dunning-block", response_model=InvoiceResponse)
+@router.post("/{invoice_id}/dunning-block", response_model=InvoiceResponse, dependencies=MAHN_RECHT)
 async def dunning_sperre(
     invoice_id: UUID,
     body: DunningBlockRequest,
