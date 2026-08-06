@@ -108,8 +108,16 @@ def test_ueberzahlung_wird_angenommen_und_gekennzeichnet(auth_client, db_session
 
 
 def test_zahlung_zuruecknehmen(auth_client, db_session):
-    """Fehleingaben müssen korrigierbar sein — vorher waren sie es nicht."""
-    inv = _offener_beleg(auth_client, db_session)
+    """
+    Fehleingaben müssen korrigierbar sein — vorher waren sie es nicht.
+
+    Das Zahlungsziel liegt bewusst in der Zukunft und wird aus dem heutigen
+    Datum gerechnet: Nach dem Entfernen der Zahlung leitet sich der Status neu
+    ab, und ein fest eingetragenes Datum macht aus „offen" irgendwann
+    „überfällig" — der Test wäre eine Zeitbombe.
+    """
+    ziel = (date.today() + timedelta(days=30)).isoformat()
+    inv = _offener_beleg(auth_client, db_session, due_date=ziel)
     zahlung_id = _zahlen(auth_client, inv["id"], "1200.00").json()["payments"][0]["id"]
 
     resp = auth_client.delete(f"/api/invoices/payments/{zahlung_id}")
