@@ -8,13 +8,22 @@ export const changelog = [
     day: '06',
     month: 'August',
     year: '2026',
+    features: [],
+    updates: [
+      'Mahnlauf und Mahnungen setzen jetzt das Zusatzrecht „Buchhaltung“ voraus — sie zeigen dieselben offenen Beträge wie die Offene-Posten-Liste, die schon bisher dieses Recht verlangt',
+    ],
+  },
+  {
+    version: '1.12.43',
+    day: '04',
+    month: 'August',
+    year: '2026',
     features: [
       'Mahnwesen: Mahnlauf mit Vorschau, vierstufige Mahnungen mit Frist, Gebühr und Verzugszinsen, Sammelmahnung je Kunde, Mahnsperre und Mahnhistorie am Beleg',
       'Skonto je Beleg: Zahlungsbedingung auf dem Beleg, Ausbuchen des Restbetrags mit anteiliger Umsatzsteuer-Berichtigung im Monat der Zahlung',
     ],
     updates: [
       'Umsatzsteuer-Auswertung: Eine Rabattzeile wurde mangels Steuersatz als Reverse-Charge-Umsatz gezählt statt als Minderung der besteuerten Grundlage',
-      'Mahnlauf und Mahnungen setzen das Zusatzrecht „Buchhaltung“ voraus — sie zeigen dieselben offenen Beträge wie die Offene-Posten-Liste',
     ],
   },
   {
