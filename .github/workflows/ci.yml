@@ -57,7 +57,15 @@ jobs:
           POSTGRES_DB: deinezeit_test
         ports:
           - 5432:5432
+        # Datenverzeichnis im Arbeitsspeicher statt auf der Platte des Runners.
+        #
+        # Jeder Test legt sämtliche Tabellen neu an und verwirft sie wieder
+        # (siehe tests/conftest.py). Das sind hunderte Schema-Anweisungen, die
+        # Postgres sonst einzeln auf die Platte schreibt — der Lauf brauchte
+        # dadurch rund 48 Minuten, lokal sind es fünf. Die Daten sind nach dem
+        # Job ohnehin wertlos, ein Verlust bei Absturz also belanglos.
         options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
           --health-cmd "pg_isready -U deinezeit"
           --health-interval 5s
           --health-timeout 5s
