@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.44] – 2026-08-06 – Verkauf mahnwesen
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.43] – 2026-08-04 – Verkauf: Mahnwesen und Skonto
 
 ### Neu

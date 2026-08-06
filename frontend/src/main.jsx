@@ -102,9 +102,9 @@ function App() {
                       <Route path="/invoices/book"       element={<ModuleRoute module="buchhaltung"><InvoiceBookPage /></ModuleRoute>} />
                       <Route path="/invoices/open-items" element={<ModuleRoute module="buchhaltung"><OpenItemsPage /></ModuleRoute>} />
                       <Route path="/invoices/abschluss"  element={<ModuleRoute module="buchhaltung"><MonatsabschlussPage /></ModuleRoute>} />
-                      {/* Mahnwesen gehört zum Verkauf, nicht zur Buchhaltung:
-                          Forderungen treibt ein, wer verkauft hat. */}
-                      <Route path="/invoices/mahnlauf"   element={<ModuleRoute module="verkauf"><MahnlaufPage /></ModuleRoute>} />
+                      {/* Mahnlauf zeigt dieselben offenen Beträge wie die
+                          OP-Liste und hängt deshalb am selben Zusatzrecht. */}
+                      <Route path="/invoices/mahnlauf"   element={<ModuleRoute module="buchhaltung"><MahnlaufPage /></ModuleRoute>} />
                       <Route path="/invoices/:id"        element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       <Route path="/invoices/:id/edit"   element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       {/* Feldverwaltung & Einstellungen: nur Admin */}

@@ -171,16 +171,16 @@ export default function InvoicePage() {
             </button>
           )}
           <div className="flex items-center gap-2">
-            {/* Mahnwesen bewusst OHNE Buchhaltungsrecht: Forderungen treibt
-                ein, wer verkauft hat. */}
-            <button onClick={() => navigate('/invoices/mahnlauf')}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-              <Bell size={15} /> Mahnlauf
-            </button>
             {/* Auswertungen hängen am Zusatzrecht "Buchhaltung" — wer Belege
-                schreiben darf, muss nicht zwangsläufig Zahlen und Export sehen. */}
+                schreiben darf, muss nicht zwangsläufig Zahlen und Export sehen.
+                Der Mahnlauf gehört dazu: Er zeigt dieselben offenen Beträge
+                wie die OP-Liste. */}
             {hatBuchhaltung && (
               <>
+                <button onClick={() => navigate('/invoices/mahnlauf')}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
+                  <Bell size={15} /> Mahnlauf
+                </button>
                 <button onClick={() => navigate('/invoices/open-items')}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
                   <Wallet size={15} /> Offene Posten
