@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.12.45',
+    day: '06',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Eigener Menüpunkt „Buchhaltung“ mit Übersichtsseite: offen gesamt, davon überfällig und wie viele Belege gerade mahnbar sind — dazu der Zugang zu allen Auswertungen',
+    ],
+    updates: [
+      'Offene Posten, Mahnlauf, Verkaufsbuch, Monatsabschluss und Kontenplan sind vom Verkauf in den Bereich Buchhaltung gezogen; die bisherigen Adressen leiten weiter',
+      'Der Kontenplan liegt nicht mehr in den Einstellungen: Wer das Recht „Buchhaltung“ hat, sieht ihn — ändern darf ihn weiterhin nur ein Administrator',
+    ],
+  },
+  {
     version: '1.12.44',
     day: '06',
     month: 'August',

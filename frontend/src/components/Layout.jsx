@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Database, Users, User, LogOut, Menu, X,
   ChevronRight, ChevronDown, Clock, Settings2, HardDrive, Receipt, GanttChartSquare,
-  PanelLeftClose, PanelLeftOpen, ListTodo, Megaphone, Moon
+  PanelLeftClose, PanelLeftOpen, ListTodo, Megaphone, Moon, Calculator
 } from 'lucide-react'
 import { toggleDark } from '../utils/anzeige'
 import { useSettings } from '../contexts/SettingsContext'
@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { to: '/aufgaben',     icon: ListTodo,         label: 'Aufgaben',      module: 'aufgaben' },
   { to: '/projekte',     icon: GanttChartSquare, label: 'Projekte',      module: 'projekte' },
   { to: '/invoices',     icon: Receipt,          label: 'Verkauf',       module: 'verkauf' },
+  { to: '/buchhaltung',  icon: Calculator,       label: 'Buchhaltung',   module: 'buchhaltung' },
   { to: '/postecke',     icon: Megaphone,        label: 'Postecke',      module: 'postecke' },
   { to: '/masterdata',   icon: Database,         label: 'Stammdaten',    module: 'stammdaten' },
   { to: '/datacenter',   icon: HardDrive,        label: 'Datacenter',    module: 'datacenter' },

@@ -46,7 +46,7 @@ export default function OpenItemsPage() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/invoices')} className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500">
+        <button onClick={() => navigate('/buchhaltung')} className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500">
           <ArrowLeft size={18} />
         </button>
         <PageHeader icon={Wallet} title="Offene Posten"

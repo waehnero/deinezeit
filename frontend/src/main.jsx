@@ -27,6 +27,8 @@ import InvoiceBookPage from './pages/InvoiceBookPage'
 import OpenItemsPage from './pages/OpenItemsPage'
 import MonatsabschlussPage from './pages/MonatsabschlussPage'
 import MahnlaufPage from './pages/MahnlaufPage'
+import BuchhaltungPage from './pages/BuchhaltungPage'
+import KontenplanPage from './pages/KontenplanPage'
 import ProjektplanPage from './pages/ProjektplanPage'
 import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
 import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
@@ -99,12 +101,22 @@ function App() {
                       {/* Rechnungsmodul */}
                       <Route path="/invoices"            element={<ModuleRoute module="verkauf"><InvoicePage /></ModuleRoute>} />
                       <Route path="/invoices/new"        element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
-                      <Route path="/invoices/book"       element={<ModuleRoute module="buchhaltung"><InvoiceBookPage /></ModuleRoute>} />
-                      <Route path="/invoices/open-items" element={<ModuleRoute module="buchhaltung"><OpenItemsPage /></ModuleRoute>} />
-                      <Route path="/invoices/abschluss"  element={<ModuleRoute module="buchhaltung"><MonatsabschlussPage /></ModuleRoute>} />
-                      {/* Mahnlauf zeigt dieselben offenen Beträge wie die
-                          OP-Liste und hängt deshalb am selben Zusatzrecht. */}
-                      <Route path="/invoices/mahnlauf"   element={<ModuleRoute module="buchhaltung"><MahnlaufPage /></ModuleRoute>} />
+                      {/* Die Auswertungen sind in den Bereich Buchhaltung
+                          gezogen. Die alten Pfade bleiben als Weiterleitung
+                          bestehen — sie stecken in Lesezeichen und in
+                          PWA-Verknüpfungen auf dem Startbildschirm. */}
+                      <Route path="/invoices/book"       element={<Navigate to="/buchhaltung/verkaufsbuch" replace />} />
+                      <Route path="/invoices/open-items" element={<Navigate to="/buchhaltung/offene-posten" replace />} />
+                      <Route path="/invoices/abschluss"  element={<Navigate to="/buchhaltung/abschluss" replace />} />
+                      <Route path="/invoices/mahnlauf"   element={<Navigate to="/buchhaltung/mahnlauf" replace />} />
+
+                      {/* Bereich Buchhaltung */}
+                      <Route path="/buchhaltung"                element={<ModuleRoute module="buchhaltung"><BuchhaltungPage /></ModuleRoute>} />
+                      <Route path="/buchhaltung/offene-posten"   element={<ModuleRoute module="buchhaltung"><OpenItemsPage /></ModuleRoute>} />
+                      <Route path="/buchhaltung/mahnlauf"        element={<ModuleRoute module="buchhaltung"><MahnlaufPage /></ModuleRoute>} />
+                      <Route path="/buchhaltung/verkaufsbuch"    element={<ModuleRoute module="buchhaltung"><InvoiceBookPage /></ModuleRoute>} />
+                      <Route path="/buchhaltung/abschluss"       element={<ModuleRoute module="buchhaltung"><MonatsabschlussPage /></ModuleRoute>} />
+                      <Route path="/buchhaltung/konten"          element={<ModuleRoute module="buchhaltung"><KontenplanPage /></ModuleRoute>} />
                       <Route path="/invoices/:id"        element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       <Route path="/invoices/:id/edit"   element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       {/* Feldverwaltung & Einstellungen: nur Admin */}

@@ -22,7 +22,7 @@
 > | Sammelbranch Kleinigkeiten | `fix/verkauf-kleinigkeiten` | ✅ umgesetzt (A-14, A-17e/f/g, B-3) |
 > | Positionstypen & Gliederung | `feature/verkauf-positionstypen` | ✅ umgesetzt (A-15 + Umsortieren) |
 > | 5 — E-Rechnung & Komfort | — | offen |
-> | 6 — Buchhaltung als eigener Bereich | offen | eigener Menüpunkt, Verkauf behält die Belegarbeit |
+> | 6 — Buchhaltung als eigener Bereich | `feature/buchhaltung-bereich` | ✅ umgesetzt (Menüpunkt, Übersicht, Umzug von OP/Mahnlauf/Verkaufsbuch/Abschluss/Kontenplan) |
 >
 > **Entscheidungen aus Etappe 2a** (Oliver): Gesperrt wird alles, was auf dem
 > Beleg gedruckt wird oder die Buchung bestimmt — änderbar bleiben nur interne
