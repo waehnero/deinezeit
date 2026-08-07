@@ -16,6 +16,14 @@ name: Deploy → Produktion
 on:
   push:
     branches: [main]
+  # Von Hand auslösbar (Actions → Deploy → Produktion → Run workflow).
+  #
+  # Nötig, weil der Deploy sonst ausschließlich am Push auf main hängt: Legt
+  # GitHub bei einer Störung gar keinen Lauf an, gibt es auch nichts zum
+  # Wiederholen — und main ist geschützt, ein Nachschieben per Push also
+  # ausgeschlossen. Genau dieser Fall trat am 06.08.2026 während der
+  # Actions-Großstörung ein.
+  workflow_dispatch:
 
 jobs:
   deploy:
