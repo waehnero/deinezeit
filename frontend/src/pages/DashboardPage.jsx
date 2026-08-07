@@ -580,7 +580,7 @@ function BuchhaltungWidget({ accountCount, editMode, navigate }) {
   return (
     <div
       className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
-      onClick={editMode ? undefined : () => navigate('/invoices/book')}
+      onClick={editMode ? undefined : () => navigate('/buchhaltung')}
     >
       <WidgetHead
         icon={Landmark} title="Buchhaltung" sub="Konten & BMD-Export"

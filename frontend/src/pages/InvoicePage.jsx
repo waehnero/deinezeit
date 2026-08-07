@@ -5,15 +5,13 @@ import Fab from '../components/Fab'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
-import { useAuth } from '../contexts/AuthContext'
 import RichTextEditor from '../components/RichTextEditor'
 import toast from 'react-hot-toast'
 import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
-  MoreHorizontal, Book, RotateCcw, Mail, MailCheck, MailX,
-  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet,
-  CalendarCheck, Bell
+  MoreHorizontal, RotateCcw, Mail, MailCheck, MailX,
+  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet
 } from 'lucide-react'
 
 function fmtDate(d) {
@@ -65,9 +63,6 @@ function DocTypeBadge({ type }) {
 
 export default function InvoicePage() {
   const navigate = useNavigate()
-  const { hasModule } = useAuth()
-  // Zusatzrecht: schaltet Verkaufsbuch und offene Posten frei
-  const hatBuchhaltung = hasModule('buchhaltung')
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('')
@@ -171,30 +166,9 @@ export default function InvoicePage() {
             </button>
           )}
           <div className="flex items-center gap-2">
-            {/* Auswertungen hängen am Zusatzrecht "Buchhaltung" — wer Belege
-                schreiben darf, muss nicht zwangsläufig Zahlen und Export sehen.
-                Der Mahnlauf gehört dazu: Er zeigt dieselben offenen Beträge
-                wie die OP-Liste. */}
-            {hatBuchhaltung && (
-              <>
-                <button onClick={() => navigate('/invoices/mahnlauf')}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-                  <Bell size={15} /> Mahnlauf
-                </button>
-                <button onClick={() => navigate('/invoices/open-items')}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-                  <Wallet size={15} /> Offene Posten
-                </button>
-                <button onClick={() => navigate('/invoices/book')}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-                  <Book size={15} /> Verkaufsbuch
-                </button>
-                <button onClick={() => navigate('/invoices/abschluss')}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-neutral-600 border border-neutral-200 rounded-lg hover:bg-neutral-50">
-                  <CalendarCheck size={15} /> Monatsabschluss
-                </button>
-              </>
-            )}
+            {/* Offene Posten, Mahnlauf, Verkaufsbuch, Monatsabschluss und
+                Kontenplan liegen im Bereich Buchhaltung und werden über den
+                Menüpunkt erreicht. Hier steht nur noch die Belegarbeit. */}
             <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
               className="flex-1 hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
               <Plus size={15} /> Neu erstellen
