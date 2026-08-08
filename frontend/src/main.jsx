@@ -29,6 +29,7 @@ import MonatsabschlussPage from './pages/MonatsabschlussPage'
 import MahnlaufPage from './pages/MahnlaufPage'
 import BuchhaltungPage from './pages/BuchhaltungPage'
 import KontenplanPage from './pages/KontenplanPage'
+import EingangsrechnungenPage from './pages/EingangsrechnungenPage'
 import ProjektplanPage from './pages/ProjektplanPage'
 import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
 import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
@@ -117,6 +118,7 @@ function App() {
                       <Route path="/buchhaltung/verkaufsbuch"    element={<ModuleRoute module="buchhaltung"><InvoiceBookPage /></ModuleRoute>} />
                       <Route path="/buchhaltung/abschluss"       element={<ModuleRoute module="buchhaltung"><MonatsabschlussPage /></ModuleRoute>} />
                       <Route path="/buchhaltung/konten"          element={<ModuleRoute module="buchhaltung"><KontenplanPage /></ModuleRoute>} />
+                      <Route path="/buchhaltung/eingangsrechnungen" element={<ModuleRoute module="buchhaltung"><EingangsrechnungenPage /></ModuleRoute>} />
                       <Route path="/invoices/:id"        element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       <Route path="/invoices/:id/edit"   element={<ModuleRoute module="verkauf"><InvoiceFormPage /></ModuleRoute>} />
                       {/* Feldverwaltung & Einstellungen: nur Admin */}

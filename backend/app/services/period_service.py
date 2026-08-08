@@ -234,19 +234,20 @@ async def paket_bauen(db: Session, jahr: int, monat: int, benutzer) -> tuple:
     Baut das Übergabe-ZIP und protokolliert die Übergabe.
 
     Inhalt:
-      * ``buchungsjournal.csv``   — BMD-Buchungssätze
-      * ``belegjournal.pdf``      — Verkaufsbuch des Monats
-      * ``umsatzsteuer.pdf``      — Aufstellung der Umsätze (Umsatzseite)
-      * ``offene_posten.csv``     — Forderungsstand zum Monatsletzten
-      * ``belege/…pdf``           — jeder ausgestellte Beleg als PDF
-      * ``UEBERGABE.txt``         — Inhaltsverzeichnis mit SHA-256 je Datei
+      * ``buchungsjournal.csv``          — BMD-Buchungssätze (Verkauf)
+      * ``buchungsjournal_eingang.csv``  — Buchungssätze der Eingangsrechnungen
+      * ``belegjournal.pdf``             — Verkaufsbuch des Monats
+      * ``umsatzsteuer.pdf``             — Umsatz- und Vorsteuerseite
+      * ``offene_posten.csv``            — Forderungsstand zum Monatsletzten
+      * ``belege/…pdf``                  — jeder ausgestellte Beleg als PDF
+      * ``UEBERGABE.txt``                — Inhaltsverzeichnis mit SHA-256 je Datei
 
     Gibt ``(zip_bytes, handover)`` zurück.
     """
     import csv as csv_mod
     from app.api.invoice import (get_book_csv, get_book_pdf, get_uva_pdf,
                                  get_open_items, _load_pdf_context)
-    from app.api.accounting import export_bmd
+    from app.api.accounting import export_bmd, export_bmd_eingang
     from app.services.invoice_pdf import generate_pdf
 
     von, bis = monatsgrenzen(jahr, monat)
@@ -278,6 +279,11 @@ async def paket_bauen(db: Session, jahr: int, monat: int, benutzer) -> tuple:
 
     await sammle("buchungsjournal.csv",
                  export_bmd(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
+    # Eingangsseite als eigene Datei — im Verkaufsjournal hießen die Spalten
+    # „Erlöskonto" und „Debitornummer", was für Aufwand und Kreditoren falsch
+    # wäre.
+    await sammle("buchungsjournal_eingang.csv",
+                 export_bmd_eingang(date_from=von, date_to=bis, db=db, _=benutzer))
     await sammle("belegjournal.pdf",
                  get_book_pdf(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
     await sammle("umsatzsteuer.pdf",

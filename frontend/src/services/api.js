@@ -276,6 +276,7 @@ export const invoiceApi = {
 
   // Rechnungsbuch
   book:           (params) => api.get('/invoices/book/list', { params }),
+  // (Eingangsrechnungen siehe purchaseApi weiter unten)
   bookCsv:        (params) => api.get('/invoices/book/csv', { params, responseType: 'blob' }),
 
   // E-Mail-Vorlagen
@@ -314,6 +315,32 @@ export const accountingApi = {
   deleteAccount:      (id)     => api.delete(`/accounting/accounts/${id}`),
   setDefaultErloes:   (id)     => api.post(`/accounting/accounts/${id}/set-default-erloes`),
   exportBmd:          (params) => api.get('/accounting/export/bmd', { params, responseType: 'blob' }),
+  exportBmdEingang:   (params) => api.get('/accounting/export/bmd-eingang', { params, responseType: 'blob' }),
+}
+
+// ── Eingangsrechnungen (Kreditoren) ──────────────────────────────────────────
+export const purchaseApi = {
+  list:        (params) => api.get('/purchase-invoices', { params }),
+  get:         (id) => api.get(`/purchase-invoices/${id}`),
+  create:      (data) => api.post('/purchase-invoices', data),
+  update:      (id, data) => api.put(`/purchase-invoices/${id}`, data),
+  cancel:      (id) => api.post(`/purchase-invoices/${id}/cancel`),
+  remove:      (id) => api.delete(`/purchase-invoices/${id}`),
+
+  listPayments: (id) => api.get(`/purchase-invoices/${id}/payments`),
+  addPayment:   (id, data) => api.post(`/purchase-invoices/${id}/payments`, data),
+  deletePayment: (paymentId) => api.delete(`/purchase-invoices/payments/${paymentId}`),
+
+  openItems:   (params) => api.get('/purchase-invoices/open-items', { params }),
+  vorsteuer:   (params) => api.get('/purchase-invoices/vorsteuer', { params }),
+
+  uploadFile:  (id, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/purchase-invoices/${id}/file`, form,
+                    { headers: { 'Content-Type': undefined } })
+  },
+  fileUrl:     (id) => `/api/purchase-invoices/${id}/file`,
 }
 
 // ── Projekt-Aufzeichnungstool (Projektplanung) ───────────────────────────────

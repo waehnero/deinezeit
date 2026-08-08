@@ -23,6 +23,7 @@
 > | Positionstypen & Gliederung | `feature/verkauf-positionstypen` | ✅ umgesetzt (A-15 + Umsortieren) |
 > | 5 — E-Rechnung & Komfort | — | offen |
 > | 6 — Buchhaltung als eigener Bereich | `feature/buchhaltung-bereich` | ✅ umgesetzt (Menüpunkt, Übersicht, Umzug von OP/Mahnlauf/Verkaufsbuch/Abschluss/Kontenplan) |
+> | 7 — Eingangsrechnungen & Vorsteuer | `feature/eingangsrechnungen` | ✅ umgesetzt (Erfassung, Zahlungen, Kreditoren-OP, Vorsteuer in der UVA, eigenes Buchungsjournal + Tests) |
 >
 > **Entscheidungen aus Etappe 2a** (Oliver): Gesperrt wird alles, was auf dem
 > Beleg gedruckt wird oder die Buchung bestimmt — änderbar bleiben nur interne

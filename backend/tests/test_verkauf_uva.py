@@ -76,13 +76,15 @@ def _zeile(daten, kennzahl):
 
 def _kennzahl_hinweise(daten):
     """
-    Hinweise zu fehlenden Kennzahlen — ohne den Vorsteuer-Hinweis.
+    Hinweise zu fehlenden Kennzahlen — ohne die, die immer dabeistehen.
 
-    Der Vorsteuer-Hinweis steht bewusst IMMER dabei, weil DeineZeit keine
-    Eingangsrechnungen erfasst. „Keine Hinweise" heißt hier also: keine
-    ungeklärte Kennzahl, nicht „gar nichts angemerkt".
+    Zwei Hinweise sind Dauergäste: der Vorbehalt „Aufbereitung, keine
+    Steuerberatung" und die Meldung, dass im Zeitraum keine Eingangsrechnung
+    erfasst ist (in diesen Tests bucht niemand welche). „Keine Hinweise" heißt
+    hier also: keine ungeklärte Kennzahl, nicht „gar nichts angemerkt".
     """
-    return [h for h in daten["hinweise"] if "Vorsteuer" not in h]
+    return [h for h in daten["hinweise"]
+            if "Vorsteuer" not in h and "Aufbereitung" not in h]
 
 
 # ── C-7: Auswertung je Steuersatz ─────────────────────────────────────────────
@@ -209,17 +211,18 @@ def test_kleinunternehmer_ohne_steuer(auth_client, db_session):
     assert Decimal(daten["kz_000"]) == Decimal("1000.00")
 
 
-def test_hinweis_auf_fehlende_vorsteuer_immer(auth_client, db_session):
+def test_hinweis_wenn_keine_eingangsrechnung_erfasst_ist(auth_client, db_session):
     """
-    DeineZeit erfasst keine Eingangsrechnungen. Eine Meldung mit Vorsteuer null
-    würde deutlich zu viel Umsatzsteuer ausweisen — darauf muss die Auswertung
-    ausnahmslos hinweisen, auch wenn sonst alles sauber zugeordnet ist.
+    Seit Etappe 7 enthält die Auswertung die Vorsteuer. Ist im Zeitraum keine
+    Eingangsrechnung erfasst, weist sie null Vorsteuer aus — das kann stimmen,
+    ist aber oft schlicht vergessen. Eine Meldung ohne Vorsteuer bedeutet zu
+    viel Zahllast, deshalb sagt die Auswertung es ausdrücklich.
     """
     inv = _create_invoice(auth_client, _make_kontakt(db_session).id)
     _ausstellen(auth_client, inv["id"])
 
     daten = _uva(auth_client)
-    assert any("Vorsteuer" in h for h in daten["hinweise"])
+    assert any("keine Eingangsrechnung erfasst" in h for h in daten["hinweise"])
 
 
 def test_steuerland_wird_ausgewiesen(auth_client, db_session):
