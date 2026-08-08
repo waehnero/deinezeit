@@ -317,6 +317,92 @@ def _skonto_zeilen(db: Session, date_from, date_to, default_erloes: str,
     return zeilen
 
 
+def _kreditor_konto(db: Session) -> str:
+    """Standard-Kreditorensammelkonto (EKR 3300), sofern im Kontenplan vorhanden."""
+    acc = db.query(AccountingAccount).filter(
+        AccountingAccount.nr == "3300",
+        AccountingAccount.is_active == True,
+    ).first()
+    return acc.nr if acc else "3300"
+
+
+@router.get("/export/bmd-eingang")
+async def export_bmd_eingang(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Buchungsjournal der **Eingangsrechnungen** (CSV, Semikolon-getrennt).
+
+    Bewusst eine eigene Datei und nicht in den Verkaufsexport gemischt: Dort
+    heißen die Spalten „Erlöskonto" und „Debitornummer". Eingangsrechnungen
+    dort einzureihen hieße, Aufwand unter Erlös und Kreditoren unter Debitoren
+    zu stellen — die Kanzlei müsste raten, was gemeint ist.
+
+    Der USt-Code kommt aus derselben gepflegten Tabelle wie beim Verkauf. Ob
+    die Kanzlei für Vorsteuer andere Codes verwendet, weiß nur sie; die Spalte
+    „Steuerart" nennt deshalb zusätzlich den Sachverhalt im Klartext.
+    """
+    from decimal import Decimal
+    from app.models.purchase import PurchaseInvoice, TAX_KIND_LABELS
+
+    q = db.query(PurchaseInvoice).filter(PurchaseInvoice.status != "storniert")
+    if date_from:
+        q = q.filter(PurchaseInvoice.date >= date_from)
+    if date_to:
+        q = q.filter(PurchaseInvoice.date <= date_to)
+    belege = q.order_by(PurchaseInvoice.date.asc()).all()
+
+    steuersaetze = tax_rates_service.get_tax_rates(db)
+    kreditor = _kreditor_konto(db)
+    default_aufwand = "7000"
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "Datum", "Beleg-Nr", "Rechnungs-Nr Lieferant", "Buchungstext",
+        "Aufwandskonto", "Kreditorkonto", "Nettobetrag", "USt-Code",
+        "Steuerbetrag", "Bruttobetrag", "Steuerart", "Vorsteuer abziehbar",
+        "Währung", "Lieferant",
+    ])
+
+    for inv in belege:
+        aufwand = inv.account_nr or default_aufwand
+        text = inv.title or f"Eingangsrechnung {inv.supplier_name or ''}".strip()
+        for zeile in inv.taxes:
+            satz = zeile.tax_rate
+            code = tax_rates_service.ust_code_for(steuersaetze, satz)
+            netto = Decimal(str(zeile.net_amount or 0))
+            steuer = Decimal(str(zeile.tax_amount or 0))
+            writer.writerow([
+                inv.date.strftime("%d.%m.%Y"),
+                inv.internal_number or "",
+                inv.supplier_number or "",
+                text,
+                aufwand,
+                kreditor,
+                f"{float(netto):.2f}".replace(".", ","),
+                code,
+                f"{float(steuer):.2f}".replace(".", ","),
+                f"{float(netto + steuer):.2f}".replace(".", ","),
+                TAX_KIND_LABELS.get(inv.tax_kind, inv.tax_kind),
+                "ja" if inv.vat_deductible else "nein",
+                inv.currency or "EUR",
+                inv.supplier_name or "",
+            ])
+
+    output.seek(0)
+    zeitraum = f"{date_from or 'alle'}_{date_to or 'alle'}"
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition":
+                 f'attachment; filename="bmd_eingang_{zeitraum}.csv"'},
+    )
+
+
 @router.get("/export/bmd")
 async def export_bmd(
     date_from: Optional[date] = Query(None),

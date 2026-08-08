@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { invoiceApi } from '../services/api'
 import PageHeader from '../components/PageHeader'
 import {
-  Calculator, Wallet, Bell, Book, CalendarCheck, BookText, RefreshCw,
+  Calculator, Wallet, Bell, Book, CalendarCheck, BookText, RefreshCw, FileInput,
 } from 'lucide-react'
 
 function fmtEuro(n) {
@@ -23,6 +23,10 @@ function fmtEuro(n) {
  * ist zu spät, und muss ich mahnen?
  */
 const KACHELN = [
+  {
+    to: '/buchhaltung/eingangsrechnungen', icon: FileInput, titel: 'Eingangsrechnungen',
+    text: 'Lieferantenrechnungen erfassen, Originale hinterlegen, Zahlungen führen — Grundlage für den Vorsteuerabzug.',
+  },
   {
     to: '/buchhaltung/offene-posten', icon: Wallet, titel: 'Offene Posten',
     text: 'Ausgestellte Belege, die noch nicht beglichen sind — mit Fälligkeitsstaffel und Summen je Kunde.',

@@ -1197,12 +1197,12 @@ async def get_uva(
             f"stammen aus dem österreichischen Formular U30 und passen dann "
             f"nicht — die Beträge je Steuersatz stimmen, die Zuordnung nicht.")
 
-    # Vollständigkeit: DeineZeit erfasst keine Eingangsrechnungen, damit fehlt
-    # die gesamte Vorsteuerseite der Voranmeldung (KZ 060, 061, 065, 070 ff.).
+    # Der frühere Vermerk „enthält nur die Umsatzseite" ist mit den
+    # Eingangsrechnungen entfallen — die Vorsteuer kommt jetzt weiter unten
+    # dazu. Der Vorbehalt bleibt trotzdem: Aufbereitung, keine Steuerberatung.
     hinweise.append(
-        "Diese Auswertung enthält nur die Umsatzseite. Vorsteuer, Einfuhr"
-        "umsatzsteuer und innergemeinschaftliche Erwerbe erfasst DeineZeit "
-        "nicht — sie sind vor der Abgabe zu ergänzen.")
+        "Diese Auswertung ist eine Aufbereitung aus den erfassten Belegen. "
+        "Sonderfälle gehören vor der Abgabe mit der Steuerberatung geprüft.")
 
     if skonto_gesamt:
         hinweise.append(
@@ -1239,11 +1239,37 @@ async def get_uva(
             "Lieferung oder Bauleistung). Die Zuordnung gehört mit der "
             "Steuerberatung geklärt.")
 
+    # ── Vorsteuerseite aus den Eingangsrechnungen ────────────────────────────
+    #
+    # Bis Etappe 7 endete die Auswertung hier, mit dem Vermerk, dass die
+    # Vorsteuer fehlt. Reverse Charge und innergemeinschaftlicher Erwerb
+    # erzeugen dabei ZWEI Zeilen: die selbst geschuldete Steuer und — bei
+    # Abzugsberechtigung — die gleich hohe Vorsteuer.
+    from app.services import vorsteuer as vorsteuer_service
+    vst = vorsteuer_service.auswertung(db, date_from, date_to)
+
+    for z in vst["zeilen"]:
+        zeilen.append(UvaZeile(
+            kennzahl=z["kennzahl"], bezeichnung=z["bezeichnung"], satz=None,
+            bemessungsgrundlage=z["grundlage"], steuer=z["betrag"],
+            zugeordnet=z["zugeordnet"],
+        ))
+        # Selbst geschuldete Steuer erhöht die Zahllast, Vorsteuer mindert sie.
+        # Die Bemessungsgrundlage der Umsatzseite (KZ 000) bleibt unberührt —
+        # dort gehören nur eigene Umsätze hinein.
+        steuer_gesamt += z["betrag"] if z["art"] == "steuerschuld" else -z["betrag"]
+
+    hinweise.extend(vst["hinweise"])
+    if vst["beleg_anzahl"] == 0:
+        hinweise.append(
+            "Im Zeitraum ist keine Eingangsrechnung erfasst — die Auswertung "
+            "enthält damit keine Vorsteuer. Bitte prüfen, ob das stimmt.")
+
     return UvaResponse(
         date_from=date_from, date_to=date_to,
         country=land, country_supported=land_unterstuetzt, zeilen=zeilen,
         kz_000=kz_gesamt, steuer_gesamt=steuer_gesamt,
-        beleg_anzahl=len(belege), hinweise=hinweise,
+        beleg_anzahl=len(belege) + vst["beleg_anzahl"], hinweise=hinweise,
     )
 
 

@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.12.46',
+    day: '08',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Eingangsrechnungen: Lieferantenrechnungen erfassen, das Original hinterlegen, Zahlungen führen und die offenen Posten der Kreditoren sehen',
+      'Die Umsatzsteuer-Auswertung enthält jetzt die Vorsteuer — Reverse Charge und innergemeinschaftlicher Erwerb erscheinen mit Steuerschuld und Vorsteuerabzug',
+    ],
+    updates: [
+      'Das Übergabepaket an die Steuerberatung enthält ein zweites Buchungsjournal für die Eingangsseite',
+    ],
+  },
+  {
     version: '1.12.45',
     day: '06',
     month: 'August',

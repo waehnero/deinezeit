@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.12.46] – 2026-08-08 – Eingangsrechnungen und Vorsteuer
+
+### Neu
+- Eingangsrechnungen: Lieferantenrechnungen erfassen, das Original hinterlegen, Zahlungen führen und die offenen Posten der Kreditoren sehen
+- Die Umsatzsteuer-Auswertung enthält jetzt die Vorsteuer — Reverse Charge und innergemeinschaftlicher Erwerb erscheinen mit Steuerschuld *und* Vorsteuerabzug
+
+### Aktualisierungen
+- Das Übergabepaket an die Steuerberatung enthält ein zweites Buchungsjournal für die Eingangsseite
+
+---
+
 ## [1.12.45] – 2026-08-06 – Buchhaltung als eigener Bereich
 
 ### Neu
