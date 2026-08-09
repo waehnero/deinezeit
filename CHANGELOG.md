@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.47] – 2026-08-09 – Wiederkehrende Belege vollstaendig
+
+### Neu
+- Wiederkehrende Rechnungen können jetzt auch nur erinnern (Aufgabe statt Beleg) oder den Beleg ausstellen und gleich verschicken — die Auswahl steht im Belegformular unter „Am Stichtag"
+
+---
+
 ## [1.12.46] – 2026-08-08 – Eingangsrechnungen und Vorsteuer
 
 ### Neu
