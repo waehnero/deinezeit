@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.12.49] – 2026-08-09 – Anzahlung, Teil- und Schlussrechnung
+
+### Neu
+- Rechnungen können jetzt als Anzahlung, Teilrechnung oder Schlussrechnung geführt werden. Aus einem Angebot lässt sich mit einem Klick eine Anzahlung über einen Prozentsatz oder einen festen Betrag anfordern
+- Die Schlussrechnung weist die Gesamtleistung aus und zieht alle bereits gestellten Anzahlungen und Teilrechnungen wieder ab — je Steuersatz getrennt, wie es die Umsatzsteuer verlangt
+- Neuer Abschnitt „Abrechnungsvorgang“ am Beleg: zeigt alle Rechnungen eines Bauvorhabens, was davon offen ist und was in der Schlussrechnung abgezogen wird
+
+### Aktualisierungen
+- Beim Umwandeln eines Angebots reisen Positionsbilder und das Erlöskonto der Position jetzt mit — bisher gingen beide verloren
+
+---
+
 ## [1.12.48] – 2026-08-09 – Angebote mit Bindefrist
 
 ### Neu

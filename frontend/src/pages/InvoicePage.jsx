@@ -11,7 +11,8 @@ import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
   MoreHorizontal, RotateCcw, Mail, MailCheck, MailX,
-  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet
+  Paperclip, X as XIcon, HardDrive, Upload, Copy, Repeat, Trash2, Wallet,
+  Layers, FileCheck
 } from 'lucide-react'
 
 function fmtDate(d) {
@@ -25,6 +26,20 @@ function belegNr(inv) {
 function fmtEuro(n) {
   if (n === null || n === undefined) return '—'
   return Number(n).toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
+// Abrechnungsstufe. Technisch bleibt es eine Rechnung — sichtbar muss aber
+// sein, welche: Der Unterschied zwischen Anzahlung und Schlussrechnung ist
+// für den Kunden wie für die Prüfung wesentlich.
+const STUFEN_LABEL = {
+  anzahlung: 'Anzahlung',
+  teil:      'Teilrechnung',
+  schluss:   'Schlussrechnung',
+}
+const STUFEN_FARBE = {
+  anzahlung: 'bg-sky-100 text-sky-700',
+  teil:      'bg-indigo-100 text-indigo-700',
+  schluss:   'bg-emerald-100 text-emerald-700',
 }
 
 const RECURRING_TAB = '__recurring__'
@@ -73,6 +88,7 @@ export default function InvoicePage() {
   const [paidDialog, setPaidDialog] = useState(null)
   const [sendDialog, setSendDialog] = useState(null)
   const [duplicateDialog, setDuplicateDialog] = useState(null)
+  const [advanceDialog, setAdvanceDialog] = useState(null)
   const [selected, setSelected] = useState(new Set())
   const [sentStatus, setSentStatus] = useState({}) // id → 'ok' | 'error'
 
@@ -152,6 +168,45 @@ export default function InvoicePage() {
     if (!window.confirm(`${belegNr(invoice)} wirklich löschen?`)) return
     try {
       await invoiceApi.delete(invoice.id); toast.success('Gelöscht'); load()
+    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
+  }
+
+  /**
+   * Anzahlung anfordern. Die Rückfrage bei abgelaufener Bindefrist gilt hier
+   * genauso wie beim Umwandeln — auch eine Anzahlung stützt sich auf die
+   * Preise des Angebots.
+   */
+  async function handleAdvance(invoice, daten) {
+    const anfordern = (trotzdem) => invoiceApi.createAdvance(invoice.id, daten, trotzdem)
+    try {
+      const res = await anfordern(false)
+      toast.success('Anzahlungsrechnung als Entwurf erstellt')
+      setAdvanceDialog(null)
+      navigate(`/invoices/${res.data.id}/edit`)
+    } catch (e) {
+      if (e.response?.status === 409) {
+        if (!window.confirm(`${e.response.data.detail}\n\nTrotzdem anfordern?`)) return
+        try {
+          const res = await anfordern(true)
+          toast.success('Anzahlungsrechnung als Entwurf erstellt')
+          setAdvanceDialog(null)
+          navigate(`/invoices/${res.data.id}/edit`)
+        } catch (e2) { toast.error(e2.response?.data?.detail || 'Fehler') }
+        return
+      }
+      toast.error(e.response?.data?.detail || 'Fehler')
+    }
+  }
+
+  async function handleFinal(invoice) {
+    try {
+      const res = await invoiceApi.createFinal(invoice.id, {
+        // Die Gesamtleistung stammt aus dem Beleg, aus dem heraus die
+        // Schlussrechnung angestoßen wurde — üblicherweise dem Angebot.
+        from_invoice_id: invoice.id,
+      })
+      toast.success('Schlussrechnung als Entwurf erstellt — bitte die Positionen prüfen')
+      navigate(`/invoices/${res.data.id}/edit`)
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
 
@@ -269,6 +324,12 @@ export default function InvoicePage() {
                         ? inv.number
                         : <span className="text-neutral-400 italic" title="Die Belegnummer wird beim Finalisieren vergeben">Entwurf</span>}
                     </span>
+                    {inv.billing_stage && (
+                      <span className={`ml-1.5 text-[11px] px-1.5 py-0.5 rounded font-sans font-medium ${STUFEN_FARBE[inv.billing_stage] || 'bg-neutral-100 text-neutral-600'}`}
+                        title="Gehört zu einem Abrechnungsvorgang">
+                        {STUFEN_LABEL[inv.billing_stage] || inv.billing_stage}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-neutral-600 hidden md:table-cell whitespace-nowrap">{fmtDate(inv.date)}</td>
                   <td className="px-4 py-3 text-neutral-600 hidden md:table-cell whitespace-nowrap">
@@ -319,6 +380,8 @@ export default function InvoicePage() {
                           onSetStatus={s => { setActionMenu(null); handleSetStatus(inv, s) }}
                           onConvertToAb={() => { setActionMenu(null); handleConvertToAb(inv) }}
                           onConvertToInvoice={() => { setActionMenu(null); handleConvertToInvoice(inv) }}
+                          onAdvance={() => { setActionMenu(null); setAdvanceDialog(inv) }}
+                          onFinal={() => { setActionMenu(null); handleFinal(inv) }}
                           onSend={() => { setActionMenu(null); setSendDialog({ invoices: [inv], mode: 'single' }) }}
                           onCancel={() => { setActionMenu(null); setCancelDialog(inv) }}
                           onPaid={() => { setActionMenu(null); setPaidDialog(inv) }}
@@ -359,11 +422,16 @@ export default function InvoicePage() {
         <DuplicateDialog invoice={duplicateDialog} onClose={() => setDuplicateDialog(null)}
           onConfirm={opts => handleDuplicate(duplicateDialog, opts)} />
       )}
+      {advanceDialog && (
+        <AdvanceDialog invoice={advanceDialog} onClose={() => setAdvanceDialog(null)}
+          onConfirm={daten => handleAdvance(advanceDialog, daten)} />
+      )}
     </div>
   )
 }
 
-function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, onConvertToInvoice, onSend, onCancel, onPaid, onDuplicate, onDelete, onEdit }) {
+function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, onConvertToInvoice,
+                      onAdvance, onFinal, onSend, onCancel, onPaid, onDuplicate, onDelete, onEdit }) {
   const menuRef = useRef(null)
   const MENU_WIDTH = 224 // w-56 = 14rem = 224px
 
@@ -444,6 +512,20 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
       {(isAn || isAb) && ['entwurf', 'gesendet', 'angenommen', 'offen'].includes(status) && (
         <button onClick={onConvertToInvoice} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-primary-600">
           <RotateCcw size={14} /> → Rechnung umwandeln
+        </button>
+      )}
+      {/* Anzahlung nur aus einem Vorbeleg: Dort steht die Auftragssumme,
+          auf die sich der Prozentsatz bezieht. */}
+      {(isAn || isAb) && ['entwurf', 'gesendet', 'angenommen', 'offen'].includes(status) && (
+        <button onClick={onAdvance} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-sky-600">
+          <Layers size={14} /> Anzahlung anfordern…
+        </button>
+      )}
+      {/* Die Schlussrechnung setzt einen Vorgang mit gestellten Anzahlungen
+          voraus — ohne Strang gibt es nichts abzuziehen. */}
+      {invoice.chain_id && invoice.billing_stage !== 'schluss' && status !== 'storniert' && (
+        <button onClick={onFinal} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-emerald-600">
+          <FileCheck size={14} /> Schlussrechnung erstellen
         </button>
       )}
 
@@ -690,6 +772,111 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
     </div>
   )
 }
+
+/**
+ * Anzahlung anfordern.
+ *
+ * Prozentsatz ODER Betrag — nie beides. Der umgerechnete Betrag steht sofort
+ * daneben, damit niemand blind auf einen Prozentsatz klickt: Was der Kunde
+ * bekommt, ist der Betrag.
+ */
+function AdvanceDialog({ invoice, onClose, onConfirm }) {
+  const [modus, setModus] = useState('percent')
+  const [prozent, setProzent] = useState('30')
+  const [betrag, setBetrag] = useState('')
+  const [text, setText] = useState('')
+  const [faellig, setFaellig] = useState('')
+
+  const grundlage = Number(invoice.subtotal ?? invoice.total ?? 0)
+  const vorschau = modus === 'percent'
+    ? (grundlage * (Number(prozent) || 0)) / 100
+    : (Number(betrag) || 0)
+  const zuViel = grundlage > 0 && vorschau > grundlage
+  const gueltig = vorschau > 0 && !zuViel
+
+  const senden = () => onConfirm({
+    percent: modus === 'percent' ? Number(prozent) : null,
+    amount:  modus === 'amount'  ? Number(betrag)  : null,
+    description: text || null,
+    due_date: faellig || null,
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 sheet-safe">
+      <div className="max-h-full overflow-y-auto bg-surface rounded-xl shadow-xl p-6 w-full max-w-md">
+        <h2 className="text-base font-semibold mb-1">Anzahlung anfordern</h2>
+        <p className="text-sm text-neutral-500 mb-4">
+          {belegNr(invoice)} — Auftragssumme netto {fmtEuro(grundlage)}
+        </p>
+
+        <div className="flex gap-1 bg-neutral-100 p-1 rounded-lg mb-4 w-fit">
+          {[['percent', 'Prozentsatz'], ['amount', 'Fester Betrag']].map(([k, label]) => (
+            <button key={k} onClick={() => setModus(k)}
+              className={`px-3 py-1.5 text-sm rounded-md ${modus === k ? 'bg-surface shadow-sm font-medium' : 'text-neutral-600'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {modus === 'percent' ? (
+          <div className="mb-4">
+            <label className="block text-sm text-neutral-600 mb-1">Anteil der Auftragssumme</label>
+            <div className="flex items-center gap-2">
+              <input type="number" min="0" max="100" step="1" value={prozent}
+                onChange={e => setProzent(e.target.value)}
+                className="w-28 px-3 py-2 border rounded-lg" />
+              <span className="text-neutral-500">%</span>
+              <span className="ml-auto text-sm font-medium text-neutral-800">= {fmtEuro(vorschau)} netto</span>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-4">
+            <label className="block text-sm text-neutral-600 mb-1">Nettobetrag</label>
+            <input type="number" min="0" step="0.01" value={betrag}
+              onChange={e => setBetrag(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg" placeholder="0,00" />
+          </div>
+        )}
+
+        <div className="mb-4">
+          <label className="block text-sm text-neutral-600 mb-1">Positionstext (optional)</label>
+          <input value={text} onChange={e => setText(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg"
+            placeholder={modus === 'percent'
+              ? `Anzahlung ${prozent || 0} % auf ${belegNr(invoice)}`
+              : `Anzahlung auf ${belegNr(invoice)}`} />
+        </div>
+
+        <div className="mb-5">
+          <label className="block text-sm text-neutral-600 mb-1">Zahlungsziel (optional)</label>
+          <input type="date" value={faellig} onChange={e => setFaellig(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg" />
+        </div>
+
+        {zuViel && (
+          <p className="mb-4 text-sm text-red-600">
+            Die Anzahlung übersteigt die Auftragssumme.
+          </p>
+        )}
+        <p className="mb-5 text-xs text-neutral-500">
+          Es entsteht ein Entwurf. Die Umsatzsteuer wird bereits mit dieser
+          Rechnung fällig und später in der Schlussrechnung wieder abgezogen.
+        </p>
+
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-lg">
+            Abbrechen
+          </button>
+          <button onClick={senden} disabled={!gueltig}
+            className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-40">
+            Anzahlungsrechnung erstellen
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 function DuplicateDialog({ invoice, onClose, onConfirm }) {
   const [opts, setOpts] = useState({ positions: true, texts: true, contact: true, attachments: false })

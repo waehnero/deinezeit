@@ -27,6 +27,7 @@ from app.services import positionen as positionen_service
 from app.services import skonto as skonto_service
 from app.services import dunning as dunning_service
 from app.services import angebot as angebot_service
+from app.services import anzahlung as anzahlung_service
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -39,6 +40,8 @@ from app.schemas.invoice import (
     DunningCandidate, DunningRunResponse, DunningCreateRequest, DunningEntry,
     DunningBlockRequest, DunningBatchRequest, DunningLevelConfig,
     SkontoVorschau, SkontoZeile, SkontoRequest,
+    AnzahlungRequest, SchlussrechnungRequest,
+    AbzugZeile, StrangBeleg, StrangResponse,
 )
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
@@ -393,6 +396,17 @@ def _finalize(db: Session, invoice: Invoice) -> bool:
                     f"§ 11 Abs. 1 Z 2 UStG Pflichtangabe — ohne sie verliert ein "
                     f"unternehmerischer Empfänger den Vorsteuerabzug.",
                user_email=invoice.updated_by)
+
+    # Schlussrechnung: Zieht sie mehr ab, als sie an Leistung ausweist, wurde
+    # sie vermutlich mit der Restleistung statt der Gesamtleistung gefüllt.
+    # Ein Hinweis, keine Sperre — es gibt Fälle, in denen der Kunde tatsächlich
+    # etwas zurückbekommt, und das darf die Software nicht verbieten.
+    if invoice.billing_stage == "schluss" and invoice.chain_id:
+        abzug = anzahlung_service.abzug_je_satz(
+            anzahlung_service.abzugsfaehige_belege(db, invoice.chain_id,
+                                                   ausser_id=invoice.id))
+        for hinweis in anzahlung_service.pruefe_abzug(invoice, abzug):
+            _audit(db, invoice, "hinweis", note=hinweis, user_email=invoice.updated_by)
     return neue_nummer
 
 
@@ -432,6 +446,23 @@ GESPERRTE_FELDER = {
 }
 # Weiterhin änderbar, weil nicht Bestandteil des gedruckten Belegs:
 #   notes (interne Notiz), project_id (Zuordnung), Anhänge und Verträge.
+
+
+def _pruefe_stufe(doc_type: str, stufe: str) -> None:
+    """
+    Die Abrechnungsstufe gibt es nur an einer Rechnung.
+
+    Ein Angebot mit der Stufe „Schlussrechnung" wäre sinnlos, würde aber in
+    der Abzugsrechnung mitzählen und dort echten Schaden anrichten.
+    """
+    if not stufe:
+        return
+    if stufe not in anzahlung_service.STUFEN:
+        raise HTTPException(400, f"Unbekannte Abrechnungsstufe: {stufe}. "
+                                 f"Erlaubt: {', '.join(anzahlung_service.STUFEN)}")
+    if doc_type != "rechnung":
+        raise HTTPException(400, "Anzahlung, Teil- und Schlussrechnung gibt es nur "
+                                 "als Rechnung")
 
 
 def _verwaiste_bilder_entfernen(db: Session, kandidaten: dict) -> int:
@@ -614,6 +645,8 @@ async def list_invoices(
             "valid_until": inv.valid_until,
             # Abgeleitet, nicht gespeichert — siehe services/angebot.py
             "expired": angebot_service.ist_abgelaufen(inv),
+            "billing_stage": inv.billing_stage,
+            "chain_id": inv.chain_id,
         })
     return result
 
@@ -630,6 +663,8 @@ async def create_invoice(
     if body.date and period_service.ist_gesperrt(db, body.date):
         period_service.pruefe_periode_offen(db, body.date, "angelegt")
 
+    _pruefe_stufe(body.doc_type, body.billing_stage)
+
     # Bewusst OHNE Nummer: Der Beleg entsteht als Entwurf, die Nummer fällt
     # erst beim Finalisieren (siehe _ensure_number).
     data = body.model_dump(exclude={"positions"})
@@ -644,6 +679,12 @@ async def create_invoice(
     invoice = Invoice(**data)
     db.add(invoice)
     db.flush()
+
+    # Eine Rechnung mit Abrechnungsstufe, die keinem Strang zugeordnet wurde,
+    # eröffnet einen eigenen. Sonst stünde sie allein da und die spätere
+    # Schlussrechnung fände sie nicht.
+    if invoice.billing_stage and not invoice.chain_id:
+        anzahlung_service.strang_anlegen(db, invoice)
 
     for i, pos_data in enumerate(body.positions):
         pos = InvoicePosition(invoice_id=invoice.id, **pos_data.model_dump())
@@ -2137,10 +2178,15 @@ async def update_invoice(
         return inv
 
     # ── Entwurf: frei bearbeitbar ────────────────────────────────────────────
+    _pruefe_stufe(inv.doc_type, body.billing_stage)
     update_data = body.model_dump(exclude={"positions"})
     for k, v in update_data.items():
         setattr(inv, k, v)
     inv.updated_by = current_user.email
+    # Wer eine Rechnung nachträglich zur Anzahlung erklärt, eröffnet damit
+    # einen Strang — sonst fände die spätere Schlussrechnung sie nicht.
+    if inv.billing_stage and not inv.chain_id:
+        anzahlung_service.strang_anlegen(db, inv)
 
     # Positionen ersetzen. Vorher merken, welche Bilder daran hingen — beim
     # Speichern werden alle Positionen gelöscht und neu angelegt, und ein Bild,
@@ -2149,11 +2195,28 @@ async def update_invoice(
 
     db.query(InvoicePosition).filter(InvoicePosition.invoice_id == invoice_id).delete()
     for i, pos_data in enumerate(body.positions):
+        # Der Anzahlungsabzug wird nicht vom Formular übernommen, sondern
+        # gleich darunter neu gerechnet: Er hängt an den bereits gestellten
+        # Rechnungen, nicht an dem, was im Browser stand. Käme in der
+        # Zwischenzeit eine weitere Teilrechnung dazu, wäre der Abzug aus dem
+        # Formular veraltet — und niemand würde es merken.
+        if (pos_data.pos_type or "item") == positionen_service.ANZAHLUNGSABZUG:
+            continue
         pos = InvoicePosition(invoice_id=inv.id, **pos_data.model_dump())
         pos.sort_order = i
         db.add(pos)
 
     db.flush()
+    if inv.billing_stage == "schluss" and inv.chain_id:
+        # Erst auffrischen: Die Positionen wurden per Massenlöschung ersetzt,
+        # die Beziehung am Beleg zeigt sonst noch den alten Stand — und die
+        # Abzugszeile bekäme eine Sortierung, die schon vergeben ist.
+        db.refresh(inv)
+        anzahlung_service.zeilen_anhaengen(
+            db, inv,
+            anzahlung_service.abzugsfaehige_belege(db, inv.chain_id, ausser_id=inv.id))
+        db.flush()
+
     _verwaiste_bilder_entfernen(db, alte_bilder)
     db.refresh(inv)
     _calc_totals(inv)
@@ -2554,6 +2617,294 @@ async def convert_to_invoice(
     return invoice
 
 
+# ── Abrechnung in Stufen (C-10) ───────────────────────────────────────────────
+
+def _positionen_kopieren(db: Session, ziel: Invoice, quelle: Invoice) -> None:
+    """
+    Übernimmt die Positionen eines Belegs vollständig.
+
+    Vollständig heißt hier auch: mit Bild und Erlöskonto. Beim Umwandeln eines
+    Angebots wurden beide bisher stillschweigend fallengelassen — aus einem
+    bebilderten Angebot wurde eine Rechnung ohne Bilder, und das gepflegte
+    Erlöskonto der Position ging im Buchhaltungs-Export verloren.
+
+    Der Anzahlungsabzug wird NICHT mitkopiert: Er gehört zu genau der
+    Schlussrechnung, in der er entstanden ist.
+    """
+    for orig in quelle.positions:
+        if positionen_service.typ(orig) == positionen_service.ANZAHLUNGSABZUG:
+            continue
+        db.add(InvoicePosition(
+            invoice_id=ziel.id,
+            sort_order=orig.sort_order,
+            pos_type=orig.pos_type,
+            description=orig.description,
+            detail=orig.detail,
+            quantity=orig.quantity,
+            unit=orig.unit,
+            unit_price=orig.unit_price,
+            discount_pct=orig.discount_pct,
+            tax_rate=orig.tax_rate,
+            account_nr=orig.account_nr,
+            image_key=orig.image_key,
+            image_size=orig.image_size,
+            image_provider=orig.image_provider,
+        ))
+
+
+@router.get("/{invoice_id}/chain", response_model=StrangResponse)
+async def get_chain(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+    __=Depends(require_module("verkauf")),
+):
+    """
+    Der Abrechnungsstrang eines Belegs: alle Belege des Bauvorhabens und der
+    Stand des Abzugs.
+
+    Auch für Belege ohne Strang aufrufbar — dann kommt eine leere Antwort
+    zurück statt eines Fehlers. Die Oberfläche kann den Abschnitt so ohne
+    Fallunterscheidung einblenden.
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    if not inv.chain_id:
+        return StrangResponse(chain_id=None)
+
+    chain_id = inv.chain_id
+    abzugsfaehig = {b.id for b in anzahlung_service.abzugsfaehige_belege(db, chain_id)}
+
+    belege = []
+    for b in anzahlung_service.strang_belege(db, chain_id):
+        _, offen, _ = _zahlstand(b)
+        belege.append(StrangBeleg(
+            id=b.id, doc_type=b.doc_type, number=b.number,
+            billing_stage=b.billing_stage,
+            stage_label=anzahlung_service.bezeichnung(b.billing_stage)
+            if b.doc_type == "rechnung" else DOC_TYPE_LABELS_DE.get(b.doc_type, b.doc_type),
+            date=b.date, title=b.title,
+            subtotal=b.subtotal, total=b.total, status=b.status,
+            open_amount=offen if b.status not in ("entwurf", "storniert") else Decimal("0"),
+            deducted=b.id in abzugsfaehig,
+        ))
+
+    abzug = anzahlung_service.abzug_je_satz(
+        anzahlung_service.abzugsfaehige_belege(db, chain_id))
+    zeilen, netto_gesamt, brutto_gesamt = [], Decimal("0"), Decimal("0")
+    for satz in sorted(abzug, key=lambda s: (s is None, -(s or 0))):
+        netto = abzug[satz]
+        steuer = (netto * satz / 100).quantize(Decimal("0.01")) if satz else Decimal("0")
+        zeilen.append(AbzugZeile(tax_rate=satz, net_amount=netto, tax_amount=steuer))
+        netto_gesamt += netto
+        brutto_gesamt += netto + steuer
+
+    return StrangResponse(
+        chain_id=chain_id, belege=belege, abzug=zeilen,
+        abzug_netto=netto_gesamt, abzug_brutto=brutto_gesamt,
+        hat_schlussrechnung=anzahlung_service.hat_schlussrechnung(db, chain_id),
+    )
+
+
+@router.post("/{invoice_id}/anzahlung", response_model=InvoiceResponse)
+async def create_advance(
+    invoice_id: UUID,
+    body: AnzahlungRequest,
+    trotz_ablauf: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _=Depends(require_module("verkauf")),
+):
+    """
+    Fordert aus einem Angebot oder einer Auftragsbestätigung eine Anzahlung an.
+
+    Die Anzahlungsrechnung bekommt **eine** Position: den angeforderten Betrag
+    zum Steuersatz des Vorbelegs. Sie die Positionen des Angebots anteilig
+    nachbilden zu lassen wäre eine Scheingenauigkeit — angezahlt wird auf die
+    Auftragssumme, nicht auf einzelne Leistungen.
+
+    Der Steuersatz kommt aus dem Vorbeleg. Sind dort mehrere im Spiel, wird
+    abgebrochen statt geraten: Welcher Satz für eine Anzahlung auf einen
+    gemischten Auftrag gilt, ist eine steuerliche Frage.
+    """
+    quelle = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not quelle:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    if quelle.doc_type not in ("angebot", "auftragsbestaetigung"):
+        raise HTTPException(400, "Eine Anzahlung wird aus einem Angebot oder einer "
+                                 "Auftragsbestätigung angefordert")
+    _pruefe_gueltigkeit(quelle, trotz_ablauf)
+
+    if body.percent is None and body.amount is None:
+        raise HTTPException(400, "Bitte einen Prozentsatz oder einen Betrag angeben")
+    if body.percent is not None and body.amount is not None:
+        raise HTTPException(400, "Bitte entweder einen Prozentsatz oder einen Betrag "
+                                 "angeben, nicht beides")
+
+    saetze = {satz for satz, netto in anzahlung_service.netto_je_satz(quelle).items() if netto}
+    if len(saetze) > 1:
+        raise HTTPException(
+            400, "Der Auftrag enthält mehrere Steuersätze. Eine Anzahlung darauf "
+                 "muss von Hand erfasst werden — welcher Satz gilt, ist eine "
+                 "steuerliche Entscheidung.")
+    satz = saetze.pop() if saetze else None
+
+    grundlage = Decimal(str(quelle.subtotal or 0))
+    if body.percent is not None:
+        if body.percent <= 0 or body.percent > 100:
+            raise HTTPException(400, "Der Prozentsatz muss zwischen 0 und 100 liegen")
+        betrag = (grundlage * body.percent / 100).quantize(Decimal("0.01"))
+    else:
+        betrag = Decimal(str(body.amount)).quantize(Decimal("0.01"))
+    if betrag <= 0:
+        raise HTTPException(400, "Der Anzahlungsbetrag muss größer als null sein")
+    if betrag > grundlage > 0:
+        raise HTTPException(400, f"Die Anzahlung ({betrag:.2f}) übersteigt die "
+                                 f"Auftragssumme ({grundlage:.2f})")
+
+    belegdatum = body.date or datetime.now().date()
+    if period_service.ist_gesperrt(db, belegdatum):
+        period_service.pruefe_periode_offen(db, belegdatum, "angelegt")
+
+    # Das Angebot eröffnet den Strang, sofern es noch keinem angehört.
+    anzahlung_service.strang_anlegen(db, quelle)
+
+    rechnung = Invoice(
+        doc_type="rechnung",
+        billing_stage="anzahlung",
+        chain_id=quelle.chain_id,
+        advance_percent=body.percent,
+        contact_id=quelle.contact_id,
+        project_id=quelle.project_id,
+        related_invoice_id=quelle.id,
+        title=quelle.title,
+        date=belegdatum,
+        due_date=body.due_date,
+        delivery_date=quelle.delivery_date,
+        delivery_date_to=quelle.delivery_date_to,
+        tax_mode=quelle.tax_mode,
+        currency=quelle.currency,
+        template_id=quelle.template_id,
+        intro_text=quelle.intro_text,
+        status="entwurf",
+        created_by=current_user.email,
+        updated_by=current_user.email,
+    )
+    db.add(rechnung)
+    db.flush()
+
+    if body.description:
+        text = body.description
+    elif body.percent is not None:
+        bezug = f"Angebot {quelle.number}" if quelle.number else "den Auftrag"
+        text = f"Anzahlung {body.percent:g} % auf {bezug}"
+    else:
+        bezug = f"Angebot {quelle.number}" if quelle.number else "den Auftrag"
+        text = f"Anzahlung auf {bezug}"
+
+    db.add(InvoicePosition(
+        invoice_id=rechnung.id, sort_order=0, pos_type="item",
+        description=text, quantity=Decimal("1"), unit_price=betrag, tax_rate=satz,
+    ))
+
+    db.flush()
+    db.refresh(rechnung)
+    _calc_totals(rechnung)
+    db.commit()
+    db.refresh(rechnung)
+    return rechnung
+
+
+@router.post("/{invoice_id}/schlussrechnung", response_model=InvoiceResponse)
+async def create_final_invoice(
+    invoice_id: UUID,
+    body: SchlussrechnungRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _=Depends(require_module("verkauf")),
+):
+    """
+    Erzeugt die Schlussrechnung eines Strangs.
+
+    Sie enthält die **Gesamtleistung** und zieht davon jede bereits gestellte
+    Anzahlungs- und Teilrechnung wieder ab — je Steuersatz eine eigene Zeile.
+    Abgezogen wird, was fakturiert wurde, nicht was bezahlt wurde: Die
+    Umsatzsteuer entsteht mit der Rechnung. Ein offener Betrag bleibt als
+    eigener offener Posten stehen und wird dort gemahnt.
+
+    ``invoice_id`` ist irgendein Beleg des Strangs; die Positionen der
+    Gesamtleistung kommen aus ``from_invoice_id`` (üblicherweise dem Angebot)
+    oder, wenn nichts angegeben ist, aus dem Kopf des Strangs.
+    """
+    beleg = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not beleg:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    anzahlung_service.strang_anlegen(db, beleg)
+    chain_id = beleg.chain_id
+
+    if anzahlung_service.hat_schlussrechnung(db, chain_id):
+        raise HTTPException(
+            409, "Zu diesem Vorgang gibt es bereits eine Schlussrechnung. Eine "
+                 "zweite würde dieselben Anzahlungen ein weiteres Mal abziehen.")
+
+    abzuziehen = anzahlung_service.abzugsfaehige_belege(db, chain_id)
+    if not abzuziehen:
+        raise HTTPException(
+            400, "Zu diesem Vorgang gibt es keine gestellte Anzahlungs- oder "
+                 "Teilrechnung. Eine Schlussrechnung ohne Abzug ist eine "
+                 "gewöhnliche Rechnung.")
+
+    quelle = beleg
+    if body.from_invoice_id:
+        quelle = db.query(Invoice).filter(Invoice.id == body.from_invoice_id).first()
+        if not quelle:
+            raise HTTPException(404, "Vorlagebeleg nicht gefunden")
+        if anzahlung_service.strang_kopf(quelle) != chain_id:
+            raise HTTPException(400, "Der Vorlagebeleg gehört zu einem anderen Vorgang")
+
+    belegdatum = body.date or datetime.now().date()
+    if period_service.ist_gesperrt(db, belegdatum):
+        period_service.pruefe_periode_offen(db, belegdatum, "angelegt")
+
+    schluss = Invoice(
+        doc_type="rechnung",
+        billing_stage="schluss",
+        chain_id=chain_id,
+        contact_id=quelle.contact_id,
+        project_id=quelle.project_id,
+        related_invoice_id=quelle.id,
+        title=quelle.title,
+        date=belegdatum,
+        due_date=body.due_date,
+        delivery_date=quelle.delivery_date,
+        delivery_date_to=quelle.delivery_date_to,
+        tax_mode=quelle.tax_mode,
+        currency=quelle.currency,
+        template_id=quelle.template_id,
+        intro_text=quelle.intro_text,
+        outro_text=quelle.outro_text,
+        status="entwurf",
+        created_by=current_user.email,
+        updated_by=current_user.email,
+    )
+    db.add(schluss)
+    db.flush()
+
+    _positionen_kopieren(db, schluss, quelle)
+    db.flush()
+    db.refresh(schluss)
+
+    anzahlung_service.zeilen_anhaengen(db, schluss, abzuziehen)
+    db.flush()
+    db.refresh(schluss)
+    _calc_totals(schluss)
+    db.commit()
+    db.refresh(schluss)
+    return schluss
+
+
 @router.post("/{invoice_id}/duplicate", response_model=InvoiceResponse)
 async def duplicate_invoice(
     invoice_id: UUID,
@@ -2817,7 +3168,11 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
     from app.models.attachment import Attachment
     from app.services import storage_service
 
-    doc_label    = DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type)
+    # Die Abrechnungsstufe schlägt die Belegart — im Betreff der E-Mail soll
+    # „Anzahlungsrechnung" stehen, nicht bloß „Rechnung".
+    doc_label    = (anzahlung_service.bezeichnung(inv.billing_stage)
+                    if inv.doc_type == "rechnung" and inv.billing_stage
+                    else DOC_TYPE_LABELS_DE.get(inv.doc_type, inv.doc_type))
     company_name = settings_d.get("company_name", "DeineZeit")
 
     # Pflichtangaben VOR dem Versand prüfen — sonst geht der Beleg raus und

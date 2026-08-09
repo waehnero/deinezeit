@@ -4,6 +4,20 @@
  */
 export const changelog = [
   {
+    version: '1.12.49',
+    day: '09',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Rechnungen können jetzt als Anzahlung, Teilrechnung oder Schlussrechnung geführt werden. Aus einem Angebot lässt sich mit einem Klick eine Anzahlung über einen Prozentsatz oder einen festen Betrag anfordern',
+      'Die Schlussrechnung weist die Gesamtleistung aus und zieht alle bereits gestellten Anzahlungen und Teilrechnungen wieder ab — je Steuersatz getrennt, wie es die Umsatzsteuer verlangt',
+      'Neuer Abschnitt „Abrechnungsvorgang“ am Beleg: zeigt alle Rechnungen eines Bauvorhabens, was davon offen ist und was in der Schlussrechnung abgezogen wird',
+    ],
+    updates: [
+      'Beim Umwandeln eines Angebots reisen Positionsbilder und das Erlöskonto der Position jetzt mit — bisher gingen beide verloren',
+    ],
+  },
+  {
     version: '1.12.48',
     day: '09',
     month: 'August',

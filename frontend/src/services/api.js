@@ -233,6 +233,13 @@ export const invoiceApi = {
   convertToInvoice: (id, trotzAblauf = false) =>
     api.post(`/invoices/${id}/convert-to-invoice`, null, { params: { trotz_ablauf: trotzAblauf } }),
   duplicate:        (id, opts) => api.post(`/invoices/${id}/duplicate`, opts || {}),
+
+  // Abrechnung in Stufen (Anzahlung → Teil → Schluss)
+  chain:            (id) => api.get(`/invoices/${id}/chain`),
+  // Anzahlung aus Angebot/AB: entweder percent ODER amount
+  createAdvance:    (id, data, trotzAblauf = false) =>
+    api.post(`/invoices/${id}/anzahlung`, data, { params: { trotz_ablauf: trotzAblauf } }),
+  createFinal:      (id, data) => api.post(`/invoices/${id}/schlussrechnung`, data || {}),
   uploadContract:   (id, file) => {
     const form = new FormData()
     form.append('file', file)
