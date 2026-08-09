@@ -82,20 +82,23 @@ def speicher_schluessel(endung: str) -> str:
     return f"belege/positionsbilder/{uuid.uuid4().hex}.{endung}"
 
 
-def als_datenurl(db, image_key: str) -> str | None:
+def als_datenurl(db, image_key: str, provider: str = None) -> str | None:
     """
     Lädt das Bild und gibt es als Data-URL zurück.
 
     Für die PDF-Erzeugung: WeasyPrint müsste eine Datei-URL sonst selbst
     auflösen können — im Container hinter dem Objektspeicher geht das nicht.
     Fehler werden geschluckt, ein fehlendes Bild darf keinen Beleg verhindern.
+
+    ``provider`` ist der Speicher, in dem die Datei liegt. Ohne ihn wird der
+    aktive genommen — im Mischbetrieb also womöglich der falsche.
     """
     if not image_key:
         return None
     import base64
     from app.services import storage_service
     try:
-        daten, mime = storage_service.download_file(image_key, db=db)
+        daten, mime = storage_service.download_file(image_key, db=db, backend=provider)
         b64 = base64.b64encode(daten).decode("ascii")
         return f"data:{mime or 'image/jpeg'};base64,{b64}"
     except Exception as e:

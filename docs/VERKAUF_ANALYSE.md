@@ -25,6 +25,21 @@
 > | 6 — Buchhaltung als eigener Bereich | `feature/buchhaltung-bereich` | ✅ umgesetzt (Menüpunkt, Übersicht, Umzug von OP/Mahnlauf/Verkaufsbuch/Abschluss/Kontenplan) |
 > | 7 — Eingangsrechnungen & Vorsteuer | `feature/eingangsrechnungen` | ✅ umgesetzt (Erfassung, Zahlungen, Kreditoren-OP, Vorsteuer in der UVA, eigenes Buchungsjournal + Tests) |
 > | 8 — Wiederkehrende Belege vollständig | `feature/wiederkehrend-vervollstaendigen` | ✅ umgesetzt (A-17c: erinnern per Aufgabe, ausstellen und versenden + Tests) |
+> | 9 — Angebotsgültigkeit & Bilder-Waisen | `feature/angebot-gueltigkeit` | ✅ umgesetzt (A-17h + Positionsbilder werden beim Ersetzen mitgelöscht, Speicher je Datei) — **damit ist Teil A vollständig** |
+>
+> **Nachtrag zu Etappe 9 (Oliver):** „Es muss nicht immer MinIO sein, es kann
+> auch OneDrive sein." Zutreffend — und der Fund reichte weiter als der
+> Aufräumlauf. Positionsbilder (Etappe 9) und die Originale der
+> Eingangsrechnungen (Etappe 7) benutzten den **gerade aktiven** Speicher zum
+> Hochladen, Abrufen UND Löschen. Nach einem Anbieterwechsel wären ältere
+> Dateien in Vorschau und PDF unauffindbar gewesen — nicht bloß unlöschbar.
+> Migration 0051 merkt sich den Anbieter deshalb **je Datei**
+> (`invoice_positions.image_provider`, `purchase_invoices.file_provider`),
+> analog zu `attachments.storage_provider` aus Migration 0039. `NULL` heißt
+> weiter „unbekannt, nimm den aktiven"; ein Backfill mit dem heute aktiven
+> Anbieter wäre geraten und bei bereits erfolgtem Wechsel schlicht falsch.
+> Offen und bewusst ausgeklammert: Die Postecke legt Fotos und Videos nach
+> demselben Muster ohne Anbieter ab — gehört in den Postecke-Branch.
 >
 > **Entscheidungen aus Etappe 2a** (Oliver): Gesperrt wird alles, was auf dem
 > Beleg gedruckt wird oder die Buchung bestimmt — änderbar bleiben nur interne

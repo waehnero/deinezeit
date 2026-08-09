@@ -20,6 +20,7 @@ class InvoicePositionBase(BaseModel):
     account_nr: Optional[str] = None        # Erlöskonto, leer = Standard-Erlöskonto
     image_key: Optional[str] = None         # Objektspeicher-Schlüssel des Bildes
     image_size: Optional[str] = None        # klein | mittel | gross
+    image_provider: Optional[str] = None    # Speicher der Datei; leer = aktiver
     article_id: Optional[UUID] = None
     time_entry_id: Optional[UUID] = None
 
@@ -75,6 +76,7 @@ class InvoiceCreate(BaseModel):
     due_date: Optional[date] = None
     delivery_date: Optional[date] = None
     delivery_date_to: Optional[date] = None
+    valid_until: Optional[date] = None      # Bindefrist (Angebot)
     reference: Optional[str] = None
     intro_text: Optional[str] = None
     outro_text: Optional[str] = None
@@ -109,6 +111,7 @@ class InvoiceUpdate(BaseModel):
     due_date: Optional[date] = None
     delivery_date: Optional[date] = None
     delivery_date_to: Optional[date] = None
+    valid_until: Optional[date] = None      # Bindefrist (Angebot)
     reference: Optional[str] = None
     intro_text: Optional[str] = None
     outro_text: Optional[str] = None
@@ -142,6 +145,7 @@ class InvoiceResponse(BaseModel):
     due_date: Optional[date] = None
     delivery_date: Optional[date] = None
     delivery_date_to: Optional[date] = None
+    valid_until: Optional[date] = None      # Bindefrist (Angebot)
     reference: Optional[str] = None
     intro_text: Optional[str] = None
     outro_text: Optional[str] = None
@@ -193,6 +197,8 @@ class InvoiceListItem(BaseModel):
     created_at: datetime
     is_recurring_template: bool = False
     recurring_source_id: Optional[UUID] = None    # gesetzt = automatisch aus Vorlage erzeugt
+    valid_until: Optional[date] = None            # Bindefrist (Angebot)
+    expired: bool = False                         # abgeleitet, kein Status
 
     class Config:
         from_attributes = True

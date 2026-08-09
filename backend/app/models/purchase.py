@@ -76,6 +76,9 @@ class PurchaseInvoice(Base):
     file_key = Column(String(500), nullable=True)
     file_name = Column(String(300), nullable=True)
     file_mimetype = Column(String(100), nullable=True)
+    # Speicher, in dem das Original liegt — im Mischbetrieb unverzichtbar.
+    # NULL = unbekannt, dann gilt der aktive Speicher.
+    file_provider = Column(String(20), nullable=True)
 
     created_by = Column(String(200), nullable=True)
     updated_by = Column(String(200), nullable=True)

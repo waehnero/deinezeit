@@ -48,6 +48,11 @@ class Invoice(Base):
     # und Wartungsverträge.
     delivery_date = Column(Date, nullable=True)
     delivery_date_to = Column(Date, nullable=True)
+    # Bindefrist des Angebots. Ob es abgelaufen ist, wird aus dem Datum
+    # abgeleitet und nicht als Status gespeichert: „abgelaufen" und „abgelehnt"
+    # sind zwei verschiedene Dinge, und der Unterschied wird für die
+    # Angebotsverfolgung gebraucht.
+    valid_until = Column(Date, nullable=True)
     reference = Column(String(200), nullable=True)
     intro_text = Column(Text, nullable=True)
     outro_text = Column(Text, nullable=True)
@@ -153,6 +158,11 @@ class InvoicePosition(Base):
     # werden — sie haben keine dauerhafte Kennung, an der ein Anhang hinge.
     image_key = Column(String(500), nullable=True)
     image_size = Column(String(10), nullable=True)      # klein | mittel | gross
+    # In welchem Speicher die Datei liegt (minio | onedrive | webdav …).
+    # Ohne diese Angabe wird im Mischbetrieb am falschen Ort gesucht: Nach
+    # einem Wechsel auf OneDrive liegen ältere Bilder weiter in MinIO.
+    # NULL = unbekannt, dann gilt der aktive Speicher (bisheriges Verhalten).
+    image_provider = Column(String(20), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
