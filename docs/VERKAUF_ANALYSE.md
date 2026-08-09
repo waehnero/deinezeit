@@ -24,6 +24,7 @@
 > | 5 — E-Rechnung & Komfort | — | offen |
 > | 6 — Buchhaltung als eigener Bereich | `feature/buchhaltung-bereich` | ✅ umgesetzt (Menüpunkt, Übersicht, Umzug von OP/Mahnlauf/Verkaufsbuch/Abschluss/Kontenplan) |
 > | 7 — Eingangsrechnungen & Vorsteuer | `feature/eingangsrechnungen` | ✅ umgesetzt (Erfassung, Zahlungen, Kreditoren-OP, Vorsteuer in der UVA, eigenes Buchungsjournal + Tests) |
+> | 8 — Wiederkehrende Belege vollständig | `feature/wiederkehrend-vervollstaendigen` | ✅ umgesetzt (A-17c: erinnern per Aufgabe, ausstellen und versenden + Tests) |
 >
 > **Entscheidungen aus Etappe 2a** (Oliver): Gesperrt wird alles, was auf dem
 > Beleg gedruckt wird oder die Buchung bestimmt — änderbar bleiben nur interne

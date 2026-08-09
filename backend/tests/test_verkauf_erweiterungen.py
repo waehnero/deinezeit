@@ -132,6 +132,138 @@ def test_wiederkehrend_stoppt_am_enddatum(auth_client, db_session):
     assert tpl.recurring_next is None
 
 
+# ── A-17c: die beiden bisher toten Modi ───────────────────────────────────────
+#
+# recurring_action stand seit jeher im Modell, wurde aber nie ausgewertet:
+# Jede Vorlage erzeugte stillschweigend Entwürfe, egal was eingestellt war.
+
+def test_vorgabe_bleibt_der_entwurf(auth_client, db_session):
+    """Ohne ausdrücklichen Modus ändert sich nichts am bisherigen Verhalten."""
+    kontakt = _make_kontakt(db_session)
+    _create_invoice(auth_client, kontakt.id, is_recurring_template=True,
+                    recurring_interval="monthly", recurring_next="2026-01-01",
+                    date="2026-01-01")
+
+    recurring_service.materialize_due_recurring(db_session, date(2026, 1, 15))
+    kinder = db_session.query(Invoice).filter(Invoice.recurring_source_id.isnot(None)).all()
+    assert len(kinder) == 1 and kinder[0].status == "entwurf"
+
+
+def test_erinnern_legt_eine_aufgabe_an_statt_eines_belegs(auth_client, db_session):
+    """
+    Modus „remind": Es entsteht kein Beleg, sondern eine Aufgabe — dort schaut
+    man täglich hin, eine E-Mail ginge im Posteingang unter.
+    """
+    from app.models.aufgaben import Todo
+
+    kontakt = _make_kontakt(db_session, "Erinnerungskunde GmbH")
+    _create_invoice(auth_client, kontakt.id, is_recurring_template=True,
+                    recurring_interval="monthly", recurring_next="2026-01-01",
+                    recurring_action="remind", date="2026-01-01")
+
+    erledigt = recurring_service.materialize_due_recurring(db_session, date(2026, 1, 15))
+    assert erledigt == 1
+    assert db_session.query(Invoice).filter(Invoice.recurring_source_id.isnot(None)).count() == 0
+
+    aufgabe = db_session.query(Todo).filter(Todo.source == "wiederkehrend").first()
+    assert aufgabe is not None
+    assert "Erinnerungskunde GmbH" in aufgabe.title
+    assert aufgabe.due_date == date(2026, 1, 1)
+    assert aufgabe.record_id == kontakt.id
+    assert "kein Beleg" in aufgabe.description
+
+
+def test_erinnern_je_faelligem_termin_eine_aufgabe(auth_client, db_session):
+    from app.models.aufgaben import Todo
+
+    _create_invoice(auth_client, _make_kontakt(db_session).id, is_recurring_template=True,
+                    recurring_interval="monthly", recurring_next="2026-01-01",
+                    recurring_action="remind", date="2026-01-01")
+
+    recurring_service.materialize_due_recurring(db_session, date(2026, 3, 15))
+    assert db_session.query(Todo).filter(Todo.source == "wiederkehrend").count() == 3
+
+
+def test_anlegen_und_senden_stellt_aus_und_verschickt(auth_client, db_session, monkeypatch):
+    """
+    Modus „create_and_send": Der Beleg bekommt eine Nummer, wechselt auf
+    „gesendet" und geht an die Adresse des Kunden.
+    """
+    versandt = {}
+
+    def _fake_send(inv, db, settings_d, inv_settings_d, sender, recipient,
+                   to_email, user_email, **kw):
+        versandt["nummer"] = inv.number
+        versandt["an"] = to_email
+
+    monkeypatch.setattr("app.api.invoice._send_invoice_email", _fake_send)
+
+    kontakt = _make_kontakt(db_session)          # data: {"email": "info@muster.at"}
+    _create_invoice(auth_client, kontakt.id, is_recurring_template=True,
+                    recurring_interval="monthly", recurring_next="2026-01-01",
+                    recurring_action="create_and_send", date="2026-01-01")
+
+    recurring_service.materialize_due_recurring(db_session, date(2026, 1, 15))
+
+    kind = db_session.query(Invoice).filter(Invoice.recurring_source_id.isnot(None)).one()
+    assert kind.status == "gesendet"
+    assert kind.number is not None               # Nummer beim Ausstellen vergeben
+    assert versandt["an"] == "info@muster.at"
+    assert versandt["nummer"] == kind.number
+
+
+def test_versand_ohne_adresse_laesst_den_beleg_ausgestellt_stehen(auth_client, db_session):
+    """
+    Der Beleg hat beim Ausstellen bereits eine Nummer. Die zurückzunehmen
+    hieße, eine Lücke in den Nummernkreis zu reißen — also bleibt er stehen,
+    und der Fehlschlag steht im Protokoll.
+    """
+    from app.models.invoice import InvoiceAuditLog
+
+    ohne_mail = _make_kontakt(db_session, "Kunde ohne Mail")
+    ohne_mail.data = {}
+    db_session.commit()
+
+    _create_invoice(auth_client, ohne_mail.id, is_recurring_template=True,
+                    recurring_interval="monthly", recurring_next="2026-01-01",
+                    recurring_action="create_and_send", date="2026-01-01")
+
+    recurring_service.materialize_due_recurring(db_session, date(2026, 1, 15))
+
+    kind = db_session.query(Invoice).filter(Invoice.recurring_source_id.isnot(None)).one()
+    assert kind.status == "gesendet"
+    assert kind.number is not None
+
+    hinweise = (db_session.query(InvoiceAuditLog)
+                .filter(InvoiceAuditLog.invoice_id == kind.id,
+                        InvoiceAuditLog.action == "hinweis").all())
+    assert any("keine E-Mail-Adresse" in h.note for h in hinweise)
+
+
+def test_versandfehler_bricht_den_lauf_nicht_ab(auth_client, db_session, monkeypatch):
+    """Ein defekter Mailserver darf die Serienverarbeitung nicht anhalten."""
+    from app.models.invoice import InvoiceAuditLog
+
+    def _kaputt(*a, **kw):
+        raise RuntimeError("Mailserver antwortet nicht")
+
+    monkeypatch.setattr("app.api.invoice._send_invoice_email", _kaputt)
+
+    _create_invoice(auth_client, _make_kontakt(db_session).id, is_recurring_template=True,
+                    recurring_interval="monthly", recurring_next="2026-01-01",
+                    recurring_action="create_and_send", date="2026-01-01")
+
+    erledigt = recurring_service.materialize_due_recurring(db_session, date(2026, 3, 15))
+    assert erledigt == 3                      # alle drei Termine abgearbeitet
+
+    kinder = db_session.query(Invoice).filter(Invoice.recurring_source_id.isnot(None)).all()
+    assert len(kinder) == 3
+    assert all(k.number is not None for k in kinder)
+    hinweise = db_session.query(InvoiceAuditLog).filter(
+        InvoiceAuditLog.action == "hinweis").all()
+    assert any("Mailserver antwortet nicht" in h.note for h in hinweise)
+
+
 def test_templates_in_hauptliste_und_eigenem_tab(auth_client, db_session):
     kontakt = _make_kontakt(db_session)
     _create_invoice(auth_client, kontakt.id,

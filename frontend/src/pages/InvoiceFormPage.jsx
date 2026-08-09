@@ -322,6 +322,8 @@ export default function InvoiceFormPage() {
   const [recurringInterval, setRecurringInterval] = useState('monthly')
   const [recurringNext, setRecurringNext] = useState(today())
   const [recurringEnd, setRecurringEnd] = useState('')
+  // Was am Stichtag geschehen soll: erinnern | Entwurf anlegen | anlegen und senden
+  const [recurringAction, setRecurringAction] = useState('create')
   const [contracts, setContracts] = useState([])   // [{id, filename}, …] bereits hinterlegt
   const [contractUploading, setContractUploading] = useState(false)
   const MAX_CONTRACTS = 10
@@ -378,6 +380,7 @@ export default function InvoiceFormPage() {
       if (inv.recurring_interval) setRecurringInterval(inv.recurring_interval)
       if (inv.recurring_next) setRecurringNext(inv.recurring_next)
       setRecurringEnd(inv.recurring_end || '')
+      setRecurringAction(inv.recurring_action || 'create')
       setContracts((inv.attachments || [])
         .filter(a => a.attach_type === 'contract')
         .map(a => ({ id: a.id, filename: a.filename })))
@@ -437,7 +440,7 @@ export default function InvoiceFormPage() {
         recurring_interval: (docType === 'rechnung' && isRecurring) ? recurringInterval : null,
         recurring_next: (docType === 'rechnung' && isRecurring) ? (recurringNext || date) : null,
         recurring_end: (docType === 'rechnung' && isRecurring && recurringEnd) ? recurringEnd : null,
-        recurring_action: (docType === 'rechnung' && isRecurring) ? 'create' : null,
+        recurring_action: (docType === 'rechnung' && isRecurring) ? recurringAction : null,
         positions: positions.map((p, i) => ({
           sort_order: i, pos_type: p.pos_type, description: p.description, detail: p.detail || null,
           quantity: parseFloat(p.quantity) || 1, unit: p.unit || null, unit_price: parseFloat(p.unit_price) || 0,
@@ -702,9 +705,26 @@ export default function InvoiceFormPage() {
             {isRecurring && (
               <>
                 <p className="text-xs text-neutral-500 mt-2 mb-4">
-                  Diese Rechnung dient als Vorlage. Gemäß Intervall werden automatisch neue Rechnungen als <strong>Entwurf</strong> erzeugt (kein automatischer Versand).
+                  Diese Rechnung dient als Vorlage. Was am Stichtag geschieht, legst du unten fest.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Am Stichtag</label>
+                    <select value={recurringAction} onChange={e => setRecurringAction(e.target.value)}
+                      className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
+                      <option value="create">Entwurf anlegen — ich stelle ihn selbst aus</option>
+                      <option value="remind">Nur erinnern — Aufgabe anlegen, kein Beleg</option>
+                      <option value="create_and_send">Anlegen, ausstellen und per E-Mail senden</option>
+                    </select>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      {recurringAction === 'remind' &&
+                        'Es entsteht kein Beleg, sondern eine Aufgabe mit dem Fälligkeitsdatum.'}
+                      {recurringAction === 'create' &&
+                        'Der Entwurf bekommt noch keine Belegnummer — die fällt erst beim Ausstellen.'}
+                      {recurringAction === 'create_and_send' &&
+                        'Der Beleg wird ausgestellt (Nummer wird vergeben) und an die E-Mail-Adresse des Kunden geschickt. Scheitert der Versand, bleibt er ausgestellt stehen und ist von Hand zu verschicken.'}
+                    </p>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Intervall</label>
                     <select value={recurringInterval} onChange={e => setRecurringInterval(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">

@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.47',
+    day: '09',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Wiederkehrende Rechnungen können jetzt auch nur erinnern (Aufgabe statt Beleg) oder den Beleg ausstellen und gleich verschicken — die Auswahl steht im Belegformular unter „Am Stichtag“',
+    ],
+    updates: [],
+  },
+  {
     version: '1.12.46',
     day: '08',
     month: 'August',

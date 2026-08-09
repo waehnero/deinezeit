@@ -88,11 +88,128 @@ def _create_child(db, tpl, doc_date: date):
     return child
 
 
+def _erinnerung_anlegen(db, tpl, termin: date) -> None:
+    """
+    Legt statt eines Belegs eine Aufgabe an (Modus ``remind``).
+
+    Bewusst eine Aufgabe und keine E-Mail: In den Aufgaben schaut man ohnehin
+    täglich, eine Mail geht im Posteingang zwischen allem anderen unter. Die
+    Aufgabe verweist über ``record_id`` auf den Kunden, damit der Weg von der
+    Erinnerung zum Beleg kurz bleibt.
+    """
+    from app.models.aufgaben import Todo
+    from app.models.masterdata import EntityRecord
+
+    kunde = None
+    if tpl.contact_id:
+        rec = db.query(EntityRecord).filter(EntityRecord.id == tpl.contact_id).first()
+        kunde = rec.display_name if rec else None
+
+    bezeichnung = tpl.title or "Wiederkehrende Rechnung"
+    db.add(Todo(
+        title=f"Rechnung fällig: {bezeichnung}" + (f" ({kunde})" if kunde else ""),
+        description=(
+            f"Die wiederkehrende Vorlage „{bezeichnung}“ ist zum "
+            f"{termin:%d.%m.%Y} fällig.\n\n"
+            f"Eingestellt ist „nur erinnern“ — es wurde absichtlich kein Beleg "
+            f"erzeugt. Bitte prüfen und die Rechnung von Hand anlegen."
+        ),
+        status="offen", priority="mittel", due_date=termin,
+        record_id=tpl.contact_id, record_name=kunde,
+        record_type_slug="kontakte" if tpl.contact_id else None,
+        source="wiederkehrend",
+        source_meta={"vorlage_id": str(tpl.id), "termin": termin.isoformat()},
+        created_by_name="System (wiederkehrend)",
+    ))
+
+
+def _versenden(db, beleg) -> tuple:
+    """
+    Stellt den Beleg aus und verschickt ihn (Modus ``create_and_send``).
+
+    Gibt ``(erfolg, meldung)`` zurück. **Scheitert der Versand, bleibt der
+    Beleg ausgestellt stehen** — er hat dann bereits eine Nummer, und die
+    zurückzunehmen hieße, eine Lücke in den Nummernkreis zu reißen. Statt
+    dessen wird der Fehlschlag im Änderungsprotokoll vermerkt; der Beleg ist
+    danach von Hand zu versenden.
+    """
+    from app.api.invoice import _load_pdf_context, _send_invoice_email, _audit
+
+    empfaenger = ""
+    settings_d, inv_settings_d, sender_contact, recipient_contact = \
+        _load_pdf_context(db, beleg)
+    if recipient_contact is not None:
+        empfaenger = (recipient_contact.data or {}).get("email", "") or ""
+    if not empfaenger:
+        _audit(db, beleg, "hinweis",
+               note="Automatischer Versand nicht möglich: Der Kunde hat keine "
+                    "E-Mail-Adresse. Der Beleg ist ausgestellt und wartet auf "
+                    "den Versand von Hand.",
+               user_email="system:wiederkehrend")
+        return False, "keine E-Mail-Adresse hinterlegt"
+
+    try:
+        _send_invoice_email(beleg, db, settings_d, inv_settings_d,
+                            sender_contact, recipient_contact, empfaenger,
+                            "system:wiederkehrend")
+        return True, empfaenger
+    except Exception as e:
+        # Der Beleg bleibt ausgestellt — siehe Docstring.
+        _audit(db, beleg, "hinweis",
+               note=f"Automatischer Versand fehlgeschlagen: {e}. Der Beleg ist "
+                    f"ausgestellt und wartet auf den Versand von Hand.",
+               user_email="system:wiederkehrend")
+        print(f"[WARN] Wiederkehrend: Versand von {beleg.number} fehlgeschlagen: {e}")
+        return False, str(e)
+
+
+def _abarbeiten(db, tpl, termin: date) -> str:
+    """
+    Führt für einen fälligen Termin aus, was die Vorlage vorsieht.
+
+    Gibt zurück, was passiert ist: ``erinnert``, ``entwurf`` oder ``versendet``.
+    ``create`` bleibt der Vorgabewert — die beiden anderen Modi standen zwar
+    seit jeher im Modell, wurden aber nie ausgewertet, sodass jede Vorlage
+    stillschweigend Entwürfe erzeugte.
+    """
+    from app.api.invoice import _finalize, _audit, _audit_changes
+    from app.services.invoice_archive import archive_invoice_pdf
+
+    modus = tpl.recurring_action or "create"
+
+    if modus == "remind":
+        _erinnerung_anlegen(db, tpl, termin)
+        return "erinnert"
+
+    kind = _create_child(db, tpl, termin)
+
+    if modus == "create_and_send":
+        # Reihenfolge wie im set-status-Endpunkt: erst den Status setzen,
+        # dann finalisieren — dabei fällt die Belegnummer, der Empfänger wird
+        # eingefroren und die Zeiteinträge gelten als abgerechnet.
+        alter_status = kind.status
+        kind.status = "gesendet"
+        neue_nummer = _finalize(db, kind)
+        _audit(db, kind, "finalisiert" if neue_nummer else "status",
+               changes=_audit_changes(alter_status, kind, neue_nummer),
+               note="Automatisch aus wiederkehrender Vorlage ausgestellt",
+               user_email="system:wiederkehrend")
+        db.flush()
+        archive_invoice_pdf(db, kind, "gesendet")
+        erfolg, _meldung = _versenden(db, kind)
+        return "versendet" if erfolg else "entwurf"
+
+    return "entwurf"
+
+
 def materialize_due_recurring(db, today: date = None) -> int:
     """
-    Erzeugt für alle fälligen Vorlagen die Entwürfe. Gibt die Anzahl erzeugter
-    Belege zurück. Idempotent bezogen auf ``recurring_next`` (jeder Termin wird
-    genau einmal erzeugt, weil das Datum danach weitergesetzt wird).
+    Arbeitet alle fälligen Vorlagen ab. Gibt die Anzahl der erledigten Termine
+    zurück. Idempotent bezogen auf ``recurring_next`` (jeder Termin wird genau
+    einmal abgearbeitet, weil das Datum danach weitergesetzt wird).
+
+    Was je Termin geschieht, hängt an ``recurring_action``:
+    erinnern, Entwurf anlegen oder anlegen und versenden.
     """
     from app.models.invoice import Invoice
 
@@ -113,7 +230,7 @@ def materialize_due_recurring(db, today: date = None) -> int:
             if tpl.recurring_end and tpl.recurring_next > tpl.recurring_end:
                 tpl.recurring_next = None
                 break
-            _create_child(db, tpl, tpl.recurring_next)
+            _abarbeiten(db, tpl, tpl.recurring_next)
             created += 1
             nxt = advance(tpl.recurring_next, interval)
             if tpl.recurring_end and nxt > tpl.recurring_end:
