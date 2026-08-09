@@ -223,12 +223,15 @@ export const invoiceApi = {
 
   // Aktionen
   setStatus:        (id, status) => api.post(`/invoices/${id}/set-status`, { status }),
-  convertToAb:      (id) => api.post(`/invoices/${id}/convert-to-ab`),
+  // trotzAblauf: abgelaufenes Angebot dennoch umwandeln (nach Rückfrage)
+  convertToAb:      (id, trotzAblauf = false) =>
+    api.post(`/invoices/${id}/convert-to-ab`, null, { params: { trotz_ablauf: trotzAblauf } }),
   cancel:           (id, cancel_mode) => api.post(`/invoices/${id}/cancel`, { cancel_mode }),
   sendEmail:        (id, to_email, extra_attachments = [], cc_email = '', subject = '', body_html = '') => api.post(`/invoices/${id}/send-email`, { to_email, extra_attachments, cc_email, subject, body_html }),
   bulkSendEmail:    (invoice_ids) => api.post('/invoices/bulk-send-email', { invoice_ids }),
   markPaid:       (id, data) => api.post(`/invoices/${id}/mark-paid`, data),
-  convertToInvoice: (id) => api.post(`/invoices/${id}/convert-to-invoice`),
+  convertToInvoice: (id, trotzAblauf = false) =>
+    api.post(`/invoices/${id}/convert-to-invoice`, null, { params: { trotz_ablauf: trotzAblauf } }),
   duplicate:        (id, opts) => api.post(`/invoices/${id}/duplicate`, opts || {}),
   uploadContract:   (id, file) => {
     const form = new FormData()
@@ -250,7 +253,11 @@ export const invoiceApi = {
     return api.post(`/invoices/positions/image?size=${size}`, form,
                     { headers: { 'Content-Type': undefined } })
   },
-  positionImageUrl: (key) => `/api/invoices/positions/image?key=${encodeURIComponent(key)}`,
+  // provider: Speicher der Datei. Im Mischbetrieb liegt ein älteres Bild noch
+  // im alten Speicher — ohne diese Angabe wird am falschen Ort gesucht.
+  positionImageUrl: (key, provider) =>
+    `/api/invoices/positions/image?key=${encodeURIComponent(key)}`
+    + (provider ? `&provider=${encodeURIComponent(provider)}` : ''),
 
   // Zahlungen & offene Posten
   listPayments:   (id) => api.get(`/invoices/${id}/payments`),

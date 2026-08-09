@@ -26,6 +26,7 @@ from app.services import period_service
 from app.services import positionen as positionen_service
 from app.services import skonto as skonto_service
 from app.services import dunning as dunning_service
+from app.services import angebot as angebot_service
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -412,6 +413,10 @@ GESPERRTE_FELDER = {
     "due_date":         "Zahlungsziel",
     "delivery_date":    "Liefer-/Leistungsdatum",
     "delivery_date_to": "Ende des Leistungszeitraums",
+    # Die Bindefrist steht auf dem Angebot. Sie nachträglich zu verlängern
+    # hieße, dem Kunden stillschweigend etwas anderes zuzusagen, als er
+    # bekommen hat.
+    "valid_until":      "Gültig bis",
     "contact_id":    "Empfänger",
     "title":         "Titel / Betreff",
     "reference":     "Referenz",
@@ -427,6 +432,45 @@ GESPERRTE_FELDER = {
 }
 # Weiterhin änderbar, weil nicht Bestandteil des gedruckten Belegs:
 #   notes (interne Notiz), project_id (Zuordnung), Anhänge und Verträge.
+
+
+def _verwaiste_bilder_entfernen(db: Session, kandidaten: dict) -> int:
+    """
+    Löscht Positionsbilder, auf die keine Position mehr zeigt.
+
+    Aufgerufen, nachdem die Positionen eines Belegs ersetzt wurden. Wird eine
+    Position mit Bild entfernt, blieb die Datei bisher für immer im Speicher —
+    ein Aufräumlauf dafür fehlte, weil sich der Objektspeicher nicht auflisten
+    lässt. Beim Ersetzen wissen wir aber genau, welche Schlüssel betroffen sind;
+    das ist der Moment, in dem es ohne Suchlauf geht.
+
+    Geprüft wird gegen ALLE Positionen, nicht nur die des Belegs: Ein Bild kann
+    beim Duplizieren eines Belegs mitgereist sein und dann noch anderswo
+    verwendet werden. Fehler beim Löschen werden geschluckt — eine Datei, die
+    liegen bleibt, darf das Speichern des Belegs nicht verhindern.
+
+    ``kandidaten`` ist ``{schlüssel: provider}``. Der Provider muss mit, sonst
+    wird im Mischbetrieb im falschen Speicher gelöscht — die Datei bliebe
+    liegen, und zwar unbemerkt.
+    """
+    if not kandidaten:
+        return 0
+    from app.services import storage_service
+
+    noch_verwendet = {
+        k for (k,) in db.query(InvoicePosition.image_key)
+        .filter(InvoicePosition.image_key.in_(list(kandidaten))).distinct().all()
+    }
+    entfernt = 0
+    for schluessel, provider in kandidaten.items():
+        if schluessel in noch_verwendet:
+            continue
+        try:
+            storage_service.delete_file(schluessel, db=db, backend=provider)
+            entfernt += 1
+        except Exception as e:
+            print(f"[WARN] Verwaistes Positionsbild {schluessel} nicht löschbar: {e}")
+    return entfernt
 
 
 def _positions_fingerprint(positions) -> list:
@@ -567,6 +611,9 @@ async def list_invoices(
             "created_at": inv.created_at,
             "is_recurring_template": inv.is_recurring_template,
             "recurring_source_id": inv.recurring_source_id,
+            "valid_until": inv.valid_until,
+            # Abgeleitet, nicht gespeichert — siehe services/angebot.py
+            "expired": angebot_service.ist_abgelaufen(inv),
         })
     return result
 
@@ -588,6 +635,11 @@ async def create_invoice(
     data = body.model_dump(exclude={"positions"})
     data["created_by"] = current_user.email
     data["updated_by"] = current_user.email
+    # Bindefrist vorbelegen, wenn der Anwender keine angegeben hat. Ohne
+    # Vorbelegung müsste sie bei jedem Angebot getippt werden — und wird
+    # vergessen.
+    if not data.get("valid_until"):
+        data["valid_until"] = angebot_service.vorbelegen(db, body.doc_type, body.date)
 
     invoice = Invoice(**data)
     db.add(invoice)
@@ -768,6 +820,7 @@ async def get_invoice_settings(
     werte.setdefault("dunning_surcharge_b2b", float(zins["aufschlag_b2b"]))
     werte.setdefault("dunning_rate_b2c", float(zins["zins_b2c"]))
     werte.setdefault("dunning_interest_mode", zins["modus"])
+    werte.setdefault("default_offer_valid_days", angebot_service.vorgabe_tage(db))
     return werte
 
 
@@ -1084,18 +1137,23 @@ async def upload_position_image(
 
     daten, mime, endung = position_image.verkleinern(rohdaten, size)
     schluessel = position_image.speicher_schluessel(endung)
+    # Den Speicher festhalten, in den wir schreiben. Ohne diese Angabe wird die
+    # Datei nach einem Speicherwechsel am falschen Ort gesucht — dieselbe
+    # Lehre wie bei den Anhängen (Migration 0039).
+    backend = storage_service.current_backend(db)
     try:
-        storage_service.upload_file(schluessel, daten, mime, db=db)
+        storage_service.upload_file(schluessel, daten, mime, db=db, backend=backend)
     except Exception as exc:
         raise HTTPException(500, f"Speicher-Fehler: {exc}")
 
-    return {"image_key": schluessel, "image_size": size,
+    return {"image_key": schluessel, "image_size": size, "image_provider": backend,
             "breite_mm": position_image.breite_mm(size), "bytes": len(daten)}
 
 
 @router.get("/positions/image")
 async def get_position_image(
     key: str = Query(..., description="Speicher-Schlüssel aus dem Upload"),
+    provider: Optional[str] = Query(None, description="Speicher der Datei; leer = aktiver"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -1104,7 +1162,7 @@ async def get_position_image(
     if not key.startswith("belege/positionsbilder/"):
         raise HTTPException(400, "Ungültiger Bildschlüssel")
     try:
-        daten, mime = storage_service.download_file(key, db=db)
+        daten, mime = storage_service.download_file(key, db=db, backend=provider)
     except Exception:
         raise HTTPException(404, "Bild nicht gefunden")
     return Response(content=daten, media_type=mime or "image/jpeg",
@@ -2084,7 +2142,11 @@ async def update_invoice(
         setattr(inv, k, v)
     inv.updated_by = current_user.email
 
-    # Positionen ersetzen
+    # Positionen ersetzen. Vorher merken, welche Bilder daran hingen — beim
+    # Speichern werden alle Positionen gelöscht und neu angelegt, und ein Bild,
+    # dessen Position verschwindet, bliebe sonst für immer im Speicher liegen.
+    alte_bilder = {p.image_key: p.image_provider for p in inv.positions if p.image_key}
+
     db.query(InvoicePosition).filter(InvoicePosition.invoice_id == invoice_id).delete()
     for i, pos_data in enumerate(body.positions):
         pos = InvoicePosition(invoice_id=inv.id, **pos_data.model_dump())
@@ -2092,6 +2154,7 @@ async def update_invoice(
         db.add(pos)
 
     db.flush()
+    _verwaiste_bilder_entfernen(db, alte_bilder)
     db.refresh(inv)
     _calc_totals(inv)
     # Zeiteinträge bleiben am Entwurf bewusst unangetastet — sie werden erst
@@ -2119,7 +2182,11 @@ async def delete_invoice(
             "Nur Entwürfe können gelöscht werden. Ausgestellte Belege — auch "
             "stornierte — unterliegen der Aufbewahrungspflicht.",
         )
+    # Bilder der Positionen mitnehmen, sonst bleiben sie im Speicher zurück.
+    bilder = {p.image_key: p.image_provider for p in inv.positions if p.image_key}
     db.delete(inv)
+    db.flush()
+    _verwaiste_bilder_entfernen(db, bilder)
     db.commit()
 
 
@@ -2342,9 +2409,28 @@ async def set_status(
     return inv
 
 
+def _pruefe_gueltigkeit(offer: Invoice, trotzdem: bool) -> None:
+    """
+    Hält die Umwandlung eines abgelaufenen Angebots an — einmal.
+
+    Bewusst als Rückfrage und nicht als Verbot: Ob man ein Angebot nach
+    Fristende noch gelten lässt, ist eine kaufmännische Entscheidung und keine
+    Sache der Software. Sie soll nur nicht unbemerkt getroffen werden.
+    """
+    if trotzdem or not angebot_service.ist_abgelaufen(offer):
+        return
+    raise HTTPException(
+        409,
+        f"Die Bindefrist dieses Angebots ist am "
+        f"{offer.valid_until:%d.%m.%Y} abgelaufen. Wenn du es trotzdem "
+        f"umwandeln willst, bestätige das bitte — die Preise stammen dann aus "
+        f"einer älteren Kalkulation.")
+
+
 @router.post("/{invoice_id}/convert-to-ab", response_model=InvoiceResponse)
 async def convert_to_ab(
     invoice_id: UUID,
+    trotz_ablauf: bool = Query(False, description="Abgelaufenes Angebot dennoch umwandeln"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -2354,6 +2440,7 @@ async def convert_to_ab(
         raise HTTPException(404, "Angebot nicht gefunden")
     if offer.doc_type != "angebot":
         raise HTTPException(400, "Nur Angebote können in eine AB umgewandelt werden")
+    _pruefe_gueltigkeit(offer, trotz_ablauf)
 
     # Standard-Texte für AB laden
     intro_setting = db.query(InvoiceSettings).filter_by(key="default_intro_auftragsbestaetigung").first()
@@ -2403,6 +2490,7 @@ async def convert_to_ab(
 @router.post("/{invoice_id}/convert-to-invoice", response_model=InvoiceResponse)
 async def convert_to_invoice(
     invoice_id: UUID,
+    trotz_ablauf: bool = Query(False, description="Abgelaufenes Angebot dennoch umwandeln"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -2412,6 +2500,7 @@ async def convert_to_invoice(
         raise HTTPException(404, "Dokument nicht gefunden")
     if offer.doc_type not in ("angebot", "auftragsbestaetigung"):
         raise HTTPException(400, "Nur Angebote oder Auftragsbestätigungen können umgewandelt werden")
+    _pruefe_gueltigkeit(offer, trotz_ablauf)
 
     # Die Rechnung entsteht als Entwurf — Nummer erst beim Finalisieren
     invoice = Invoice(

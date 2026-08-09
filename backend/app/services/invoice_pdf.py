@@ -289,7 +289,10 @@ def _bild_zeile(p, spalten: int, db=None) -> str:
     if not schluessel:
         return ""
     from app.services.position_image import als_datenurl, breite_mm
-    quelle = als_datenurl(db, schluessel)
+    # Der Speicher der Datei muss mit: Nach einem Wechsel auf einen anderen
+    # Anbieter läge das Bild sonst außer Reichweite, und der Beleg käme ohne
+    # Bild heraus.
+    quelle = als_datenurl(db, schluessel, getattr(p, "image_provider", None))
     if not quelle:
         return ""      # fehlendes Bild darf keinen Beleg verhindern
     mm = breite_mm(getattr(p, "image_size", None) or "mittel")
@@ -487,6 +490,9 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     if invoice.due_date:   meta_rows.append(("Zahlungsziel",  _fmt_date(invoice.due_date)))
     if invoice.delivery_date:
         meta_rows.append(_leistungszeile(invoice, _fmt_date))
+    # Bindefrist: gehört auf das Angebot, sonst gilt es unbefristet.
+    if invoice.doc_type == "angebot" and getattr(invoice, "valid_until", None):
+        meta_rows.append(("Gültig bis", _fmt_date(invoice.valid_until)))
     _skonto = _skonto_zeile(invoice, _fmt_date)
     if _skonto:            meta_rows.append(_skonto)
     if invoice.reference:  meta_rows.append(("Referenz",      invoice.reference))
@@ -590,6 +596,8 @@ def _t1(**kw) -> str:
     meta_rows.append((_label + ":", _wert))
     if getattr(invoice, "due_date", None):
         meta_rows.append(("Zahlungsziel:", _fmt_date_long(invoice.due_date)))
+    if invoice.doc_type == "angebot" and getattr(invoice, "valid_until", None):
+        meta_rows.append(("Gültig bis:", _fmt_date_long(invoice.valid_until)))
     _skonto = _skonto_zeile(invoice, _fmt_date_long)
     if _skonto:
         meta_rows.append((_skonto[0] + ":", _skonto[1]))

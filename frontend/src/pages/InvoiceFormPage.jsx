@@ -293,6 +293,8 @@ export default function InvoiceFormPage() {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(today())
   const [dueDate, setDueDate] = useState(addDays(today(), 30))
+  // Bindefrist des Angebots. Leer lassen ist erlaubt — dann gilt es unbefristet.
+  const [validUntil, setValidUntil] = useState('')
   // Zahlungsbedingung: "x % Skonto binnen y Tagen". Steht auf dem Beleg und
   // ist nach dem Ausstellen gesperrt — eine Zusage ändert man nicht nachträglich.
   const [skontoPercent, setSkontoPercent] = useState('')
@@ -370,6 +372,7 @@ export default function InvoiceFormPage() {
       setDate(inv.date); setDueDate(inv.due_date || ''); setReference(inv.reference || '')
       setSkontoPercent(inv.skonto_percent ?? '')
       setSkontoDays(inv.skonto_days ?? '')
+      setValidUntil(inv.valid_until || '')
       setDeliveryDate(inv.delivery_date || inv.date)
       setDeliveryDateTo(inv.delivery_date_to || '')
       setIstZeitraum(!!inv.delivery_date_to)
@@ -431,6 +434,7 @@ export default function InvoiceFormPage() {
         date, due_date: dueDate || null, reference: reference || null,
         skonto_percent: skontoPercent === '' ? null : skontoPercent,
         skonto_days: skontoDays === '' ? null : parseInt(skontoDays),
+        valid_until: (docType === 'angebot' && validUntil) ? validUntil : null,
         delivery_date: deliveryDate || null,
         delivery_date_to: (istZeitraum && deliveryDateTo) ? deliveryDateTo : null,
         intro_text: introText || null, outro_text: outroText || null, notes: notes || null,
@@ -450,6 +454,7 @@ export default function InvoiceFormPage() {
           // Bild reist als Feld mit — Positionen werden beim Speichern gelöscht
           // und neu angelegt, ein Anhang könnte sich sonst nirgends festhalten.
           image_key: p.image_key || null, image_size: p.image_size || null,
+          image_provider: p.image_provider || null,
           article_id: p.article_id || null, time_entry_id: p.time_entry_id || null,
         })),
       }
@@ -598,6 +603,16 @@ export default function InvoiceFormPage() {
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Zahlungsziel</label>
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+            )}
+            {docType === 'angebot' && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Gültig bis</label>
+                <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)}
+                  className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+                <p className="text-xs text-neutral-400 mt-1">
+                  Steht auf dem Angebot. Leer heißt: unbefristet gültig.
+                </p>
               </div>
             )}
             {docType === 'rechnung' && (
@@ -1061,7 +1076,7 @@ function PositionImage({ pos, onChange }) {
     ;(async () => {
       try {
         const token = localStorage.getItem('access_token')
-        const res = await fetch(invoiceApi.positionImageUrl(pos.image_key),
+        const res = await fetch(invoiceApi.positionImageUrl(pos.image_key, pos.image_provider),
                                 { headers: { Authorization: 'Bearer ' + token } })
         if (!res.ok) throw new Error(res.status)
         const blob = await res.blob()
@@ -1071,7 +1086,7 @@ function PositionImage({ pos, onChange }) {
       } catch { setVorschau(null) }
     })()
     return () => { abgebrochen = true; if (url) URL.revokeObjectURL(url) }
-  }, [pos.image_key])
+  }, [pos.image_key, pos.image_provider])
 
   async function hochladen(groesse) {
     setLaeuft(true)
@@ -1079,6 +1094,7 @@ function PositionImage({ pos, onChange }) {
       const res = await invoiceApi.uploadPositionImage(datei, groesse)
       onChange('image_key', res.data.image_key)
       onChange('image_size', res.data.image_size)
+      onChange('image_provider', res.data.image_provider)
       setDatei(null)
       toast.success('Bild hinterlegt')
     } catch (e) { toast.error(e.response?.data?.detail || 'Upload fehlgeschlagen') }
@@ -1099,7 +1115,7 @@ function PositionImage({ pos, onChange }) {
           Bild · {label ? `${label[1]} (${label[2]})` : pos.image_size}
         </span>
         <button type="button" title="Bild entfernen"
-          onClick={() => { onChange('image_key', null); onChange('image_size', null) }}
+          onClick={() => { onChange('image_key', null); onChange('image_size', null); onChange('image_provider', null) }}
           className="p-1 text-neutral-400 hover:text-red-500"><XIcon size={13} /></button>
       </div>
     )

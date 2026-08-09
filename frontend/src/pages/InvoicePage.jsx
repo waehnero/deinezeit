@@ -116,21 +116,37 @@ export default function InvoicePage() {
     } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
   }
 
-  async function handleConvertToAb(invoice) {
+  /**
+   * Umwandeln, mit Rückfrage bei abgelaufener Bindefrist.
+   *
+   * Das Backend antwortet in dem Fall mit 409 und dem Grund im Klartext. Erst
+   * wenn der Anwender bestätigt, wird derselbe Aufruf mit `trotz_ablauf`
+   * wiederholt — die Entscheidung ist kaufmännisch, nicht technisch.
+   */
+  async function umwandeln(invoice, aufruf, erfolgstext) {
     try {
-      const res = await invoiceApi.convertToAb(invoice.id)
-      toast.success('Auftragsbestätigung als Entwurf erstellt')
+      const res = await aufruf(invoice.id)
+      toast.success(erfolgstext)
       navigate(`/invoices/${res.data.id}`)
-    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
+    } catch (e) {
+      if (e.response?.status === 409) {
+        if (!window.confirm(`${e.response.data.detail}\n\nTrotzdem umwandeln?`)) return
+        try {
+          const res = await aufruf(invoice.id, true)
+          toast.success(erfolgstext)
+          navigate(`/invoices/${res.data.id}`)
+        } catch (e2) { toast.error(e2.response?.data?.detail || 'Fehler') }
+        return
+      }
+      toast.error(e.response?.data?.detail || 'Fehler')
+    }
   }
 
-  async function handleConvertToInvoice(invoice) {
-    try {
-      const res = await invoiceApi.convertToInvoice(invoice.id)
-      toast.success('Rechnung als Entwurf erstellt')
-      navigate(`/invoices/${res.data.id}`)
-    } catch (e) { toast.error(e.response?.data?.detail || 'Fehler') }
-  }
+  const handleConvertToAb = (invoice) =>
+    umwandeln(invoice, invoiceApi.convertToAb, 'Auftragsbestätigung als Entwurf erstellt')
+
+  const handleConvertToInvoice = (invoice) =>
+    umwandeln(invoice, invoiceApi.convertToInvoice, 'Rechnung als Entwurf erstellt')
 
   async function handleDelete(invoice) {
     if (!window.confirm(`${belegNr(invoice)} wirklich löschen?`)) return
@@ -268,6 +284,15 @@ export default function InvoicePage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <StatusBadge status={inv.status} />
+                      {/* Abgelaufen ist KEIN Status, sondern aus der Bindefrist
+                          abgeleitet — deshalb ein zusätzliches Kennzeichen und
+                          kein Ersatz für den Status. */}
+                      {inv.expired && (
+                        <span title={`Bindefrist am ${fmtDate(inv.valid_until)} abgelaufen`}
+                          className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">
+                          Abgelaufen
+                        </span>
+                      )}
                       {(inv.status === 'gesendet' || sentStatus[inv.id] === 'ok') && sentStatus[inv.id] !== 'error' && (
                         <MailCheck size={15} className="text-green-500 shrink-0" title="Erfolgreich versendet" />
                       )}

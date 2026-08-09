@@ -25,7 +25,8 @@ def _admin_client(client, admin_user):
 def test_get_settings_initial_nur_wirksame_vorgabewerte(auth_client):
     """
     Ohne gespeicherte Werte kommen genau die Einstellungen zurück, für die es
-    wirksame Vorgaben gibt: Archiv-Auslöser, Steuersätze und das Mahnwesen.
+    wirksame Vorgaben gibt: Archiv-Auslöser, Steuersätze, das Mahnwesen und die
+    Bindefrist für Angebote.
 
     Sie werden bewusst immer mitgeliefert, damit die Oberfläche keine eigene
     Kopie der Vorgabewerte vorhalten muss — sonst schreibt sie diese beim
@@ -44,6 +45,7 @@ def test_get_settings_initial_nur_wirksame_vorgabewerte(auth_client):
         "archive_triggers", "tax_rates",
         "dunning_levels", "dunning_base_rate", "dunning_surcharge_b2b",
         "dunning_rate_b2c", "dunning_interest_mode",
+        "default_offer_valid_days",
     }
     assert daten["archive_triggers"] == DEFAULT_TRIGGERS
     assert [s["satz"] for s in daten["tax_rates"]] == [20, 13, 10, 0]
@@ -52,6 +54,9 @@ def test_get_settings_initial_nur_wirksame_vorgabewerte(auth_client):
     assert daten["dunning_base_rate"] is None
     assert daten["dunning_surcharge_b2b"] == 9.2
     assert daten["dunning_rate_b2c"] == 4.0
+    # Die Bindefrist dagegen hat eine sinnvolle Vorgabe (30 Tage) — ohne sie
+    # bliebe das Feld am Angebot leer, und genau das war der Ausgangsfehler.
+    assert daten["default_offer_valid_days"] == 30
 
 
 def test_gespeicherte_archiv_ausloeser_haben_vorrang(auth_client, admin_user, db_session):

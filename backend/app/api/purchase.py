@@ -517,15 +517,20 @@ async def upload_file(
 
     endung = (file.filename or "beleg").rsplit(".", 1)[-1].lower()[:8] or "pdf"
     schluessel = f"eingangsrechnungen/{inv.date.year}/{inv.id}.{endung}"
+    # Speicher festhalten: Nach einem Wechsel auf einen anderen Anbieter liegt
+    # das Original weiter im alten und wäre sonst nicht mehr auffindbar.
+    backend = storage_service.current_backend(db)
     try:
         storage_service.upload_file(schluessel, daten,
-                                    file.content_type or "application/pdf", db=db)
+                                    file.content_type or "application/pdf",
+                                    db=db, backend=backend)
     except Exception as exc:
         raise HTTPException(500, f"Speicher-Fehler: {exc}")
 
     inv.file_key = schluessel
     inv.file_name = file.filename
     inv.file_mimetype = file.content_type
+    inv.file_provider = backend
     inv.updated_by = current_user.email
     db.commit()
     db.refresh(inv)
@@ -547,7 +552,9 @@ async def get_file(
     if not inv.file_key:
         raise HTTPException(404, "Zu diesem Beleg ist kein Original hinterlegt")
     try:
-        daten, mime = storage_service.download_file(inv.file_key, db=db)
+        # Provider der Datei, nicht der gerade aktive — siehe upload_file.
+        daten, mime = storage_service.download_file(inv.file_key, db=db,
+                                                    backend=inv.file_provider)
     except Exception:
         raise HTTPException(404, "Das Original ist im Speicher nicht auffindbar")
     name = inv.file_name or f"{inv.internal_number or 'beleg'}.pdf"

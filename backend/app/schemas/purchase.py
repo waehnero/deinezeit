@@ -78,6 +78,7 @@ class PurchaseInvoiceResponse(BaseModel):
     paid_amount: Optional[Decimal] = None
     file_key: Optional[str] = None
     file_name: Optional[str] = None
+    file_provider: Optional[str] = None
     created_by: Optional[str] = None
     created_at: datetime
     taxes: List[PurchaseTaxLineResponse] = []

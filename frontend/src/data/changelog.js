@@ -4,6 +4,20 @@
  */
 export const changelog = [
   {
+    version: '1.12.48',
+    day: '09',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Angebote haben jetzt eine Bindefrist: Das Feld „Gültig bis“ wird beim Anlegen automatisch gefüllt (Vorgabe 30 Tage, in den Belegeinstellungen änderbar) und steht auf dem ausgedruckten Angebot',
+      'Abgelaufene Angebote sind in der Liste als solche erkennbar. Wer sie trotzdem in einen Auftrag oder eine Rechnung umwandelt, wird einmal gefragt — gehindert wird niemand',
+    ],
+    updates: [
+      'Wird eine Position mit Bild entfernt, verschwindet die Bilddatei jetzt mit ihr, statt im Speicher liegenzubleiben',
+      'Jede Datei merkt sich, in welchem Speicher sie liegt. Nach einem Wechsel zwischen MinIO und OneDrive bleiben ältere Positionsbilder und Rechnungsoriginale weiter abrufbar',
+    ],
+  },
+  {
     version: '1.12.47',
     day: '09',
     month: 'August',
