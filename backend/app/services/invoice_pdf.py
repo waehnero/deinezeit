@@ -323,6 +323,14 @@ def _positions_html(positions, tax_mode: str, db=None) -> str:
                      f'{p.description or "Rabatt"}{hinweis}</td>'
                      f'<td class="pos-num">{_fmt_amount(p.line_total, "")}</td></tr>')
             continue
+        # Abzug einer bereits gestellten Anzahlung: wie der Rabatt über die
+        # volle Breite. Menge und Einzelpreis wären hier nur Beiwerk — der
+        # Betrag ist die Aussage.
+        if _t == "advance_deduction":
+            rows += (f'<tr class="pos-disc"><td colspan="4">'
+                     f'{p.description or "Abzüglich Anzahlung"}</td>'
+                     f'<td class="pos-num">{_fmt_amount(p.line_total, "")}</td></tr>')
+            continue
         qty   = float(p.quantity or 0)
         price = float(p.unit_price or 0)
         disc  = p.discount_pct
@@ -358,6 +366,22 @@ DOC_TYPE_LABELS = {
     "gutschrift":   "GUTSCHRIFT",
     "lieferschein": "LIEFERSCHEIN",
 }
+
+# Abrechnungsstufe schlägt die Belegart. Technisch ist eine Anzahlungsrechnung
+# eine Rechnung — auf dem Papier muss aber stehen, was sie ist: Der Kunde
+# unterscheidet Anzahlung und Schlussrechnung, und der Prüfer auch.
+BILLING_STAGE_LABELS = {
+    "anzahlung": "ANZAHLUNGSRECHNUNG",
+    "teil":      "TEILRECHNUNG",
+    "schluss":   "SCHLUSSRECHNUNG",
+}
+
+
+def _beleg_ueberschrift(invoice) -> str:
+    stufe = getattr(invoice, "billing_stage", None)
+    if invoice.doc_type == "rechnung" and stufe in BILLING_STAGE_LABELS:
+        return BILLING_STAGE_LABELS[stufe]
+    return DOC_TYPE_LABELS.get(invoice.doc_type, invoice.doc_type.upper())
 
 STATUS_WATERMARKS = {
     "entwurf":   "ENTWURF",
@@ -435,7 +459,7 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
 
     sender     = _addr_lines(sender_contact, settings)
     recipient  = _recipient_lines(recipient_contact)
-    doc_label  = DOC_TYPE_LABELS.get(invoice.doc_type, invoice.doc_type.upper())
+    doc_label  = _beleg_ueberschrift(invoice)
     watermark  = STATUS_WATERMARKS.get(invoice.status, "")
 
     tax_mode   = invoice.tax_mode
@@ -629,6 +653,11 @@ def _t1(**kw) -> str:
             hinweis = f" ({float(p.discount_pct):.0f} %)" if p.discount_pct else ""
             rows += (f'<tr class="item"><td colspan="{ncols - 1}">'
                      f'{p.description or "Rabatt"}{hinweis}</td>'
+                     f'<td class="num total">{_fmt_amount(p.line_total, currency)}</td></tr>')
+            continue
+        if _t == "advance_deduction":
+            rows += (f'<tr class="item"><td colspan="{ncols - 1}">'
+                     f'{p.description or "Abzüglich Anzahlung"}</td>'
                      f'<td class="num total">{_fmt_amount(p.line_total, currency)}</td></tr>')
             continue
         qty    = float(p.quantity or 0)

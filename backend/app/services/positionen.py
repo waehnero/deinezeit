@@ -1,7 +1,7 @@
 """
 Positionstypen und ihre Rechenregeln — eine Quelle für alle Auswerter.
 
-Ein Beleg kennt sechs Zeilentypen:
+Ein Beleg kennt sieben Zeilentypen:
 
   ``item``       gewöhnliche Position mit Menge, Preis und Steuersatz
   ``time_entry`` wie ``item``, zusätzlich mit einem Zeiteintrag verknüpft
@@ -9,6 +9,10 @@ Ein Beleg kennt sechs Zeilentypen:
   ``text``       Freitext zur Erläuterung, ohne Gruppenwirkung
   ``subtotal``   Zwischensumme der laufenden Gruppe, danach neue Gruppe
   ``discount``   Rabatt auf die laufende Gruppe (Betrag oder Prozent)
+  ``advance_deduction``
+                 Abzug einer bereits fakturierten Anzahlung oder Teilrechnung
+                 in der Schlussrechnung; negativer Betrag, je Steuersatz eine
+                 eigene Zeile
 
 Die Gruppe reicht von der letzten Überschrift **oder** der letzten
 Zwischensumme — je nachdem, was zuletzt kam.
@@ -23,10 +27,16 @@ from collections import defaultdict
 from decimal import Decimal
 
 
-# Zeilen, die einen eigenen Betrag tragen
+# Zeilen, deren Steuersatz der Benutzer bestimmt (und die „ein Satz für alle"
+# deshalb vereinheitlichen darf). Der Anzahlungsabzug gehört bewusst NICHT
+# dazu: Sein Satz stammt aus der bereits gestellten Anzahlungsrechnung und
+# darf nachträglich nicht umgebogen werden — sonst stimmte der Abzug nicht
+# mehr mit der damals abgeführten Steuer überein.
 WERTZEILEN = ("item", "time_entry", "discount")
 # Zeilen, die nur der Gliederung dienen
 GLIEDERUNG = ("heading", "text", "subtotal")
+# Der Abzug bereits fakturierter Anzahlungen und Teilrechnungen.
+ANZAHLUNGSABZUG = "advance_deduction"
 
 
 def typ(pos) -> str:

@@ -53,6 +53,20 @@ class Invoice(Base):
     # sind zwei verschiedene Dinge, und der Unterschied wird für die
     # Angebotsverfolgung gebraucht.
     valid_until = Column(Date, nullable=True)
+
+    # ── Abrechnung in Stufen (Anzahlung → Teil → Schluss) ─────────────────────
+    # NULL = gewöhnliche Rechnung. Bewusst ein Feld und keine eigene Belegart:
+    # Sonst müsste jede der sieben vorhandenen Prüfungen auf
+    # `doc_type in ("rechnung", "gutschrift")` erweitert werden — wird eine
+    # übersehen, fehlt die Anzahlung lautlos in der UVA.
+    billing_stage = Column(String(20), nullable=True)       # anzahlung | teil | schluss
+    # Kopf des Abrechnungsstrangs; der Kopf zeigt auf sich selbst, damit
+    # „alle Belege des Strangs" eine einzige Abfrage bleibt.
+    chain_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id", ondelete="SET NULL"),
+                      nullable=True)
+    # Nur zur Anzeige („Anzahlung 30 % der Auftragssumme"). Gerechnet wird
+    # immer mit dem Betrag.
+    advance_percent = Column(Numeric(5, 2), nullable=True)
     reference = Column(String(200), nullable=True)
     intro_text = Column(Text, nullable=True)
     outro_text = Column(Text, nullable=True)
@@ -121,13 +135,17 @@ class Invoice(Base):
                             cascade="all, delete-orphan",
                             order_by="InvoiceDunning.level")
     related_invoice = relationship("Invoice", foreign_keys=[related_invoice_id], remote_side="Invoice.id")
+    chain_head = relationship("Invoice", foreign_keys=[chain_id], remote_side="Invoice.id")
     recurring_instances = relationship("Invoice", foreign_keys=[recurring_source_id], remote_side="Invoice.id")
 
 
 class InvoicePosition(Base):
     """
     Eine Position in einer Rechnung.
-    pos_type: item | text | time_entry | discount | subtotal
+    pos_type: item | text | time_entry | discount | subtotal | heading
+              | advance_deduction (Abzug einer bereits fakturierten Anzahlung
+                oder Teilrechnung in der Schlussrechnung — je Steuersatz eine
+                Zeile mit negativem Betrag)
     """
     __tablename__ = "invoice_positions"
 

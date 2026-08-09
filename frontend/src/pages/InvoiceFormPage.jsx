@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search,
   RefreshCw, FileText, Clock, Download, Eye, Repeat, Paperclip, X as XIcon,
-  Lock, History, ChevronUp, ChevronDown, Image as ImageIcon, Bell
+  Lock, History, ChevronUp, ChevronDown, Image as ImageIcon, Bell, Layers
 } from 'lucide-react'
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -21,6 +21,9 @@ function calcLine(pos) {
 }
 // Zeilen, die nur der Gliederung dienen (siehe backend/app/services/positionen.py)
 const GLIEDERUNG = ['heading', 'text', 'subtotal']
+// Abzug einer bereits gestellten Anzahlung. Wird serverseitig gerechnet und
+// hier nur angezeigt — die Zeile trägt einen negativen Betrag.
+const ANZAHLUNGSABZUG = 'advance_deduction'
 
 /** Index, ab dem die Gruppe der Zeile bei `index` zählt. */
 function gruppeAb(positions, index) {
@@ -37,6 +40,9 @@ function gruppenSumme(positions, ab, bis, mitRabatt = false) {
     const p = positions[i]
     if (GLIEDERUNG.includes(p.pos_type)) continue
     if (p.pos_type === 'discount') { if (mitRabatt) s += calcZeile(positions, i); continue }
+    // Ein Rabatt bezieht sich auf die Leistung, nicht auf einen Abzug —
+    // sonst würde er den Abzug mitrabattieren.
+    if (p.pos_type === ANZAHLUNGSABZUG) continue
     s += calcLine(p)
   }
   return Math.round(s * 100) / 100
@@ -295,6 +301,10 @@ export default function InvoiceFormPage() {
   const [dueDate, setDueDate] = useState(addDays(today(), 30))
   // Bindefrist des Angebots. Leer lassen ist erlaubt — dann gilt es unbefristet.
   const [validUntil, setValidUntil] = useState('')
+  // Abrechnung in Stufen: '' = gewöhnliche Rechnung
+  const [billingStage, setBillingStage] = useState('')
+  const [chainId, setChainId] = useState(null)
+  const [strang, setStrang] = useState(null)
   // Zahlungsbedingung: "x % Skonto binnen y Tagen". Steht auf dem Beleg und
   // ist nach dem Ausstellen gesperrt — eine Zusage ändert man nicht nachträglich.
   const [skontoPercent, setSkontoPercent] = useState('')
@@ -373,6 +383,8 @@ export default function InvoiceFormPage() {
       setSkontoPercent(inv.skonto_percent ?? '')
       setSkontoDays(inv.skonto_days ?? '')
       setValidUntil(inv.valid_until || '')
+      setBillingStage(inv.billing_stage || '')
+      setChainId(inv.chain_id || null)
       setDeliveryDate(inv.delivery_date || inv.date)
       setDeliveryDateTo(inv.delivery_date_to || '')
       setIstZeitraum(!!inv.delivery_date_to)
@@ -435,6 +447,10 @@ export default function InvoiceFormPage() {
         skonto_percent: skontoPercent === '' ? null : skontoPercent,
         skonto_days: skontoDays === '' ? null : parseInt(skontoDays),
         valid_until: (docType === 'angebot' && validUntil) ? validUntil : null,
+        // Die Stufe gibt es nur an der Rechnung — sie bestimmt, ob in der
+        // Schlussrechnung abgezogen wird.
+        billing_stage: docType === 'rechnung' ? (billingStage || null) : null,
+        chain_id: chainId,
         delivery_date: deliveryDate || null,
         delivery_date_to: (istZeitraum && deliveryDateTo) ? deliveryDateTo : null,
         intro_text: introText || null, outro_text: outroText || null, notes: notes || null,
@@ -612,6 +628,26 @@ export default function InvoiceFormPage() {
                   className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
                 <p className="text-xs text-neutral-400 mt-1">
                   Steht auf dem Angebot. Leer heißt: unbefristet gültig.
+                </p>
+              </div>
+            )}
+            {docType === 'rechnung' && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Abrechnungsstufe
+                  <span className="text-xs font-normal text-neutral-400 ml-1">optional</span>
+                </label>
+                <select value={billingStage} onChange={e => setBillingStage(e.target.value)}
+                  disabled={status !== 'entwurf'}
+                  className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm disabled:bg-neutral-50 disabled:text-neutral-400">
+                  <option value="">Gewöhnliche Rechnung</option>
+                  <option value="anzahlung">Anzahlungsrechnung</option>
+                  <option value="teil">Teilrechnung</option>
+                  <option value="schluss">Schlussrechnung</option>
+                </select>
+                <p className="text-xs text-neutral-400 mt-1">
+                  Anzahlungen und Teilrechnungen werden in der Schlussrechnung
+                  desselben Vorgangs wieder abgezogen.
                 </p>
               </div>
             )}
@@ -845,6 +881,7 @@ export default function InvoiceFormPage() {
             className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" />
         </div>
 
+        {!isNew && chainId && <StrangPanel invoiceId={id} />}
         {!isNew && gesperrt && docType === 'rechnung' && hatBuchhaltung && <MahnPanel invoiceId={id} />}
         {!isNew && gesperrt && <AuditPanel invoiceId={id} />}
       </div>
@@ -989,6 +1026,106 @@ const FELD_LABELS = {
   status: 'Status', number: 'Belegnummer', notes: 'Interne Notiz',
   project_id: 'Projekt',
 }
+
+/**
+ * Überblick über den Abrechnungsvorgang.
+ *
+ * Zeigt alle Belege des Bauvorhabens und was in der Schlussrechnung abgezogen
+ * wird. Ohne diese Ansicht müsste man sich aus der Belegliste zusammensuchen,
+ * was zusammengehört — und würde eine vergessene Teilrechnung erst bemerken,
+ * wenn der Kunde reklamiert.
+ */
+function StrangPanel({ invoiceId }) {
+  const navigate = useNavigate()
+  const [daten, setDaten] = useState(null)
+  const [offen, setOffen] = useState(true)
+
+  useEffect(() => {
+    invoiceApi.chain(invoiceId).then(r => setDaten(r.data)).catch(() => {})
+  }, [invoiceId])
+
+  if (!daten?.belege?.length) return null
+
+  return (
+    <div className="bg-surface border border-neutral-200 rounded-xl overflow-hidden">
+      <button onClick={() => setOffen(o => !o)}
+        className="w-full flex items-center gap-2 px-5 py-3 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
+        <Layers size={15} className="text-neutral-500" />
+        Abrechnungsvorgang
+        <span className="font-normal text-neutral-400">
+          {daten.belege.length} {daten.belege.length === 1 ? 'Beleg' : 'Belege'}
+        </span>
+        {offen ? <ChevronUp size={15} className="ml-auto text-neutral-400" />
+               : <ChevronDown size={15} className="ml-auto text-neutral-400" />}
+      </button>
+
+      {offen && (
+        <div className="border-t border-neutral-100">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-neutral-100">
+              {daten.belege.map(b => (
+                <tr key={b.id} className={b.id === invoiceId ? 'bg-primary-50/50' : 'hover:bg-neutral-50'}>
+                  <td className="px-5 py-2.5">
+                    <button onClick={() => navigate(`/invoices/${b.id}/edit`)}
+                      className="font-medium text-neutral-800 hover:text-primary-600">
+                      {b.number || 'Entwurf'}
+                    </button>
+                    <span className="block text-xs text-neutral-400">{b.stage_label}</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-neutral-500 hidden sm:table-cell whitespace-nowrap">
+                    {new Date(b.date).toLocaleDateString('de-AT')}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-medium text-neutral-800 whitespace-nowrap">
+                    {fmtEuro(b.total)}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-neutral-500 whitespace-nowrap">
+                    {b.status}
+                    {Number(b.open_amount) !== 0 && (
+                      <span className="block text-amber-600">offen {fmtEuro(b.open_amount)}</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-2.5 text-right">
+                    {b.deducted && (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                        wird abgezogen
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {daten.abzug?.length > 0 && (
+            <div className="border-t border-neutral-100 px-5 py-3 bg-neutral-50/60">
+              <p className="text-xs font-medium text-neutral-600 mb-1.5">
+                Abzug in der Schlussrechnung
+              </p>
+              {daten.abzug.map((z, i) => (
+                <div key={i} className="flex justify-between text-xs text-neutral-600">
+                  <span>{z.tax_rate == null ? 'Reverse Charge' : `${Number(z.tax_rate)} % USt.`}</span>
+                  <span>{fmtEuro(z.net_amount)} netto + {fmtEuro(z.tax_amount)} USt.</span>
+                </div>
+              ))}
+              <div className="flex justify-between text-xs font-semibold text-neutral-800 mt-1.5 pt-1.5 border-t border-neutral-200">
+                <span>Gesamt brutto</span>
+                <span>{fmtEuro(daten.abzug_brutto)}</span>
+              </div>
+              {/* Der Unterschied zwischen „gestellt" und „bezahlt" ist hier
+                  wesentlich — deshalb ausgeschrieben und nicht nur angedeutet. */}
+              <p className="text-xs text-neutral-500 mt-2 leading-relaxed">
+                Abgezogen wird, was bereits in Rechnung gestellt wurde — auch wenn
+                es noch nicht bezahlt ist. Die Umsatzsteuer entsteht mit der
+                Rechnung; ein offener Betrag bleibt als offener Posten stehen.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 function AuditPanel({ invoiceId }) {
   const [eintraege, setEintraege] = useState([])
@@ -1167,6 +1304,29 @@ function MoveButtons({ istErste, istLetzte, onMove }) {
 function PositionRow({ pos, index, taxMode, taxRates = [], betrag,
                       istErste, istLetzte, onMove, onChange, onRemove }) {
   const typ = pos.pos_type || 'item'
+
+  // Abzug einer bereits gestellten Anzahlung: nur lesbar. Er wird beim
+  // Speichern serverseitig aus den tatsächlich gestellten Rechnungen neu
+  // gerechnet — hier daran zu drehen hätte keine Wirkung und wäre deshalb
+  // eine Lüge gegenüber dem Anwender.
+  if (typ === ANZAHLUNGSABZUG) {
+    return (
+      <div className="border border-emerald-200 rounded-lg p-3 bg-emerald-50/60">
+        <div className="flex items-center gap-2">
+          <Lock size={13} className="text-emerald-600 shrink-0" />
+          <span className="text-xs text-emerald-700 w-24 shrink-0">Anzahlungsabzug</span>
+          <span className="flex-1 text-sm text-neutral-700">{pos.description}</span>
+          <span className="text-sm font-medium text-neutral-800 w-28 text-right">
+            {fmtEuro(calcLine(pos))}
+          </span>
+        </div>
+        <p className="text-xs text-neutral-500 mt-1.5">
+          Wird aus den gestellten Anzahlungs- und Teilrechnungen dieses Vorgangs
+          berechnet und beim Speichern aktualisiert.
+        </p>
+      </div>
+    )
+  }
 
   // Gliederungszeilen brauchen nur ein Textfeld — Menge, Preis und Steuersatz
   // wären dort sinnlos und würden zum Ausfüllen einladen.

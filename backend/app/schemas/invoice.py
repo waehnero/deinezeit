@@ -9,6 +9,9 @@ from decimal import Decimal
 
 class InvoicePositionBase(BaseModel):
     sort_order: int = 0
+    # item | text | time_entry | discount | subtotal | heading
+    # | advance_deduction (Abzug einer bereits gestellten Anzahlung; wird
+    #   serverseitig gerechnet und beim Speichern verworfen)
     pos_type: str = "item"
     description: str
     detail: Optional[str] = None
@@ -87,6 +90,9 @@ class InvoiceCreate(BaseModel):
     # Zahlungsbedingung: "skonto_percent % bei Zahlung binnen skonto_days Tagen"
     skonto_percent: Optional[Decimal] = None
     skonto_days: Optional[int] = None
+    # Abrechnung in Stufen: anzahlung | teil | schluss (None = normale Rechnung)
+    billing_stage: Optional[str] = None
+    chain_id: Optional[UUID] = None
     positions: List[InvoicePositionCreate] = []
     # Wiederkehrend
     is_recurring_template: bool = False
@@ -122,6 +128,11 @@ class InvoiceUpdate(BaseModel):
     # Zahlungsbedingung: "skonto_percent % bei Zahlung binnen skonto_days Tagen"
     skonto_percent: Optional[Decimal] = None
     skonto_days: Optional[int] = None
+    # Die Abrechnungsstufe bleibt änderbar, solange der Beleg Entwurf ist:
+    # Aus einer versehentlich gewöhnlichen Rechnung soll eine Teilrechnung
+    # werden können, ohne sie neu anzulegen.
+    billing_stage: Optional[str] = None
+    chain_id: Optional[UUID] = None
     positions: List[InvoicePositionCreate] = []
     is_recurring_template: bool = False
     recurring_interval: Optional[str] = None
@@ -165,6 +176,10 @@ class InvoiceResponse(BaseModel):
     dunning_block_reason: Optional[str] = None
     dunning_level: int = 0
     dunning_last_at: Optional[date] = None
+    # Abrechnung in Stufen
+    billing_stage: Optional[str] = None
+    chain_id: Optional[UUID] = None
+    advance_percent: Optional[Decimal] = None
     template_id: int
     is_recurring_template: bool
     recurring_interval: Optional[str] = None
@@ -199,6 +214,8 @@ class InvoiceListItem(BaseModel):
     recurring_source_id: Optional[UUID] = None    # gesetzt = automatisch aus Vorlage erzeugt
     valid_until: Optional[date] = None            # Bindefrist (Angebot)
     expired: bool = False                         # abgeleitet, kein Status
+    billing_stage: Optional[str] = None           # anzahlung | teil | schluss
+    chain_id: Optional[UUID] = None               # Kopf des Abrechnungsstrangs
 
     class Config:
         from_attributes = True
@@ -216,6 +233,80 @@ class InvoiceMarkPaidRequest(BaseModel):
 class InvoiceConvertRequest(BaseModel):
     """Angebot → Rechnung umwandeln"""
     pass
+
+
+# ── Abrechnung in Stufen (C-10) ───────────────────────────────────────────────
+
+# ``date`` ist in diesem Modul zugleich Typ und übliches Feldname. Solange das
+# Feld keinen Vorgabewert hat (``date: date``), ist das harmlos. Bekommt es
+# einen (``date: Optional[date] = None``), landet der Name im Namensraum der
+# Klasse — und Pydantic löst die Typangaben anschließend gegen genau diesen
+# Namensraum auf. Aus ``Optional[date]`` wird dann stillschweigend
+# ``Optional[None]``: Das Feld nimmt nur noch ``null`` an und weist jedes
+# Datum mit 422 ab. Betroffen sind ALLE Datumsfelder der Klasse, nicht nur das
+# auslösende. Ein eigener Name für den Typ umgeht das.
+Belegdatum = date
+
+
+class AnzahlungRequest(BaseModel):
+    """
+    Anzahlung aus einem Angebot oder einer Auftragsbestätigung anfordern.
+
+    Entweder Prozentsatz **oder** Betrag. Der Prozentsatz wird sofort in einen
+    Betrag umgerechnet und nur zur Anzeige mitgeführt: Ändert sich das Angebot
+    später, soll auf der bereits gestellten Anzahlungsrechnung weiterhin das
+    stehen, was der Kunde bekommen hat.
+    """
+    percent: Optional[Decimal] = None
+    amount: Optional[Decimal] = None        # Nettobetrag
+    description: Optional[str] = None
+    date: Optional[Belegdatum] = None
+    due_date: Optional[Belegdatum] = None
+
+
+class SchlussrechnungRequest(BaseModel):
+    """
+    Schlussrechnung eines Strangs erzeugen.
+
+    ``from_invoice_id`` ist der Beleg, aus dem die Positionen der
+    Gesamtleistung übernommen werden — üblicherweise das Angebot. Fehlt er,
+    entsteht die Schlussrechnung leer und wird von Hand gefüllt.
+    """
+    from_invoice_id: Optional[UUID] = None
+    date: Optional[Belegdatum] = None
+    due_date: Optional[Belegdatum] = None
+
+
+class AbzugZeile(BaseModel):
+    tax_rate: Optional[Decimal] = None
+    net_amount: Decimal
+    tax_amount: Decimal
+
+
+class StrangBeleg(BaseModel):
+    id: UUID
+    doc_type: str
+    number: Optional[str] = None
+    billing_stage: Optional[str] = None
+    stage_label: str
+    date: date
+    title: Optional[str] = None
+    subtotal: Decimal
+    total: Decimal
+    status: str
+    open_amount: Decimal = Decimal("0")
+    deducted: bool = False              # wird in der Schlussrechnung abgezogen
+
+
+class StrangResponse(BaseModel):
+    """Übersicht über ein Bauvorhaben: alle Belege und der Stand der Abrechnung."""
+    chain_id: Optional[UUID] = None
+    belege: List[StrangBeleg] = []
+    abzug: List[AbzugZeile] = []
+    abzug_netto: Decimal = Decimal("0")
+    abzug_brutto: Decimal = Decimal("0")
+    hat_schlussrechnung: bool = False
+    hinweise: List[str] = []
 
 class InvoiceDuplicateRequest(BaseModel):
     """Steuert, welche Bestandteile beim Duplizieren übernommen werden."""

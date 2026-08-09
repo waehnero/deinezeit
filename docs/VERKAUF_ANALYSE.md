@@ -22,6 +22,7 @@
 > | Sammelbranch Kleinigkeiten | `fix/verkauf-kleinigkeiten` | ✅ umgesetzt (A-14, A-17e/f/g, B-3) |
 > | Positionstypen & Gliederung | `feature/verkauf-positionstypen` | ✅ umgesetzt (A-15 + Umsortieren) |
 > | 5 — E-Rechnung & Komfort | — | offen |
+> | 10 — Anzahlung, Teil- und Schlussrechnung | `feature/anzahlung-schlussrechnung` | ✅ umgesetzt (C-10: Abrechnungsstufe, Vorgangs-Strang, Abzug je Steuersatz + Tests) |
 > | 6 — Buchhaltung als eigener Bereich | `feature/buchhaltung-bereich` | ✅ umgesetzt (Menüpunkt, Übersicht, Umzug von OP/Mahnlauf/Verkaufsbuch/Abschluss/Kontenplan) |
 > | 7 — Eingangsrechnungen & Vorsteuer | `feature/eingangsrechnungen` | ✅ umgesetzt (Erfassung, Zahlungen, Kreditoren-OP, Vorsteuer in der UVA, eigenes Buchungsjournal + Tests) |
 > | 8 — Wiederkehrende Belege vollständig | `feature/wiederkehrend-vervollstaendigen` | ✅ umgesetzt (A-17c: erinnern per Aufgabe, ausstellen und versenden + Tests) |
@@ -617,6 +618,44 @@ Anzahlungsrechnung → Teilrechnungen nach Baufortschritt → Schlussrechnung mi
 Abzug der bereits fakturierten Beträge. Umsatzsteuerlich heikel, weil die
 Anzahlung bereits USt-pflichtig ist und in der Schlussrechnung korrekt
 abgesetzt werden muss. Fehlt vollständig.
+
+**Umgesetzt in Etappe 10.** Entscheidungen (Oliver):
+
+1. **Kennzeichen statt Belegart.** `invoices.billing_stage` (anzahlung | teil |
+   schluss), NULL = gewöhnliche Rechnung. Eine eigene Belegart hätte an sieben
+   Stellen erweitert werden müssen, an denen auf
+   `doc_type in ("rechnung", "gutschrift")` geprüft wird — bei Zahlungen, UVA,
+   Buchungsjournal und Mahnwesen. Eine übersehene Stelle hieße: Die
+   Anzahlungsrechnung fehlt lautlos in der Voranmeldung.
+2. **Abgezogen wird alles Fakturierte, nicht das Bezahlte.** Die Steuer
+   entsteht mit der Rechnung. Würde nur Bezahltes abgezogen, stünde die USt
+   einer offenen Anzahlungsrechnung zweimal in der UVA. Der unbezahlte Betrag
+   bleibt ein eigener offener Posten und wird dort gemahnt.
+3. **Anzahlung aus Angebot/AB und frei.** Prozentsatz oder Betrag; der
+   Prozentsatz wird sofort in einen Betrag umgerechnet und nur zur Anzeige
+   mitgeführt. Bei gemischten Steuersätzen im Auftrag bricht der Aufruf ab,
+   statt sich einen Satz auszusuchen.
+4. **Eigener Vorgangs-Strang** (`chain_id`), nicht über `project_id`: Zwei
+   Bauabschnitte desselben Projekts würden sich sonst vermischen, und ohne
+   gepflegtes Projekt gäbe es gar keine Schlussrechnung. Der Kopf zeigt auf
+   sich selbst, damit „alle Belege des Strangs" eine Abfrage bleibt.
+
+Der Abzug entsteht als Positionen vom Typ `advance_deduction` — **je Steuersatz
+eine Zeile**. Eine Sammelzeile ginge nur bei einem einzigen Satz auf. Sie
+werden bei jedem Speichern der Schlussrechnung serverseitig neu gerechnet, nie
+aus dem Formular übernommen: Käme zwischendurch eine weitere Teilrechnung
+dazu, wäre der Abzug aus dem Browser veraltet.
+
+**Bekannte Grenze:** Verteilt sich eine abgezogene Rechnung auf mehrere
+Erlöskonten, bucht der Abzug auf das Standard-Erlöskonto. Die Summe stimmt, die
+Aufteilung auf die Konten ist gröber. Ist das Konto eindeutig, reist es mit.
+Das offen zu lassen war die Entscheidung gegen eine Schätzung.
+
+**Für die Steuerberatung:** Dieses System weist Erlöse je Beleg und Steuersatz
+aus. Die Anzahlungsrechnung bucht damit bereits Erlös, die Schlussrechnung nur
+noch den Rest; in Summe stimmt es. Eine Buchhaltung, die mit einem eigenen
+Konto „erhaltene Anzahlungen" arbeitet, bucht anders. Das Muster gehört einmal
+gegengelesen.
 
 ---
 
