@@ -28,6 +28,7 @@ from app.services import skonto as skonto_service
 from app.services import dunning as dunning_service
 from app.services import angebot as angebot_service
 from app.services import anzahlung as anzahlung_service
+from app.services.erechnung import beleg as erechnung_service
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -40,6 +41,7 @@ from app.schemas.invoice import (
     DunningCandidate, DunningRunResponse, DunningCreateRequest, DunningEntry,
     DunningBlockRequest, DunningBatchRequest, DunningLevelConfig,
     SkontoVorschau, SkontoZeile, SkontoRequest,
+    ERechnungPruefung,
     AnzahlungRequest, SchlussrechnungRequest,
     AbzugZeile, StrangBeleg, StrangResponse,
 )
@@ -862,6 +864,10 @@ async def get_invoice_settings(
     werte.setdefault("dunning_rate_b2c", float(zins["zins_b2c"]))
     werte.setdefault("dunning_interest_mode", zins["modus"])
     werte.setdefault("default_offer_valid_days", angebot_service.vorgabe_tage(db))
+    # E-Rechnung ist standardmäßig AUS. Sie ändert das Dateiformat jedes
+    # versendeten Belegs — das gehört eingeschaltet, nicht stillschweigend
+    # übernommen.
+    werte.setdefault("erechnung_aktiv", erechnung_service.ist_aktiv(db))
     return werte
 
 
@@ -2098,6 +2104,73 @@ async def get_invoice_audit(
             .all())
 
 
+# ── E-Rechnung (C-5) ──────────────────────────────────────────────────────────
+
+@router.get("/{invoice_id}/erechnung/pruefen", response_model=ERechnungPruefung)
+async def check_einvoice(
+    invoice_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+    __=Depends(require_module("verkauf")),
+):
+    """
+    Was einer E-Rechnung dieses Belegs noch fehlt.
+
+    Auch aufrufbar, wenn die E-Rechnung ausgeschaltet ist — man will vor dem
+    Einschalten wissen, was auf einen zukommt.
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+
+    _settings, inv_settings, verkaeufer, empfaenger = _load_pdf_context(db, inv)
+    fehlt = erechnung_service.pruefen(inv, inv_settings, verkaeufer, empfaenger)
+    return ERechnungPruefung(
+        aktiv=erechnung_service.ist_aktiv(db),
+        moeglich=not fehlt and inv.doc_type in erechnung_service.BELEGARTEN,
+        fehlende_angaben=fehlt,
+        format="ZUGFeRD 2.5 / Factur-X, Profil EN 16931",
+    )
+
+
+@router.get("/{invoice_id}/erechnung/xml")
+async def download_einvoice_xml(
+    invoice_id: UUID,
+    trotz_luecken: bool = Query(False),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+    __=Depends(require_module("verkauf")),
+):
+    """
+    Das reine XML herunterladen — zum Prüfen und für Empfänger, die kein PDF
+    wollen.
+
+    Bei fehlenden Pflichtangaben kommt HTTP 409 mit der Liste. Mit
+    ``trotz_luecken`` gibt es die Datei dennoch: Beim Einrichten hilft es,
+    die halbfertige Datei zu sehen. Verschicken darf man sie nicht.
+    """
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Beleg nicht gefunden")
+    if inv.doc_type not in erechnung_service.BELEGARTEN:
+        raise HTTPException(400, "Eine E-Rechnung gibt es nur für Rechnungen "
+                                 "und Gutschriften")
+
+    _settings, inv_settings, verkaeufer, empfaenger = _load_pdf_context(db, inv)
+    xml, fehlt = erechnung_service.xml_erzeugen(
+        inv, inv_settings, verkaeufer, empfaenger, trotz_luecken=trotz_luecken)
+    if xml is None:
+        raise HTTPException(409, "Die E-Rechnung ist noch nicht vollständig: "
+                                 + " ".join(fehlt))
+
+    name = f"{(inv.number or 'beleg').replace('/', '-')}-factur-x.xml"
+    return Response(
+        content=xml,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
+
+
 @router.get("/{invoice_id}/pdf")
 async def download_invoice_pdf(
     invoice_id: UUID,
@@ -2110,9 +2183,12 @@ async def download_invoice_pdf(
         raise HTTPException(404, "Beleg nicht gefunden")
 
     settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
+    xml = erechnung_service.xml_fuer_pdf(db, inv, inv_settings_d,
+                                          sender_contact, recipient_contact)
     try:
         pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
-                                 sender_contact, recipient_contact, db=db)
+                                 sender_contact, recipient_contact, db=db,
+                                 erechnung_xml=xml)
     except Exception as e:
         raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {str(e)}")
 
@@ -3179,14 +3255,51 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
     # scheitert erst danach am Statuswechsel.
     _pruefe_pflichtangaben(inv)
 
-    # Nummer VOR der PDF-Erzeugung vergeben: Ein Entwurf ist nummernlos, und
-    # der Beleg geht mit dem Versand ohnehin aus dem Entwurf. Ohne diesen
-    # Schritt stünde auf dem versendeten PDF keine Belegnummer.
-    _ensure_number(db, inv)
+    # ── Der Beleg verlässt den Entwurf, BEVOR das PDF entsteht ──────────────
+    #
+    # Das PDF trägt ein Wasserzeichen, solange der Beleg ein Entwurf ist, und
+    # es rendert den Empfänger live statt aus dem eingefrorenen Snapshot.
+    # Wurde erst gesendet und danach finalisiert, bekam der Kunde deshalb
+    # einen Beleg mit „ENTWURF" quer darüber — beim zweiten Versand war es
+    # weg. Ebenso liefen die Prüfungen auf Leistungsdatum und Periodensperre
+    # erst NACH dem Versand: Die Mail war beim Kunden, und der Server meldete
+    # anschließend einen Fehler.
+    #
+    # Sicher ist das, weil der Aufrufer erst nach erfolgreichem Versand
+    # committet — scheitert die Zustellung, bleibt der Beleg Entwurf.
+    if inv.status not in ("bezahlt", "storniert", "angenommen", "abgelehnt",
+                          "gesendet"):
+        alter_status = inv.status
+        inv.status = "gesendet"
+        inv.updated_by = current_user_email
+        neue_nummer = _finalize(db, inv)
+        _audit(db, inv, "finalisiert" if neue_nummer else "status",
+               changes=_audit_changes(alter_status, inv, neue_nummer),
+               note=f"Per E-Mail an {to_email}", user_email=current_user_email)
+        db.add(inv)
+    else:
+        # Schon ausgestellt: Status bleibt, eine fehlende Nummer (Altbestand)
+        # wird nachgezogen. Der erneute Versand wird trotzdem vermerkt —
+        # „wann ging der Beleg zum zweiten Mal hinaus" ist eine Frage, die
+        # tatsächlich gestellt wird.
+        _ensure_number(db, inv)
+        _audit(db, inv, "hinweis", note=f"Erneut per E-Mail an {to_email}",
+               user_email=current_user_email)
     db.flush()
 
+    # Empfänger jetzt aus dem eingefrorenen Snapshot lesen. Sonst entstünde
+    # das versendete PDF aus den Live-Stammdaten, jeder spätere Nachdruck aber
+    # aus dem Snapshot — zwei Fassungen desselben Belegs.
+    recipient_contact = snapshot_as_contact(inv.recipient_snapshot) or recipient_contact
+
+    # Der versendete Beleg ist die eigentliche E-Rechnung: Ist sie
+    # eingeschaltet und vollständig, geht das hybride PDF hinaus — sichtbar
+    # unverändert, nur mit den Daten darin.
+    xml = erechnung_service.xml_fuer_pdf(db, inv, inv_settings_d,
+                                          sender_contact, recipient_contact)
     pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
-                              sender_contact, recipient_contact, db=db)
+                              sender_contact, recipient_contact, db=db,
+                              erechnung_xml=xml)
 
     filename = f"{(inv.number or 'beleg').replace('/', '-')}.pdf"
 
@@ -3266,16 +3379,7 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
         cc_email=cc_email or None,
     )
 
-    # Status auf "gesendet" setzen (außer bereits bezahlt/storniert/angenommen/abgelehnt)
-    if inv.status not in ("bezahlt", "storniert", "angenommen", "abgelehnt"):
-        alter_status = inv.status
-        inv.status = "gesendet"
-        inv.updated_by = current_user_email
-        neue_nummer = _finalize(db, inv)
-        _audit(db, inv, "finalisiert" if neue_nummer else "status",
-               changes=_audit_changes(alter_status, inv, neue_nummer),
-               note=f"Per E-Mail an {to_email}", user_email=current_user_email)
-        db.add(inv)
+    # Der Statuswechsel ist oben schon passiert — vor der PDF-Erzeugung.
 
     # Bei aktiviertem Auslöser PDF ins Datacenter archivieren (E-Mail-Versand)
     db.flush()
@@ -3321,6 +3425,12 @@ async def send_invoice_email(
                              extra_attachments=extra_attachments, cc_email=cc_email,
                              custom_subject=custom_subject, custom_body_html=custom_body_html)
         db.commit()
+    except HTTPException:
+        # Die Prüfungen auf Leistungsdatum und Periodensperre laufen jetzt VOR
+        # dem Versand und melden im Klartext, was fehlt. Als „E-Mail konnte
+        # nicht gesendet werden" verkleidet wäre das irreführend — gesendet
+        # wurde ja gerade nicht, und der Grund liegt am Beleg.
+        raise
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
@@ -3373,6 +3483,12 @@ async def bulk_send_email(
                                  sender_contact, recipient_contact, to_email, current_user.email)
             db.commit()
             results.append({"id": str(inv_id), "number": inv.number, "ok": True, "to": to_email})
+        except HTTPException as e:
+            db.rollback()
+            # detail statt str(e): Sonst stünde „400: Das Liefer-/Leistungs-
+            # datum fehlt…" in der Liste, mit Statuscode als Präfix.
+            results.append({"id": str(inv_id), "number": inv.number, "ok": False,
+                            "error": str(e.detail)})
         except Exception as e:
             db.rollback()
             results.append({"id": str(inv_id), "number": inv.number, "ok": False, "error": str(e)})
