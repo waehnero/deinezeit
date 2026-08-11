@@ -1717,6 +1717,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
   const [paymentDays, setPaymentDays] = useState(30)
   // Vorbelegung der Angebots-Bindefrist; 0 = keine Vorbelegung
   const [offerValidDays, setOfferValidDays] = useState(30)
+  const [erechnungAktiv, setErechnungAktiv] = useState(false)
   const [kleinunternehmerText, setKleinunternehmerText] = useState('')
   const [contactHint, setContactHint] = useState('')  // Info ob Bankdaten aus Kontakt kamen
   // PDF-Archivierung ins Datacenter. Bewusst OHNE eigenen Vorgabewert — die
@@ -1767,6 +1768,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
       setDefaultTaxRate(s.default_tax_rate || 20)
       setPaymentDays(s.default_payment_days || 30)
       setOfferValidDays(s.default_offer_valid_days ?? 30)
+      setErechnungAktiv(!!s.erechnung_aktiv)
       setKleinunternehmerText(typeof s.kleinunternehmer_text === 'string' ? s.kleinunternehmer_text.replace(/^"|"$/g, '') : '')
       if (Array.isArray(s.archive_triggers)) setArchiveTriggers(s.archive_triggers)
       if (Array.isArray(s.tax_rates)) setTaxRates(s.tax_rates)
@@ -1795,6 +1797,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         invoiceApi.updateSetting('default_tax_rate', Number(defaultTaxRate)),
         invoiceApi.updateSetting('default_payment_days', Number(paymentDays)),
         invoiceApi.updateSetting('default_offer_valid_days', Number(offerValidDays)),
+        invoiceApi.updateSetting('erechnung_aktiv', erechnungAktiv),
         invoiceApi.updateSetting('kleinunternehmer_text', kleinunternehmerText),
         invoiceApi.updateSetting('archive_triggers', archiveTriggers),
         invoiceApi.updateSetting('tax_rates', taxRates),
@@ -1848,6 +1851,23 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
         </div>
         <div className="mt-3"><label className="block text-xs font-medium text-neutral-600 mb-1">Kleinunternehmer-Hinweistext</label>
           <textarea value={kleinunternehmerText} onChange={e => setKleinunternehmerText(e.target.value)} rows={2} className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm resize-none" /></div>
+
+        {/* E-Rechnung. Vorgabe ist aus: Sie ändert das Dateiformat jedes
+            versendeten Belegs und gehört bewusst eingeschaltet. */}
+        <label className="mt-4 flex items-start gap-3 p-3 border border-neutral-200 rounded-lg cursor-pointer hover:bg-neutral-50">
+          <input type="checkbox" checked={erechnungAktiv}
+            onChange={e => setErechnungAktiv(e.target.checked)} className="mt-0.5 w-4 h-4 rounded" />
+          <div>
+            <p className="text-sm font-medium text-neutral-800">E-Rechnung einbetten (ZUGFeRD 2.5 / Factur-X)</p>
+            <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">
+              Versendete Rechnungen und Gutschriften bekommen die Rechnungsdaten als
+              Datei ins PDF eingebettet. Für den Empfänger sieht der Beleg unverändert
+              aus; wer die Daten verarbeiten kann, spart das Abtippen. Fehlt an einem
+              Beleg eine Pflichtangabe, geht wie bisher ein gewöhnliches PDF hinaus —
+              der Versand bleibt in jedem Fall möglich.
+            </p>
+          </div>
+        </label>
       </div>
       <hr className="border-gray-100" />
       <div>

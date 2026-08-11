@@ -21,7 +21,7 @@
 > | 4b — Periodenabschluss & Übergabepaket | `feature/verkauf-monatsabschluss` | ✅ umgesetzt (C-6, C-8, B-5, Übergabe-Historie + Tests) |
 > | Sammelbranch Kleinigkeiten | `fix/verkauf-kleinigkeiten` | ✅ umgesetzt (A-14, A-17e/f/g, B-3) |
 > | Positionstypen & Gliederung | `feature/verkauf-positionstypen` | ✅ umgesetzt (A-15 + Umsortieren) |
-> | 5 — E-Rechnung & Komfort | — | offen |
+> | 5 — E-Rechnung (C-5) | `feature/e-rechnung-facturx` | ✅ umgesetzt (ZUGFeRD 2.5 / Factur-X, Profil EN 16931, hybrides PDF/A-3 + Tests) |
 > | 10 — Anzahlung, Teil- und Schlussrechnung | `feature/anzahlung-schlussrechnung` | ✅ umgesetzt (C-10: Abrechnungsstufe, Vorgangs-Strang, Abzug je Steuersatz + Tests) |
 > | 6 — Buchhaltung als eigener Bereich | `feature/buchhaltung-bereich` | ✅ umgesetzt (Menüpunkt, Übersicht, Umzug von OP/Mahnlauf/Verkaufsbuch/Abschluss/Kontenplan) |
 > | 7 — Eingangsrechnungen & Vorsteuer | `feature/eingangsrechnungen` | ✅ umgesetzt (Erfassung, Zahlungen, Kreditoren-OP, Vorsteuer in der UVA, eigenes Buchungsjournal + Tests) |
@@ -542,6 +542,61 @@ Legende: ✅ vorhanden · ⚠️ rudimentär · ❌ fehlt
 | C-16 | Projektabrechnung Budget vs. verrechnet | ❌ | ❌ | ⚠️ | ✅ | ✅ | ✅ |
 | C-17 | Angebotsverfolgung / Pipeline | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
 | C-18 | Zahlungslink / Kundenportal | ❌ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ |
+
+#### C-5 · E-Rechnung
+
+**Umgesetzt in Etappe 11** (Format ZUGFeRD 2.5 / Factur-X 1.09, Profil
+EN 16931). Recherchestand August 2026: In Österreich besteht **keine
+allgemeine B2B-Pflicht**; verpflichtend ist die E-Rechnung nur gegenüber dem
+Bund (seit 2014). EU-weit greift ViDA ab 1. Juli 2030 für innergemeinschaftliche
+Umsätze. In Deutschland müssen Unternehmen seit 1.1.2025 E-Rechnungen
+**empfangen** können, die Ausstellungspflicht folgt 2027/2028.
+
+Entscheidungen (Oliver):
+
+1. **ZUGFeRD/Factur-X zuerst, nicht ebInterface.** Das hybride Format braucht
+   keinen neuen Versandweg: Das PDF geht per E-Mail hinaus wie bisher und trägt
+   die Daten in sich. ebInterface wäre nur für öffentliche Auftraggeber nötig
+   und brächte zusätzlich die B2G-Pflichtfelder (Auftragsreferenz,
+   Lieferantennummer) und die Einbringung über e-Rechnung.gv.at mit.
+2. **Versand wie bisher** — per E-Mail und als Download. Kein Peppol-Access-
+   Point, keine laufenden Kosten.
+3. **Einheiten über eine Zuordnungstabelle** im Code, unbekannte werden
+   gemeldet statt geraten.
+
+**Aufbau in drei Schichten**, damit ebInterface später ein zweiter
+Serialisierer ist und nicht ein zweiter Rechenweg: `datensatz` (formatneutral,
+enthält Steueraufteilung und Prüfung), `facturx` (CII-XML), `pdf_anhang`
+(PDF/A-3-Einbettung über den WeasyPrint-`finisher`, ohne neue Abhängigkeit).
+
+**Der Abzug gestellter Anzahlungen ist ein Abschlag auf Belegebene** (BT-92 ff.),
+nicht `TotalPrepaidAmount`. Letzteres mindert nur den Zahlbetrag, nicht die
+Bemessungsgrundlage — in DeineZeit mindert der Abzug aber beides. Beides
+zugleich hätte denselben Betrag zweimal abgezogen, und im XML stünde mehr
+Steuer als auf dem Beleg. ZUGFeRD verlangt ausdrücklich Deckungsgleichheit.
+
+**Offen und bewusst benannt:** Konformität ist nicht getestet, sondern muss
+extern geprüft werden. Die Tests decken Struktur, Summen und das Nicht-Raten
+ab — nicht Schema und Schematron. Vor dem produktiven Einsatz gehört eine
+erzeugte Datei durch einen Validator.
+
+**Nicht umgesetzt:** ebInterface 6.1, e-Rechnung.gv.at-Webservice, Peppol.
+Der Datensatz ist so geschnitten, dass sie ohne Umbau danebenpassen.
+
+**Nebenbefund aus der Etappe (Oliver, Betriebstest):** Der E-Mail-Versand
+erzeugte das PDF, **bevor** der Beleg den Entwurf verließ. Folge: Der Kunde
+bekam „ENTWURF" quer über den Beleg, beim zweiten Versand war es weg. Der
+Fehler reichte weiter als das Wasserzeichen — der Empfänger wurde live aus den
+Stammdaten gerendert statt aus dem Snapshot (zwei Fassungen desselben Belegs),
+und die Pflichtprüfungen auf Leistungsdatum und Periodensperre liefen erst
+NACH dem Versand: Die Mail war beim Kunden, der Server meldete danach einen
+Fehler. Finalisierung läuft jetzt vor der PDF-Erzeugung; da der Aufrufer erst
+nach erfolgreichem Versand committet, bleibt der Beleg bei einem Fehlschlag
+Entwurf. Abgedeckt in `tests/test_verkauf_versand.py` — geprüft wird der
+Zustand des Belegs im Augenblick der PDF-Erzeugung, nicht das Aussehen des
+PDF.
+
+---
 
 ### Die sieben wichtigsten Lücken im Detail
 

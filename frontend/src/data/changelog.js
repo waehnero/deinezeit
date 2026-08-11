@@ -4,6 +4,21 @@
  */
 export const changelog = [
   {
+    version: '1.12.50',
+    day: '10',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Rechnungen und Gutschriften können die Rechnungsdaten als E-Rechnung ins PDF eingebettet mitführen (ZUGFeRD 2.5 / Factur-X, Profil EN 16931). Für den Empfänger sieht der Beleg unverändert aus; wer die Daten verarbeiten kann, spart das Abtippen',
+      'Neuer Abschnitt „E-Rechnung“ am ausgestellten Beleg: zeigt, ob der Beleg vollständig ist, benennt fehlende Angaben und stellt das XML zum Herunterladen bereit',
+      'Einzuschalten in den Belegeinstellungen unter Verkauf — ab Werk ausgeschaltet',
+    ],
+    updates: [
+      'Mengeneinheiten werden für die E-Rechnung in genormte Codes übersetzt. Unbekannte Einheiten werden gemeldet statt geraten, damit aus Stunden nicht still Stück werden',
+      'Behoben: Wird ein Beleg direkt nach dem Anlegen per E-Mail verschickt, kam er beim Empfänger bisher mit dem Wasserzeichen „ENTWURF“ an — erst beim zweiten Versand war es weg. Der Beleg wird jetzt ausgestellt, bevor das PDF entsteht. Fehlt dabei eine Pflichtangabe, wird das vorher gemeldet, statt die E-Mail hinausgehen zu lassen und danach einen Fehler zu zeigen',
+    ],
+  },
+  {
     version: '1.12.49',
     day: '09',
     month: 'August',

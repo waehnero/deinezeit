@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import {
   Save, ArrowLeft, Plus, Trash2, Search,
   RefreshCw, FileText, Clock, Download, Eye, Repeat, Paperclip, X as XIcon,
-  Lock, History, ChevronUp, ChevronDown, Image as ImageIcon, Bell, Layers
+  Lock, History, ChevronUp, ChevronDown, Image as ImageIcon, Bell, Layers, FileCode
 } from 'lucide-react'
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -882,6 +882,9 @@ export default function InvoiceFormPage() {
         </div>
 
         {!isNew && chainId && <StrangPanel invoiceId={id} />}
+        {!isNew && gesperrt && ['rechnung', 'gutschrift'].includes(docType) && (
+          <ERechnungPanel invoiceId={id} nummer={number} />
+        )}
         {!isNew && gesperrt && docType === 'rechnung' && hatBuchhaltung && <MahnPanel invoiceId={id} />}
         {!isNew && gesperrt && <AuditPanel invoiceId={id} />}
       </div>
@@ -1122,6 +1125,85 @@ function StrangPanel({ invoiceId }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+
+/**
+ * E-Rechnung (ZUGFeRD 2.5 / Factur-X).
+ *
+ * Zeigt den Stand und benennt, was noch fehlt. Der Ton ist bewusst sachlich:
+ * Eine unvollständige E-Rechnung ist kein Fehler des Anwenders, sondern eine
+ * Liste von Feldern, die niemand vorher gebraucht hat.
+ */
+function ERechnungPanel({ invoiceId, nummer }) {
+  const [stand, setStand] = useState(null)
+  const [laden, setLaden] = useState(true)
+
+  useEffect(() => {
+    invoiceApi.erechnungPruefen(invoiceId)
+      .then(r => setStand(r.data))
+      .catch(() => {})
+      .finally(() => setLaden(false))
+  }, [invoiceId])
+
+  if (laden || !stand) return null
+
+  const vollstaendig = stand.moeglich
+  return (
+    <div className="bg-surface border border-neutral-200 rounded-xl p-5">
+      <div className="flex items-start gap-3">
+        <FileCode size={16} className={vollstaendig ? 'text-emerald-600 mt-0.5' : 'text-amber-600 mt-0.5'} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-neutral-800">
+            E-Rechnung
+            <span className="ml-2 text-xs font-normal text-neutral-400">{stand.format}</span>
+          </p>
+
+          {vollstaendig ? (
+            <p className="text-sm text-neutral-600 mt-1 leading-relaxed">
+              {stand.aktiv
+                ? 'Eingeschaltet. Das PDF dieses Belegs enthält die Rechnungsdaten als eingebettete Datei — sichtbar ändert sich nichts.'
+                : 'Dieser Beleg wäre vollständig, die E-Rechnung ist aber ausgeschaltet. Der Schalter steht in den Belegeinstellungen.'}
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-neutral-600 mt-1">
+                Noch nicht vollständig. Es fehlt:
+              </p>
+              <ul className="mt-2 space-y-1">
+                {stand.fehlende_angaben.map((z, i) => (
+                  <li key={i} className="text-sm text-neutral-600 flex gap-2">
+                    <span className="text-amber-500 shrink-0">•</span>
+                    <span>{z}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <div className="flex flex-wrap gap-2 mt-4">
+            <a href={invoiceApi.erechnungXmlUrl(invoiceId, !vollstaendig)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
+              <Download size={14} /> XML {vollstaendig ? 'herunterladen' : 'trotzdem ansehen'}
+            </a>
+            {nummer && (
+              <a href={`/api/invoices/${invoiceId}/pdf`}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
+                <Download size={14} /> PDF
+              </a>
+            )}
+          </div>
+
+          {/* Der Punkt, an dem ich mich nicht selbst bestätigen kann. */}
+          <p className="text-xs text-neutral-400 mt-3 leading-relaxed">
+            Ob die Datei einer Prüfung standhält, entscheidet ein Validator —
+            nicht der Erzeuger. Vor dem ersten echten Versand gehört eine
+            Probedatei extern geprüft.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

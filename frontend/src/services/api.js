@@ -240,6 +240,11 @@ export const invoiceApi = {
   createAdvance:    (id, data, trotzAblauf = false) =>
     api.post(`/invoices/${id}/anzahlung`, data, { params: { trotz_ablauf: trotzAblauf } }),
   createFinal:      (id, data) => api.post(`/invoices/${id}/schlussrechnung`, data || {}),
+
+  // E-Rechnung (ZUGFeRD 2.5 / Factur-X)
+  erechnungPruefen: (id) => api.get(`/invoices/${id}/erechnung/pruefen`),
+  erechnungXmlUrl:  (id, trotzLuecken = false) =>
+    `/api/invoices/${id}/erechnung/xml` + (trotzLuecken ? '?trotz_luecken=true' : ''),
   uploadContract:   (id, file) => {
     const form = new FormData()
     form.append('file', file)

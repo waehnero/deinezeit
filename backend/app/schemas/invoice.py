@@ -561,3 +561,19 @@ class InvoiceAuditEntry(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── E-Rechnung (C-5) ──────────────────────────────────────────────────────────
+
+class ERechnungPruefung(BaseModel):
+    """
+    Ob und was einer E-Rechnung dieses Belegs noch fehlt.
+
+    ``aktiv`` und ``moeglich`` sind zwei verschiedene Fragen: Die E-Rechnung
+    kann eingeschaltet und der Beleg trotzdem unvollständig sein — und
+    umgekehrt.
+    """
+    aktiv: bool = False
+    moeglich: bool = False
+    fehlende_angaben: List[str] = []
+    format: str = ""

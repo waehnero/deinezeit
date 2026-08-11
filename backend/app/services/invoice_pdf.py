@@ -952,8 +952,17 @@ table.totals .grand-total td {{ color: var(--primary); }}
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
-                 sender_contact=None, recipient_contact=None, db=None) -> bytes:
-    """Gibt PDF-Bytes zurück."""
+                 sender_contact=None, recipient_contact=None, db=None,
+                 erechnung_xml: bytes = None) -> bytes:
+    """
+    Gibt PDF-Bytes zurück.
+
+    Ist ``erechnung_xml`` gesetzt, entsteht ein **hybrider** Beleg: dasselbe
+    PDF, nur als PDF/A-3 mit eingebettetem XML. Sichtbar ändert sich nichts —
+    genau das ist der Sinn der Sache. Ohne XML bleibt alles wie bisher; ein
+    Rückfall auf PDF/A für jeden Beleg wäre eine stille Änderung an allen
+    Ausdrucken des Hauses.
+    """
     # Vorlage: zuerst aus inv_settings (globale Einstellung), dann aus Rechnung, Fallback 1
     default_tpl = inv_settings.get("default_template", 1)
     try: default_tpl = int(default_tpl)
@@ -970,7 +979,21 @@ def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
         db=db,
     )
     buf = io.BytesIO()
-    WeasyprintHTML(string=html, base_url="/").write_pdf(buf)
+    dokument = WeasyprintHTML(string=html, base_url="/")
+    if erechnung_xml:
+        from app.services.erechnung import pdf_anhang, facturx
+        titel = f"{DOC_TYPE_LABELS.get(invoice.doc_type, 'Beleg')} {invoice.number or ''}".strip()
+        dokument.write_pdf(
+            buf,
+            pdf_variant="pdf/a-3b",
+            finisher=pdf_anhang.finisher(
+                erechnung_xml, facturx.dateiname(),
+                titel=titel,
+                autor=settings.get("company_name", "") or "",
+            ),
+        )
+    else:
+        dokument.write_pdf(buf)
     return buf.getvalue()
 
 
