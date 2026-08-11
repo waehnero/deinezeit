@@ -27,6 +27,7 @@ import InvoiceBookPage from './pages/InvoiceBookPage'
 import OpenItemsPage from './pages/OpenItemsPage'
 import MonatsabschlussPage from './pages/MonatsabschlussPage'
 import MahnlaufPage from './pages/MahnlaufPage'
+import AuswertungenPage from './pages/AuswertungenPage'
 import BuchhaltungPage from './pages/BuchhaltungPage'
 import KontenplanPage from './pages/KontenplanPage'
 import EingangsrechnungenPage from './pages/EingangsrechnungenPage'
@@ -115,6 +116,7 @@ function App() {
                       <Route path="/buchhaltung"                element={<ModuleRoute module="buchhaltung"><BuchhaltungPage /></ModuleRoute>} />
                       <Route path="/buchhaltung/offene-posten"   element={<ModuleRoute module="buchhaltung"><OpenItemsPage /></ModuleRoute>} />
                       <Route path="/buchhaltung/mahnlauf"        element={<ModuleRoute module="buchhaltung"><MahnlaufPage /></ModuleRoute>} />
+                      <Route path="/buchhaltung/auswertungen"   element={<ModuleRoute module="buchhaltung"><AuswertungenPage /></ModuleRoute>} />
                       <Route path="/buchhaltung/verkaufsbuch"    element={<ModuleRoute module="buchhaltung"><InvoiceBookPage /></ModuleRoute>} />
                       <Route path="/buchhaltung/abschluss"       element={<ModuleRoute module="buchhaltung"><MonatsabschlussPage /></ModuleRoute>} />
                       <Route path="/buchhaltung/konten"          element={<ModuleRoute module="buchhaltung"><KontenplanPage /></ModuleRoute>} />

@@ -4,6 +4,19 @@
  */
 export const changelog = [
   {
+    version: '1.12.51',
+    day: '11',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Neue Seite „Auswertungen“ unter Buchhaltung: Umsatz je Monat mit Vorjahresvergleich, Rangliste der Kunden mit Anteil am Gesamtumsatz, Rangliste der Artikel und die Angebotsquote',
+      'Bei den Artikeln steht über der Liste, wie viel Umsatz sich keinem Artikel zuordnen ließ — frei geschriebene Positionen tauchen dort nicht auf, und das soll man wissen, bevor man die Rangliste liest',
+    ],
+    updates: [
+      'Alle Beträge sind netto und zählen im Monat des Belegdatums — dieselbe Abgrenzung wie Verkaufsbuch und Umsatzsteuer, damit beide Ansichten dieselbe Zahl nennen',
+    ],
+  },
+  {
     version: '1.12.50',
     day: '10',
     month: 'August',

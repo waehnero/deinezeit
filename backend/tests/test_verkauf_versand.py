@@ -136,7 +136,12 @@ def test_umgewandeltes_angebot_geht_ohne_wasserzeichen_hinaus(auth_client, db_se
     """
     kontakt = _make_kontakt(db_session)
     angebot = _create(auth_client, kontakt.id, doc_type="angebot")
-    rechnung = auth_client.post(f"/api/invoices/{angebot['id']}/convert-to-invoice").json()
+    # Das Angebot bleibt hier Entwurf — ein Entwurf gilt nie als abgelaufen,
+    # deshalb greift die Rückfrage zur Bindefrist nicht. Wird der Test später
+    # um ein ausgestelltes Angebot erweitert, braucht es `trotz_ablauf`.
+    resp = auth_client.post(f"/api/invoices/{angebot['id']}/convert-to-invoice")
+    assert resp.status_code == 200, resp.text
+    rechnung = resp.json()
     assert rechnung["status"] == "entwurf"
 
     assert _senden(auth_client, rechnung["id"]).status_code == 200
