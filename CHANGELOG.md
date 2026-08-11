@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.12.51] – 2026-08-11 – Auswertungen im Verkauf
+
+### Neu
+- Neue Seite „Auswertungen“ unter Buchhaltung: Umsatz je Monat mit Vorjahresvergleich, Rangliste der Kunden mit Anteil am Gesamtumsatz, Rangliste der Artikel und die Angebotsquote
+- Bei den Artikeln steht über der Liste, wie viel Umsatz sich keinem Artikel zuordnen ließ — frei geschriebene Positionen tauchen dort nicht auf, und das soll man wissen, bevor man die Rangliste liest
+
+### Aktualisierungen
+- Alle Beträge sind netto und zählen im Monat des Belegdatums — dieselbe Abgrenzung wie Verkaufsbuch und Umsatzsteuer, damit beide Ansichten dieselbe Zahl nennen
+
+---
+
 ## [1.12.50] – 2026-08-10 – E-Rechnung (ZUGFeRD / Factur-X)
 
 ### Neu

@@ -4,6 +4,7 @@ import { invoiceApi } from '../services/api'
 import PageHeader from '../components/PageHeader'
 import {
   Calculator, Wallet, Bell, Book, CalendarCheck, BookText, RefreshCw, FileInput,
+  BarChart3,
 } from 'lucide-react'
 
 function fmtEuro(n) {
@@ -40,6 +41,10 @@ const KACHELN = [
     // denselben Zeitraum. Eine eigene Kachel würde nur zweimal dorthin führen.
     to: '/buchhaltung/verkaufsbuch', icon: Book, titel: 'Verkaufsbuch & Umsatzsteuer',
     text: 'Belegjournal des Zeitraums, Auswertung je Steuersatz für die Voranmeldung und der Buchungsexport für die Kanzlei.',
+  },
+  {
+    to: '/buchhaltung/auswertungen', icon: BarChart3, titel: 'Auswertungen',
+    text: 'Umsatz je Monat, Kunde und Artikel — und wie viele Angebote zu Aufträgen werden.',
   },
   {
     to: '/buchhaltung/abschluss', icon: CalendarCheck, titel: 'Monatsabschluss',

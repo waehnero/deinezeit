@@ -22,6 +22,7 @@
 > | Sammelbranch Kleinigkeiten | `fix/verkauf-kleinigkeiten` | ✅ umgesetzt (A-14, A-17e/f/g, B-3) |
 > | Positionstypen & Gliederung | `feature/verkauf-positionstypen` | ✅ umgesetzt (A-15 + Umsortieren) |
 > | 5 — E-Rechnung (C-5) | `feature/e-rechnung-facturx` | ✅ umgesetzt (ZUGFeRD 2.5 / Factur-X, Profil EN 16931, hybrides PDF/A-3 + Tests) |
+> | 12 — Auswertungen (C-15) | `feature/verkauf-auswertungen` | ✅ umgesetzt (Umsatz je Monat/Kunde/Artikel, Angebotsquote + Tests) |
 > | 10 — Anzahlung, Teil- und Schlussrechnung | `feature/anzahlung-schlussrechnung` | ✅ umgesetzt (C-10: Abrechnungsstufe, Vorgangs-Strang, Abzug je Steuersatz + Tests) |
 > | 6 — Buchhaltung als eigener Bereich | `feature/buchhaltung-bereich` | ✅ umgesetzt (Menüpunkt, Übersicht, Umzug von OP/Mahnlauf/Verkaufsbuch/Abschluss/Kontenplan) |
 > | 7 — Eingangsrechnungen & Vorsteuer | `feature/eingangsrechnungen` | ✅ umgesetzt (Erfassung, Zahlungen, Kreditoren-OP, Vorsteuer in der UVA, eigenes Buchungsjournal + Tests) |
@@ -538,7 +539,7 @@ Legende: ✅ vorhanden · ⚠️ rudimentär · ❌ fehlt
 | C-12 | Preislisten / Kundenpreise / Staffeln | ❌ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
 | C-13 | Lieferschein → Rechnung, Teillieferung | ❌ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
 | C-14 | Fremdwährung mit Kurs | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| C-15 | Auswertungen (Umsatz je Kunde/Artikel/Monat) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| C-15 | Auswertungen (Umsatz je Kunde/Artikel/Monat) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | C-16 | Projektabrechnung Budget vs. verrechnet | ❌ | ❌ | ⚠️ | ✅ | ✅ | ✅ |
 | C-17 | Angebotsverfolgung / Pipeline | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
 | C-18 | Zahlungslink / Kundenportal | ❌ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ |
@@ -595,6 +596,40 @@ nach erfolgreichem Versand committet, bleibt der Beleg bei einem Fehlschlag
 Entwurf. Abgedeckt in `tests/test_verkauf_versand.py` — geprüft wird der
 Zustand des Belegs im Augenblick der PDF-Erzeugung, nicht das Aussehen des
 PDF.
+
+---
+
+#### C-15 · Umsatzauswertungen
+
+**Umgesetzt in Etappe 12.** Entscheidungen (Oliver):
+
+1. **Stichtag ist das Belegdatum**, nicht der Zahlungseingang — dieselbe
+   Abgrenzung wie UVA, Verkaufsbuch und Monatsabschluss. Zwei Auswertungen im
+   selben Haus, die zum selben Monat verschiedene Zahlen nennen, kosten mehr
+   Zeit als sie sparen. Ein eigener Test hält fest, dass Auswertung und
+   Verkaufsbuch dieselbe Nettosumme liefern.
+2. **Umfang:** Umsatz je Monat (mit Vorjahresvergleich), je Kunde, je Artikel
+   und die Angebotsquote.
+3. **Ort:** Kachel im Bereich Buchhaltung, hinter dem Modulrecht
+   `buchhaltung` — sie zeigt dieselben Zahlen wie Verkaufsbuch und UVA, nur
+   anders geschnitten.
+
+Drei Festlegungen, die den Wert der Zahlen bestimmen:
+
+* Der **Anteil je Kunde** rechnet am vollen Umsatz, auch bei gekürzter Liste.
+  Sonst summierten sich die obersten fünfzehn auf 100 %.
+* Bei den **Artikeln** wird ausgewiesen, wie viel Umsatz sich keinem Artikel
+  zuordnen ließ. Frei getippte Positionen unter ihrem Text zu gruppieren würde
+  „Regiestunden" und „Regiestunde" trennen und eine Genauigkeit vortäuschen.
+  Rabatt und Anzahlungsabzug werden anteilig auf die Zeilen verteilt, sonst
+  wäre die Artikelsumme größer als der Jahresumsatz daneben.
+* Die **Angebotsquote** rechnet auf die entschiedenen Angebote; offene würden
+  sie drücken und jeden Monat rückwirkend verändern. Ohne Entscheidung steht
+  dort `null` statt 0 %. Als gewonnen gilt auch ein Angebot, aus dem ein
+  Folgebeleg entstanden ist — ohne dass jemand auf „angenommen" geklickt hat.
+
+**Bekannte Grenze:** Die Dauer bis zur Zusage ist eine Näherung über
+`updated_at`; ein eigenes Annahmedatum führt das System nicht.
 
 ---
 

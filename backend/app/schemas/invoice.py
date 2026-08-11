@@ -577,3 +577,69 @@ class ERechnungPruefung(BaseModel):
     moeglich: bool = False
     fehlende_angaben: List[str] = []
     format: str = ""
+
+
+# ── Auswertungen (C-15) ───────────────────────────────────────────────────────
+
+class UmsatzMonat(BaseModel):
+    monat: int
+    netto: Decimal
+    vorjahr: Decimal
+    belege: int
+
+
+class UmsatzJahrResponse(BaseModel):
+    jahr: int
+    monate: List[UmsatzMonat] = []
+    netto_gesamt: Decimal
+    vorjahr_gesamt: Decimal
+    belege_gesamt: int
+
+
+class UmsatzKundeZeile(BaseModel):
+    contact_id: Optional[UUID] = None
+    name: str
+    netto: Decimal
+    belege: int
+    anteil: Decimal            # Prozent am Gesamtumsatz des Zeitraums
+
+
+class UmsatzKundeResponse(BaseModel):
+    zeilen: List[UmsatzKundeZeile] = []
+    netto_gesamt: Decimal
+    kunden: int
+
+
+class UmsatzArtikelZeile(BaseModel):
+    article_id: Optional[UUID] = None
+    name: str
+    netto: Decimal
+    menge: Decimal
+    belege: int
+
+
+class UmsatzArtikelResponse(BaseModel):
+    """
+    ``ohne_artikel_*`` ist kein Rest, sondern die Aussage über die Güte der
+    Liste: Freie Positionstexte lassen sich keinem Artikel zuordnen.
+    """
+    zeilen: List[UmsatzArtikelZeile] = []
+    netto_gesamt: Decimal
+    ohne_artikel_netto: Decimal
+    ohne_artikel_belege: int
+    ohne_artikel_anteil: Decimal
+
+
+class AngebotsquoteResponse(BaseModel):
+    gesamt: int
+    gesamt_netto: Decimal
+    gewonnen: int
+    gewonnen_netto: Decimal
+    verloren: int
+    verloren_netto: Decimal
+    offen: int
+    offen_netto: Decimal
+    # None, solange nichts entschieden ist — 0 % wäre eine Aussage, die es
+    # nicht gibt.
+    quote: Optional[Decimal] = None
+    tage_bis_entscheidung: Optional[int] = None

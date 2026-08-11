@@ -242,6 +242,12 @@ export const invoiceApi = {
   createFinal:      (id, data) => api.post(`/invoices/${id}/schlussrechnung`, data || {}),
 
   // E-Rechnung (ZUGFeRD 2.5 / Factur-X)
+  // Auswertungen (C-15) — Stichtag ist das Belegdatum, wie in UVA und Verkaufsbuch
+  umsatzJahr:     (jahr) => api.get('/invoices/auswertung/umsatz-jahr', { params: { jahr } }),
+  umsatzKunden:   (params) => api.get('/invoices/auswertung/umsatz-kunden', { params }),
+  umsatzArtikel:  (params) => api.get('/invoices/auswertung/umsatz-artikel', { params }),
+  angebotsquote:  (params) => api.get('/invoices/auswertung/angebotsquote', { params }),
+
   erechnungPruefen: (id) => api.get(`/invoices/${id}/erechnung/pruefen`),
   erechnungXmlUrl:  (id, trotzLuecken = false) =>
     `/api/invoices/${id}/erechnung/xml` + (trotzLuecken ? '?trotz_luecken=true' : ''),

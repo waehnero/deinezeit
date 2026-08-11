@@ -29,6 +29,7 @@ from app.services import dunning as dunning_service
 from app.services import angebot as angebot_service
 from app.services import anzahlung as anzahlung_service
 from app.services.erechnung import beleg as erechnung_service
+from app.services import auswertungen as auswertungen_service
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
@@ -42,6 +43,8 @@ from app.schemas.invoice import (
     DunningBlockRequest, DunningBatchRequest, DunningLevelConfig,
     SkontoVorschau, SkontoZeile, SkontoRequest,
     ERechnungPruefung,
+    UmsatzJahrResponse, UmsatzKundeResponse, UmsatzArtikelResponse,
+    AngebotsquoteResponse,
     AnzahlungRequest, SchlussrechnungRequest,
     AbzugZeile, StrangBeleg, StrangResponse,
 )
@@ -2102,6 +2105,70 @@ async def get_invoice_audit(
             .filter(InvoiceAuditLog.invoice_id == invoice_id)
             .order_by(InvoiceAuditLog.changed_at.desc())
             .all())
+
+
+# ── Auswertungen (C-15) ───────────────────────────────────────────────────────
+#
+# Alle vier hinter dem Modulrecht `buchhaltung`: Sie zeigen dieselben Zahlen
+# wie Verkaufsbuch und UVA, nur anders geschnitten. Ein Recht, das dort greift
+# und hier nicht, wäre über die Auswertung umgehbar.
+
+AUSWERTUNG_RECHT = [Depends(require_module("buchhaltung"))]
+
+
+@router.get("/auswertung/umsatz-jahr", response_model=UmsatzJahrResponse,
+            dependencies=AUSWERTUNG_RECHT)
+async def umsatz_je_monat(
+    jahr: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Monatsumsatz eines Jahres mit Vorjahresvergleich."""
+    return auswertungen_service.je_monat(db, jahr or datetime.now().year)
+
+
+@router.get("/auswertung/umsatz-kunden", response_model=UmsatzKundeResponse,
+            dependencies=AUSWERTUNG_RECHT)
+async def umsatz_je_kunde(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    limit: int = Query(0, ge=0, le=500),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Rangliste der Kunden. ``limit=0`` gibt alle zurück."""
+    return auswertungen_service.je_kunde(db, date_from, date_to, limit)
+
+
+@router.get("/auswertung/umsatz-artikel", response_model=UmsatzArtikelResponse,
+            dependencies=AUSWERTUNG_RECHT)
+async def umsatz_je_artikel(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    limit: int = Query(0, ge=0, le=500),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Rangliste der Artikel.
+
+    Die Antwort nennt ausdrücklich, wie viel Umsatz sich **keinem** Artikel
+    zuordnen ließ — bei überwiegend frei getippten Positionen ist die Liste
+    sonst eine Genauigkeit, die es nicht gibt.
+    """
+    return auswertungen_service.je_artikel(db, date_from, date_to, limit)
+
+
+@router.get("/auswertung/angebotsquote", response_model=AngebotsquoteResponse,
+            dependencies=AUSWERTUNG_RECHT)
+async def angebotsquote(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Wie viele Angebote zu Aufträgen werden, gezählt nach Angebotsdatum."""
+    return auswertungen_service.angebotsquote(db, date_from, date_to)
 
 
 # ── E-Rechnung (C-5) ──────────────────────────────────────────────────────────
