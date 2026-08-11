@@ -79,6 +79,37 @@
 > Reverse-Charge-Umsatz. Sie läuft jetzt wie PDF und BMD-Export über
 > `services/positionen.py` — es waren also vier Auswerter, nicht drei.
 >
+> **Beschlossene nächste Etappen (Oliver, 11.08.2026)** — in dieser
+> Reihenfolge, je ein eigener Branch:
+>
+> 1. **C-16 Projektabrechnung** Budget gegen verrechnet. Reines Lesen, keine
+>    Migration; Stundenkonten und Projektbudgets liegen bereits vor, nur die
+>    Verbindung zur Fakturierung fehlt.
+> 2. **C-17 Angebotsverfolgung.** Das Rückblickende ist mit Bindefrist
+>    (Etappe 9) und Angebotsquote (Etappe 12) da; es fehlt die aktive Seite —
+>    welche Angebote brauchen jetzt einen Anruf.
+> 3. **C-12 Kundenpreise und Staffeln.** Erste der vier, die bestehendes
+>    Verhalten ändert (Preisfindung im Belegformular). Offene Fachfrage vor
+>    dem Bau: **Wo lebt ein Kundenpreis** — am Kunden, am Artikel oder in einer
+>    eigenen Preisliste? Davon hängt der spätere Pflegeaufwand ab.
+> 4. **C-13 Lieferschein → Rechnung.** Die größte der vier: Umwandlung,
+>    Teillieferungen, mehrere Lieferscheine auf eine Rechnung. Bewusst zuletzt,
+>    weil sie von der Preisfindung aus C-12 profitiert — sonst wird sie zweimal
+>    gebaut.
+>
+> Nicht gewählt: C-11 (Sammelrechnung), C-14 (Fremdwährung mit Kurs),
+> C-18 (Zahlungslink). C-14 und C-18 nur bei tatsächlichem Bedarf; C-18 ist
+> ohnehin eher eine Geschäfts- als eine Programmierentscheidung.
+>
+> **Zwei Dinge warten unabhängig davon:**
+>
+> * Der **E-Rechnungs-Schalter steht auf aus** und soll es bleiben, bis eine
+>   erzeugte Datei extern gegen Schema und Schematron geprüft wurde. Die Tests
+>   decken Struktur, Summen und das Nicht-Raten ab — nicht die Konformität.
+> * **Werkzeug:** CI-Laufzeit (zuletzt ~47 Minuten, mit `pytest --durations`
+>   messen statt raten), pre-commit-Hook zählt bei Folge-Commits im selben
+>   Branch erneut hoch, und `fix/postecke-ki-diagnose` liegt noch.
+
 > **Weiterhin offen:** Zeiteinträge können ohne `contact_id` entstehen (nur
 > Name); der Namens-Rückfall fängt das ab, sauber ist es nicht. Ein
 > Aufräumlauf für verwaiste Positionsbilder fehlt (eine gelöschte Position
