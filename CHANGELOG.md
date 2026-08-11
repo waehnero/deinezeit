@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.52] – 2026-08-11 – E rechnung facturx
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.51] – 2026-08-11 – Auswertungen im Verkauf
 
 ### Neu
