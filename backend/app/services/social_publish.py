@@ -143,7 +143,8 @@ def _publiziere_fb_seite_video(db: Session, post: SocialPost, profil: SocialProf
     """
     video = post.video
     beschreibung = "\n\n".join(t for t in (post.text, post.hashtags) if t) or ""
-    daten, _ct = storage_service.download_file(video.storage_key, db)
+    daten, _ct = storage_service.download_file(
+        video.storage_key, db, backend=video.storage_provider)
     resp = httpx.post(
         f"{GRAPH_API}/{page_id}/videos",
         data={"description": beschreibung, "access_token": token},
@@ -176,7 +177,8 @@ def _publiziere_fb_seite(db: Session, post: SocialPost, profil: SocialProfil) ->
     # 1. Fotos einzeln (unveröffentlicht) hochladen -> media_fbids
     media_ids = []
     for foto in (post.fotos or []):
-        daten, _ct = storage_service.download_file(foto.storage_key, db)
+        daten, _ct = storage_service.download_file(
+            foto.storage_key, db, backend=foto.storage_provider)
         try:
             daten, mimetype = bearbeite_foto(
                 daten, profil.bild_format or "original", profil.bild_filter or "kein")

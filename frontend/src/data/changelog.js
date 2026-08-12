@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.53',
+    day: '12',
+    month: 'August',
+    year: '2026',
+    features: [],
+    updates: [
+      'Postecke: Fotos und Videos merken sich jetzt, in welchem Dateispeicher sie abgelegt wurden. Nach einem Wechsel des Speichers bleiben auch ältere Medien in Vorschau, Download und beim Veröffentlichen erreichbar — und werden beim Löschen restlos entfernt.',
+    ],
+  },
+  {
     version: '1.12.52',
     day: '11',
     month: 'August',

@@ -11,6 +11,7 @@ Der echte KI-Aufruf (services/ki.call_ki) und der Objektspeicher werden
 gemockt — Tests laufen ohne API-Key und ohne MinIO.
 """
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 import pytest
 
@@ -29,10 +30,10 @@ def _storage_in_memory(monkeypatch):
         lambda key, data, mimetype=None, db=None, backend=None: ablage.__setitem__(key, data))
     monkeypatch.setattr(
         "app.services.storage_service.download_file",
-        lambda key, db=None: (ablage.get(key, b""), "application/octet-stream"))
+        lambda key, db=None, backend=None: (ablage.get(key, b""), "application/octet-stream"))
     monkeypatch.setattr(
         "app.services.storage_service.delete_file",
-        lambda key, db=None: ablage.pop(key, None))
+        lambda key, db=None, backend=None: ablage.pop(key, None))
 
 
 # ── Hilfen ────────────────────────────────────────────────────────────────────
@@ -120,7 +121,7 @@ def test_post_loeschen_entfernt_fotos_im_storage(auth_client, monkeypatch):
     """Beim Löschen eines Posts werden auch Speicher-Objekte aufgeräumt."""
     geloescht = []
     monkeypatch.setattr("app.api.postecke.storage_service.delete_file",
-                        lambda key, db=None: geloescht.append(key))
+                        lambda key, db=None, backend=None: geloescht.append(key))
     post = _post_anlegen(auth_client)
     assert auth_client.delete(f"/api/postecke/posts/{post['id']}").status_code == 204
     # keine Fotos vorhanden -> nichts zu löschen, aber Endpunkt funktioniert
@@ -215,7 +216,7 @@ def _mock_storage(monkeypatch):
     monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
                         lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
     monkeypatch.setattr("app.api.postecke.storage_service.delete_file",
-                        lambda key, db=None: speicher.pop(key, None))
+                        lambda key, db=None, backend=None: speicher.pop(key, None))
     monkeypatch.setattr("app.services.postecke.synchronisiere_datacenter",
                         lambda db, post, user_id=None: 0)
     return speicher
@@ -302,7 +303,7 @@ def test_video_poster_wird_erzeugt_und_ausgeliefert(auth_client, monkeypatch):
     monkeypatch.setattr("app.api.postecke.postecke_service.erzeuge_video_poster",
                         lambda data, endung=".mp4": b"jpeg-poster-bytes")
     monkeypatch.setattr("app.api.postecke.storage_service.download_file",
-                        lambda key, db=None: (speicher.get(key, b""), "image/jpeg"))
+                        lambda key, db=None, backend=None: (speicher.get(key, b""), "image/jpeg"))
 
     post = _post_anlegen(auth_client)
     resp = auth_client.post(f"/api/postecke/posts/{post['id']}/video",
@@ -369,7 +370,7 @@ def test_foto_ausspielung_endpoint(auth_client, monkeypatch):
     monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
                         lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data))
     monkeypatch.setattr("app.api.postecke.storage_service.download_file",
-                        lambda key, db=None: (speicher[key], "image/jpeg"))
+                        lambda key, db=None, backend=None: (speicher[key], "image/jpeg"))
 
     profil = _profil_anlegen(auth_client, bild_format="1:1", bild_filter="kein")
     post = _post_anlegen(auth_client, profil_id=profil["id"])
@@ -424,7 +425,7 @@ def test_fb_seite_video_publisher_nutzt_videos_endpunkt(auth_client, monkeypatch
 
     monkeypatch.setattr(social_publish.httpx, "post", _fake_post)
     monkeypatch.setattr(social_publish.storage_service, "download_file",
-                        lambda key, db=None: (b"videobytes", "video/mp4"))
+                        lambda key, db=None, backend=None: (b"videobytes", "video/mp4"))
     monkeypatch.setattr("app.api.postecke.storage_service.upload_file",
                         lambda key, data, mt, db=None, backend=None: None)
 
@@ -526,7 +527,7 @@ def _mock_storage_mit_download(monkeypatch):
     """Storage-Mock (upload/download/delete, api + service) für die Sync-Tests."""
     speicher = {}
     _up = lambda key, data, mt, db=None, backend=None: speicher.__setitem__(key, data)
-    _del = lambda key, db=None: speicher.pop(key, None)
+    _del = lambda key, db=None, backend=None: speicher.pop(key, None)
     for pfad in ("app.api.postecke.storage_service.upload_file",
                  "app.services.postecke.storage_service.upload_file"):
         monkeypatch.setattr(pfad, _up)
@@ -534,7 +535,7 @@ def _mock_storage_mit_download(monkeypatch):
                  "app.services.postecke.storage_service.delete_file"):
         monkeypatch.setattr(pfad, _del)
     monkeypatch.setattr("app.services.postecke.storage_service.download_file",
-                        lambda key, db=None: (speicher[key], "application/octet-stream"))
+                        lambda key, db=None, backend=None: (speicher[key], "application/octet-stream"))
     return speicher
 
 
@@ -715,7 +716,7 @@ def test_oeffentlicher_medien_abruf(auth_client, monkeypatch):
     from app.services import social_publish
     _mock_storage(monkeypatch)
     monkeypatch.setattr("app.api.oeffentlich.storage_service.download_file",
-                        lambda key, db=None: (b"video-bytes", "video/mp4"))
+                        lambda key, db=None, backend=None: (b"video-bytes", "video/mp4"))
 
     post = _post_anlegen(auth_client)
     r = auth_client.post(f"/api/postecke/posts/{post['id']}/video",
@@ -803,3 +804,145 @@ def test_instagram_verbindung_testen(auth_client, monkeypatch):
     assert r.status_code == 200
     assert r.json()["ok"] is True
     assert "wwinterface" in r.json()["message"]
+
+
+# ── Speicher-Provider je Datei (Migration 0053) ───────────────────────────────
+# Hintergrund: Fotos und Videos wurden über den *gerade aktiven* Speicher
+# hoch- und heruntergeladen sowie gelöscht. Nach einem Wechsel zwischen MinIO
+# und OneDrive wären ältere Medien unauffindbar. Seit 0053 merkt sich jede
+# Datei ihren Speicher; NULL heißt weiterhin „nimm den aktiven".
+
+def _mock_storage_mit_provider(monkeypatch, aktiver="minio"):
+    """
+    Storage-Mock, der zusätzlich mitschreibt, mit welchem ``backend`` jeder
+    Aufruf erfolgt ist. Liefert (speicher, protokoll, setze_aktiven).
+    """
+    speicher = {}
+    protokoll = {"upload": [], "download": [], "delete": []}
+    zustand = {"aktiv": aktiver}
+
+    def _up(key, data, mt=None, db=None, backend=None):
+        protokoll["upload"].append((key, backend))
+        speicher[key] = data
+
+    def _down(key, db=None, backend=None):
+        protokoll["download"].append((key, backend))
+        return speicher.get(key, b""), "application/octet-stream"
+
+    def _del(key, db=None, backend=None):
+        protokoll["delete"].append((key, backend))
+        speicher.pop(key, None)
+
+    monkeypatch.setattr("app.services.storage_service.upload_file", _up)
+    monkeypatch.setattr("app.services.storage_service.download_file", _down)
+    monkeypatch.setattr("app.services.storage_service.delete_file", _del)
+    monkeypatch.setattr("app.services.storage_service.current_backend",
+                        lambda db=None: zustand["aktiv"])
+    monkeypatch.setattr("app.services.postecke.synchronisiere_datacenter",
+                        lambda db, post, user_id=None: 0)
+
+    def setze_aktiven(name):
+        zustand["aktiv"] = name
+
+    return speicher, protokoll, setze_aktiven
+
+
+def test_foto_merkt_sich_den_speicher_beim_upload(auth_client, db_session, monkeypatch):
+    """Der beim Upload aktive Speicher wird an der Foto-Zeile festgehalten."""
+    from app.models.postecke import SocialPostFoto
+
+    _speicher, protokoll, _ = _mock_storage_mit_provider(monkeypatch, aktiver="minio")
+    post = _post_anlegen(auth_client)
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
+                            files=[("files", ("t.jpg", b"bytes", "image/jpeg"))])
+    assert resp.status_code == 201, resp.text
+    foto_id = resp.json()["fotos"][0]["id"]
+
+    zeile = db_session.query(SocialPostFoto).filter(
+        SocialPostFoto.id == UUID(foto_id)).first()
+    assert zeile.storage_provider == "minio"
+    # ... und der Upload ging auch wirklich dorthin (nicht "aktiver Speicher")
+    assert protokoll["upload"][-1][1] == "minio"
+
+
+def test_foto_abruf_und_loeschen_nutzen_den_gemerkten_speicher(
+        auth_client, db_session, monkeypatch):
+    """
+    Der Kern der Sache: nach einem Speicherwechsel muss ein altes Foto weiterhin
+    aus MinIO gelesen und dort gelöscht werden — nicht aus dem neuen OneDrive.
+    """
+    _speicher, protokoll, setze_aktiven = _mock_storage_mit_provider(
+        monkeypatch, aktiver="minio")
+    post = _post_anlegen(auth_client)
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
+                            files=[("files", ("t.jpg", b"bytes", "image/jpeg"))])
+    foto_id = resp.json()["fotos"][0]["id"]
+
+    # Speicher umstellen (wie in den Einstellungen)
+    setze_aktiven("onedrive")
+
+    assert auth_client.get(f"/api/postecke/fotos/{foto_id}").status_code == 200
+    assert protokoll["download"][-1][1] == "minio"
+
+    assert auth_client.delete(f"/api/postecke/fotos/{foto_id}").status_code == 204
+    assert protokoll["delete"][-1][1] == "minio"
+
+
+def test_video_und_poster_teilen_sich_den_speicher(auth_client, db_session, monkeypatch):
+    """
+    Video und Standbild werden im selben Vorgang geschrieben, also auch im
+    selben Speicher — und nach einem Wechsel von dort wieder gelesen/gelöscht.
+    """
+    from app.models.postecke import SocialPostVideo
+
+    _speicher, protokoll, setze_aktiven = _mock_storage_mit_provider(
+        monkeypatch, aktiver="minio")
+    monkeypatch.setattr("app.services.postecke.erzeuge_video_poster",
+                        lambda data, endung=".mp4": b"jpeg-poster")
+
+    post = _post_anlegen(auth_client)
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/video",
+                            files={"file": ("clip.mp4", b"x", "video/mp4")})
+    assert resp.status_code == 201, resp.text
+    video_id = resp.json()["video"]["id"]
+
+    zeile = db_session.query(SocialPostVideo).filter(
+        SocialPostVideo.id == UUID(video_id)).first()
+    assert zeile.storage_provider == "minio"
+    assert zeile.poster_key  # Standbild wurde abgelegt
+    # Video UND Poster gingen nach minio
+    assert {b for _k, b in protokoll["upload"]} == {"minio"}
+
+    setze_aktiven("onedrive")
+
+    assert auth_client.get(f"/api/postecke/videos/{video_id}/poster").status_code == 200
+    assert protokoll["download"][-1][1] == "minio"
+
+    assert auth_client.delete(f"/api/postecke/videos/{video_id}").status_code == 204
+    # beide Objekte (Video + Poster) wurden in minio gelöscht
+    assert [b for _k, b in protokoll["delete"][-2:]] == ["minio", "minio"]
+
+
+def test_unbekannter_provider_faellt_auf_aktiven_speicher_zurueck(
+        auth_client, db_session, monkeypatch):
+    """
+    Bestandsdaten haben NULL (kein Backfill). Das muss weiterhin bedeuten
+    „nimm den aktiven Speicher" — sonst wäre 0053 ein Bruch für Altdaten.
+    """
+    from app.models.postecke import SocialPostFoto
+
+    _speicher, protokoll, _ = _mock_storage_mit_provider(monkeypatch, aktiver="onedrive")
+    post = _post_anlegen(auth_client)
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
+                            files=[("files", ("t.jpg", b"bytes", "image/jpeg"))])
+    foto_id = resp.json()["fotos"][0]["id"]
+
+    # Altdatensatz simulieren: Provider unbekannt
+    zeile = db_session.query(SocialPostFoto).filter(
+        SocialPostFoto.id == UUID(foto_id)).first()
+    zeile.storage_provider = None
+    db_session.commit()
+
+    assert auth_client.get(f"/api/postecke/fotos/{foto_id}").status_code == 200
+    # backend=None -> storage_service entscheidet selbst (aktiver Speicher)
+    assert protokoll["download"][-1][1] is None

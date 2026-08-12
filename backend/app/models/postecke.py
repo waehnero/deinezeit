@@ -133,6 +133,11 @@ class SocialPostFoto(Base):
                      ForeignKey("social_posts.id", ondelete="CASCADE"), nullable=False)
 
     storage_key = Column(String(500), nullable=False)
+    # In welchem Speicher liegt die Datei (minio | nextcloud | seadrive | onedrive).
+    # Abruf, Vorschau und Löschen nutzen genau diesen Provider, damit ältere
+    # Fotos nach einem Speicherwechsel auffindbar bleiben (vgl. Migration 0039).
+    # NULL = unbekannt -> aktiver Speicher (bisheriges Verhalten).
+    storage_provider = Column(String(20), nullable=True)
     filename = Column(String(300), nullable=False)
     mimetype = Column(String(100), nullable=False)
     size_bytes = Column(Integer, nullable=True)
@@ -157,6 +162,10 @@ class SocialPostVideo(Base):
                      nullable=False, unique=True)
 
     storage_key = Column(String(500), nullable=False)
+    # In welchem Speicher liegen Video UND Standbild (minio | nextcloud |
+    # seadrive | onedrive). Beide werden im selben Upload-Vorgang geschrieben,
+    # daher genügt eine Spalte. NULL = unbekannt -> aktiver Speicher.
+    storage_provider = Column(String(20), nullable=True)
     filename = Column(String(300), nullable=False)
     mimetype = Column(String(100), nullable=False)
     size_bytes = Column(Integer, nullable=True)

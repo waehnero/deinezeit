@@ -57,6 +57,19 @@ ERLAUBTE_VIDEO_TYPEN = ("video/mp4", "video/quicktime")
 MAX_VIDEO_BYTES = 200 * 1024 * 1024  # 200 MB je Video
 
 
+def _loesche_video_dateien(db: Session, video: SocialPostVideo) -> None:
+    """
+    Entfernt Video und Standbild aus dem Speicher, in dem sie tatsächlich
+    liegen (``storage_provider``), nicht aus dem gerade aktiven. Ohne diese
+    Unterscheidung bleiben nach einem Speicherwechsel Dateileichen zurück —
+    ein Löschversuch am falschen Ort meldet je nach Provider nicht einmal
+    einen Fehler. NULL bedeutet weiterhin „aktiver Speicher".
+    """
+    storage_service.delete_file(video.storage_key, db, backend=video.storage_provider)
+    if video.poster_key:
+        storage_service.delete_file(video.poster_key, db, backend=video.storage_provider)
+
+
 def _sync_datacenter(db: Session, post: SocialPost, user_id) -> None:
     """
     Spiegelt den Post laufend ins Datacenter (Ordner „Postecke" bzw. beim
@@ -245,11 +258,9 @@ def delete_post(
 ):
     p = _get_post(db, post_id, current_user)
     for foto in list(p.fotos or []):
-        storage_service.delete_file(foto.storage_key, db)
+        storage_service.delete_file(foto.storage_key, db, backend=foto.storage_provider)
     if p.video is not None:
-        storage_service.delete_file(p.video.storage_key, db)
-        if p.video.poster_key:
-            storage_service.delete_file(p.video.poster_key, db)
+        _loesche_video_dateien(db, p.video)
     db.delete(p)
     db.commit()
 
@@ -382,11 +393,16 @@ async def upload_fotos(
         filename = f.filename or "foto.jpg"
         storage_key = storage_service.build_storage_key(
             "postecke", str(p.id), f"{foto_id}_{filename}")
-        storage_service.upload_file(storage_key, data, mimetype, db)
+        # Den Speicher festhalten, in den wir schreiben. Ohne diese Angabe wird
+        # die Datei nach einem Speicherwechsel am falschen Ort gesucht — dieselbe
+        # Lehre wie bei den Anhängen (0039) und Positionsbildern (0051).
+        backend = storage_service.current_backend(db)
+        storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
         db.add(SocialPostFoto(
             id=foto_id,
             post_id=p.id,
             storage_key=storage_key,
+            storage_provider=backend,
             filename=filename,
             mimetype=mimetype,
             size_bytes=len(data),
@@ -429,7 +445,8 @@ def get_foto_ausspielung(
             bild_format = profil.bild_format or "original"
             bild_filter = profil.bild_filter or "kein"
 
-    data, _ct = storage_service.download_file(foto.storage_key, db)
+    data, _ct = storage_service.download_file(
+        foto.storage_key, db, backend=foto.storage_provider)
     try:
         daten, mimetype = postecke_service.bearbeite_foto(data, bild_format, bild_filter)
     except Exception:
@@ -450,7 +467,8 @@ def get_foto(
                     SocialPost.owner_user_id == current_user.id).first())
     if not foto:
         raise HTTPException(404, "Foto nicht gefunden")
-    data, content_type = storage_service.download_file(foto.storage_key, db)
+    data, content_type = storage_service.download_file(
+        foto.storage_key, db, backend=foto.storage_provider)
     return Response(content=data, media_type=content_type or foto.mimetype)
 
 
@@ -467,7 +485,7 @@ def delete_foto(
     if not foto:
         raise HTTPException(404, "Foto nicht gefunden")
     post_id = foto.post_id
-    storage_service.delete_file(foto.storage_key, db)
+    storage_service.delete_file(foto.storage_key, db, backend=foto.storage_provider)
     db.delete(foto)
     db.commit()
     # Datacenter-Spiegelung nachziehen (entfernt die Kopie des gelöschten Fotos)
@@ -505,9 +523,7 @@ async def upload_video(
 
     # Vorhandenes Video ersetzen (Datei + Poster + Datensatz entfernen)
     if p.video is not None:
-        storage_service.delete_file(p.video.storage_key, db)
-        if p.video.poster_key:
-            storage_service.delete_file(p.video.poster_key, db)
+        _loesche_video_dateien(db, p.video)
         db.delete(p.video)
         db.flush()
 
@@ -515,7 +531,10 @@ async def upload_video(
     filename = file.filename or "video.mp4"
     storage_key = storage_service.build_storage_key(
         "postecke", str(p.id), f"{video_id}_{filename}")
-    storage_service.upload_file(storage_key, data, mimetype, db)
+    # Speicher festhalten — Video und Standbild landen gemeinsam in diesem
+    # Speicher und werden später auch dort gesucht (vgl. Migration 0053).
+    backend = storage_service.current_backend(db)
+    storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
 
     # Standbild (erstes Frame) per ffmpeg erzeugen und ablegen — schlägt es fehl,
     # bleibt poster_key leer (Vorschau fällt dann auf den Video-Player zurück).
@@ -525,12 +544,13 @@ async def upload_video(
     if poster:
         poster_key = storage_service.build_storage_key(
             "postecke", str(p.id), f"{video_id}_poster.jpg")
-        storage_service.upload_file(poster_key, poster, "image/jpeg", db)
+        storage_service.upload_file(poster_key, poster, "image/jpeg", db=db, backend=backend)
 
     db.add(SocialPostVideo(
         id=video_id,
         post_id=p.id,
         storage_key=storage_key,
+        storage_provider=backend,
         filename=filename,
         mimetype=mimetype,
         size_bytes=len(data),
@@ -556,7 +576,8 @@ def get_video(
                      SocialPost.owner_user_id == current_user.id).first())
     if not video:
         raise HTTPException(404, "Video nicht gefunden")
-    data, content_type = storage_service.download_file(video.storage_key, db)
+    data, content_type = storage_service.download_file(
+        video.storage_key, db, backend=video.storage_provider)
     return Response(content=data, media_type=content_type or video.mimetype)
 
 
@@ -573,7 +594,8 @@ def get_video_poster(
                      SocialPost.owner_user_id == current_user.id).first())
     if not video or not video.poster_key:
         raise HTTPException(404, "Kein Standbild vorhanden")
-    data, _ct = storage_service.download_file(video.poster_key, db)
+    data, _ct = storage_service.download_file(
+        video.poster_key, db, backend=video.storage_provider)
     return Response(content=data, media_type="image/jpeg")
 
 
@@ -590,9 +612,7 @@ def delete_video(
     if not video:
         raise HTTPException(404, "Video nicht gefunden")
     post_id = video.post_id
-    storage_service.delete_file(video.storage_key, db)
-    if video.poster_key:
-        storage_service.delete_file(video.poster_key, db)
+    _loesche_video_dateien(db, video)
     db.delete(video)
     db.commit()
     # Datacenter-Spiegelung nachziehen (entfernt die Kopie des gelöschten Videos)

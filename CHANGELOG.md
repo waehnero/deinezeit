@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.53] – 2026-08-12 – Postecke: Medien bleiben nach Speicherwechsel auffindbar
+
+### Aktualisierungen
+- Postecke: Fotos und Videos merken sich jetzt, in welchem Dateispeicher sie abgelegt wurden. Nach einem Wechsel des Speichers bleiben auch ältere Medien in Vorschau, Download und beim Veröffentlichen erreichbar — und werden beim Löschen restlos entfernt.
+
+---
+
 ## [1.12.52] – 2026-08-11 – E rechnung facturx
 
 ### Aktualisierungen

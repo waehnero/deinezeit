@@ -43,7 +43,8 @@ def postecke_medium(token: str, db: Session = Depends(get_db)):
         video = db.query(SocialPostVideo).filter(SocialPostVideo.id == mid).first()
         if not video:
             raise HTTPException(404, "Nicht gefunden")
-        data, content_type = storage_service.download_file(video.storage_key, db)
+        data, content_type = storage_service.download_file(
+            video.storage_key, db, backend=video.storage_provider)
         return Response(content=data, media_type=content_type or video.mimetype or "video/mp4")
 
     if art == "foto":
@@ -59,7 +60,8 @@ def postecke_medium(token: str, db: Session = Depends(get_db)):
             if profil:
                 bild_format = profil.bild_format or "original"
                 bild_filter = profil.bild_filter or "kein"
-        data, _ct = storage_service.download_file(foto.storage_key, db)
+        data, _ct = storage_service.download_file(
+            foto.storage_key, db, backend=foto.storage_provider)
         try:
             daten, mimetype = postecke_service.bearbeite_foto(data, bild_format, bild_filter)
         except Exception:

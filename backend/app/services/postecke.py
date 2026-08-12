@@ -71,7 +71,8 @@ def _lade_fotos(db: Session, post: SocialPost) -> List[Tuple[bytes, str]]:
     bilder: List[Tuple[bytes, str]] = []
     for foto in (post.fotos or [])[:MAX_FOTOS_FUER_KI]:
         try:
-            data, _ct = storage_service.download_file(foto.storage_key, db)
+            data, _ct = storage_service.download_file(
+                foto.storage_key, db, backend=foto.storage_provider)
             bilder.append((data, foto.mimetype or "image/jpeg"))
         except Exception:
             continue  # fehlendes Einzelfoto bricht die Generierung nicht ab
@@ -347,7 +348,11 @@ def synchronisiere_datacenter(db: Session, post: SocialPost, user_id=None) -> in
         # "text" immer neu schreiben (Content kann sich geändert haben)
         if teil == "text" or teil not in soll_teile or falscher_ort:
             try:
-                storage_service.delete_file(a.storage_key, db)
+                # Aus dem Speicher löschen, in dem die Spiegelung tatsächlich
+                # liegt (seit Migration 0039 je Anlage vermerkt) — sonst bleiben
+                # nach einem Speicherwechsel Dateileichen zurück.
+                storage_service.delete_file(a.storage_key, db,
+                                            backend=a.storage_provider)
             except Exception:
                 pass
             db.delete(a)
@@ -380,7 +385,8 @@ def synchronisiere_datacenter(db: Session, post: SocialPost, user_id=None) -> in
         if f"foto:{foto.id}" in vorhandene_teile:
             continue
         try:
-            daten, _ct = storage_service.download_file(foto.storage_key, db)
+            daten, _ct = storage_service.download_file(
+                foto.storage_key, db, backend=foto.storage_provider)
         except Exception:
             continue  # fehlendes Einzelfoto bricht die Spiegelung nicht ab
         endung = _ENDUNGEN.get(foto.mimetype, ".jpg")
@@ -391,7 +397,8 @@ def synchronisiere_datacenter(db: Session, post: SocialPost, user_id=None) -> in
     # 4. Video — nur wenn noch nicht gespiegelt (kein Re-Upload bei Textänderung)
     if post.video is not None and f"video:{post.video.id}" not in vorhandene_teile:
         try:
-            daten, _ct = storage_service.download_file(post.video.storage_key, db)
+            daten, _ct = storage_service.download_file(
+                post.video.storage_key, db, backend=post.video.storage_provider)
             endung = _ENDUNGEN.get(post.video.mimetype, ".mp4")
             fname = f"{basis}_Video{endung}"
             _anlage(f"video:{post.video.id}", f"{key_prefix}/{fname}", daten,
