@@ -616,7 +616,7 @@ def test_generieren_speichert_vorschlag(auth_client, monkeypatch):
                '"hashtags": "#Feuerwehrfest #Ebreichsdorf", '
                '"ort": "Ebreichsdorf", "gefuehl": "fröhlich"}')
     monkeypatch.setattr(postecke_service, "call_ki",
-                        lambda ki, prompt, images=None, max_tokens=0: antwort)
+                        lambda ki, prompt, images=None, max_tokens=0, kontext="": antwort)
     monkeypatch.setattr(postecke_service, "load_ki_settings",
                         lambda db: {"provider": "anthropic",
                                     "api_key_enc": "x", "model": "test-modell"})
@@ -641,7 +641,7 @@ def test_generieren_speichert_vorschlag(auth_client, monkeypatch):
 
 
 def test_generieren_ohne_ki_key_fehler(auth_client, monkeypatch):
-    def _kein_key(ki, prompt, images=None, max_tokens=0):
+    def _kein_key(ki, prompt, images=None, max_tokens=0, kontext=""):
         raise RuntimeError("Kein KI-API-Key konfiguriert")
     monkeypatch.setattr(postecke_service, "call_ki", _kein_key)
 
@@ -653,7 +653,7 @@ def test_generieren_ohne_ki_key_fehler(auth_client, monkeypatch):
 
 def test_generieren_unbrauchbare_antwort(auth_client, monkeypatch):
     monkeypatch.setattr(postecke_service, "call_ki",
-                        lambda ki, prompt, images=None, max_tokens=0: "kein json")
+                        lambda ki, prompt, images=None, max_tokens=0, kontext="": "kein json")
     monkeypatch.setattr(postecke_service, "load_ki_settings",
                         lambda db: {"provider": "anthropic", "api_key_enc": "x", "model": None})
     post = _post_anlegen(auth_client)
@@ -946,3 +946,133 @@ def test_unbekannter_provider_faellt_auf_aktiven_speicher_zurueck(
     assert auth_client.get(f"/api/postecke/fotos/{foto_id}").status_code == 200
     # backend=None -> storage_service entscheidet selbst (aktiver Speicher)
     assert protokoll["download"][-1][1] is None
+
+
+# ── KI-Diagnose: unbrauchbare Antwort wird nachvollziehbar ───────────────────
+# Bisher endete dieser Fall als nacktes 400 ohne jede Spur der Rohantwort.
+
+def test_unbrauchbare_antwort_landet_im_log(auth_client, monkeypatch, caplog):
+    """Bei Parse-Fehler steht die (gekürzte) Rohantwort mit Grund im Log."""
+    import logging
+
+    monkeypatch.setattr(postecke_service, "call_ki",
+                        lambda ki, prompt, images=None, max_tokens=0, kontext="":
+                        "Klar, hier ist dein Post!")
+    monkeypatch.setattr(postecke_service, "load_ki_settings",
+                        lambda db: {"provider": "anthropic", "api_key_enc": "x",
+                                    "model": None})
+    post = _post_anlegen(auth_client)
+
+    with caplog.at_level(logging.INFO, logger="app.services.postecke"):
+        resp = auth_client.post(f"/api/postecke/posts/{post['id']}/generieren",
+                                json={})
+
+    assert resp.status_code == 400
+    treffer = [r for r in caplog.records if "[KI-PARSE]" in r.getMessage()]
+    assert treffer, "Parse-Fehler wurde nicht protokolliert"
+    meldung = treffer[-1].getMessage()
+    assert "kein JSON-Objekt gefunden" in meldung
+    assert "Klar, hier ist dein Post!" in meldung
+
+
+def test_antwort_mit_json_aber_ohne_text_wird_unterschieden(
+        auth_client, monkeypatch, caplog):
+    """
+    Zweiter Parse-Fall: JSON kam an, aber das Feld 'text' fehlt. Der Grund muss
+    im Log unterscheidbar sein — sonst rätselt man, ob die KI gar nichts oder
+    nur das Falsche geliefert hat.
+    """
+    import logging
+
+    monkeypatch.setattr(postecke_service, "call_ki",
+                        lambda ki, prompt, images=None, max_tokens=0, kontext="":
+                        '{"titel": "Nur ein Titel"}')
+    monkeypatch.setattr(postecke_service, "load_ki_settings",
+                        lambda db: {"provider": "anthropic", "api_key_enc": "x",
+                                    "model": None})
+    post = _post_anlegen(auth_client)
+
+    with caplog.at_level(logging.INFO, logger="app.services.postecke"):
+        resp = auth_client.post(f"/api/postecke/posts/{post['id']}/generieren",
+                                json={})
+
+    assert resp.status_code == 400
+    meldung = [r.getMessage() for r in caplog.records if "[KI-PARSE]" in r.getMessage()][-1]
+    assert "Feld 'text' fehlt oder leer" in meldung
+
+
+def test_rohantwort_wird_im_log_gekuerzt(auth_client, monkeypatch, caplog):
+    """
+    Die Rohantwort kann Postinhalte enthalten — deshalb nur ein Anriss, und
+    auch der nur im Fehlerfall.
+    """
+    import logging
+
+    lange_antwort = "x" * 5000
+    monkeypatch.setattr(postecke_service, "call_ki",
+                        lambda ki, prompt, images=None, max_tokens=0, kontext="":
+                        lange_antwort)
+    monkeypatch.setattr(postecke_service, "load_ki_settings",
+                        lambda db: {"provider": "anthropic", "api_key_enc": "x",
+                                    "model": None})
+    post = _post_anlegen(auth_client)
+
+    with caplog.at_level(logging.INFO, logger="app.services.postecke"):
+        auth_client.post(f"/api/postecke/posts/{post['id']}/generieren", json={})
+
+    meldung = [r.getMessage() for r in caplog.records if "[KI-PARSE]" in r.getMessage()][-1]
+    assert "5000 Zeichen" in meldung          # die volle Länge wird benannt ...
+    assert meldung.count("x") <= postecke_service.MAX_LOG_ROHANTWORT + 10  # ... aber nicht ausgegeben
+
+
+def test_geglueckte_generierung_protokolliert_keine_rohantwort(
+        auth_client, monkeypatch, caplog):
+    """Im Normalfall landet nichts vom Postinhalt im Log."""
+    import logging
+
+    monkeypatch.setattr(postecke_service, "call_ki",
+                        lambda ki, prompt, images=None, max_tokens=0, kontext="":
+                        '{"text": "Ein schöner Abend beim Feuerwehrfest"}')
+    monkeypatch.setattr(postecke_service, "load_ki_settings",
+                        lambda db: {"provider": "anthropic", "api_key_enc": "x",
+                                    "model": None})
+    post = _post_anlegen(auth_client)
+
+    with caplog.at_level(logging.INFO, logger="app.services.postecke"):
+        resp = auth_client.post(f"/api/postecke/posts/{post['id']}/generieren",
+                                json={})
+
+    assert resp.status_code == 200
+    assert not [r for r in caplog.records if "[KI-PARSE]" in r.getMessage()]
+    assert "Feuerwehrfest" not in "\n".join(r.getMessage() for r in caplog.records)
+
+
+def test_fehlendes_foto_wird_gemeldet(auth_client, db_session, monkeypatch, caplog):
+    """
+    Ein nicht ladbares Foto brach die Generierung nie ab — aber lautlos. Die
+    KI bekommt dann weniger Bilder als gedacht.
+    """
+    import logging
+
+    post = _post_anlegen(auth_client)
+    resp = auth_client.post(f"/api/postecke/posts/{post['id']}/fotos",
+                            files=[("files", ("t.jpg", b"bytes", "image/jpeg"))])
+    assert resp.status_code == 201
+
+    def _kaputt(key, db=None, backend=None):
+        raise RuntimeError("Objekt nicht gefunden")
+
+    monkeypatch.setattr("app.services.storage_service.download_file", _kaputt)
+    monkeypatch.setattr(postecke_service, "call_ki",
+                        lambda ki, prompt, images=None, max_tokens=0, kontext="":
+                        '{"text": "trotzdem was"}')
+    monkeypatch.setattr(postecke_service, "load_ki_settings",
+                        lambda db: {"provider": "anthropic", "api_key_enc": "x",
+                                    "model": None})
+
+    with caplog.at_level(logging.INFO, logger="app.services.postecke"):
+        auth_client.post(f"/api/postecke/posts/{post['id']}/generieren", json={})
+
+    meldungen = "\n".join(r.getMessage() for r in caplog.records)
+    assert "[KI-FOTO]" in meldungen
+    assert "nur 0 von 1 Fotos" in meldungen

@@ -388,7 +388,7 @@ def extract_tasks(ki: dict, mail: dict) -> List[dict]:
         received=(mail.get("received_at").isoformat() if mail.get("received_at") else "-"),
         body=(mail.get("body") or "")[:MAX_BODY_CHARS],
     )
-    text = call_ki(ki, prompt, max_tokens=1500)
+    text = call_ki(ki, prompt, max_tokens=1500, kontext="mail-importer")
     return _parse_ki_json(text)
 
 

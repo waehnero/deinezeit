@@ -8,6 +8,7 @@ auf (services/ki.py — Einstellungen -> System -> KI & Mail-Importer).
 """
 
 import json
+import logging
 import os
 import re
 import subprocess  # nosec B404 - fester ffmpeg-Aufruf, keine Shell, keine Nutzereingabe
@@ -19,6 +20,17 @@ from sqlalchemy.orm import Session
 from app.models.postecke import SocialPost, SocialProfil
 from app.services import storage_service
 from app.services.ki import call_ki, load_ki_settings, KI_DEFAULT_MODELS
+
+logger = logging.getLogger(__name__)
+
+# Diagnose-Präfixe (Gegenstück zu den Präfixen in services/ki.py).
+# [KI-PARSE] = Antwort kam an, war aber nicht verwertbar — der Fall, der bisher
+# als nacktes 400 endete. [KI-FOTO] = Bild fehlte schon vor dem KI-Aufruf.
+LOG_PRAEFIX_PARSE = "[KI-PARSE]"
+LOG_PRAEFIX_FOTO = "[KI-FOTO]"
+
+# So viele Zeichen der Rohantwort landen im Log — nur im Fehlerfall.
+MAX_LOG_ROHANTWORT = 500
 
 # Maximal so viele Fotos werden der KI übergeben (Kosten-/Kontextbegrenzung)
 MAX_FOTOS_FUER_KI = 5
@@ -69,13 +81,22 @@ def _parse_ki_json(text: str) -> Optional[dict]:
 def _lade_fotos(db: Session, post: SocialPost) -> List[Tuple[bytes, str]]:
     """Lädt die Fotos des Posts aus dem Objektspeicher (max. MAX_FOTOS_FUER_KI)."""
     bilder: List[Tuple[bytes, str]] = []
-    for foto in (post.fotos or [])[:MAX_FOTOS_FUER_KI]:
+    auswahl = (post.fotos or [])[:MAX_FOTOS_FUER_KI]
+    for foto in auswahl:
         try:
             data, _ct = storage_service.download_file(
                 foto.storage_key, db, backend=foto.storage_provider)
             bilder.append((data, foto.mimetype or "image/jpeg"))
-        except Exception:
-            continue  # fehlendes Einzelfoto bricht die Generierung nicht ab
+        except Exception as e:
+            # Ein fehlendes Einzelfoto bricht die Generierung nicht ab — bisher
+            # aber völlig lautlos. Die KI bekommt dann weniger Bilder als
+            # gedacht und antwortet entsprechend dünn.
+            logger.warning("%s post=%s Foto %s nicht ladbar (%s: %s) — "
+                           "wird übersprungen", LOG_PRAEFIX_FOTO, post.id,
+                           foto.id, e.__class__.__name__, e)
+    if len(bilder) < len(auswahl):
+        logger.warning("%s post=%s: nur %d von %d Fotos an die KI übergeben",
+                       LOG_PRAEFIX_FOTO, post.id, len(bilder), len(auswahl))
     return bilder
 
 
@@ -99,9 +120,16 @@ def generiere_vorschlag(db: Session, post: SocialPost,
     prompt = _GENERIEREN_PROMPT.format(
         kanal=kanal, stil_block=stil_block, beschreibung=text_beschreibung)
 
-    antwort = call_ki(ki, prompt, images=_lade_fotos(db, post), max_tokens=2000)
+    antwort = call_ki(ki, prompt, images=_lade_fotos(db, post), max_tokens=2000,
+                      kontext=f"postecke post={post.id}")
     data = _parse_ki_json(antwort)
     if not data or not (data.get("text") or "").strip():
+        # Ohne die Rohantwort war hier nur ein nacktes 400 im Log zu sehen.
+        # Gekürzt und nur im Fehlerfall — der Text kann Postinhalte enthalten.
+        grund = "kein JSON-Objekt gefunden" if not data else "Feld 'text' fehlt oder leer"
+        logger.error("%s postecke post=%s: %s | Rohantwort (%d Zeichen, gekürzt): %r",
+                     LOG_PRAEFIX_PARSE, post.id, grund, len(antwort or ""),
+                     (antwort or "")[:MAX_LOG_ROHANTWORT])
         raise RuntimeError("Die KI-Antwort konnte nicht verarbeitet werden — bitte erneut versuchen")
 
     provider = ki.get("provider") or "anthropic"

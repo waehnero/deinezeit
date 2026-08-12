@@ -6,12 +6,31 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+import logging
 import os
 from app.core.config import settings
 from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase
 from app.api import settings as settings_api
 from app.services import storage_service
 from app.api.system import record_activity
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+# Uvicorn konfiguriert nur seine eigenen Logger; der Root-Logger bleibt leer.
+# Meldungen aus unseren Modulen (logging.getLogger(__name__), also unterhalb
+# von "app") liefen dadurch ins Leere, sobald sie unter WARNING lagen — ein
+# Grund, warum im Serverlog zu Fehlern oft nur der nackte HTTP-Status stand.
+# Wir hängen daher genau EINEN Handler an den Teilbaum "app". Fremdbibliotheken
+# (httpx, sqlalchemy, ...) bleiben unberührt, es wird also nicht lauter als nötig.
+_log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+_app_logger = logging.getLogger("app")
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    _app_logger.addHandler(_handler)
+_app_logger.setLevel(getattr(logging, _log_level, logging.INFO))
+# propagate bleibt bewusst an: der Root-Logger hat unter Uvicorn keine Handler,
+# es gibt also keine doppelten Zeilen — und pytest (caplog) kann mitlesen.
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
