@@ -699,7 +699,7 @@ async def ki_nachtragen(
 
     ki = load_ki_settings(db)
     try:
-        antwort = call_ki(ki, prompt, max_tokens=800)
+        antwort = call_ki(ki, prompt, max_tokens=800, kontext="zeiterfassung")
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.54] – 2026-08-12 – Postecke ki diagnose
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.53] – 2026-08-12 – Postecke: Medien bleiben nach Speicherwechsel auffindbar
 
 ### Aktualisierungen

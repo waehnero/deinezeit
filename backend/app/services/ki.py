@@ -19,6 +19,7 @@ Alle Funktionen sind synchron — FastAPI führt sync-Endpunkte im Threadpool au
 import base64
 import hashlib
 import json
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
@@ -28,6 +29,26 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.settings import Setting
+
+logger = logging.getLogger(__name__)
+
+# Diagnose: Die KI-Antwort wurde bisher nirgends protokolliert — bei einem
+# Fehlschlag stand im Serverlog nur ein nacktes "400 Bad Request", ohne dass
+# erkennbar war, ob der Provider abgelehnt hat oder ob seine Antwort
+# unbrauchbar war. Alle Diagnose-Zeilen tragen daher ein festes Präfix:
+#
+#   [KI-AUFRUF]  je Aufruf: Modell, Bilder, stop_reason, Token-Verbrauch
+#   [KI-BILD]    Foto konnte nicht verkleinert werden (Original geht raus)
+#   [KI-HTTP]    der Provider selbst hat mit einem Fehlerstatus geantwortet
+#   [KI-PARSE]   Antwort kam an, ließ sich aber nicht verwerten (in postecke.py)
+#
+# Im Log filtern:  docker compose logs backend | grep '\[KI-'
+LOG_PRAEFIX_AUFRUF = "[KI-AUFRUF]"
+LOG_PRAEFIX_BILD = "[KI-BILD]"
+LOG_PRAEFIX_HTTP = "[KI-HTTP]"
+
+# So viele Zeichen einer Provider-Fehlerantwort landen im Log.
+MAX_LOG_FEHLERTEXT = 800
 
 KI_SETTINGS_KEY = "ki_settings"
 KI_DEFAULT_MODELS = {
@@ -91,6 +112,12 @@ def _bild_verkleinern(data: bytes, mimetype: str) -> Tuple[bytes, str]:
     Verkleinert ein Bild auf max. MAX_BILD_KANTE Pixel Kantenlänge und wandelt
     es nach JPEG (spart Tokens/Kosten). Schlägt die Verarbeitung fehl, wird
     das Original unverändert zurückgegeben.
+
+    Wichtig für die Diagnose: Der Rückfall auf das Original war bisher völlig
+    stumm. Genau dann geht aber ein unverkleinertes Handyfoto an den Provider —
+    ein plausibler Grund für Ablehnungen, die nur auf dem Server auftreten
+    (dort echte Fotos, lokal kleine Testbilder). Deshalb wird der Fehlschlag
+    jetzt protokolliert.
     """
     try:
         import io
@@ -103,7 +130,11 @@ def _bild_verkleinern(data: bytes, mimetype: str) -> Tuple[bytes, str]:
         out = io.BytesIO()
         img.save(out, format="JPEG", quality=85)
         return out.getvalue(), "image/jpeg"
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "%s Verkleinern fehlgeschlagen (%s: %s) — Original geht unverändert "
+            "an die KI: %s, %d Bytes",
+            LOG_PRAEFIX_BILD, e.__class__.__name__, e, mimetype, len(data))
         return data, mimetype
 
 
@@ -130,23 +161,65 @@ def _post_mit_fehlerbehandlung(url: str, provider: str, **kwargs) -> httpx.Respo
         resp.raise_for_status()
         return resp
     except httpx.HTTPStatusError as e:
+        # Vollen Fehlerkörper ins Log — die Nutzermeldung bleibt kurz, aber für
+        # die Diagnose brauchen wir den Originaltext des Providers.
+        logger.error("%s HTTP %s von %s: %s", LOG_PRAEFIX_HTTP,
+                     e.response.status_code, provider,
+                     (e.response.text or "")[:MAX_LOG_FEHLERTEXT])
         raise RuntimeError(_api_fehlertext(provider, e.response))
     except httpx.HTTPError as e:
+        logger.error("%s %s nicht erreichbar: %s: %s", LOG_PRAEFIX_HTTP,
+                     provider, e.__class__.__name__, e)
         raise RuntimeError(
             f"KI-Provider {provider} nicht erreichbar ({e.__class__.__name__}) — "
             "Internetzugang des Backends prüfen")
 
 
+def _protokolliere_antwort(kontext: str, provider: str, model: str,
+                           bilder: List[Tuple[bytes, str]], max_tokens: int,
+                           daten: dict, text: str) -> None:
+    """
+    Schreibt eine Diagnose-Zeile je KI-Aufruf.
+
+    Entscheidend ist ``stop_reason``: Reißt die Antwort am Token-Limit ab
+    ("max_tokens" bei Anthropic, "length" bei OpenAI), dann ist ein
+    nachgelagerter Parser-Fehler die *Folge*, nicht die Ursache. Ohne diese
+    Zeile war das von außen nicht unterscheidbar.
+    """
+    if provider == "anthropic":
+        stop = daten.get("stop_reason")
+        usage = daten.get("usage") or {}
+        verbrauch = (f"{usage.get('input_tokens', '?')} rein / "
+                     f"{usage.get('output_tokens', '?')} raus")
+    else:
+        wahl = (daten.get("choices") or [{}])[0]
+        stop = wahl.get("finish_reason")
+        usage = daten.get("usage") or {}
+        verbrauch = (f"{usage.get('prompt_tokens', '?')} rein / "
+                     f"{usage.get('completion_tokens', '?')} raus")
+
+    bildinfo = ", ".join(f"{mt} {len(d)}B" for d, mt in bilder) or "keine"
+    abgeschnitten = stop in ("max_tokens", "length")
+    melde = logger.warning if abgeschnitten else logger.info
+    melde("%s%s %s/%s | max_tokens=%d | Bilder (nach Verkleinern): %s | "
+          "stop_reason=%s | Tokens: %s | Antwortlänge: %d Zeichen%s",
+          LOG_PRAEFIX_AUFRUF, f" {kontext}" if kontext else "",
+          provider, model, max_tokens, bildinfo, stop, verbrauch, len(text),
+          " | ACHTUNG: am Token-Limit abgeschnitten" if abgeschnitten else "")
+
+
 def call_ki(ki: dict, prompt: str,
             images: Optional[List[Tuple[bytes, str]]] = None,
-            max_tokens: int = 1500) -> str:
+            max_tokens: int = 1500, kontext: str = "") -> str:
     """
     Ruft den konfigurierten KI-Provider auf und liefert den Antworttext.
 
-    ki      dict aus load_ki_settings() (api_key_enc verschlüsselt)
-    prompt  Nutzertext/Anweisung
-    images  optionale Liste [(bytes, mimetype), ...] — wird als Vision-Input
-            übergeben (beide Provider unterstützen Base64-Bilder)
+    ki       dict aus load_ki_settings() (api_key_enc verschlüsselt)
+    prompt   Nutzertext/Anweisung
+    images   optionale Liste [(bytes, mimetype), ...] — wird als Vision-Input
+             übergeben (beide Provider unterstützen Base64-Bilder)
+    kontext  freies Kürzel für das Log (z.B. "postecke"), damit sich Aufrufe
+             verschiedener Module im Serverlog auseinanderhalten lassen
     """
     if not ki.get("api_key_enc"):
         raise RuntimeError(
@@ -192,7 +265,11 @@ def call_ki(ki: dict, prompt: str,
             },
             timeout=120,
         )
-        return "".join(b.get("text", "") for b in resp.json().get("content", []))
+        daten = resp.json()
+        text = "".join(b.get("text", "") for b in daten.get("content", []))
+        _protokolliere_antwort(kontext, provider, model, bilder, max_tokens,
+                               daten, text)
+        return text
 
     # openai
     content = []
@@ -212,4 +289,8 @@ def call_ki(ki: dict, prompt: str,
         },
         timeout=120,
     )
-    return resp.json()["choices"][0]["message"]["content"]
+    daten = resp.json()
+    text = daten["choices"][0]["message"]["content"]
+    _protokolliere_antwort(kontext, provider, model, bilder, max_tokens,
+                           daten, text)
+    return text
