@@ -162,11 +162,23 @@ def bearbeite_foto(data: bytes, bild_format: str = "original",
     Wendet Zielformat (mittiger Zuschnitt) und Filter auf ein Foto an.
     Liefert (JPEG-Bytes, "image/jpeg"). Bei "original"/"kein" wird nur
     dezent verkleinert und nach JPEG gewandelt (einheitliche Ausspielung).
+
+    WICHTIG — Drehung: Handykameras speichern die Pixel so, wie der Sensor
+    sitzt, und vermerken die nötige Drehung nur als EXIF-Feld "Orientation".
+    Beim Neuspeichern als JPEG geht dieses Feld verloren. Ohne das Aufrichten
+    unten kämen solche Fotos beim Empfänger (z.B. im Teilen-Dialog von
+    Facebook) um 90 Grad gedreht an — in der App selbst sieht man nichts
+    davon, weil dort das unveränderte Original ausgeliefert wird und der
+    Browser die EXIF-Angabe berücksichtigt.
     """
     import io
     from PIL import Image, ImageEnhance, ImageOps
 
     img = Image.open(io.BytesIO(data))
+    # Drehung aus dem EXIF in echte Pixel überführen — muss VOR dem Zuschnitt
+    # passieren, sonst wird an der falschen Kante beschnitten. Bei Fotos ohne
+    # Drehanweisung (Orientation = 1) ist der Aufruf wirkungslos.
+    img = ImageOps.exif_transpose(img)
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
 

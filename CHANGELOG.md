@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.55] – 2026-08-12 – Postecke foto drehung
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.54] – 2026-08-12 – Postecke ki diagnose
 
 ### Aktualisierungen
