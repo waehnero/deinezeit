@@ -121,8 +121,13 @@ def _bild_verkleinern(data: bytes, mimetype: str) -> Tuple[bytes, str]:
     """
     try:
         import io
-        from PIL import Image
+        from PIL import Image, ImageOps
         img = Image.open(io.BytesIO(data))
+        # Wie bei der Ausspielung: EXIF-Drehung in echte Pixel überführen.
+        # Sonst sieht die KI Handyfotos um 90 Grad gekippt — der Prompt bittet
+        # sie ausdrücklich, Plakattexte (Veranstaltungsname, Datum) zu lesen,
+        # und das gelingt auf einem liegenden Bild deutlich schlechter.
+        img = ImageOps.exif_transpose(img)
         if img.mode not in ("RGB", "L"):
             img = img.convert("RGB")
         if max(img.size) > MAX_BILD_KANTE:

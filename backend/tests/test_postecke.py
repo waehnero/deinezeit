@@ -10,6 +10,7 @@ Abgedeckt:
 Der echte KI-Aufruf (services/ki.call_ki) und der Objektspeicher werden
 gemockt — Tests laufen ohne API-Key und ohne MinIO.
 """
+import os
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -1076,3 +1077,116 @@ def test_fehlendes_foto_wird_gemeldet(auth_client, db_session, monkeypatch, capl
     meldungen = "\n".join(r.getMessage() for r in caplog.records)
     assert "[KI-FOTO]" in meldungen
     assert "nur 0 von 1 Fotos" in meldungen
+
+
+# ── Foto-Drehung (EXIF-Orientation) ──────────────────────────────────────────
+# Handykameras speichern die Pixel so, wie der Sensor sitzt, und vermerken die
+# nötige Drehung nur im EXIF-Feld "Orientation". Beim Neuspeichern als JPEG
+# geht dieses Feld verloren — ohne Aufrichten kam das Foto im Teilen-Dialog von
+# Facebook um 90 Grad gedreht an. In der App fiel das nicht auf, weil dort das
+# unveränderte Original ausgeliefert wird.
+#
+# Prüffoto: tests/daten/iphone_hochformat_exif.jpg — roh liegend (900x675),
+# Orientation 6, aufrecht also hochkant (675x900).
+
+_EXIF_FOTO = os.path.join(os.path.dirname(__file__), "daten",
+                          "iphone_hochformat_exif.jpg")
+
+
+def _exif_testfoto() -> bytes:
+    with open(_EXIF_FOTO, "rb") as f:
+        return f.read()
+
+
+def test_prueffoto_hat_wirklich_eine_drehanweisung():
+    """
+    Vorbedingung des ganzen Abschnitts: Ohne gesetztes Orientation-Feld würden
+    die folgenden Tests durchlaufen, ohne irgendetwas zu beweisen.
+    """
+    import io
+
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(_exif_testfoto()))
+    assert img.getexif().get(274) == 6, "Prüffoto trägt keine EXIF-Drehung mehr"
+    assert img.size == (900, 675), "Prüffoto liegt nicht mehr roh im Querformat"
+
+
+def test_ausspielung_richtet_gedrehtes_foto_auf():
+    """Kern des Fehlers: die ausgespielte Datei muss aufrecht sein."""
+    import io
+
+    from PIL import Image
+
+    daten, mimetype = postecke_service.bearbeite_foto(
+        _exif_testfoto(), "original", "kein")
+
+    assert mimetype == "image/jpeg"
+    ergebnis = Image.open(io.BytesIO(daten))
+    breite, hoehe = ergebnis.size
+    assert hoehe > breite, (
+        f"Foto kam liegend heraus ({breite}x{hoehe}) — EXIF-Drehung ignoriert")
+
+
+def test_zuschnitt_greift_erst_nach_dem_aufrichten():
+    """
+    Reihenfolge zählt: Wird zuerst zugeschnitten und danach gedreht, liegt der
+    Ausschnitt an der falschen Kante. Bei 1:1 muss unabhängig davon ein
+    Quadrat herauskommen — und zwar aus dem AUFRECHTEN Bild.
+    """
+    import io
+
+    from PIL import Image
+
+    daten, _mt = postecke_service.bearbeite_foto(_exif_testfoto(), "1:1", "kein")
+    breite, hoehe = Image.open(io.BytesIO(daten)).size
+    assert breite == hoehe, f"1:1 lieferte {breite}x{hoehe}"
+    # Aufrecht ist das Bild 675 breit -> das Quadrat kann nicht breiter sein.
+    # Ohne Aufrichten wäre die Kante 675 hoch, aber aus dem liegenden Bild
+    # geschnitten und damit inhaltlich falsch.
+    assert breite <= 675
+
+
+def test_hochformat_zuschnitt_bleibt_hochformat():
+    """4:5 aus einem aufrechten Foto bleibt hochkant (Gegenprobe zum Zuschnitt)."""
+    import io
+
+    from PIL import Image
+
+    daten, _mt = postecke_service.bearbeite_foto(_exif_testfoto(), "4:5", "kein")
+    breite, hoehe = Image.open(io.BytesIO(daten)).size
+    assert hoehe > breite
+
+
+def test_ki_bekommt_das_foto_aufrecht():
+    """
+    Derselbe Defekt steckte im KI-Pfad: Die KI soll laut Prompt Plakattexte
+    lesen — auf einem liegenden Bild gelingt das schlechter.
+    """
+    import io
+
+    from PIL import Image
+
+    from app.services import ki as ki_service
+
+    daten, mimetype = ki_service._bild_verkleinern(_exif_testfoto(), "image/jpeg")
+    assert mimetype == "image/jpeg"
+    breite, hoehe = Image.open(io.BytesIO(daten)).size
+    assert hoehe > breite, f"KI bekäme das Foto liegend ({breite}x{hoehe})"
+
+
+def test_aufrechtes_foto_bleibt_unveraendert_ausgerichtet():
+    """
+    Gegenprobe: Bei Fotos ohne Drehanweisung (Orientation 1) darf das
+    Aufrichten nichts tun — sonst würden korrekte Bilder verdreht.
+    """
+    import io
+
+    from PIL import Image
+
+    puffer = io.BytesIO()
+    Image.new("RGB", (800, 400), (60, 90, 120)).save(puffer, format="JPEG")
+
+    daten, _mt = postecke_service.bearbeite_foto(puffer.getvalue(), "original", "kein")
+    breite, hoehe = Image.open(io.BytesIO(daten)).size
+    assert breite > hoehe, "querformatiges Foto wurde fälschlich gedreht"
