@@ -18,9 +18,16 @@ import {
   GripVertical, Settings2, ChevronRight, Plus, Play, Square,
   Database, Clock, Check, FileText, GanttChartSquare, CheckSquare,
   FolderOpen, BarChart3, Landmark, ShieldCheck, Mail, Zap,
-  Mic, Sparkles,
+  Mic, Sparkles, X, Pencil, RotateCcw, Copy, Trash2, LayoutGrid,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import VoiceEntryDialog from '../components/VoiceEntryDialog'
+import { WIDGET_REGISTRY, widgetDef, widgetErlaubt } from '../data/dashboardWidgets'
+import {
+  normalisiereConfig, aktivesLayout, setzeWidgets, wechsleLayout,
+  fuegeLayoutHinzu, benenneLayoutUm, loescheLayout, setzeLayoutZurueck,
+  neuesWidget, STANDARD_LAYOUT_ID, MAX_LAYOUTS,
+} from '../utils/dashboardConfig'
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 const ICON_MAP = { Users: '👥', Package: '📦', FolderOpen: '📁', Database: '🗄️', Settings: '⚙️' }
@@ -60,29 +67,8 @@ function dueLabel(dueDate) {
   return due.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' })
 }
 
-// ── Widget-Katalog ────────────────────────────────────────────────────────────
-// Feste Widgets; adminOnly-Widgets erscheinen nur für Admins.
-const FIXED_WIDGETS = [
-  { id: 'widget_aufgaben',   type: 'aufgaben',        size: 2 },
-  { id: 'widget_zeit',       type: 'zeiterfassung',   size: 2 },
-  { id: 'widget_rechnungen', type: 'rechnungen',      size: 2 },
-  { id: 'widget_projekte',   type: 'projekte',        size: 2 },
-  { id: 'widget_quick',      type: 'quick_access',    size: 2 },
-  { id: 'widget_datacenter', type: 'datacenter',      size: 1 },
-  { id: 'widget_berichte',   type: 'berichte',        size: 1 },
-  { id: 'widget_buha',       type: 'buchhaltung',     size: 2, adminOnly: true },
-  { id: 'widget_system',     type: 'benutzer_system', size: 2, adminOnly: true },
-]
-
-const WIDGET_LABELS = {
-  aufgaben: 'Aufgaben', zeiterfassung: 'Zeiterfassung', rechnungen: 'Finanzen',
-  projekte: 'Projekte', quick_access: 'Schnellzugriff', datacenter: 'Datacenter',
-  berichte: 'Berichte', buchhaltung: 'Buchhaltung', benutzer_system: 'Benutzer & System',
-}
-
-const ADMIN_TYPES = new Set(
-  FIXED_WIDGETS.filter(w => w.adminOnly).map(w => w.type)
-)
+// Der Widget-Katalog liegt jetzt zentral in ../data/dashboardWidgets.js.
+// Ein neues Widget wird dort eingetragen und unten im Render-Zweig dargestellt.
 
 // ── Größen-Auswahl ────────────────────────────────────────────────────────────
 function SizeButtons({ size, onChange }) {
@@ -106,16 +92,26 @@ function SizeButtons({ size, onChange }) {
 }
 
 // ── Sortierbarer Wrapper ──────────────────────────────────────────────────────
-function SortableWidget({ id, size, editMode, onSizeChange, children }) {
+function SortableWidget({
+  id, size, editMode, onSizeChange, onRemove, onTitelChange,
+  titel, standardTitel, children,
+}) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id })
+  const [umbenennen, setUmbenennen] = useState(false)
+  const [entwurf, setEntwurf] = useState(titel || '')
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 10 : undefined,
+  }
+
+  function titelSpeichern() {
+    onTitelChange(entwurf.trim())
+    setUmbenennen(false)
   }
 
   return (
@@ -125,19 +121,61 @@ function SortableWidget({ id, size, editMode, onSizeChange, children }) {
       className={`${colSpanClass(size)} min-w-0 ${editMode ? 'relative' : ''}`}
     >
       {editMode && (
-        <div className="absolute top-0 inset-x-0 flex items-center justify-between px-2 py-1 bg-primary-500 rounded-t-xl z-10">
-          <div
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing text-white flex items-center gap-1 text-xs font-medium select-none"
-          >
-            <GripVertical size={14} />
-            <span>Verschieben</span>
+        <div className="absolute top-0 inset-x-0 bg-primary-500 rounded-t-xl z-10">
+          <div className="flex items-center justify-between gap-1 px-2 py-1">
+            <div
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-white flex items-center gap-1 text-xs font-medium select-none min-w-0"
+            >
+              <GripVertical size={14} className="flex-shrink-0" />
+              <span className="hidden sm:inline">Verschieben</span>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <SizeButtons size={size} onChange={onSizeChange} />
+              <button
+                onClick={() => { setEntwurf(titel || ''); setUmbenennen(o => !o) }}
+                title="Überschrift ändern"
+                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                onClick={onRemove}
+                title="Baustein entfernen"
+                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-red-500 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
-          <SizeButtons size={size} onChange={onSizeChange} />
+
+          {/* Eigene Überschrift — leer lassen für die Standardbezeichnung */}
+          {umbenennen && (
+            <div className="flex items-center gap-1 px-2 pb-1.5">
+              <input
+                autoFocus
+                value={entwurf}
+                maxLength={40}
+                placeholder={standardTitel}
+                onChange={e => setEntwurf(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') titelSpeichern()
+                  if (e.key === 'Escape') setUmbenennen(false)
+                }}
+                className="flex-1 min-w-0 text-xs px-2 py-1 rounded border-0 focus:ring-2 focus:ring-white/60"
+              />
+              <button
+                onClick={titelSpeichern}
+                className="text-[11px] font-medium px-2 py-1 rounded bg-white text-primary-600 hover:bg-primary-50"
+              >
+                OK
+              </button>
+            </div>
+          )}
         </div>
       )}
-      <div className={editMode ? 'pt-7' : ''}>
+      <div className={editMode ? (umbenennen ? 'pt-16' : 'pt-7') : ''}>
         {children}
       </div>
     </div>
@@ -168,7 +206,7 @@ function WidgetHead({ icon: Icon, title, sub, badge, editMode }) {
 }
 
 // ── Widget: Stammdaten-Typ ────────────────────────────────────────────────────
-function EntityTypeWidget({ type, editMode, onClick }) {
+function EntityTypeWidget({ type, titel, editMode, onClick }) {
   return (
     <button
       onClick={editMode ? undefined : onClick}
@@ -190,7 +228,7 @@ function EntityTypeWidget({ type, editMode, onClick }) {
           <ChevronRight size={16} className="text-neutral-300 group-hover:text-primary-500 transition-colors mt-1" />
         )}
       </div>
-      <p className="font-semibold text-neutral-900 text-sm">{type.name}</p>
+      <p className="font-semibold text-neutral-900 text-sm">{titel || type.name}</p>
       <p className="text-2xl font-bold text-neutral-900 mt-1">{type.record_count ?? 0}</p>
       <p className="text-xs text-neutral-400 mt-0.5">{type.record_count === 1 ? 'Eintrag' : 'Einträge'}</p>
     </button>
@@ -198,7 +236,7 @@ function EntityTypeWidget({ type, editMode, onClick }) {
 }
 
 // ── Widget: Aufgaben (heute & überfällig + Mail-Vorschläge) ───────────────────
-function AufgabenWidget({ stats, mailCount, editMode, navigate }) {
+function AufgabenWidget({ stats, mailCount, titel, editMode, navigate }) {
   const badge = stats && stats.ueberfaellig > 0
     ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">{stats.ueberfaellig} überfällig</span>
     : stats
@@ -210,7 +248,7 @@ function AufgabenWidget({ stats, mailCount, editMode, navigate }) {
       className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
       onClick={editMode ? undefined : () => navigate('/aufgaben')}
     >
-      <WidgetHead icon={CheckSquare} title="Aufgaben" sub={stats ? `${stats.heute_faellig} heute fällig` : 'Übersicht'} badge={badge} editMode={editMode} />
+      <WidgetHead icon={CheckSquare} title={titel || 'Aufgaben'} sub={stats ? `${stats.heute_faellig} heute fällig` : 'Übersicht'} badge={badge} editMode={editMode} />
       {stats ? (
         <div className="flex flex-col gap-1.5">
           {stats.naechste.length === 0 && (
@@ -244,7 +282,7 @@ function AufgabenWidget({ stats, mailCount, editMode, navigate }) {
 }
 
 // ── Widget: Zeiterfassung (inkl. aktivem Zeitgeber) ───────────────────────────
-function ZeiterfassungWidget({ stats, running, elapsedSec, onStop, editMode, navigate }) {
+function ZeiterfassungWidget({ stats, running, elapsedSec, onStop, titel, editMode, navigate }) {
   const [voiceOpen, setVoiceOpen] = useState(false)
 
   // KI-Vorschlag → weiter zur Zeiterfassung, dort öffnet der vorbefüllte
@@ -265,7 +303,7 @@ function ZeiterfassungWidget({ stats, running, elapsedSec, onStop, editMode, nav
         className={!editMode ? 'cursor-pointer group' : ''}
         onClick={editMode ? undefined : () => navigate('/zeiterfassung')}
       >
-        <WidgetHead icon={Clock} title="Zeiterfassung" sub="Übersicht" editMode={editMode} />
+        <WidgetHead icon={Clock} title={titel || 'Zeiterfassung'} sub="Übersicht" editMode={editMode} />
       </div>
 
       {/* Aktiver Zeitgeber — erscheint nur, wenn ein Timer läuft */}
@@ -353,7 +391,7 @@ function ZeiterfassungWidget({ stats, running, elapsedSec, onStop, editMode, nav
 }
 
 // ── Widget: Finanzen (Rechnungsübersicht) ─────────────────────────────────────
-function FinanzWidget({ invoiceStats, editMode, onClick }) {
+function FinanzWidget({ invoiceStats, titel, editMode, onClick }) {
   const { offen, ueberfaellig, bezahltMonat } = invoiceStats || {}
   const rows = [
     { label: 'Offen',           count: offen?.count,        sum: offen?.sum,        color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -365,7 +403,7 @@ function FinanzWidget({ invoiceStats, editMode, onClick }) {
       className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
       onClick={editMode ? undefined : onClick}
     >
-      <WidgetHead icon={FileText} title="Finanzen" sub="Rechnungen & Umsatz" editMode={editMode} />
+      <WidgetHead icon={FileText} title={titel || 'Finanzen'} sub="Rechnungen & Umsatz" editMode={editMode} />
       {invoiceStats ? (
         <div className="flex flex-col gap-2">
           {rows.map(({ label, count, sum, color, bg }) => (
@@ -386,7 +424,7 @@ function FinanzWidget({ invoiceStats, editMode, onClick }) {
 }
 
 // ── Widget: Projekte (5 zuletzt bearbeitete) ──────────────────────────────────
-function ProjekteWidget({ projects, editMode, navigate }) {
+function ProjekteWidget({ projects, titel, editMode, navigate }) {
   return (
     <div className={`card p-5 h-full ${editMode ? 'rounded-tl-none rounded-tr-none' : ''}`}>
       <button
@@ -394,7 +432,7 @@ function ProjekteWidget({ projects, editMode, navigate }) {
         onClick={editMode ? undefined : () => navigate('/projekte')}
         className={`w-full text-left ${editMode ? '' : 'group'}`}
       >
-        <WidgetHead icon={GanttChartSquare} title="Projekte" sub="Zuletzt bearbeitet" editMode={editMode} />
+        <WidgetHead icon={GanttChartSquare} title={titel || 'Projekte'} sub="Zuletzt bearbeitet" editMode={editMode} />
       </button>
 
       {(!projects || projects.length === 0) ? (
@@ -436,7 +474,7 @@ const QUICK_LINKS = [
 const QUICK_LS_KEY = 'dashboard_quickaccess_v1'
 const QUICK_DEFAULT = ['masterdata', 'zeiterfassung']
 
-function QuickAccessWidget({ editMode, navigate }) {
+function QuickAccessWidget({ titel, editMode, navigate }) {
   const [selected, setSelected] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(QUICK_LS_KEY))
@@ -463,7 +501,7 @@ function QuickAccessWidget({ editMode, navigate }) {
             <Zap size={18} className="text-primary-600" />
           </div>
           <div>
-            <p className="font-semibold text-neutral-900 text-sm">Schnellzugriff</p>
+            <p className="font-semibold text-neutral-900 text-sm">{titel || 'Schnellzugriff'}</p>
             <p className="text-xs text-neutral-400">Häufige Aktionen</p>
           </div>
         </div>
@@ -525,7 +563,7 @@ function QuickAccessWidget({ editMode, navigate }) {
 }
 
 // ── Widget: Datacenter ────────────────────────────────────────────────────────
-function DatacenterWidget({ dcStats, editMode, onClick }) {
+function DatacenterWidget({ dcStats, titel, editMode, onClick }) {
   return (
     <button
       onClick={editMode ? undefined : onClick}
@@ -542,7 +580,7 @@ function DatacenterWidget({ dcStats, editMode, onClick }) {
           <ChevronRight size={16} className="text-neutral-300 group-hover:text-primary-500 transition-colors mt-1" />
         )}
       </div>
-      <p className="font-semibold text-neutral-900 text-sm">Datacenter</p>
+      <p className="font-semibold text-neutral-900 text-sm">{titel || 'Datacenter'}</p>
       <p className="text-2xl font-bold text-neutral-900 mt-1">{dcStats?.gesamt ?? '—'}</p>
       <p className="text-xs text-neutral-400 mt-0.5">
         Dateien{dcStats?.neu_7_tage > 0 ? ` · ${dcStats.neu_7_tage} neu (7 Tage)` : ''}
@@ -552,7 +590,7 @@ function DatacenterWidget({ dcStats, editMode, onClick }) {
 }
 
 // ── Widget: Berichte ──────────────────────────────────────────────────────────
-function BerichteWidget({ editMode, onClick }) {
+function BerichteWidget({ titel, editMode, onClick }) {
   return (
     <button
       onClick={editMode ? undefined : onClick}
@@ -569,21 +607,21 @@ function BerichteWidget({ editMode, onClick }) {
           <ChevronRight size={16} className="text-neutral-300 group-hover:text-primary-500 transition-colors mt-1" />
         )}
       </div>
-      <p className="font-semibold text-neutral-900 text-sm">Berichte</p>
+      <p className="font-semibold text-neutral-900 text-sm">{titel || 'Berichte'}</p>
       <p className="text-xs text-neutral-400 mt-1">Zeiten auswerten und exportieren</p>
     </button>
   )
 }
 
 // ── Widget: Buchhaltung (nur Admin) ──────────────────────────────────────────
-function BuchhaltungWidget({ accountCount, editMode, navigate }) {
+function BuchhaltungWidget({ accountCount, titel, editMode, navigate }) {
   return (
     <div
       className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
       onClick={editMode ? undefined : () => navigate('/buchhaltung')}
     >
       <WidgetHead
-        icon={Landmark} title="Buchhaltung" sub="Konten & BMD-Export"
+        icon={Landmark} title={titel || 'Buchhaltung'} sub="Konten & BMD-Export"
         badge={<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-white">Admin</span>}
         editMode={editMode}
       />
@@ -602,14 +640,14 @@ function BuchhaltungWidget({ accountCount, editMode, navigate }) {
 }
 
 // ── Widget: Benutzer & System (nur Admin) ─────────────────────────────────────
-function SystemWidget({ userStats, versionInfo, editMode, navigate }) {
+function SystemWidget({ userStats, versionInfo, titel, editMode, navigate }) {
   return (
     <div
       className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
       onClick={editMode ? undefined : () => navigate('/users')}
     >
       <WidgetHead
-        icon={ShieldCheck} title="Benutzer & System" sub="Verwaltung"
+        icon={ShieldCheck} title={titel || 'Benutzer & System'} sub="Verwaltung"
         badge={<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-white">Admin</span>}
         editMode={editMode}
       />
@@ -632,36 +670,186 @@ function SystemWidget({ userStats, versionInfo, editMode, navigate }) {
   )
 }
 
-// ── Konfiguration: Standard & Migration ───────────────────────────────────────
-function normalizeWidget(w) {
-  return { id: w.id, type: w.type, slug: w.slug, size: w.size || 1, hidden: !!w.hidden }
+// ── Katalog-Dialog: Baustein hinzufügen ───────────────────────────────────────
+// Zeigt alles, was die Registry hergibt und der Benutzer sehen darf. Bereits
+// verwendete Bausteine sind ausgegraut (Stammdaten-Typen einzeln je Typ).
+function KatalogDialog({ offen, onClose, vorhandeneTypen, vorhandeneSlugs, types, ctx, onAdd }) {
+  if (!offen) return null
+
+  const eintraege = []
+  for (const def of WIDGET_REGISTRY) {
+    if (!widgetErlaubt(def.type, ctx)) continue
+    if (def.mehrfach) {
+      // Stammdaten-Typen: ein Eintrag je vorhandenem Typ
+      for (const t of types) {
+        eintraege.push({
+          key: `${def.type}:${t.slug}`,
+          def,
+          slug: t.slug,
+          label: t.name,
+          beschreibung: 'Stammdaten-Typ',
+          drin: vorhandeneSlugs.has(t.slug),
+        })
+      }
+    } else {
+      eintraege.push({
+        key: def.type,
+        def,
+        slug: undefined,
+        label: def.label,
+        beschreibung: def.beschreibung,
+        drin: vorhandeneTypen.has(def.type),
+      })
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
+          <div>
+            <p className="font-semibold text-neutral-900">Baustein hinzufügen</p>
+            <p className="text-xs text-neutral-400">Wird unten an die Ansicht angehängt</p>
+          </div>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-3 flex flex-col gap-1.5">
+          {eintraege.map(e => {
+            const Icon = e.def.icon
+            return (
+              <button
+                key={e.key}
+                disabled={e.drin}
+                onClick={() => { onAdd(e.def.type, e.slug); onClose() }}
+                className={`flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${
+                  e.drin
+                    ? 'opacity-40 cursor-default'
+                    : 'hover:bg-primary-50 cursor-pointer'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                  <Icon size={17} className="text-primary-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-neutral-900 truncate">
+                    {e.label}
+                    {e.def.adminOnly && (
+                      <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-neutral-800 text-white align-middle">Admin</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-neutral-400 truncate">{e.beschreibung}</p>
+                </div>
+                {e.drin
+                  ? <span className="text-[11px] text-neutral-400 flex-shrink-0">bereits drin</span>
+                  : <Plus size={16} className="text-neutral-300 flex-shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 }
 
-function buildDefaultConfig(types) {
-  return [
-    ...FIXED_WIDGETS.map(normalizeWidget),
-    ...types.map(t => normalizeWidget({ id: `widget_et_${t.slug}`, type: 'entity_type', slug: t.slug, size: 1 })),
-  ]
-}
+// ── Ansichten-Leiste (mehrere Layouts je Benutzer) ────────────────────────────
+function LayoutLeiste({ config, editMode, onWechsel, onNeu, onKopie, onUmbenennen, onLoeschen }) {
+  const [umbenennen, setUmbenennen] = useState(false)
+  const [entwurf, setEntwurf] = useState('')
+  const aktiv = aktivesLayout(config)
 
-function mergeConfig(saved, types) {
-  const normalized = saved.map(normalizeWidget)
-  const savedIds = normalized.map(w => w.id)
+  // Außerhalb des Bearbeiten-Modus nur zeigen, wenn es überhaupt etwas zu
+  // wechseln gibt — bei einer einzigen Ansicht wäre die Leiste nur Ballast.
+  if (!editMode && config.layouts.length < 2) return null
 
-  // Neue feste Widgets hinzufügen falls noch nicht vorhanden
-  const newFixed = FIXED_WIDGETS.filter(w => !savedIds.includes(w.id)).map(normalizeWidget)
+  return (
+    <div className="flex items-center gap-2 mb-4 flex-wrap">
+      <LayoutGrid size={15} className="text-neutral-400 flex-shrink-0" />
 
-  // Neue Entity-Typen die noch nicht in der Config sind hinzufügen
-  const existingSlugs = normalized.filter(w => w.type === 'entity_type').map(w => w.slug)
-  const newEntityWidgets = types
-    .filter(t => !existingSlugs.includes(t.slug))
-    .map(t => normalizeWidget({ id: `widget_et_${t.slug}`, type: 'entity_type', slug: t.slug, size: 1 }))
+      {config.layouts.map(l => (
+        <button
+          key={l.id}
+          onClick={() => onWechsel(l.id)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            l.id === aktiv?.id
+              ? 'bg-primary-500 text-white'
+              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+          }`}
+        >
+          {l.name}
+        </button>
+      ))}
 
-  // Gelöschte Entity-Typen entfernen
-  const validSlugs = types.map(t => t.slug)
-  const filtered = normalized.filter(w => w.type !== 'entity_type' || validSlugs.includes(w.slug))
+      {editMode && (
+        <>
+          {config.layouts.length < MAX_LAYOUTS && (
+            <>
+              <button
+                onClick={onNeu}
+                title="Leere Ansicht anlegen"
+                className="p-1.5 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+              >
+                <Plus size={15} />
+              </button>
+              <button
+                onClick={onKopie}
+                title="Aktuelle Ansicht duplizieren"
+                className="p-1.5 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+              >
+                <Copy size={14} />
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => { setEntwurf(aktiv?.name || ''); setUmbenennen(o => !o) }}
+            title="Ansicht umbenennen"
+            className="p-1.5 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+          >
+            <Pencil size={14} />
+          </button>
+          {aktiv?.id !== STANDARD_LAYOUT_ID && (
+            <button
+              onClick={() => onLoeschen(aktiv.id)}
+              title="Ansicht löschen"
+              className="p-1.5 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
 
-  return [...filtered, ...newFixed, ...newEntityWidgets]
+          {umbenennen && (
+            <div className="flex items-center gap-1 w-full sm:w-auto">
+              <input
+                autoFocus
+                value={entwurf}
+                maxLength={30}
+                onChange={e => setEntwurf(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { onUmbenennen(aktiv.id, entwurf); setUmbenennen(false) }
+                  if (e.key === 'Escape') setUmbenennen(false)
+                }}
+                className="text-sm px-2 py-1.5 rounded-lg border border-neutral-200 focus:ring-2 focus:ring-primary-200 focus:border-primary-400"
+              />
+              <button
+                onClick={() => { onUmbenennen(aktiv.id, entwurf); setUmbenennen(false) }}
+                className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary-500 text-white hover:bg-primary-600"
+              >
+                OK
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 // ── Hauptseite ────────────────────────────────────────────────────────────────
@@ -680,8 +868,9 @@ export default function DashboardPage() {
   const [userStats,      setUserStats]      = useState(null)
   const [versionInfo,    setVersionInfo]    = useState(null)
   const [accountCount,   setAccountCount]   = useState(null)
-  const [widgets,  setWidgets]  = useState([])
+  const [config,   setConfig]   = useState(null)
   const [editMode, setEditMode] = useState(false)
+  const [katalogOffen, setKatalogOffen] = useState(false)
   const [loading,  setLoading]  = useState(true)
   const configLoaded = useRef(false)
   const saveTimer = useRef(null)
@@ -741,32 +930,35 @@ export default function DashboardPage() {
         accountingApi.listAccounts().then(res => setAccountCount((res.data || []).length)).catch(() => {})
       }
 
-      // ── Dashboard-Konfiguration: Server → localStorage-Migration → Standard ──
-      const serverCfg = cfgRes.data?.config
-      if (serverCfg && Array.isArray(serverCfg.widgets)) {
-        setWidgets(mergeConfig(serverCfg.widgets, loadedTypes))
-      } else {
-        // Migration: alte Browser-Konfiguration übernehmen, falls vorhanden
-        let migrated = null
-        try {
-          const old = JSON.parse(localStorage.getItem(LS_KEY))
-          if (Array.isArray(old)) migrated = mergeConfig(old, loadedTypes)
-        } catch { /* ignorieren */ }
-        setWidgets(migrated || buildDefaultConfig(loadedTypes))
+      // ── Dashboard-Konfiguration: Server → localStorage-Altbestand → Standard ─
+      // normalisiereConfig kümmert sich um das alte Format v1, um entfernte
+      // Stammdaten-Typen und um neu ausgelieferte Bausteine.
+      const ctx = { isAdmin: me?.role === 'admin', modules: me?.modules ?? null }
+      let roh = cfgRes.data?.config
+      if (!roh) {
+        try { roh = JSON.parse(localStorage.getItem(LS_KEY)) } catch { /* ignorieren */ }
       }
+      setConfig(normalisiereConfig(roh, loadedTypes, ctx))
       configLoaded.current = true
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch(err => {
+      console.error('Dashboard laden fehlgeschlagen:', err?.response?.data || err)
+    }).finally(() => setLoading(false))
   }, [])
 
   // ── Config speichern (serverseitig, entprellt) ───────────────────────────
+  // Fehler NICHT verschlucken: sonst arbeitet der Benutzer weiter und wundert
+  // sich später, warum seine Anordnung verschwunden ist.
   useEffect(() => {
-    if (!configLoaded.current || widgets.length === 0) return
+    if (!configLoaded.current || !config) return
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      usersApi.saveDashboard({ widgets }).catch(() => {})
+      usersApi.saveDashboard(config).catch(err => {
+        console.error('Dashboard speichern fehlgeschlagen:', err?.response?.data || err)
+        toast.error('Dashboard konnte nicht gespeichert werden.')
+      })
     }, 800)
     return () => clearTimeout(saveTimer.current)
-  }, [widgets])
+  }, [config])
 
   // ── Timer-Sekundentakt (nur bei laufendem Timer) ─────────────────────────
   useEffect(() => {
@@ -798,31 +990,38 @@ export default function DashboardPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  // ── Bearbeiten: alle Änderungen betreffen die gerade aktive Ansicht ───────
+  function aendereWidgets(fn) {
+    setConfig(prev => setzeWidgets(prev, fn(aktivesLayout(prev)?.widgets || [])))
+  }
+
   function handleDragEnd(event) {
     const { active, over } = event
-    if (over && active.id !== over.id) {
-      setWidgets(prev => {
-        const oldIdx = prev.findIndex(w => w.id === active.id)
-        const newIdx = prev.findIndex(w => w.id === over.id)
-        return arrayMove(prev, oldIdx, newIdx)
-      })
-    }
+    if (!over || active.id === over.id) return
+    aendereWidgets(liste => {
+      const alt = liste.findIndex(w => w.id === active.id)
+      const neu = liste.findIndex(w => w.id === over.id)
+      return (alt < 0 || neu < 0) ? liste : arrayMove(liste, alt, neu)
+    })
   }
 
-  function updateSize(id, size) {
-    setWidgets(prev => prev.map(w => w.id === id ? { ...w, size } : w))
-  }
-
-  function toggleHidden(id) {
-    setWidgets(prev => prev.map(w => w.id === id ? { ...w, hidden: !w.hidden } : w))
-  }
+  const updateSize   = (id, size)  => aendereWidgets(l => l.map(w => w.id === id ? { ...w, size } : w))
+  const entferne     = (id)        => aendereWidgets(l => l.filter(w => w.id !== id))
+  const setzeTitel   = (id, titel) => aendereWidgets(l => l.map(w => {
+    if (w.id !== id) return w
+    const rest = { ...w }
+    if (titel) rest.titel = titel.slice(0, 40)
+    else delete rest.titel                       // leer = wieder Standardbezeichnung
+    return rest
+  }))
+  const fuegeHinzu   = (type, slug) => aendereWidgets(l => [...l, neuesWidget(type, slug)])
 
   // ── Render ───────────────────────────────────────────────────────────────
   const hour      = new Date().getHours()
   const greeting  = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend'
   const firstName = user?.full_name?.split(' ')[0] || ''
 
-  if (loading) {
+  if (loading || !config) {
     return (
       <div className="flex items-center justify-center py-24 text-neutral-400">
         <span className="text-sm">Wird geladen…</span>
@@ -832,41 +1031,25 @@ export default function DashboardPage() {
 
   const typeMap = Object.fromEntries(types.map(t => [t.slug, t]))
 
-  // Modulrechte: Widget-Typ → benötigtes Modul (Beschluss 2026-07-12).
-  // Widgets nicht freigeschalteter Module werden ausgeblendet.
-  const WIDGET_MODULE = {
-    aufgaben: 'aufgaben', zeiterfassung: 'zeiterfassung', berichte: 'zeiterfassung',
-    rechnungen: 'verkauf', projekte: 'projekte', datacenter: 'datacenter',
-    entity_type: 'stammdaten',
-  }
-  const userModules = user?.modules ?? null
-  const widgetAllowed = (w) => {
-    const mod = WIDGET_MODULE[w.type]
-    if (!mod || userModules === null) return true
-    return userModules.includes(mod)
-  }
+  // Rechte-Kontext: Modulrechte stehen in der Registry (Beschluss 2026-07-12),
+  // die Prüfung selbst in data/dashboardWidgets.js.
+  const ctx = { isAdmin, modules: user?.modules ?? null }
 
-  // Sichtbare Widgets: Admin-Widgets nur für Admins, Modul-Widgets nur mit
-  // freigeschaltetem Modul, versteckte nie
-  const visibleWidgets = widgets.filter(w => {
-    if (ADMIN_TYPES.has(w.type) && !isAdmin) return false
-    if (!widgetAllowed(w)) return false
-    if (w.type === 'entity_type' && !typeMap[w.slug]) return false
-    return !w.hidden
-  })
+  const layout = aktivesLayout(config)
+  // normalisiereConfig hat bereits aussortiert; hier nur noch der Sicherheitsgurt
+  // für Rechte, die sich seit dem Laden geändert haben könnten.
+  const sichtbareWidgets = (layout?.widgets || []).filter(w =>
+    widgetErlaubt(w.type, ctx) && (w.type !== 'entity_type' || typeMap[w.slug])
+  )
 
-  // Katalog für den Bearbeiten-Modus (inkl. versteckter Widgets)
-  const catalogWidgets = widgets.filter(w => {
-    if (ADMIN_TYPES.has(w.type) && !isAdmin) return false
-    if (!widgetAllowed(w)) return false
-    if (w.type === 'entity_type' && !typeMap[w.slug]) return false
-    return true
-  })
+  // Was schon in der Ansicht steckt — für die Ausgrauung im Katalog
+  const vorhandeneTypen = new Set(sichtbareWidgets.filter(w => w.type !== 'entity_type').map(w => w.type))
+  const vorhandeneSlugs = new Set(sichtbareWidgets.filter(w => w.type === 'entity_type').map(w => w.slug))
 
-  function widgetLabel(w) {
-    if (w.type === 'entity_type') return typeMap[w.slug]?.name || w.slug
-    return WIDGET_LABELS[w.type] || w.type
-  }
+  // Standardbezeichnung eines Bausteins (Platzhalter beim Umbenennen)
+  const standardTitel = (w) => w.type === 'entity_type'
+    ? (typeMap[w.slug]?.name || w.slug)
+    : (widgetDef(w.type)?.label || w.type)
 
   return (
     <div>
@@ -896,47 +1079,100 @@ export default function DashboardPage() {
         </div>
       </PageHeader>
 
-      {/* Bearbeiten-Modus: Hinweis + Widget-Katalog */}
+      {/* Ansichten-Umschalter */}
+      <LayoutLeiste
+        config={config}
+        editMode={editMode}
+        onWechsel={(id) => setConfig(prev => wechsleLayout(prev, id))}
+        onNeu={() => setConfig(prev => fuegeLayoutHinzu(prev, 'Neue Ansicht'))}
+        onKopie={() => setConfig(prev => fuegeLayoutHinzu(prev, `${aktivesLayout(prev)?.name} (Kopie)`, { kopieren: true }))}
+        onUmbenennen={(id, name) => setConfig(prev => benenneLayoutUm(prev, id, name))}
+        onLoeschen={(id) => setConfig(prev => loescheLayout(prev, id))}
+      />
+
+      {/* Bearbeiten-Modus: Hinweis + Aktionen */}
       {editMode && (
         <div className="mb-4 p-4 bg-primary-50 border border-primary-200 rounded-xl text-sm text-primary-700">
-          <div className="flex items-center gap-2 mb-3">
-            <Settings2 size={15} />
-            Ziehe die Bausteine um sie neu anzuordnen. Mit ¼ / ½ / ↔ die Breite anpassen.
-            Dein Dashboard wird automatisch gespeichert und ist auf allen Geräten gleich.
+          <div className="flex items-start gap-2 mb-3">
+            <Settings2 size={15} className="mt-0.5 flex-shrink-0" />
+            <span>
+              Ziehe die Bausteine, um sie neu anzuordnen. Mit ¼ / ½ / ↔ die Breite anpassen,
+              mit dem Stift die Überschrift ändern, mit ✕ den Baustein entfernen.
+              Alles wird automatisch gespeichert und gilt auf allen deinen Geräten.
+            </span>
           </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-            {catalogWidgets.map(w => (
-              <label key={w.id} className="flex items-center gap-1.5 cursor-pointer text-neutral-700 text-[13px]">
-                <input
-                  type="checkbox"
-                  checked={!w.hidden}
-                  onChange={() => toggleHidden(w.id)}
-                />
-                {widgetLabel(w)}
-                {ADMIN_TYPES.has(w.type) && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-neutral-800 text-white">Admin</span>
-                )}
-              </label>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setKatalogOffen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
+            >
+              <Plus size={14} />
+              Baustein hinzufügen
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Diese Ansicht auf die Standardbelegung zurücksetzen?')) {
+                  setConfig(prev => setzeLayoutZurueck(prev, types, ctx))
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-primary-200 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors"
+            >
+              <RotateCcw size={14} />
+              Auf Standard zurücksetzen
+            </button>
           </div>
+        </div>
+      )}
+
+      <KatalogDialog
+        offen={katalogOffen}
+        onClose={() => setKatalogOffen(false)}
+        vorhandeneTypen={vorhandeneTypen}
+        vorhandeneSlugs={vorhandeneSlugs}
+        types={types}
+        ctx={ctx}
+        onAdd={fuegeHinzu}
+      />
+
+      {/* Leere Ansicht */}
+      {sichtbareWidgets.length === 0 && (
+        <div className="card p-10 flex flex-col items-center justify-center gap-3 text-center text-neutral-400">
+          <LayoutGrid size={28} />
+          <p className="text-sm">Diese Ansicht ist noch leer.</p>
+          {editMode ? (
+            <button
+              onClick={() => setKatalogOffen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
+            >
+              <Plus size={14} />
+              Ersten Baustein hinzufügen
+            </button>
+          ) : (
+            <p className="text-xs">Über „Anpassen" kannst du Bausteine hinzufügen.</p>
+          )}
         </div>
       )}
 
       {/* Widget-Grid */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={visibleWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
+        <SortableContext items={sichtbareWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 auto-rows-auto">
-            {visibleWidgets.map(widget => (
+            {sichtbareWidgets.map(widget => (
               <SortableWidget
                 key={widget.id}
                 id={widget.id}
                 size={Math.min(widget.size, 4)}
                 editMode={editMode}
+                titel={widget.titel}
+                standardTitel={standardTitel(widget)}
                 onSizeChange={(s) => updateSize(widget.id, s)}
+                onTitelChange={(t) => setzeTitel(widget.id, t)}
+                onRemove={() => entferne(widget.id)}
               >
                 {widget.type === 'entity_type' && typeMap[widget.slug] && (
                   <EntityTypeWidget
                     type={typeMap[widget.slug]}
+                    titel={widget.titel}
                     editMode={editMode}
                     onClick={() => navigate(`/masterdata/${widget.slug}`)}
                   />
@@ -945,6 +1181,7 @@ export default function DashboardPage() {
                   <AufgabenWidget
                     stats={aufgabenStats}
                     mailCount={mailCount}
+                    titel={widget.titel}
                     editMode={editMode}
                     navigate={navigate}
                   />
@@ -955,6 +1192,7 @@ export default function DashboardPage() {
                     running={running}
                     elapsedSec={elapsedSec}
                     onStop={stopTimer}
+                    titel={widget.titel}
                     editMode={editMode}
                     navigate={navigate}
                   />
@@ -962,33 +1200,34 @@ export default function DashboardPage() {
                 {widget.type === 'rechnungen' && (
                   <FinanzWidget
                     invoiceStats={invoiceStats}
+                    titel={widget.titel}
                     editMode={editMode}
                     onClick={() => navigate('/invoices')}
                   />
                 )}
                 {widget.type === 'projekte' && (
-                  <ProjekteWidget projects={recentProjects} editMode={editMode} navigate={navigate} />
+                  <ProjekteWidget projects={recentProjects} titel={widget.titel} editMode={editMode} navigate={navigate} />
                 )}
                 {widget.type === 'quick_access' && (
-                  <QuickAccessWidget editMode={editMode} navigate={navigate} />
+                  <QuickAccessWidget titel={widget.titel} editMode={editMode} navigate={navigate} />
                 )}
                 {widget.type === 'datacenter' && (
-                  <DatacenterWidget dcStats={dcStats} editMode={editMode} onClick={() => navigate('/datacenter')} />
+                  <DatacenterWidget dcStats={dcStats} titel={widget.titel} editMode={editMode} onClick={() => navigate('/datacenter')} />
                 )}
                 {widget.type === 'berichte' && (
-                  <BerichteWidget editMode={editMode} onClick={() => navigate('/zeiterfassung')} />
+                  <BerichteWidget titel={widget.titel} editMode={editMode} onClick={() => navigate('/zeiterfassung')} />
                 )}
                 {widget.type === 'buchhaltung' && isAdmin && (
-                  <BuchhaltungWidget accountCount={accountCount} editMode={editMode} navigate={navigate} />
+                  <BuchhaltungWidget accountCount={accountCount} titel={widget.titel} editMode={editMode} navigate={navigate} />
                 )}
                 {widget.type === 'benutzer_system' && isAdmin && (
-                  <SystemWidget userStats={userStats} versionInfo={versionInfo} editMode={editMode} navigate={navigate} />
+                  <SystemWidget userStats={userStats} versionInfo={versionInfo} titel={widget.titel} editMode={editMode} navigate={navigate} />
                 )}
               </SortableWidget>
             ))}
 
             {/* Neuer Stammdaten-Typ Button (nur außerhalb Bearbeiten-Modus) */}
-            {!editMode && (
+            {!editMode && sichtbareWidgets.length > 0 && (
               <div className="col-span-1">
                 <button
                   onClick={() => navigate('/masterdata')}
