@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.56',
+    day: '15',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Dashboard: Bausteine gezielt hinzufügen und entfernen, Kacheln umbenennen, mehrere Ansichten anlegen und umschalten.',
+    ],
+    updates: [
+      'Dashboard: bestehende Anordnungen werden automatisch übernommen; jede Ansicht lässt sich auf die Standardbelegung zurücksetzen.',
+    ],
+  },
+  {
     version: '1.12.55',
     day: '12',
     month: 'August',

@@ -48,6 +48,138 @@ def test_dashboard_config_zuruecksetzen(auth_client):
     assert auth_client.get("/api/users/me/dashboard").json()["config"] is None
 
 
+# ── 1b) Konfiguration Format v2 (mehrere Ansichten) ───────────────────────────
+def _config_v2(layouts=None):
+    """Minimale, gültige v2-Konfiguration."""
+    return {
+        "version": 2,
+        "aktivesLayout": "standard",
+        "bekannt": {"typen": ["zeiterfassung"], "slugs": []},
+        "layouts": layouts or [
+            {
+                "id": "standard",
+                "name": "Standard",
+                "widgets": [
+                    {"id": "w_zeit_ab12", "type": "zeiterfassung", "size": 2},
+                    {"id": "w_aufg_cd34", "type": "aufgaben", "size": 2,
+                     "titel": "Meine Aufgaben"},
+                ],
+            },
+        ],
+    }
+
+
+def test_dashboard_v2_speichern_und_lesen(auth_client):
+    """v2 wird unverändert gespeichert — inklusive eigener Kachelüberschrift."""
+    config = _config_v2()
+    resp = auth_client.put("/api/users/me/dashboard", json={"config": config})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["config"] == config
+
+    gelesen = auth_client.get("/api/users/me/dashboard").json()["config"]
+    assert gelesen == config
+    assert gelesen["layouts"][0]["widgets"][1]["titel"] == "Meine Aufgaben"
+
+
+def test_dashboard_v2_mehrere_ansichten(auth_client):
+    """Zweite Ansicht mit eigener Kachelauswahl bleibt getrennt erhalten."""
+    config = _config_v2(layouts=[
+        {"id": "standard", "name": "Standard",
+         "widgets": [{"id": "w1", "type": "zeiterfassung", "size": 2}]},
+        {"id": "layout_xy99", "name": "Unterwegs",
+         "widgets": [{"id": "w2", "type": "aufgaben", "size": 4}]},
+    ])
+    config["aktivesLayout"] = "layout_xy99"
+
+    resp = auth_client.put("/api/users/me/dashboard", json={"config": config})
+    assert resp.status_code == 200, resp.text
+
+    gelesen = auth_client.get("/api/users/me/dashboard").json()["config"]
+    assert [l["name"] for l in gelesen["layouts"]] == ["Standard", "Unterwegs"]
+    assert gelesen["aktivesLayout"] == "layout_xy99"
+    # Die Ansichten teilen sich keine Bausteine
+    assert gelesen["layouts"][0]["widgets"][0]["type"] == "zeiterfassung"
+    assert gelesen["layouts"][1]["widgets"][0]["type"] == "aufgaben"
+
+
+def test_dashboard_v1_wird_weiter_angenommen(auth_client):
+    """Ein Client mit altem Stand darf weiterhin schreiben (PWA-Cache)."""
+    alt = {"widgets": [{"id": "widget_zeit", "type": "zeiterfassung",
+                        "size": 2, "hidden": False}]}
+    resp = auth_client.put("/api/users/me/dashboard", json={"config": alt})
+    assert resp.status_code == 200
+    assert resp.json()["config"] == alt
+
+
+def test_dashboard_config_je_benutzer_getrennt(auth_client, admin_user, db_session):
+    """Die Konfiguration hängt am Benutzer, nicht global an der Installation."""
+    auth_client.put("/api/users/me/dashboard", json={"config": _config_v2()})
+
+    # Der zweite Benutzer hat davon nichts
+    db_session.refresh(admin_user)
+    assert admin_user.dashboard_config is None
+
+
+# ── 1c) Validierung: kaputte Konfigurationen werden abgewiesen ────────────────
+def test_dashboard_v2_ohne_layouts_abgelehnt(auth_client):
+    resp = auth_client.put("/api/users/me/dashboard",
+                           json={"config": {"version": 2, "layouts": []}})
+    assert resp.status_code == 422
+
+
+def test_dashboard_v2_ansicht_ohne_id_abgelehnt(auth_client):
+    kaputt = _config_v2(layouts=[{"name": "Ohne Id", "widgets": []}])
+    assert auth_client.put("/api/users/me/dashboard",
+                           json={"config": kaputt}).status_code == 422
+
+
+def test_dashboard_v2_baustein_ohne_typ_abgelehnt(auth_client):
+    kaputt = _config_v2(layouts=[
+        {"id": "standard", "name": "Standard", "widgets": [{"id": "w1", "size": 2}]},
+    ])
+    assert auth_client.put("/api/users/me/dashboard",
+                           json={"config": kaputt}).status_code == 422
+
+
+def test_dashboard_v2_ungueltige_groesse_abgelehnt(auth_client):
+    kaputt = _config_v2(layouts=[
+        {"id": "standard", "name": "Standard",
+         "widgets": [{"id": "w1", "type": "aufgaben", "size": 99}]},
+    ])
+    assert auth_client.put("/api/users/me/dashboard",
+                           json={"config": kaputt}).status_code == 422
+
+
+def test_dashboard_v2_aktives_layout_muss_existieren(auth_client):
+    kaputt = _config_v2()
+    kaputt["aktivesLayout"] = "gibt_es_nicht"
+    assert auth_client.put("/api/users/me/dashboard",
+                           json={"config": kaputt}).status_code == 422
+
+
+def test_dashboard_zu_viele_ansichten_abgelehnt(auth_client):
+    kaputt = _config_v2(layouts=[
+        {"id": f"l{i}", "name": f"Ansicht {i}", "widgets": []} for i in range(6)
+    ])
+    kaputt["aktivesLayout"] = "l0"
+    assert auth_client.put("/api/users/me/dashboard",
+                           json={"config": kaputt}).status_code == 422
+
+
+def test_dashboard_zu_langer_titel_abgelehnt(auth_client):
+    kaputt = _config_v2(layouts=[
+        {"id": "standard", "name": "Standard",
+         "widgets": [{"id": "w1", "type": "aufgaben", "size": 2, "titel": "x" * 41}]},
+    ])
+    assert auth_client.put("/api/users/me/dashboard",
+                           json={"config": kaputt}).status_code == 422
+
+
+def test_dashboard_unbekanntes_format_abgelehnt(auth_client):
+    assert auth_client.put("/api/users/me/dashboard",
+                           json={"config": {"irgendwas": True}}).status_code == 422
+
+
 # ── 2) Aufgaben-Statistik ─────────────────────────────────────────────────────
 def _neue_aufgabe(auth_client, titel, due=None, status="offen"):
     payload = {"title": titel, "status": status}

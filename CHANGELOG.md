@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.56] – 2026-08-15 – Dashboard: eigene Ansichten und frei wählbare Bausteine
+
+### Neu
+- Dashboard: Bausteine gezielt hinzufügen und entfernen, Kacheln umbenennen, mehrere Ansichten anlegen und umschalten.
+
+### Aktualisierungen
+- Dashboard: bestehende Anordnungen werden automatisch übernommen; jede Ansicht lässt sich auf die Standardbelegung zurücksetzen.
+
+---
+
 ## [1.12.55] – 2026-08-12 – Postecke foto drehung
 
 ### Aktualisierungen
