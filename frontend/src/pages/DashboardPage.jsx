@@ -18,6 +18,7 @@ import {
   Database, Clock, Check, FileText, GanttChartSquare, CheckSquare,
   FolderOpen, BarChart3, Landmark, ShieldCheck, Mail, Zap,
   Mic, Sparkles, X, Pencil, RotateCcw, Copy, Trash2, LayoutGrid,
+  AlertTriangle, Megaphone, TrendingUp, Receipt,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import VoiceEntryDialog from '../components/VoiceEntryDialog'
@@ -669,6 +670,247 @@ function SystemWidget({ userStats, versionInfo, titel, editMode, navigate }) {
   )
 }
 
+// ── Widget: Offene Posten & Mahnwesen ─────────────────────────────────────────
+function OffenePostenWidget({ daten, titel, editMode, navigate }) {
+  const staffel = daten?.staffel
+  const zeilen = [
+    { key: 'bis_30',   label: 'bis 30 Tage',  farbe: 'text-amber-600',  bg: 'bg-amber-50' },
+    { key: 'bis_60',   label: '31–60 Tage',   farbe: 'text-orange-600', bg: 'bg-orange-50' },
+    { key: 'ueber_60', label: 'über 60 Tage', farbe: 'text-red-600',    bg: 'bg-red-50' },
+  ]
+  const badge = daten?.gesamt?.count > 0
+    ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+        {fmtEuro(daten.gesamt.sum)}
+      </span>
+    : null
+
+  return (
+    <div
+      className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
+      onClick={editMode ? undefined : () => navigate('/buchhaltung/offene-posten')}
+    >
+      <WidgetHead
+        icon={AlertTriangle} title={titel || 'Offene Posten'}
+        sub={daten ? `${daten.gesamt.count} überfällige Forderungen` : 'Außenstände'}
+        badge={badge} editMode={editMode}
+      />
+      {!daten ? (
+        <p className="text-sm text-neutral-400">—</p>
+      ) : daten.gesamt.count === 0 ? (
+        <p className="text-sm text-neutral-400 py-2">Keine überfälligen Forderungen.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {zeilen.map(z => {
+            const w = staffel[z.key]
+            return (
+              <div key={z.key} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg ${w.count ? z.bg : ''}`}>
+                <span className="text-sm text-neutral-700">{z.label}</span>
+                <span className="flex items-baseline gap-2">
+                  <span className="text-xs text-neutral-400">{w.count}</span>
+                  <span className={`text-sm font-bold ${w.count ? z.farbe : 'text-neutral-300'}`}>
+                    {fmtEuro(w.sum)}
+                  </span>
+                </span>
+              </div>
+            )
+          })}
+          {daten.mahnstufen?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1 mt-1 border-t border-neutral-100">
+              {daten.mahnstufen.map(m => (
+                <span key={m.stufe} className="text-[11px] px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600">
+                  Stufe {m.stufe}: {m.belege}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Widget: Postecke ──────────────────────────────────────────────────────────
+function PosteckeWidget({ daten, titel, editMode, navigate }) {
+  const spalten = [
+    { key: 'entwurf',   label: 'Entwurf' },
+    { key: 'kontrolle', label: 'Kontrolle' },
+    { key: 'geplant',   label: 'Geplant' },
+  ]
+  const badge = daten?.fehler > 0
+    ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+        {daten.fehler} fehlgeschlagen
+      </span>
+    : null
+
+  return (
+    <div
+      className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
+      onClick={editMode ? undefined : () => navigate('/postecke')}
+    >
+      <WidgetHead
+        icon={Megaphone} title={titel || 'Postecke'}
+        sub="Beiträge und Veröffentlichungen" badge={badge} editMode={editMode}
+      />
+      {!daten ? (
+        <p className="text-sm text-neutral-400">—</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {spalten.map(s => (
+              <div key={s.key} className="text-center px-2 py-2 rounded-lg bg-neutral-50">
+                <p className="text-lg font-bold text-neutral-900">{daten.je_status[s.key] ?? 0}</p>
+                <p className="text-[11px] text-neutral-400">{s.label}</p>
+              </div>
+            ))}
+          </div>
+          {daten.naechste?.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              <p className="text-[11px] text-neutral-400 uppercase tracking-wide">Als Nächstes</p>
+              {daten.naechste.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-neutral-50">
+                  <span className="text-sm text-neutral-800 truncate">{p.titel}</span>
+                  <span className="text-xs text-neutral-400 flex-shrink-0">
+                    {p.geplant_am
+                      ? new Date(p.geplant_am).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' })
+                      : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-400">Nichts geplant.</p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Widget: Umsatz-Verlauf ────────────────────────────────────────────────────
+// Balkendiagramm als reines SVG — für zwölf Werte lohnt keine Bibliothek, und
+// das Bundle bleibt schlank.
+function UmsatzWidget({ daten, titel, editMode, navigate }) {
+  const MONATE = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+  const monate = daten?.monate || []
+  // Maßstab über beide Jahre, sonst wären die Balken nicht vergleichbar
+  const max = Math.max(1, ...monate.map(m => Math.max(m.netto, m.vorjahr)))
+
+  const B = 26          // Abstand je Monat
+  const H = 90          // Höhe der Zeichenfläche
+  const hoehe = (wert) => Math.max(wert > 0 ? 2 : 0, (wert / max) * H)
+
+  const diff = daten && daten.vorjahr_gesamt > 0
+    ? ((daten.netto_gesamt - daten.vorjahr_gesamt) / daten.vorjahr_gesamt) * 100
+    : null
+
+  return (
+    <div
+      className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
+      onClick={editMode ? undefined : () => navigate('/buchhaltung/auswertungen')}
+    >
+      <WidgetHead
+        icon={TrendingUp} title={titel || 'Umsatz-Verlauf'}
+        sub={daten ? `${daten.jahr} — netto ${fmtEuro(daten.netto_gesamt)}` : 'Monatsumsätze'}
+        badge={diff !== null ? (
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+            diff >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+          }`}>
+            {diff >= 0 ? '+' : ''}{diff.toFixed(0)} % ggü. Vorjahr
+          </span>
+        ) : null}
+        editMode={editMode}
+      />
+      {!daten ? (
+        <p className="text-sm text-neutral-400">—</p>
+      ) : (
+        <>
+          <svg viewBox={`0 0 ${B * 12} ${H + 18}`} className="w-full" style={{ maxHeight: 130 }}>
+            {monate.map((m, i) => {
+              const x = i * B
+              return (
+                <g key={m.monat}>
+                  {/* Vorjahr im Hintergrund, heuer davor */}
+                  <rect x={x + 4}  y={H - hoehe(m.vorjahr)} width={9} height={hoehe(m.vorjahr)}
+                        rx="2" className="fill-neutral-200" />
+                  <rect x={x + 13} y={H - hoehe(m.netto)}   width={9} height={hoehe(m.netto)}
+                        rx="2" className="fill-primary-500" />
+                  <text x={x + 13} y={H + 13} textAnchor="middle"
+                        className="fill-neutral-400" style={{ fontSize: 9 }}>
+                    {MONATE[i]}
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
+          <div className="flex items-center gap-4 mt-1 text-[11px] text-neutral-400">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary-500" />
+              {daten.jahr}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-neutral-200" />
+              {daten.jahr - 1} ({fmtEuro(daten.vorjahr_gesamt)})
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Widget: Eingangsrechnungen & Monatsabschluss ──────────────────────────────
+function EingangsrechnungenWidget({ daten, titel, editMode, navigate }) {
+  const vormonat = daten?.vormonat
+  const monatsName = vormonat
+    ? new Date(vormonat.jahr, vormonat.monat - 1, 1)
+        .toLocaleDateString('de-AT', { month: 'long', year: 'numeric' })
+    : ''
+
+  return (
+    <div
+      className={`card p-5 h-full ${!editMode ? 'cursor-pointer hover:shadow-card-hover transition-all duration-200 group' : 'rounded-tl-none rounded-tr-none'}`}
+      onClick={editMode ? undefined : () => navigate('/buchhaltung/eingangsrechnungen')}
+    >
+      <WidgetHead
+        icon={Receipt} title={titel || 'Eingangsrechnungen'}
+        sub="Lieferanten & Vorsteuer"
+        badge={daten?.offen?.count > 0
+          ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+              {daten.offen.count} zu zahlen
+            </span>
+          : null}
+        editMode={editMode}
+      />
+      {!daten ? (
+        <p className="text-sm text-neutral-400">—</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-neutral-50">
+            <span className="text-sm text-neutral-800">Offen</span>
+            <span className="text-sm font-bold text-neutral-900">{fmtEuro(daten.offen.sum)}</span>
+          </div>
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-neutral-50">
+            <span className="text-sm text-neutral-800">Vorsteuer laufender Monat</span>
+            <span className="text-sm font-bold text-neutral-900">{fmtEuro(daten.vorsteuer_monat)}</span>
+          </div>
+          {vormonat && (
+            <div className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-neutral-50">
+              <span className="text-sm text-neutral-800 truncate">Abschluss {monatsName}</span>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                vormonat.abgeschlossen
+                  ? 'bg-emerald-50 text-emerald-600'
+                  : 'bg-amber-50 text-amber-700'
+              }`}>
+                {vormonat.abgeschlossen ? 'erledigt' : 'offen'}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Katalog-Dialog: Baustein hinzufügen ───────────────────────────────────────
 // Zeigt alles, was die Registry hergibt und der Benutzer sehen darf. Bereits
 // verwendete Bausteine sind ausgegraut (Stammdaten-Typen einzeln je Typ).
@@ -867,6 +1109,11 @@ export default function DashboardPage() {
   const [userStats,      setUserStats]      = useState(null)
   const [versionInfo,    setVersionInfo]    = useState(null)
   const [accountCount,   setAccountCount]   = useState(null)
+  // Kennzahlen der vier Bausteine aus Etappe 2 — jeweils null, solange nicht geladen
+  const [offenePosten,   setOffenePosten]   = useState(null)
+  const [postecke,       setPostecke]       = useState(null)
+  const [umsatz,         setUmsatz]         = useState(null)
+  const [eingangsRe,     setEingangsRe]     = useState(null)
   const [config,   setConfig]   = useState(null)
   const [editMode, setEditMode] = useState(false)
   const [katalogOffen, setKatalogOffen] = useState(false)
@@ -932,6 +1179,10 @@ export default function DashboardPage() {
         if (k.projekte)   setRecentProjects(k.projekte || [])
         if (k.datacenter) setDcStats(k.datacenter)
         if (k.buchhaltung) setAccountCount(k.buchhaltung.konten)
+        if (k.offene_posten)      setOffenePosten(k.offene_posten)
+        if (k.postecke)           setPostecke(k.postecke)
+        if (k.umsatz)             setUmsatz(k.umsatz)
+        if (k.eingangsrechnungen) setEingangsRe(k.eingangsrechnungen)
         if (k.benutzer_system) {
           setUserStats({
             gesamt: k.benutzer_system.benutzer_gesamt,
@@ -1231,6 +1482,18 @@ export default function DashboardPage() {
                 )}
                 {widget.type === 'benutzer_system' && isAdmin && (
                   <SystemWidget userStats={userStats} versionInfo={versionInfo} titel={widget.titel} editMode={editMode} navigate={navigate} />
+                )}
+                {widget.type === 'offene_posten' && (
+                  <OffenePostenWidget daten={offenePosten} titel={widget.titel} editMode={editMode} navigate={navigate} />
+                )}
+                {widget.type === 'postecke' && (
+                  <PosteckeWidget daten={postecke} titel={widget.titel} editMode={editMode} navigate={navigate} />
+                )}
+                {widget.type === 'umsatz' && (
+                  <UmsatzWidget daten={umsatz} titel={widget.titel} editMode={editMode} navigate={navigate} />
+                )}
+                {widget.type === 'eingangsrechnungen' && (
+                  <EingangsrechnungenWidget daten={eingangsRe} titel={widget.titel} editMode={editMode} navigate={navigate} />
                 )}
               </SortableWidget>
             ))}

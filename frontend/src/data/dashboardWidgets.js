@@ -9,9 +9,13 @@
  *
  * Ein neues Widget hinzufügen:
  *   1. Hier einen Eintrag ergänzen (Typ, Beschriftung, Icon, Standardgröße,
- *      ggf. `modul` und `adminOnly`).
+ *      ggf. `module` und `adminOnly`).
  *   2. In `DashboardPage.jsx` die Darstellung im Render-Zweig ergänzen.
- *   3. Fertig — Katalog, Modulrechte und Standard-Layout ziehen automatisch nach.
+ *   3. Kennzahlen in `backend/app/services/dashboard.py` ergänzen und dort in
+ *      `BAUSTEIN_MODUL` dieselben Module eintragen (ein Test wacht darüber).
+ *   4. Fertig — Katalog, Modulrechte und Standard-Layout ziehen automatisch nach.
+ *      Bestandsbenutzer bekommen das neue Widget über das `bekannt`-Gedächtnis
+ *      in utils/dashboardConfig.js einmalig ins Standard-Layout gelegt.
  *
  * Felder:
  *   type        eindeutiger Schlüssel, wird in der gespeicherten Konfiguration
@@ -20,8 +24,9 @@
  *   beschreibung  kurzer Hinweis im Katalog-Dialog
  *   icon        lucide-Icon für den Katalog
  *   defaultSize Standardbreite (1 = ¼, 2 = ½, 4 = ganze Zeile)
- *   modul       benötigtes Modulrecht (siehe backend/app/core/modules.py);
- *               null = für alle sichtbar
+ *   module      benötigte Modulrechte (siehe backend/app/core/modules.py) —
+ *               eine Liste, weil Auswertungen „verkauf" UND „buchhaltung"
+ *               verlangen; leere Liste = für alle sichtbar
  *   adminOnly   nur für Administratoren
  *   imStandard  Teil des Standard-Dashboards eines neuen Benutzers
  *   mehrfach    darf mehrmals im selben Layout vorkommen (nur Stammdaten-Typen)
@@ -29,6 +34,7 @@
 import {
   CheckSquare, Clock, FileText, GanttChartSquare, Zap,
   Database, BarChart3, Landmark, ShieldCheck, Package,
+  AlertTriangle, Megaphone, TrendingUp, Receipt,
 } from 'lucide-react'
 
 export const WIDGET_REGISTRY = [
@@ -38,7 +44,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Offene und überfällige Aufgaben samt Mail-Vorschlägen',
     icon: CheckSquare,
     defaultSize: 2,
-    modul: 'aufgaben',
+    module: ['aufgaben'],
     adminOnly: false,
     imStandard: true,
     mehrfach: false,
@@ -49,7 +55,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Laufender Zeitgeber, heutige und wöchentliche Summen',
     icon: Clock,
     defaultSize: 2,
-    modul: 'zeiterfassung',
+    module: ['zeiterfassung'],
     adminOnly: false,
     imStandard: true,
     mehrfach: false,
@@ -60,7 +66,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Offene, überfällige und im Monat bezahlte Rechnungen',
     icon: FileText,
     defaultSize: 2,
-    modul: 'verkauf',
+    module: ['verkauf'],
     adminOnly: false,
     imStandard: true,
     mehrfach: false,
@@ -71,7 +77,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Zuletzt bearbeitete Projekte mit Fortschritt',
     icon: GanttChartSquare,
     defaultSize: 2,
-    modul: 'projekte',
+    module: ['projekte'],
     adminOnly: false,
     imStandard: true,
     mehrfach: false,
@@ -82,7 +88,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Selbst gewählte Verknüpfungen und Sofort-Aktionen',
     icon: Zap,
     defaultSize: 2,
-    modul: null,
+    module: [],
     adminOnly: false,
     imStandard: true,
     mehrfach: false,
@@ -93,7 +99,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Anzahl Dateien und die jüngsten Neuzugänge',
     icon: Database,
     defaultSize: 1,
-    modul: 'datacenter',
+    module: ['datacenter'],
     adminOnly: false,
     imStandard: true,
     mehrfach: false,
@@ -104,7 +110,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Einstieg in die Auswertungen der Zeiterfassung',
     icon: BarChart3,
     defaultSize: 1,
-    modul: 'zeiterfassung',
+    module: ['zeiterfassung'],
     adminOnly: false,
     imStandard: true,
     mehrfach: false,
@@ -115,7 +121,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Kontenplan und BMD-Export',
     icon: Landmark,
     defaultSize: 2,
-    modul: 'buchhaltung',
+    module: ['buchhaltung'],
     adminOnly: true,
     imStandard: true,
     mehrfach: false,
@@ -126,8 +132,52 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Aktive Benutzer und installierte Version',
     icon: ShieldCheck,
     defaultSize: 2,
-    modul: null,
+    module: [],
     adminOnly: true,
+    imStandard: true,
+    mehrfach: false,
+  },
+  {
+    type: 'offene_posten',
+    label: 'Offene Posten',
+    beschreibung: 'Überfällige Forderungen nach Alter gestaffelt, dazu der Mahnstand',
+    icon: AlertTriangle,
+    defaultSize: 2,
+    module: ['verkauf', 'buchhaltung'],
+    adminOnly: false,
+    imStandard: true,
+    mehrfach: false,
+  },
+  {
+    type: 'postecke',
+    label: 'Postecke',
+    beschreibung: 'Beiträge je Spalte, nächste Veröffentlichungen, gescheiterte Sendungen',
+    icon: Megaphone,
+    defaultSize: 2,
+    module: ['postecke'],
+    adminOnly: false,
+    imStandard: true,
+    mehrfach: false,
+  },
+  {
+    type: 'umsatz',
+    label: 'Umsatz-Verlauf',
+    beschreibung: 'Monatsumsätze des Jahres im Vergleich zum Vorjahr',
+    icon: TrendingUp,
+    defaultSize: 4,
+    module: ['verkauf', 'buchhaltung'],
+    adminOnly: false,
+    imStandard: true,
+    mehrfach: false,
+  },
+  {
+    type: 'eingangsrechnungen',
+    label: 'Eingangsrechnungen',
+    beschreibung: 'Offene Lieferantenrechnungen, Vorsteuer und Stand des Monatsabschlusses',
+    icon: Receipt,
+    defaultSize: 2,
+    module: ['buchhaltung'],
+    adminOnly: false,
     imStandard: true,
     mehrfach: false,
   },
@@ -137,7 +187,7 @@ export const WIDGET_REGISTRY = [
     beschreibung: 'Anzahl der Einträge eines Stammdaten-Typs',
     icon: Package,
     defaultSize: 1,
-    modul: 'stammdaten',
+    module: ['stammdaten'],
     adminOnly: false,
     imStandard: true,   // je vorhandenem Typ eine Kachel
     mehrfach: true,     // einmal pro Stammdaten-Typ
@@ -159,14 +209,18 @@ export const ALLE_TYPEN = WIDGET_REGISTRY.map(w => w.type)
 
 /**
  * Darf der Benutzer dieses Widget überhaupt sehen?
- * Prüft Adminrecht und Modulfreigabe (modules = null bedeutet „alles erlaubt").
+ *
+ * Prüft Adminrecht und Modulfreigaben; `modules = null` heißt „alles erlaubt"
+ * (Standard für Bestandsbenutzer, siehe backend/app/core/modules.py). Es
+ * müssen **alle** in `module` genannten Rechte vorliegen.
  */
 export function widgetErlaubt(type, { isAdmin, modules }) {
   const def = widgetDef(type)
   if (!def) return false                       // unbekannter Typ (z. B. altes Widget)
   if (def.adminOnly && !isAdmin) return false
-  if (!def.modul || modules === null || modules === undefined) return true
-  return modules.includes(def.modul)
+  const noetig = def.module || []
+  if (noetig.length === 0 || modules === null || modules === undefined) return true
+  return noetig.every(m => modules.includes(m))
 }
 
 /** Standard-Beschriftung eines Widgets (ohne benutzereigenen Titel). */

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.58] – 2026-08-16 – Dashboard neue widgets
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.57] – 2026-08-16 – Dashboard: schnellerer Aufbau und korrekte Finanzzahlen
 
 ### Aktualisierungen
