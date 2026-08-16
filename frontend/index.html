@@ -13,7 +13,12 @@
     <meta name="theme-color" content="#f97316" />
     <meta name="description" content="DeineZeit – Zeiterfassung, Projektverwaltung und Stammdaten" />
 
-    <!-- iOS Web-App Unterstützung ("Zum Home-Bildschirm") -->
+    <!-- Web-App Unterstützung ("Zum Home-Bildschirm").
+         Der herstellerneutrale Name ist der aktuelle; die apple-Variante
+         bleibt daneben stehen, weil iOS bis heute nur auf sie hört. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- iOS-spezifisch -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
