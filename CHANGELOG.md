@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.59] – 2026-08-16 – Datacenter spalten
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.58] – 2026-08-16 – Dashboard neue widgets
 
 ### Aktualisierungen
