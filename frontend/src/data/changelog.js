@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '1.12.57',
+    day: '16',
+    month: 'August',
+    year: '2026',
+    features: [],
+    updates: [
+      'Dashboard: lädt spürbar schneller — die Kennzahlen kommen jetzt mit einem einzigen Datenabruf statt mit über einem Dutzend.',
+      'Dashboard: die Finanz-Kachel wies bei den Beträgen immer 0,00 € aus und zeigt nun die tatsächlichen Summen. „Offen" umfasst zusätzlich gesendete und teilbezahlte Rechnungen, ausgewiesen wird der noch offene Restbetrag.',
+    ],
+  },
+  {
     version: '1.12.56',
     day: '15',
     month: 'August',

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.57] – 2026-08-16 – Dashboard: schnellerer Aufbau und korrekte Finanzzahlen
+
+### Aktualisierungen
+- Dashboard: lädt spürbar schneller — die Kennzahlen kommen jetzt mit einem einzigen Datenabruf statt mit über einem Dutzend.
+- Dashboard: die Finanz-Kachel wies bei den Beträgen immer 0,00 € aus und zeigt nun die tatsächlichen Summen. „Offen" umfasst zusätzlich gesendete und teilbezahlte Rechnungen, ausgewiesen wird der noch offene Restbetrag.
+
+---
+
 ## [1.12.56] – 2026-08-15 – Dashboard: eigene Ansichten und frei wählbare Bausteine
 
 ### Neu
