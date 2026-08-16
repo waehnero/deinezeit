@@ -50,8 +50,19 @@ function fmtElapsed(seconds) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+// Das Raster hat auf dem Handy zwei Spalten und ab „sm" vier (siehe unten).
+// Deshalb muss die Breite auf dem Handy bei zwei Spalten gedeckelt werden:
+// ein `col-span-4` in einem zweispaltigen Raster erzwingt zusätzliche Spalten,
+// das Raster wächst über den Bildschirm hinaus und alle Kacheln rutschen
+// ineinander. Die vollständigen Klassennamen stehen bewusst ausgeschrieben da,
+// sonst findet Tailwind sie beim Erzeugen der CSS-Datei nicht.
 function colSpanClass(size) {
-  return { 1: 'col-span-1', 2: 'col-span-2', 3: 'col-span-3', 4: 'col-span-4' }[size] || 'col-span-1'
+  return {
+    1: 'col-span-1',
+    2: 'col-span-2 sm:col-span-2',
+    3: 'col-span-2 sm:col-span-3',
+    4: 'col-span-2 sm:col-span-4',
+  }[size] || 'col-span-1'
 }
 
 // Fälligkeits-Label für Aufgaben ("seit 2 Tg.", "heute", "in 3 Tg.", Datum)
@@ -829,13 +840,16 @@ function UmsatzWidget({ daten, titel, editMode, navigate }) {
               const x = i * B
               return (
                 <g key={m.monat}>
-                  {/* Vorjahr im Hintergrund, heuer davor */}
+                  {/* Vorjahr im Hintergrund, heuer davor.
+                      `fill-current` + Textfarbe statt `fill-primary-500`: die
+                      Farben dieses Projekts sind CSS-Variablen, und fill-current
+                      funktioniert damit garantiert. */}
                   <rect x={x + 4}  y={H - hoehe(m.vorjahr)} width={9} height={hoehe(m.vorjahr)}
-                        rx="2" className="fill-neutral-200" />
+                        rx="2" className="fill-current text-neutral-200" />
                   <rect x={x + 13} y={H - hoehe(m.netto)}   width={9} height={hoehe(m.netto)}
-                        rx="2" className="fill-primary-500" />
+                        rx="2" className="fill-current text-primary-500" />
                   <text x={x + 13} y={H + 13} textAnchor="middle"
-                        className="fill-neutral-400" style={{ fontSize: 9 }}>
+                        className="fill-current text-neutral-400" style={{ fontSize: 9 }}>
                     {MONATE[i]}
                   </text>
                 </g>
