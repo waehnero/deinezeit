@@ -546,3 +546,260 @@ def test_kennzahlen_system_ohne_updatepruefung(auth_client, admin_user, db_sessi
     assert daten["benutzer_gesamt"] >= 1
     assert daten["version"]
     assert "update_available" not in daten
+
+
+# ── 5) Neue Bausteine (Etappe 2) ──────────────────────────────────────────────
+# ── Offene Posten & Mahnwesen ────────────────────────────────────────────────
+def test_offene_posten_staffelt_nach_alter(auth_client, db_session):
+    """Forderungen werden nach bis 30 / 31–60 / über 60 Tagen getrennt."""
+    heute = date.today()
+    _rechnung(db_session, status="offen", total="100.00",
+              due_date=heute - timedelta(days=5))
+    _rechnung(db_session, status="offen", total="200.00",
+              due_date=heute - timedelta(days=45))
+    _rechnung(db_session, status="offen", total="300.00",
+              due_date=heute - timedelta(days=90))
+    # Noch nicht fällig — taucht nirgends auf
+    _rechnung(db_session, status="offen", total="999.00",
+              due_date=heute + timedelta(days=10))
+
+    daten = _kennzahlen(auth_client, ["offene_posten"])["offene_posten"]
+    assert daten["staffel"]["bis_30"] == {"count": 1, "sum": 100.00}
+    assert daten["staffel"]["bis_60"] == {"count": 1, "sum": 200.00}
+    assert daten["staffel"]["ueber_60"] == {"count": 1, "sum": 300.00}
+    assert daten["gesamt"] == {"count": 3, "sum": 600.00}
+
+
+def test_offene_posten_beruecksichtigt_teilzahlung(auth_client, db_session):
+    _rechnung(db_session, status="teilbezahlt", total="1000.00",
+              due_date=date.today() - timedelta(days=10),
+              zahlungen=[("600.00", date.today())])
+    daten = _kennzahlen(auth_client, ["offene_posten"])["offene_posten"]
+    assert daten["gesamt"]["sum"] == 400.00
+
+
+def test_offene_posten_mahnstufe_nur_hoechste(auth_client, db_session):
+    """Ein dreimal gemahnter Beleg zählt nur in seiner höchsten Stufe."""
+    from app.models.invoice import InvoiceDunning
+    inv = _rechnung(db_session, status="ueberfaellig", total="500.00",
+                    due_date=date.today() - timedelta(days=30))
+    for stufe in (1, 2, 3):
+        db_session.add(InvoiceDunning(invoice_id=inv.id, level=stufe,
+                                      dunned_at=date.today()))
+    db_session.commit()
+
+    daten = _kennzahlen(auth_client, ["offene_posten"])["offene_posten"]
+    assert daten["mahnstufen"] == [{"stufe": 3, "belege": 1}]
+
+
+def test_offene_posten_mahnung_bezahlter_belege_zaehlt_nicht(auth_client, db_session):
+    """Eine Mahnung zu einer inzwischen bezahlten Rechnung ist erledigt."""
+    from app.models.invoice import InvoiceDunning
+    inv = _rechnung(db_session, status="bezahlt", total="500.00",
+                    paid_at=date.today())
+    db_session.add(InvoiceDunning(invoice_id=inv.id, level=2,
+                                  dunned_at=date.today() - timedelta(days=5)))
+    db_session.commit()
+
+    daten = _kennzahlen(auth_client, ["offene_posten"])["offene_posten"]
+    assert daten["mahnstufen"] == []
+
+
+# ── Postecke ─────────────────────────────────────────────────────────────────
+def test_postecke_zaehlt_je_status(auth_client, test_user, db_session):
+    from app.models.postecke import SocialPost
+    for status in ("entwurf", "entwurf", "kontrolle", "veroeffentlicht"):
+        db_session.add(SocialPost(owner_user_id=test_user.id, status=status,
+                                  titel=f"Beitrag {status}"))
+    db_session.commit()
+
+    daten = _kennzahlen(auth_client, ["postecke"])["postecke"]
+    assert daten["je_status"]["entwurf"] == 2
+    assert daten["je_status"]["kontrolle"] == 1
+    assert daten["je_status"]["geplant"] == 0
+
+
+def test_postecke_naechste_veroeffentlichungen(auth_client, test_user, db_session):
+    """Nur künftige Termine, aufsteigend, höchstens drei."""
+    from datetime import datetime, timezone
+    from app.models.postecke import SocialPost
+    jetzt = datetime.now(timezone.utc)
+
+    for titel, versatz in [("Übermorgen", 2), ("Morgen", 1), ("Vergangen", -1)]:
+        db_session.add(SocialPost(owner_user_id=test_user.id, status="geplant",
+                                  titel=titel,
+                                  geplant_am=jetzt + timedelta(days=versatz)))
+    db_session.commit()
+
+    daten = _kennzahlen(auth_client, ["postecke"])["postecke"]
+    titel = [p["titel"] for p in daten["naechste"]]
+    assert titel == ["Morgen", "Übermorgen"]
+
+
+def test_postecke_meldet_fehlgeschlagene_sendungen(auth_client, test_user, db_session):
+    """Gescheiterte Veröffentlichungen fallen im Kanban sonst niemandem auf."""
+    from app.models.postecke import SocialPost
+    db_session.add(SocialPost(owner_user_id=test_user.id, status="geplant",
+                              titel="Kaputt", publish_error="Token abgelaufen"))
+    db_session.add(SocialPost(owner_user_id=test_user.id, status="geplant",
+                              titel="Heil"))
+    db_session.commit()
+
+    assert _kennzahlen(auth_client, ["postecke"])["postecke"]["fehler"] == 1
+
+
+# ── Umsatz-Verlauf ───────────────────────────────────────────────────────────
+def test_umsatz_liefert_zwoelf_monate(auth_client):
+    """Auch leere Monate kommen mit — eine Lücke läse sich sonst wie ein
+    fehlender Monat statt wie ein Monat ohne Umsatz."""
+    daten = _kennzahlen(auth_client, ["umsatz"])["umsatz"]
+    assert len(daten["monate"]) == 12
+    assert [m["monat"] for m in daten["monate"]] == list(range(1, 13))
+    assert daten["jahr"] == date.today().year
+
+
+def test_umsatz_gleich_wie_auswertung(auth_client, db_session):
+    """Kachel und Auswertungsseite müssen dieselben Zahlen zeigen.
+
+    Beide gehen durch services/auswertungen.je_monat — der Test hält fest,
+    dass daran niemand vorbeirechnet.
+    """
+    from app.services import auswertungen
+    jahr = date.today().year
+    direkt = auswertungen.je_monat(db_session, jahr)
+    kachel = _kennzahlen(auth_client, ["umsatz"])["umsatz"]
+
+    assert kachel["netto_gesamt"] == float(direkt["netto_gesamt"])
+    assert kachel["vorjahr_gesamt"] == float(direkt["vorjahr_gesamt"])
+
+
+# ── Eingangsrechnungen & Monatsabschluss ─────────────────────────────────────
+def _eingangsrechnung(db, *, status="offen", brutto="600.00", steuer="100.00",
+                      abziehbar=True, tag=None):
+    from decimal import Decimal
+    from app.models.purchase import PurchaseInvoice
+    re = PurchaseInvoice(
+        date=tag or date.today(),
+        status=status,
+        vat_deductible=abziehbar,
+        net_total=Decimal(brutto) - Decimal(steuer),
+        tax_total=Decimal(steuer),
+        gross_total=Decimal(brutto),
+    )
+    db.add(re)
+    db.commit()
+    return re
+
+
+def test_eingangsrechnungen_offene_summe(auth_client, db_session):
+    _eingangsrechnung(db_session, status="offen", brutto="600.00")
+    _eingangsrechnung(db_session, status="offen", brutto="400.00")
+    _eingangsrechnung(db_session, status="bezahlt", brutto="900.00")
+
+    daten = _kennzahlen(auth_client, ["eingangsrechnungen"])["eingangsrechnungen"]
+    assert daten["offen"] == {"count": 2, "sum": 1000.00}
+
+
+def test_eingangsrechnungen_vorsteuer_nur_abziehbar(auth_client, db_session):
+    """Nicht abziehbare Vorsteuer (§ 12 UStG) zählt nicht mit."""
+    _eingangsrechnung(db_session, steuer="100.00", abziehbar=True)
+    _eingangsrechnung(db_session, steuer="50.00", abziehbar=False)
+
+    daten = _kennzahlen(auth_client, ["eingangsrechnungen"])["eingangsrechnungen"]
+    assert daten["vorsteuer_monat"] == 100.00
+
+
+def test_eingangsrechnungen_vorsteuer_nur_laufender_monat(auth_client, db_session):
+    vormonat = date.today().replace(day=1) - timedelta(days=1)
+    _eingangsrechnung(db_session, steuer="100.00")
+    _eingangsrechnung(db_session, steuer="70.00", tag=vormonat)
+
+    daten = _kennzahlen(auth_client, ["eingangsrechnungen"])["eingangsrechnungen"]
+    assert daten["vorsteuer_monat"] == 100.00
+
+
+def test_eingangsrechnungen_monatsabschluss(auth_client, db_session):
+    from app.models.period import AccountingPeriod
+    vormonat = date.today().replace(day=1) - timedelta(days=1)
+
+    daten = _kennzahlen(auth_client, ["eingangsrechnungen"])["eingangsrechnungen"]
+    assert daten["vormonat"]["abgeschlossen"] is False
+
+    db_session.add(AccountingPeriod(year=vormonat.year, month=vormonat.month,
+                                    status="abgeschlossen"))
+    db_session.commit()
+
+    daten = _kennzahlen(auth_client, ["eingangsrechnungen"])["eingangsrechnungen"]
+    assert daten["vormonat"]["abgeschlossen"] is True
+
+
+def test_eingangsrechnungen_abschluss_braucht_verkauf(auth_client, test_user, db_session):
+    """Der Monatsabschluss verlangt zusätzlich „verkauf" — ohne dieses Recht
+    bleibt der Teil weg, statt die ganze Kachel zu verbergen."""
+    test_user.allowed_modules = ["dashboard", "buchhaltung"]
+    db_session.commit()
+
+    daten = _kennzahlen(auth_client, ["eingangsrechnungen"])["eingangsrechnungen"]
+    assert "offen" in daten
+    assert "vormonat" not in daten
+
+
+# ── Mehrfach-Modulrechte ─────────────────────────────────────────────────────
+def test_umsatz_braucht_beide_module(auth_client, test_user, db_session):
+    """Umsatz und offene Posten verlangen verkauf UND buchhaltung — genau wie
+    ihre Fachseiten. Eine Kachel mit Zahlen zu einer gesperrten Seite wäre
+    eine Hintertür."""
+    test_user.allowed_modules = ["dashboard", "verkauf"]
+    db_session.commit()
+    daten = _kennzahlen(auth_client, ["umsatz", "offene_posten", "rechnungen"])
+    assert "umsatz" not in daten
+    assert "offene_posten" not in daten
+    assert "rechnungen" in daten            # braucht nur verkauf
+
+    test_user.allowed_modules = ["dashboard", "verkauf", "buchhaltung"]
+    db_session.commit()
+    daten = _kennzahlen(auth_client, ["umsatz", "offene_posten"])
+    assert "umsatz" in daten
+    assert "offene_posten" in daten
+
+
+# ── Registry und Backend müssen zusammenpassen ───────────────────────────────
+def test_registry_und_backend_stimmen_ueberein():
+    """Die Modulzuordnung steht doppelt: einmal in der Frontend-Registry, einmal
+    im Service. Das ist unvermeidlich (zwei Sprachen) — aber prüfbar.
+
+    Läuft die Prüfung nicht, weil die Datei fehlt, wird der Test übersprungen
+    statt rot: die Backend-Tests sollen nicht am Frontend-Baum hängen.
+    """
+    import pytest
+    import re
+    from pathlib import Path
+    from app.services.dashboard import BAUSTEIN_MODUL, NUR_ADMIN, OHNE_DATEN
+
+    registry = (Path(__file__).resolve().parents[2]
+                / "frontend" / "src" / "data" / "dashboardWidgets.js")
+    if not registry.exists():
+        pytest.skip("Frontend-Registry nicht verfügbar")
+
+    quelle = registry.read_text(encoding="utf-8")
+    eintraege = {}
+    for typ, rest in re.findall(r"\{\s*type: '(\w+)'(.*?)\n  \}", quelle, re.S):
+        module = re.search(r"module:\s*\[(.*?)\]", rest)
+        admin = re.search(r"adminOnly:\s*(true|false)", rest)
+        eintraege[typ] = (
+            tuple(re.findall(r"'(\w+)'", module.group(1))) if module else (),
+            admin.group(1) == "true" if admin else False,
+        )
+
+    assert eintraege, "Registry konnte nicht gelesen werden"
+
+    for typ, (module, admin) in eintraege.items():
+        if typ in OHNE_DATEN:
+            continue
+        assert typ in BAUSTEIN_MODUL, f"'{typ}' fehlt in BAUSTEIN_MODUL"
+        assert set(BAUSTEIN_MODUL[typ]) == set(module), (
+            f"'{typ}': Frontend verlangt {module}, Backend {BAUSTEIN_MODUL[typ]}")
+        assert (typ in NUR_ADMIN) == admin, f"'{typ}': adminOnly weicht ab"
+
+    verwaist = set(BAUSTEIN_MODUL) - set(eintraege)
+    assert not verwaist, f"Backend kennt Bausteine ohne Registry-Eintrag: {verwaist}"
