@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { datacenterApi } from '../services/api'
 import ContactSearch from '../components/ContactSearch'
+import ResponsiveTable from '../components/ResponsiveTable'
 import toast from 'react-hot-toast'
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -205,78 +206,86 @@ function ExtendDialog({ attachment, onClose, onExtended }) {
   )
 }
 
-// ── SharedFileRow ─────────────────────────────────────────────────────────────
+// ── Freigaben: Spalten & Aktionen ────────────────────────────────────────────
 
-function SharedFileRow({ attachment, onRevoke, onExtend, onCopy }) {
-  const [confirmRevoke, setConfirmRevoke] = useState(false)
+function ablaufLabel(attachment) {
+  if (!attachment.share_expires_at) return 'Unbegrenzt'
+  const d = new Date(attachment.share_expires_at)
+  const diff = d - new Date()
+  if (diff < 0) return <span className="text-red-500">Abgelaufen</span>
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+  if (days === 1) return <span className="text-orange-500">Läuft heute ab</span>
+  if (days <= 3) return <span className="text-orange-400">Noch {days} Tage</span>
+  return `Noch ${days} Tage`
+}
 
-  const isExpired = attachment.share_expires_at &&
-    new Date(attachment.share_expires_at) < new Date()
-
-  const expiresLabel = () => {
-    if (!attachment.share_expires_at) return 'Unbegrenzt'
-    const d = new Date(attachment.share_expires_at)
-    const diff = d - new Date()
-    if (diff < 0) return <span className="text-red-500">Abgelaufen</span>
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
-    if (days === 1) return <span className="text-orange-500">Läuft heute ab</span>
-    if (days <= 3) return <span className="text-orange-400">Noch {days} Tage</span>
-    return `Noch ${days} Tage`
-  }
-
-  return (
-    <tr className={`hover:bg-gray-50 transition group ${isExpired ? 'opacity-60' : ''}`}>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <FileIcon mimetype={attachment.mimetype} type={attachment.type} size={17} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-              {attachment.display_name || attachment.filename}
-            </p>
-            <p className="text-xs text-gray-400">
-              <span className="px-1.5 py-0.5 rounded-full bg-gray-100">{entityLabel(attachment.entity_type)}</span>
-            </p>
-          </div>
+const FREIGABE_SPALTEN = [
+  {
+    key: 'datei', label: 'Datei', breite: 300, minBreite: 140, fix: true,
+    sortWert: a => (a.display_name || a.filename || '').toLowerCase(),
+    render: a => (
+      <div className="flex items-center gap-3 min-w-0">
+        <FileIcon mimetype={a.mimetype} type={a.type} size={17} />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">
+            {a.display_name || a.filename}
+          </p>
+          <p className="text-xs text-gray-400 truncate">
+            <span className="px-1.5 py-0.5 rounded-full bg-gray-100">{entityLabel(a.entity_type)}</span>
+          </p>
         </div>
-      </td>
-      <td className="px-4 py-3 text-xs hidden md:table-cell">
-        <div className="flex items-center gap-1.5">
-          <Clock size={12} className="text-gray-400" />
-          <span className="text-gray-600">{expiresLabel()}</span>
+      </div>
+    ),
+  },
+  {
+    key: 'ablauf', label: 'Läuft ab', breite: 180,
+    // ohne Ablaufdatum = unbegrenzt → beim Sortieren ans Ende
+    sortWert: a => a.share_expires_at || '',
+    render: a => (
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 text-xs">
+          <Clock size={12} className="text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 truncate">{ablaufLabel(a)}</span>
         </div>
-        {attachment.share_expires_at && (
-          <p className="text-gray-400 mt-0.5">
-            {new Date(attachment.share_expires_at).toLocaleDateString('de-AT', {
+        {a.share_expires_at && (
+          <p className="text-xs text-gray-400 mt-0.5">
+            {new Date(a.share_expires_at).toLocaleDateString('de-AT', {
               day: '2-digit', month: '2-digit', year: 'numeric'
             })}
           </p>
         )}
-      </td>
-      <td className="px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">
-        {formatBytes(attachment.filesize)}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition">
-          <button onClick={() => onCopy(attachment)} title="Link kopieren"
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
-            <Copy size={14} />
-          </button>
-          <button onClick={() => onExtend(attachment)} title="Verlängern"
-            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
-            <CalendarClock size={14} />
-          </button>
-          <button
-            onClick={() => { if (confirmRevoke) onRevoke(attachment); else setConfirmRevoke(true) }}
-            onBlur={() => setTimeout(() => setConfirmRevoke(false), 200)}
-            title={confirmRevoke ? 'Nochmal klicken' : 'Freigabe widerrufen'}
-            className={`p-1.5 rounded-lg transition ${
-              confirmRevoke ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-            }`}>
-            <Ban size={14} />
-          </button>
-        </div>
-      </td>
-    </tr>
+      </div>
+    ),
+  },
+  {
+    key: 'groesse', label: 'Größe', breite: 120, muted: true,
+    sortWert: a => a.filesize || 0,
+    render: a => <span className="text-xs text-gray-400">{formatBytes(a.filesize)}</span>,
+  },
+]
+
+function FreigabeAktionen({ attachment, onRevoke, onExtend, onCopy }) {
+  const [confirmRevoke, setConfirmRevoke] = useState(false)
+  return (
+    <>
+      <button onClick={() => onCopy(attachment)} title="Link kopieren"
+        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+        <Copy size={14} />
+      </button>
+      <button onClick={() => onExtend(attachment)} title="Verlängern"
+        className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
+        <CalendarClock size={14} />
+      </button>
+      <button
+        onClick={() => { if (confirmRevoke) onRevoke(attachment); else setConfirmRevoke(true) }}
+        onBlur={() => setTimeout(() => setConfirmRevoke(false), 200)}
+        title={confirmRevoke ? 'Nochmal klicken' : 'Freigabe widerrufen'}
+        className={`p-1.5 rounded-lg transition ${
+          confirmRevoke ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+        }`}>
+        <Ban size={14} />
+      </button>
+    </>
   )
 }
 
@@ -533,98 +542,116 @@ function FolderTree({ folders, selected, onSelect, viewMode, onViewModeChange })
   )
 }
 
-// ── Datei-Zeile ──────────────────────────────────────────────────────────────
+// ── Dateiliste: Spalten & Aktionen ───────────────────────────────────────────
 
-function FileRow({ attachment, onPreview, onDownload, onShare, onDelete, onEditContact }) {
-  const _fn = (attachment.filename || '').toLowerCase()
-  const canPreview = attachment.type === 'file' && (
-    attachment.mimetype?.startsWith('image/') ||
-    attachment.mimetype === 'application/pdf' ||
-    attachment.mimetype?.startsWith('text/') ||
-    attachment.mimetype === 'message/rfc822' ||
-    attachment.mimetype === 'text/rfc822' ||
-    attachment.mimetype === 'application/vnd.ms-outlook' ||
-    _fn.endsWith('.eml') ||
-    _fn.endsWith('.msg')
+// Welche Dateien lassen sich in der Vorschau anzeigen?
+function kannVorschau(a) {
+  const fn = (a.filename || '').toLowerCase()
+  return a.type === 'file' && (
+    a.mimetype?.startsWith('image/') ||
+    a.mimetype === 'application/pdf' ||
+    a.mimetype?.startsWith('text/') ||
+    a.mimetype === 'message/rfc822' ||
+    a.mimetype === 'text/rfc822' ||
+    a.mimetype === 'application/vnd.ms-outlook' ||
+    fn.endsWith('.eml') ||
+    fn.endsWith('.msg')
   )
+}
 
+// Spalten der Dateiliste. Breite, Reihenfolge, Sichtbarkeit und Sortierung
+// stellt jeder Benutzer über das Spaltenmenü selbst ein (ResponsiveTable).
+const DATEI_SPALTEN = [
+  {
+    key: 'name', label: 'Name', breite: 320, minBreite: 140, fix: true,
+    sortWert: a => (a.display_name || a.filename || a.link_url || '').toLowerCase(),
+    render: a => (
+      <div className="flex items-center gap-3 min-w-0">
+        <FileIcon mimetype={a.mimetype} type={a.type} size={17} />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate"
+            title={a.display_name || a.filename || a.link_url}>
+            {a.display_name || a.filename || a.link_url}
+          </p>
+          {a.description && (
+            <p className="text-xs text-gray-400 truncate">{a.description}</p>
+          )}
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: 'bereich', label: 'Bereich', breite: 150,
+    sortWert: a => entityLabel(a.entity_type),
+    render: a => (
+      <span className="inline-block px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs truncate max-w-full">
+        {entityLabel(a.entity_type)}
+      </span>
+    ),
+  },
+  {
+    key: 'kontakt', label: 'Kontakt', breite: 160,
+    sortWert: a => (a.contact_name || '').toLowerCase(),
+    render: a => a.contact_name
+      ? <span className="text-xs text-gray-500 truncate block" title={a.contact_name}>👤 {a.contact_name}</span>
+      : <span className="text-xs text-gray-300">—</span>,
+  },
+  {
+    key: 'groesse', label: 'Größe / Typ', breite: 130,
+    // Links haben keine Größe → beim Sortieren hinten
+    sortWert: a => (a.type === 'file' ? (a.filesize || 0) : -1),
+    render: a => a.type === 'file'
+      ? <span className="text-xs text-gray-500">{formatBytes(a.filesize)}</span>
+      : (
+        <span className="flex items-center gap-1 text-xs text-gray-500 truncate">
+          <Link2 size={12} className="text-blue-400 flex-shrink-0" />
+          {a.link_provider || 'Link'}
+        </span>
+      ),
+  },
+  {
+    key: 'erstellt', label: 'Erstellt', breite: 165, muted: true,
+    sortWert: a => a.created_at || '',
+    render: a => <span className="text-xs text-gray-400">{formatDate(a.created_at)}</span>,
+  },
+]
+
+function DateiAktionen({ attachment, onPreview, onDownload, onShare, onDelete, onEditContact }) {
   return (
-    <tr className="hover:bg-gray-50 transition group">
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <FileIcon mimetype={attachment.mimetype} type={attachment.type} size={17} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-              {attachment.display_name || attachment.filename || attachment.link_url}
-            </p>
-            {attachment.description && (
-              <p className="text-xs text-gray-400 truncate">{attachment.description}</p>
-            )}
-          </div>
-        </div>
-      </td>
-      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap hidden md:table-cell">
-        <div className="flex flex-col gap-1 items-start">
-          <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-            {entityLabel(attachment.entity_type)}
-          </span>
-          {attachment.contact_name && (
-            <span className="text-[11px] text-gray-400 truncate max-w-[140px]" title={attachment.contact_name}>
-              👤 {attachment.contact_name}
-            </span>
-          )}
-        </div>
-      </td>
-      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap hidden lg:table-cell">
-        {attachment.type === 'file' ? formatBytes(attachment.filesize) : (
-          <span className="flex items-center gap-1">
-            <Link2 size={12} className="text-blue-400" />
-            {attachment.link_provider || 'Link'}
-          </span>
-        )}
-      </td>
-      <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap hidden xl:table-cell">
-        {formatDate(attachment.created_at)}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition">
-          {canPreview && (
-            <button onClick={() => onPreview(attachment)} title="Vorschau"
-              className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
-              <Eye size={14} />
-            </button>
-          )}
-          {attachment.type === 'file' && (
-            <button onClick={() => onDownload(attachment)} title="Herunterladen"
-              className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
-              <Download size={14} />
-            </button>
-          )}
-          {attachment.type === 'link' && (
-            <a href={attachment.link_url} target="_blank" rel="noopener noreferrer" title="Öffnen"
-              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
-              <ExternalLink size={14} />
-            </a>
-          )}
-          {attachment.type === 'file' && (
-            <button onClick={() => onShare(attachment)} title="Teilen"
-              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
-              <Share2 size={14} />
-            </button>
-          )}
-          <button onClick={() => onEditContact(attachment)} title="Kontakt zuordnen"
-            className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
-            <User size={14} />
-          </button>
-          <button
-            onClick={() => onDelete(attachment)}
-            title="Löschen"
-            className="p-1.5 rounded-lg transition text-gray-400 hover:text-red-500 hover:bg-red-50">
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </td>
-    </tr>
+    <>
+      {kannVorschau(attachment) && (
+        <button onClick={() => onPreview(attachment)} title="Vorschau"
+          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+          <Eye size={14} />
+        </button>
+      )}
+      {attachment.type === 'file' && (
+        <button onClick={() => onDownload(attachment)} title="Herunterladen"
+          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+          <Download size={14} />
+        </button>
+      )}
+      {attachment.type === 'link' && (
+        <a href={attachment.link_url} target="_blank" rel="noopener noreferrer" title="Öffnen"
+          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+          <ExternalLink size={14} />
+        </a>
+      )}
+      {attachment.type === 'file' && (
+        <button onClick={() => onShare(attachment)} title="Teilen"
+          className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
+          <Share2 size={14} />
+        </button>
+      )}
+      <button onClick={() => onEditContact(attachment)} title="Kontakt zuordnen"
+        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+        <User size={14} />
+      </button>
+      <button onClick={() => onDelete(attachment)} title="Löschen"
+        className="p-1.5 rounded-lg transition text-gray-400 hover:text-red-500 hover:bg-red-50">
+        <Trash2 size={14} />
+      </button>
+    </>
   )
 }
 
@@ -1080,55 +1107,47 @@ export default function DatacenterPage() {
               </p>
             </div>
           ) : selected === 'shared' ? (
-            <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Datei</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Läuft ab</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Größe</th>
-                    <th className="px-4 py-2.5 w-28"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {attachments.map(a => (
-                    <SharedFileRow
-                      key={a.id}
-                      attachment={a}
-                      onRevoke={handleRevokeShare}
-                      onExtend={setExtendItem}
-                      onCopy={handleCopyShareLink}
-                    />
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-surface rounded-2xl border border-gray-200">
+              <ResponsiveTable
+                tableId="datacenter-freigaben"
+                standardSortierung={{ key: 'ablauf', richtung: 'auf' }}
+                columns={FREIGABE_SPALTEN}
+                rows={attachments}
+                aktionenBreite={140}
+                actions={a => (
+                  <FreigabeAktionen
+                    attachment={a}
+                    onRevoke={handleRevokeShare}
+                    onExtend={setExtendItem}
+                    onCopy={handleCopyShareLink}
+                  />
+                )}
+                emptyText="Keine aktiven Freigaben"
+              />
             </div>
           ) : (
-            <div className="bg-surface rounded-2xl border border-gray-200 overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Bereich</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Größe / Typ</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden xl:table-cell">Erstellt</th>
-                    <th className="px-4 py-2.5 w-28"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {attachments.map(a => (
-                    <FileRow
-                      key={a.id}
-                      attachment={a}
-                      onPreview={setPreviewItem}
-                      onDownload={handleDownload}
-                      onShare={setShareItem}
-                      onDelete={setDeleteTarget}
-                      onEditContact={setContactEditItem}
-                    />
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-surface rounded-2xl border border-gray-200">
+              <ResponsiveTable
+                tableId="datacenter-dateien"
+                standardSortierung={{ key: 'erstellt', richtung: 'ab' }}
+                columns={DATEI_SPALTEN}
+                rows={attachments}
+                aktionenBreite={200}
+                // Klick auf die Zeile öffnet die Vorschau (sofern möglich)
+                onRowClick={setPreviewItem}
+                zeileKlickbar={kannVorschau}
+                actions={a => (
+                  <DateiAktionen
+                    attachment={a}
+                    onPreview={setPreviewItem}
+                    onDownload={handleDownload}
+                    onShare={setShareItem}
+                    onDelete={setDeleteTarget}
+                    onEditContact={setContactEditItem}
+                  />
+                )}
+                emptyText="Keine Dateien vorhanden"
+              />
             </div>
           )}
         </div>
