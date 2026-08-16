@@ -9,7 +9,7 @@ from slowapi.middleware import SlowAPIMiddleware
 import logging
 import os
 from app.core.config import settings
-from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase
+from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard
 from app.api import settings as settings_api
 from app.services import storage_service
 from app.api.system import record_activity
@@ -110,6 +110,11 @@ app.include_router(aufgaben.router, prefix="/api",
 app.include_router(mailimport.router, prefix="/api",
                    dependencies=[_Dep(_rm("aufgaben"))])
 app.include_router(gdpr.router, prefix="/api")
+# Dashboard-Kennzahlen: sammelt die Werte anderer Module ein. Die Freigabe je
+# Baustein prüft der Service selbst (services/dashboard.py) — hier hängt nur
+# das Grundrecht aufs Dashboard.
+app.include_router(dashboard.router, prefix="/api",
+                   dependencies=[_Dep(_rm("dashboard"))])
 app.include_router(postecke.router, prefix="/api",
                    dependencies=[_Dep(_rm("postecke"))])
 # Öffentlicher, token-gesicherter Medien-Abruf (für Instagram) — bewusst OHNE

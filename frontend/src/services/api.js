@@ -57,6 +57,15 @@ export const usersApi = {
   saveDashboard: (config) => api.put('/users/me/dashboard', { config }),
 }
 
+export const dashboardApi = {
+  // Sammelt die Kennzahlen aller sichtbaren Kacheln in einem Aufruf.
+  // `bausteine` ist ein Array von Widget-Typen; leer/weggelassen = alle
+  // Bausteine, die der Benutzer sehen darf.
+  kennzahlen: (bausteine) => api.get('/dashboard/kennzahlen', {
+    params: bausteine?.length ? { bausteine: bausteine.join(',') } : {},
+  }),
+}
+
 export const masterdataApi = {
   // Stammdaten-Typen
   listTypes: () => api.get('/masterdata/types'),

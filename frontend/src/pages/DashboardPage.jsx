@@ -3,8 +3,7 @@ import PageHeader from '../components/PageHeader'
 import { LayoutDashboard } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
-  masterdataApi, authApi, zeiterfassungApi, invoiceApi, projektplanApi,
-  aufgabenApi, mailImportApi, datacenterApi, usersApi, systemApi, accountingApi,
+  masterdataApi, authApi, zeiterfassungApi, usersApi, systemApi, dashboardApi,
 } from '../services/api'
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
@@ -878,57 +877,20 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'admin'
 
   // ── Daten laden ──────────────────────────────────────────────────────────
+  // Zwei Wellen statt der früheren dreizehn Einzelanfragen:
+  //   1. Wer bin ich, welche Stammdaten-Typen gibt es, wie sieht mein
+  //      Dashboard aus? Erst daraus ergibt sich, welche Kacheln sichtbar sind.
+  //   2. Ein Aufruf holt die Kennzahlen — und zwar nur für genau diese Kacheln.
   useEffect(() => {
     Promise.all([
       masterdataApi.listTypes(),
       authApi.me(),
-      zeiterfassungApi.getStats().catch(() => ({ data: null })),
-      invoiceApi.list({ doc_type: 'rechnung' }).catch(() => ({ data: [] })),
-      projektplanApi.recentProjects(5).catch(() => ({ data: [] })),
-      aufgabenApi.stats({ limit: 4 }).catch(() => ({ data: null })),
-      mailImportApi.listSuggestions('offen').catch(() => ({ data: [] })),
-      datacenterApi.stats(3).catch(() => ({ data: null })),
-      zeiterfassungApi.getRunning().catch(() => ({ data: null })),
       usersApi.getDashboard().catch(() => ({ data: { config: null } })),
-    ]).then(([typesRes, meRes, statsRes, invRes, recentRes,
-              aufgRes, mailRes, dcRes, runningRes, cfgRes]) => {
+    ]).then(async ([typesRes, meRes, cfgRes]) => {
       const loadedTypes = typesRes.data
       const me = meRes.data
       setTypes(loadedTypes)
       setUser(me)
-      setStats(statsRes.data)
-      setRecentProjects(recentRes.data || [])
-      setAufgabenStats(aufgRes.data)
-      setMailCount((mailRes.data || []).length)
-      setDcStats(dcRes.data)
-      setRunning(runningRes.data || null)
-
-      // Rechnungs-Statistiken berechnen
-      const invList = invRes.data || []
-      const nowMonth = new Date().getMonth()
-      const nowYear  = new Date().getFullYear()
-      function sumGroup(list) {
-        return { count: list.length, sum: list.reduce((a, i) => a + (parseFloat(i.total_gross) || 0), 0) }
-      }
-      setInvoiceStats({
-        offen:        sumGroup(invList.filter(i => i.status === 'offen')),
-        ueberfaellig: sumGroup(invList.filter(i => i.status === 'ueberfaellig')),
-        bezahltMonat: sumGroup(invList.filter(i => {
-          if (i.status !== 'bezahlt') return false
-          const d = new Date(i.paid_at || i.updated_at)
-          return d.getMonth() === nowMonth && d.getFullYear() === nowYear
-        })),
-      })
-
-      // Admin-Daten nachladen
-      if (me?.role === 'admin') {
-        usersApi.list().then(res => {
-          const list = res.data || []
-          setUserStats({ gesamt: list.length, aktiv: list.filter(u => u.is_active).length })
-        }).catch(() => {})
-        systemApi.getVersion().then(res => setVersionInfo(res.data)).catch(() => {})
-        accountingApi.listAccounts().then(res => setAccountCount((res.data || []).length)).catch(() => {})
-      }
 
       // ── Dashboard-Konfiguration: Server → localStorage-Altbestand → Standard ─
       // normalisiereConfig kümmert sich um das alte Format v1, um entfernte
@@ -938,8 +900,55 @@ export default function DashboardPage() {
       if (!roh) {
         try { roh = JSON.parse(localStorage.getItem(LS_KEY)) } catch { /* ignorieren */ }
       }
-      setConfig(normalisiereConfig(roh, loadedTypes, ctx))
+      const cfg = normalisiereConfig(roh, loadedTypes, ctx)
+      setConfig(cfg)
       configLoaded.current = true
+
+      // ── Welle 2: Kennzahlen nur für die sichtbaren Kacheln ────────────────
+      const sichtbar = aktivesLayout(cfg)?.widgets || []
+      const gebraucht = [...new Set(
+        sichtbar.map(w => w.type).filter(t => widgetErlaubt(t, ctx)),
+      )]
+
+      if (gebraucht.length) {
+        const { data } = await dashboardApi.kennzahlen(gebraucht)
+        const k = data?.kennzahlen || {}
+
+        if (k.aufgaben) {
+          setAufgabenStats(k.aufgaben.stats)
+          setMailCount(k.aufgaben.mail_vorschlaege || 0)
+        }
+        if (k.zeiterfassung) {
+          setStats(k.zeiterfassung.stats)
+          setRunning(k.zeiterfassung.laufend || null)
+        }
+        if (k.rechnungen) {
+          setInvoiceStats({
+            offen:        k.rechnungen.offen,
+            ueberfaellig: k.rechnungen.ueberfaellig,
+            bezahltMonat: k.rechnungen.bezahlt_monat,
+          })
+        }
+        if (k.projekte)   setRecentProjects(k.projekte || [])
+        if (k.datacenter) setDcStats(k.datacenter)
+        if (k.buchhaltung) setAccountCount(k.buchhaltung.konten)
+        if (k.benutzer_system) {
+          setUserStats({
+            gesamt: k.benutzer_system.benutzer_gesamt,
+            aktiv:  k.benutzer_system.benutzer_aktiv,
+          })
+          setVersionInfo({ current: k.benutzer_system.version })
+        }
+
+        // Update-Prüfung bewusst getrennt und nicht blockierend: sie fragt bei
+        // GitHub nach (5 s Timeout, notfalls git fetch mit 10 s). Im
+        // Sammelaufruf hinge das ganze Dashboard daran.
+        if (k.benutzer_system) {
+          systemApi.getVersion()
+            .then(res => setVersionInfo(res.data))
+            .catch(() => { /* lokale Version steht bereits */ })
+        }
+      }
     }).catch(err => {
       console.error('Dashboard laden fehlgeschlagen:', err?.response?.data || err)
     }).finally(() => setLoading(false))
