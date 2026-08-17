@@ -21,9 +21,13 @@ def test_login_erfolgreich(client, test_user):
     assert resp.status_code == 200
     data = resp.json()
     assert data["access_token"]          # nicht leer
-    assert data["refresh_token"]
     assert data["token_type"] == "bearer"
     assert data["requires_totp"] is False
+    # Der Refresh-Token steht seit der Sicherheits-Etappe NICHT mehr im
+    # Antworttext, sondern in einem httpOnly-Cookie. Wäre er hier zu finden,
+    # könnte JavaScript ihn lesen — genau das soll er nicht.
+    assert data["refresh_token"] == ""
+    assert "dz_refresh" in resp.cookies
 
 
 def test_login_falsches_passwort(client, test_user):

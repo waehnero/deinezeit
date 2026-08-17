@@ -27,11 +27,24 @@ class UserResponse(UserBase):
     is_active: bool
     totp_enabled: bool
     created_at: datetime
-    # Gespeicherte Modulrechte (None = alle Module erlaubt)
+    # Anmeldeschutz — die Benutzerverwaltung zeigt an, wenn ein Konto wegen
+    # Fehlversuchen gesperrt ist, damit ein Administrator auf „Sperre aufheben"
+    # nicht erst durch Nachfragen kommt.
+    is_locked: bool = False
+    locked_until: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+    # Altes Rechteformat, seit Migration 0055 nur noch Rückfall und Nachweis
+    # der Übernahme (None = alle Module erlaubt). Wird nicht mehr gesetzt.
     allowed_modules: Optional[list[str]] = None
-    # Effektive Modul-Liste (Admin: immer alle) — Pydantic liest sie über
-    # das @property User.modules (from_attributes)
+    # Module mit Lesezugriff — Pydantic liest sie über das @property
+    # User.modules (from_attributes). Grundlage für das Menü im Frontend.
     modules: Optional[list[str]] = None
+    # Rechtegruppen, in denen der Benutzer ist (Namen für die Liste)
+    gruppen_namen: list[str] = []
+    # Gesetzt, wenn individuelle Abweichungen bestehen — die Benutzerliste
+    # kennzeichnet solche Konten, damit sie bei einer Gruppenänderung nicht
+    # übersehen werden.
+    permission_overrides: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -129,14 +142,33 @@ class LoginRequest(BaseModel):
     email: str
     password: str
     totp_code: Optional[str] = None
+    # Notausgang, wenn das Authenticator-Gerät fehlt: einer der Einmal-Codes
+    # aus den Sicherheitseinstellungen — anstelle des 2FA-Codes.
+    recovery_code: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
+    """Antwort auf eine erfolgreiche Anmeldung.
+
+    ``refresh_token`` bleibt **leer**: Der langlebige Token wird seit der
+    Sicherheits-Etappe als ``httpOnly``-Cookie gesetzt und ist für JavaScript
+    nicht lesbar. Eine XSS-Lücke im Frontend kann damit nicht mehr eine
+    dauerhaft gültige Sitzung abgreifen, sondern höchstens den Access-Token —
+    und der lebt 30 Minuten.
+
+    Das Feld bleibt aus einem praktischen Grund im Schema: Eine als PWA
+    installierte Oberfläche kann eine zwischengespeicherte, ältere Version
+    sein, die das Feld noch ausliest. Es fehlt dann nicht, sondern ist leer,
+    und der Anmeldefluss läuft über den Cookie weiter.
+    """
     access_token: str
-    refresh_token: str
+    refresh_token: str = ""
     token_type: str = "bearer"
     requires_totp: bool = False
     requires_webauthn: bool = False
+    #: Anzahl noch nicht verbrauchter Einmal-Codes — die Oberfläche warnt,
+    #: wenn kaum noch welche übrig sind.
+    recovery_codes_left: Optional[int] = None
 
 
 class AdminUserUpdate(BaseModel):
@@ -151,6 +183,14 @@ class AdminUserUpdate(BaseModel):
 
 
 class TOTPSetupResponse(BaseModel):
+    """QR-Code und Secret für die Einrichtung.
+
+    Das Secret steht weiterhin in der Antwort — der Benutzer muss es abtippen
+    können, wenn die Kamera den QR-Code nicht liest. Neu ist, dass der Client
+    es beim Aktivieren **nicht** zurückschickt: der Server hat es vorgemerkt
+    (``users.totp_secret_pending``). Vorher lief es als Query-Parameter zurück
+    und landete damit in Zugriffslogs und im Browserverlauf.
+    """
     secret: str
     qr_code_url: str
     provisioning_uri: str
@@ -168,3 +208,100 @@ class WebAuthnCredentialResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ─── Sitzungen ────────────────────────────────────────────────────────────────
+
+class SessionResponse(BaseModel):
+    """Eine angemeldete Sitzung für die Übersicht „Hier bist du angemeldet"."""
+    id: UUID
+    device_label: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    expires_at: datetime
+    #: True für die Sitzung, aus der die Anfrage gerade kommt — die Oberfläche
+    #: markiert sie als „dieses Gerät" und bietet dort kein „beenden" an.
+    is_current: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class RefreshResponse(BaseModel):
+    """Antwort auf ``/auth/refresh``. Der neue Refresh-Token steckt im Cookie."""
+    access_token: str
+    token_type: str = "bearer"
+
+
+# ─── Passwort ─────────────────────────────────────────────────────────────────
+
+class PasswordForgotRequest(BaseModel):
+    email: str
+
+
+class PasswordResetRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class PasswordChangeRequest(BaseModel):
+    """Passwortwechsel im Profil.
+
+    Das aktuelle Passwort ist Pflicht: Ohne diese Rückfrage kann jemand, der
+    ein offenes Gerät vorfindet oder einen Access-Token abgegriffen hat, das
+    Passwort ändern und den rechtmäßigen Benutzer aussperren.
+    """
+    current_password: str
+    new_password: str
+    #: True = zusätzlich alle anderen Geräte abmelden (Standard).
+    logout_other_devices: bool = True
+
+
+# ─── Einmal-Codes ─────────────────────────────────────────────────────────────
+
+class RecoveryCodesResponse(BaseModel):
+    """Die Codes im Klartext — einmalig bei der Erzeugung."""
+    codes: list[str]
+    hinweis: str = ("Bitte jetzt ausdrucken oder in einem Passwort-Manager "
+                    "speichern. Nach dem Schließen sind die Codes nicht mehr "
+                    "abrufbar. Jeder Code funktioniert genau einmal.")
+
+
+class RecoveryStatusResponse(BaseModel):
+    codes_left: int
+    total: int
+
+
+# ─── Prüfpfad ─────────────────────────────────────────────────────────────────
+
+class AuthEventResponse(BaseModel):
+    id: UUID
+    event: str
+    #: Deutscher Text zur Ereignisart (siehe core/auth_events.py)
+    label: Optional[str] = None
+    email_attempted: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    detail: Optional[str] = None
+    created_at: datetime
+    suspicious: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+# ─── WebAuthn (bisher ungetypte dicts) ────────────────────────────────────────
+
+class WebAuthnRegisterComplete(BaseModel):
+    credential: dict
+    device_name: str = "Mein Gerät"
+
+
+class WebAuthnLoginBegin(BaseModel):
+    email: str
+
+
+class WebAuthnLoginComplete(BaseModel):
+    email: str
+    credential: dict

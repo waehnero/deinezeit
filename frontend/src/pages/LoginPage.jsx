@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
-import { authApi, setupApi } from '../services/api'
+import { authApi, setAccessToken, setupApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { version } from '../../package.json'
 import toast from 'react-hot-toast'
@@ -109,6 +109,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
   const [showTotp, setShowTotp] = useState(false)
+  // Notausgang, wenn das Authenticator-Gerät fehlt: einer der Einmal-Codes.
+  // Ohne diesen Weg wäre ein Benutzer beim Verlust des Handys ausgesperrt und
+  // auf einen Administrator angewiesen — der selbst betroffen sein kann.
+  const [recoveryModus, setRecoveryModus] = useState(false)
+  const [recoveryCode, setRecoveryCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -127,7 +132,12 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      const res = await authApi.login(email, password, showTotp ? totpCode : undefined)
+      // Entweder 2FA-Code oder Einmal-Code — nie beides.
+      const res = await authApi.login(
+        email, password,
+        showTotp && !recoveryModus ? totpCode : undefined,
+        showTotp && recoveryModus ? recoveryCode : undefined,
+      )
       const data = res.data
 
       if (data.requires_totp) {
@@ -137,8 +147,17 @@ export default function LoginPage() {
         return
       }
 
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
+      // Nur der kurzlebige Access-Token kommt zurück, und der bleibt im
+      // Arbeitsspeicher. Der Refresh-Token steckt im httpOnly-Cookie, den der
+      // Browser selbst verwaltet — für JavaScript unerreichbar.
+      setAccessToken(data.access_token)
+
+      if (data.recovery_codes_left !== null && data.recovery_codes_left <= 2) {
+        toast(`Nur noch ${data.recovery_codes_left} Einmal-Code(s) übrig. `
+              + 'Bitte in den Sicherheitseinstellungen neue erzeugen.',
+              { icon: '⚠️', duration: 8000 })
+      }
+
       await reload()
       navigate('/dashboard')
     } catch (err) {
@@ -146,7 +165,11 @@ export default function LoginPage() {
       const msg = Array.isArray(detail)
         ? detail.map(d => d.msg).join(', ')
         : (typeof detail === 'string' ? detail : t('auth.invalidCredentials'))
-      toast.error(msg)
+      // 429 = Kontosperre nach zu vielen Fehlversuchen. Die Meldung des
+      // Servers nennt die Wartezeit und ist hilfreicher als ein pauschales
+      // „Anmeldung fehlgeschlagen".
+      if (err.response?.status === 429) toast.error(msg, { duration: 8000 })
+      else toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -163,8 +186,7 @@ export default function LoginPage() {
       const optionsRes = await authApi.webauthnLoginBegin(email)
       const assertion = await startAuthentication(optionsRes.data)
       const res = await authApi.webauthnLoginComplete(email, assertion)
-      localStorage.setItem('access_token', res.data.access_token)
-      localStorage.setItem('refresh_token', res.data.refresh_token)
+      setAccessToken(res.data.access_token)
       await reload()
       navigate('/dashboard')
     } catch (err) {
@@ -246,7 +268,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {showTotp && (
+            {showTotp && !recoveryModus && (
               <div>
                 <label className="label">{t('auth.totpCode')}</label>
                 <input
@@ -259,6 +281,40 @@ export default function LoginPage() {
                   maxLength={6}
                   autoFocus
                 />
+                <button
+                  type="button"
+                  onClick={() => { setRecoveryModus(true); setTotpCode('') }}
+                  className="text-xs text-primary-600 hover:text-primary-700 mt-2"
+                >
+                  Kein Zugriff auf die Authenticator-App? Einmal-Code verwenden
+                </button>
+              </div>
+            )}
+
+            {showTotp && recoveryModus && (
+              <div>
+                <label className="label">Einmal-Code</label>
+                <input
+                  type="text"
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value.toUpperCase().slice(0, 12))}
+                  className="input text-center text-lg tracking-[0.2em] font-mono uppercase"
+                  placeholder="ABCDE-FGHIJ"
+                  autoComplete="off"
+                  autoFocus
+                />
+                <p className="text-xs text-neutral-500 mt-2">
+                  Einer der Codes, die bei der Einrichtung der
+                  2-Faktor-Anmeldung angezeigt wurden. Jeder Code funktioniert
+                  genau einmal.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setRecoveryModus(false); setRecoveryCode('') }}
+                  className="text-xs text-primary-600 hover:text-primary-700 mt-2"
+                >
+                  Zurück zum Code aus der App
+                </button>
               </div>
             )}
 

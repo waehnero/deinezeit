@@ -207,14 +207,26 @@ def list_todos(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from app.core.berechtigungen import darf_nur_eigene
+
     query = db.query(Todo)
+
+    # Umfang (ab Migration 0055): „nur eigene" heißt bei Aufgaben — mir
+    # zugewiesen oder von mir erstellt. Das entspricht dem, was der Filter
+    # `mine` freiwillig tat; hier wird es verbindlich. Ohne diese Einschränkung
+    # sah jeder mit Modulzugang alle Aufgaben des Betriebs, samt Beschreibungen.
+    nur_eigene = darf_nur_eigene(current_user, "aufgaben")
+    if nur_eigene:
+        query = query.filter(or_(Todo.assignee_id == current_user.id,
+                                 Todo.created_by == current_user.id))
+
     if not include_archived:
         query = query.filter(Todo.is_archived.is_(False))
     if status:
         query = query.filter(Todo.status.in_([s.strip() for s in status.split(",") if s.strip()]))
     if priority:
         query = query.filter(Todo.priority.in_([p.strip() for p in priority.split(",") if p.strip()]))
-    if assignee_id:
+    if assignee_id and not nur_eigene:
         query = query.filter(Todo.assignee_id == assignee_id)
     if mine:
         query = query.filter(or_(Todo.assignee_id == current_user.id,
@@ -393,8 +405,16 @@ def get_todo(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from app.core.berechtigungen import darf_nur_eigene
+
     todo = db.query(Todo).filter(Todo.id == todo_id).first()
     if todo:
+        # Umfang: Sonst wäre die Einschränkung in der Liste wirkungslos — man
+        # müsste nur eine ID kennen. 404 statt 403, damit die Antwort nicht
+        # verrät, dass es diese Aufgabe gibt.
+        if (darf_nur_eigene(current_user, "aufgaben")
+                and current_user.id not in (todo.assignee_id, todo.created_by)):
+            raise HTTPException(404, "Aufgabe nicht gefunden")
         return todo
     # Fallback: eingeblendete Projektplan-Aufgabe
     task = _get_planning_task(db, todo_id)

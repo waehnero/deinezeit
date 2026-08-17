@@ -8,6 +8,7 @@ from uuid import UUID
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin, require_module
+from app.core.berechtigungen import LOESCHEN, SCHREIBEN, hat_recht
 from app.models.user import User
 from app.models.masterdata import EntityType, FieldDefinition, EntityRecord
 from app.schemas.masterdata import (
@@ -20,6 +21,34 @@ from app.services.masterdata_service import masterdata_service
 from app.services import integrity
 
 router = APIRouter(prefix="/masterdata", tags=["Stammdaten"])
+
+
+def _schreibrecht_pruefen(user: User) -> None:
+    """Schreibrecht auf Stammdaten verlangen.
+
+    Der Router hat bewusst keine Modulsperre: Stammdaten müssen aus jedem
+    anderen Modul heraus *lesbar* sein (Auswahlfelder in Zeiterfassung,
+    Belegen, Aufgaben). Nur das Ändern ist eingeschränkt — und zwar seit
+    Migration 0055 über das Schreibrecht statt über die reine Modulfreigabe.
+    """
+    if not hat_recht(user, "stammdaten", SCHREIBEN):
+        raise HTTPException(
+            status_code=403,
+            detail=("Kein Zugriff — für „Stammdaten“ fehlt das Recht "
+                    "„Anlegen und ändern“."))
+
+
+def _loeschrecht_pruefen(user: User) -> None:
+    """Löschrecht auf Stammdaten verlangen (auch fürs Archivieren).
+
+    Archivieren ist in diesem Projekt das Löschen-Äquivalent (Beschluss
+    Löschregeln): Der Datensatz verschwindet aus den Auswahllisten. Es als
+    „Schreiben" zu behandeln, wäre eine Hintertür an der Löschsperre vorbei.
+    """
+    if not hat_recht(user, "stammdaten", LOESCHEN):
+        raise HTTPException(
+            status_code=403,
+            detail="Kein Zugriff — für „Stammdaten“ fehlt das Recht „Löschen“.")
 
 
 # ─── Stammdaten-Typen ─────────────────────────────────────────────────────────
@@ -269,9 +298,10 @@ async def create_record(
     """Neuen Datensatz anlegen (erfordert Modul Stammdaten).
 
     Lesen bleibt für alle offen (Auswahlfelder in anderen Modulen) —
-    Schreiben nur mit freigeschaltetem Stammdaten-Modul.
+    Anlegen nur mit Schreibrecht auf Stammdaten. Vor Migration 0055 genügte
+    hier die Modulfreigabe, die auch reines Ansehen einschloss.
     """
-    require_module("stammdaten")(current_user)
+    _schreibrecht_pruefen(current_user)
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")
@@ -300,8 +330,8 @@ async def update_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Datensatz bearbeiten (erfordert Modul Stammdaten)."""
-    require_module("stammdaten")(current_user)
+    """Datensatz bearbeiten (erfordert Schreibrecht auf Stammdaten)."""
+    _schreibrecht_pruefen(current_user)
     record = masterdata_service.get_record(db, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
@@ -349,8 +379,8 @@ async def import_records_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Datensätze aus CSV importieren (erfordert Modul Stammdaten)."""
-    require_module("stammdaten")(current_user)
+    """Datensätze aus CSV importieren (erfordert Schreibrecht auf Stammdaten)."""
+    _schreibrecht_pruefen(current_user)
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")

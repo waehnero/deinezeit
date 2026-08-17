@@ -43,8 +43,11 @@ def test_init_legt_admin_an(client):
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["access_token"]
-    assert data["refresh_token"]
     assert data["token_type"] == "bearer"
+    # Wie beim normalen Anmelden: der Refresh-Token steckt im httpOnly-Cookie
+    # und nicht im Antworttext.
+    assert data["refresh_token"] == ""
+    assert "dz_refresh" in resp.cookies
 
     # Danach ist die Einrichtung abgeschlossen …
     assert client.get("/api/setup/status").json()["needs_setup"] is False

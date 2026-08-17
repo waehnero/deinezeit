@@ -10,7 +10,8 @@ import io
 import json
 
 from app.db.base import get_db
-from app.api.deps import get_current_user, require_admin, require_module
+from app.api.deps import (get_current_user, require_admin,
+                          require_loeschen, require_modul_rechte)
 from app.models.user import User
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
                                  InvoiceNumberSequence, InvoiceSettings,
@@ -970,7 +971,7 @@ def _book_query(db: Session, date_from: Optional[date], date_to: Optional[date],
     return q.order_by(Invoice.date, Invoice.number)
 
 
-@router.get("/book/list", dependencies=[Depends(require_module("buchhaltung"))])
+@router.get("/book/list", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
 async def get_book_list(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -1024,7 +1025,7 @@ async def get_book_list(
     }
 
 
-@router.get("/book/csv", dependencies=[Depends(require_module("buchhaltung"))])
+@router.get("/book/csv", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
 async def get_book_csv(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -1061,7 +1062,7 @@ async def get_book_csv(
     )
 
 
-@router.get("/book/pdf", dependencies=[Depends(require_module("buchhaltung"))])
+@router.get("/book/pdf", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
 async def get_book_pdf(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -1220,7 +1221,7 @@ async def get_position_image(
 
 
 @router.get("/uva", response_model=UvaResponse,
-            dependencies=[Depends(require_module("buchhaltung"))])
+            dependencies=[Depends(require_modul_rechte("buchhaltung"))])
 async def get_uva(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -1381,7 +1382,7 @@ async def get_uva(
     )
 
 
-@router.get("/uva/pdf", dependencies=[Depends(require_module("buchhaltung"))])
+@router.get("/uva/pdf", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
 async def get_uva_pdf(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -1522,7 +1523,7 @@ def _bucket_fuer(tage: int) -> str:
     return "b90_plus"
 
 
-@router.get("/open-items", response_model=OpenItemsResponse, dependencies=[Depends(require_module("buchhaltung"))])
+@router.get("/open-items", response_model=OpenItemsResponse, dependencies=[Depends(require_modul_rechte("buchhaltung"))])
 async def get_open_items(
     contact_id: Optional[UUID] = Query(None),
     stichtag: Optional[date] = Query(None, description="Standard: heute"),
@@ -1731,7 +1732,7 @@ async def delete_payment(
 # Offene-Posten-Liste. Der Mahnlauf zeigt dieselben Zahlen: welcher Kunde
 # schuldet wie viel seit wann. Wäre er ohne das Recht erreichbar, stünde die
 # Sperre der OP-Liste nur auf dem Papier.
-MAHN_RECHT = [Depends(require_module("buchhaltung"))]
+MAHN_RECHT = [Depends(require_modul_rechte("buchhaltung"))]
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _kontakt(db: Session, contact_id):
@@ -2113,7 +2114,7 @@ async def get_invoice_audit(
 # wie Verkaufsbuch und UVA, nur anders geschnitten. Ein Recht, das dort greift
 # und hier nicht, wäre über die Auswertung umgehbar.
 
-AUSWERTUNG_RECHT = [Depends(require_module("buchhaltung"))]
+AUSWERTUNG_RECHT = [Depends(require_modul_rechte("buchhaltung"))]
 
 
 @router.get("/auswertung/umsatz-jahr", response_model=UmsatzJahrResponse,
@@ -2178,7 +2179,7 @@ async def check_einvoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
-    __=Depends(require_module("verkauf")),
+    __=Depends(require_modul_rechte("verkauf")),
 ):
     """
     Was einer E-Rechnung dieses Belegs noch fehlt.
@@ -2206,7 +2207,7 @@ async def download_einvoice_xml(
     trotz_luecken: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
-    __=Depends(require_module("verkauf")),
+    __=Depends(require_modul_rechte("verkauf")),
 ):
     """
     Das reine XML herunterladen — zum Prüfen und für Empfänger, die kein PDF
@@ -2400,13 +2401,19 @@ async def delete_invoice(
 # Aktionen
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/{invoice_id}/cancel", response_model=InvoiceResponse)
+@router.post("/{invoice_id}/cancel", response_model=InvoiceResponse,
+             dependencies=[Depends(require_loeschen("verkauf"))])
 async def cancel_invoice(
     invoice_id: UUID,
     body: InvoiceCancelRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Zusätzlich zur methodenbasierten Prüfung des Routers (POST → Ändern)
+    # verlangt das Stornieren ausdrücklich das LÖSCHRECHT. Ein ausgestellter
+    # Beleg lässt sich nicht löschen, das Stornieren ist der einzige Weg, ihn
+    # unwirksam zu machen — fachlich also ein Löschvorgang. Wer Rechnungen
+    # schreiben darf, soll sie nicht zwangsläufig entwerten können.
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
         raise HTTPException(404, "Rechnung nicht gefunden")
@@ -2800,7 +2807,7 @@ async def get_chain(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
-    __=Depends(require_module("verkauf")),
+    __=Depends(require_modul_rechte("verkauf")),
 ):
     """
     Der Abrechnungsstrang eines Belegs: alle Belege des Bauvorhabens und der
@@ -2857,7 +2864,7 @@ async def create_advance(
     trotz_ablauf: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _=Depends(require_module("verkauf")),
+    _=Depends(require_modul_rechte("verkauf")),
 ):
     """
     Fordert aus einem Angebot oder einer Auftragsbestätigung eine Anzahlung an.
@@ -2965,7 +2972,7 @@ async def create_final_invoice(
     body: SchlussrechnungRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _=Depends(require_module("verkauf")),
+    _=Depends(require_modul_rechte("verkauf")),
 ):
     """
     Erzeugt die Schlussrechnung eines Strangs.

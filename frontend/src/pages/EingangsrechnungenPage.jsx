@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { purchaseApi, masterdataApi } from '../services/api'
+import { getAccessToken, purchaseApi, masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/PageHeader'
 import {
@@ -89,7 +89,7 @@ export default function EingangsrechnungenPage() {
 
   async function originalOeffnen(beleg) {
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       const res = await fetch(purchaseApi.fileUrl(beleg.id),
                               { headers: { Authorization: 'Bearer ' + token } })
       if (!res.ok) throw new Error()

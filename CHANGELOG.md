@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.60] – 2026-08-17 – Sicherheit anmeldung
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.59] – 2026-08-16 – Datacenter spalten
 
 ### Aktualisierungen

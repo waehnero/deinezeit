@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../contexts/SettingsContext'
-import { settingsApi, systemApi, invoiceApi } from '../services/api'
+import { getAccessToken, settingsApi, systemApi, invoiceApi } from '../services/api'
 import toast from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
 import UserManagementPage from './UserManagementPage'
@@ -2064,7 +2064,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
               <button onClick={async () => {
                 setPreviewTemplate(n); setPreviewHtml(''); setPreviewLoading(true)
                 try {
-                  const token = localStorage.getItem('access_token')
+                  const token = getAccessToken()
                   const res = await fetch(`/api/invoices/template-preview/${n}`, { headers: { Authorization: `Bearer ${token}` } })
                   setPreviewHtml(await res.text())
                 } catch { setPreviewHtml('<p style="padding:2rem;color:red">Fehler</p>') }

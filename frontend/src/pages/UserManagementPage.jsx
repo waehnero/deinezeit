@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import {
   Users, Plus, Trash2, UserCheck, UserX,
-  Loader2, X, Pencil, ShieldOff, KeyRound
+  Loader2, X, Pencil, ShieldOff, KeyRound, Lock, LockOpen
 } from 'lucide-react'
 
 const ROLE_LABELS = { admin: 'Administrator', employee: 'Mitarbeiter' }
@@ -277,6 +277,30 @@ export default function UserManagementPage() {
     setEditUser(null)
   }
 
+  /** Kontosperre nach Fehlversuchen vorzeitig aufheben.
+   *
+   *  Die Sperre läuft nach 15 Minuten von selbst ab — dieser Weg ist für den
+   *  Fall gedacht, dass jemand nicht warten kann, etwa vor einem Kundentermin.
+   */
+  const handleUnlock = async (user) => {
+    try {
+      const res = await usersApi.unlock(user.id)
+      setUsers(users.map(u => u.id === user.id ? res.data : u))
+      toast.success(`Sperre für ${user.full_name} aufgehoben`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Sperre konnte nicht aufgehoben werden')
+    }
+  }
+
+  /** „gesperrt bis 14:35" — die Restdauer ist die Angabe, nach der ein
+   *  Administrator als Erstes gefragt wird. */
+  const sperrHinweis = (user) => {
+    if (!user.is_locked || !user.locked_until) return null
+    return new Date(user.locked_until).toLocaleTimeString('de-AT', {
+      hour: '2-digit', minute: '2-digit',
+    })
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <Loader2 size={28} className="animate-spin text-primary-500" />
@@ -336,11 +360,26 @@ export default function UserManagementPage() {
                     {user.is_active ? <UserCheck size={13} /> : <UserX size={13} />}
                     {user.is_active ? 'Aktiv' : 'Deaktiviert'}
                   </span>
+                  {user.is_locked && (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 mt-1">
+                      <Lock size={13} />
+                      gesperrt bis {sperrHinweis(user)}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
                     {isAdmin && (
                       <>
+                        {user.is_locked && (
+                          <button
+                            onClick={() => handleUnlock(user)}
+                            className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition"
+                            title="Sperre aufheben — der Benutzer kann sich sofort wieder anmelden"
+                          >
+                            <LockOpen size={14} />
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditUser(user)}
                           className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition"

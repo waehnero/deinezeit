@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, X } from 'lucide-react'
-import { systemApi } from '../services/api'
+import { getAccessToken, systemApi, tokenVerwerfen } from '../services/api'
 
 /**
  * Globales Update-Banner: polling /api/system/update-status alle 15 Sekunden.
@@ -14,8 +14,9 @@ export default function UpdateBanner() {
 
   // Polling: Update-Status vom Backend abfragen
   useEffect(() => {
-    const token = localStorage.getItem('access_token')
-    if (!token) return
+    // Nur abfragen, wenn eine Sitzung besteht — sonst läuft die Abfrage auf
+    // der Anmeldeseite dauerhaft ins Leere.
+    if (!getAccessToken()) return
 
     const poll = async () => {
       try {
@@ -63,8 +64,9 @@ export default function UpdateBanner() {
   }, [countdown])
 
   const handleLogout = useCallback((message) => {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    // Beim Update startet das Backend neu; ein Server-Aufruf zum Abmelden
+    // würde ohnehin ins Leere laufen. Deshalb hier nur der lokale Zustand.
+    tokenVerwerfen()
     sessionStorage.setItem('update_message', message)
     navigate('/login')
   }, [navigate])

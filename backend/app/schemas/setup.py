@@ -34,7 +34,14 @@ class SetupInitRequest(BaseModel):
 
 
 class SetupInitResponse(BaseModel):
+    """Antwort des Erstinstallations-Assistenten.
+
+    ``refresh_token`` bleibt leer — wie beim normalen Anmelden steckt der
+    langlebige Token in einem ``httpOnly``-Cookie und ist für JavaScript nicht
+    lesbar. Das Feld bleibt im Schema, damit eine zwischengespeicherte,
+    ältere Oberfläche nicht über ein fehlendes Feld stolpert.
+    """
     access_token: str
-    refresh_token: str
+    refresh_token: str = ""
     token_type: str = "bearer"
     company_contact_id: Optional[str] = None

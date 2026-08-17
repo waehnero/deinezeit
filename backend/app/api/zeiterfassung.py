@@ -200,12 +200,31 @@ async def list_entries(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    """Zeiteinträge abrufen – filterbar nach Benutzer, Datum, Projekt, Kontakt."""
+    """Zeiteinträge abrufen – filterbar nach Benutzer, Datum, Projekt, Kontakt.
+
+    **Umfang (ab Migration 0055):** Wer auf Zeiterfassung nur den Umfang „nur
+    eigene" hat, bekommt ausschließlich seine eigenen Einträge — auch wenn er
+    ausdrücklich nach einem anderen Benutzer filtert.
+
+    Das war vorher die größte Lücke im Modul: Der ``user_id``-Filter war
+    optional und ungeprüft. Ohne ihn lieferte die Abfrage die Einträge
+    **aller** Mitarbeiter, mit ihm die eines beliebigen Kollegen. Wer das Modul
+    freigeschaltet hatte, konnte damit die Arbeitszeiten des ganzen Betriebs
+    einsehen.
+    """
+    from app.core.berechtigungen import darf_nur_eigene
+
     q = db.query(TimeEntry)
 
-    if user_id:
+    if darf_nur_eigene(current_user, "zeiterfassung"):
+        # Vorrang vor dem Parameter: stillschweigend auf die eigenen
+        # einschränken, statt mit 403 abzuweisen. Die Oberfläche zeigt diesen
+        # Benutzern gar keine Benutzerauswahl, ein Fehler wäre also nur für
+        # jemanden sichtbar, der die Abfrage von Hand baut.
+        q = q.filter(TimeEntry.user_id == current_user.id)
+    elif user_id:
         q = q.filter(TimeEntry.user_id == user_id)
     if date_from:
         q = q.filter(TimeEntry.started_at >= date_from)
@@ -254,10 +273,24 @@ async def create_entry(
 async def get_entry(
     entry_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    """Einzelnen Zeiteintrag abrufen.
+
+    Auch hier gilt der Umfang: Sonst wäre die Einschränkung in der Liste
+    wirkungslos — man müsste nur eine ID erraten oder aus einer anderen Ansicht
+    kennen, um den Eintrag eines Kollegen zu lesen.
+    """
+    from app.core.berechtigungen import darf_nur_eigene
+
     entry = db.query(TimeEntry).filter(TimeEntry.id == entry_id).first()
     if not entry:
+        raise HTTPException(status_code=404, detail="Zeiteintrag nicht gefunden")
+
+    if (darf_nur_eigene(current_user, "zeiterfassung")
+            and entry.user_id != current_user.id):
+        # 404 und nicht 403: Ein „verboten" wäre die Auskunft, dass es diesen
+        # Eintrag gibt.
         raise HTTPException(status_code=404, detail="Zeiteintrag nicht gefunden")
     return entry
 
