@@ -7,6 +7,7 @@ import {
   Columns, List, Printer, Mail, RefreshCw, AlertCircle, Archive, AlertTriangle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useAuth } from '../contexts/AuthContext'
 import { aufgabenApi, usersApi, projektplanApi, masterdataApi, mailImportApi } from '../services/api'
 import AufgabenKanban from '../components/AufgabenKanban'
 import AufgabenKalender from '../components/AufgabenKalender'
@@ -542,7 +543,21 @@ export default function AufgabenPage() {
     try { localStorage.setItem('aufgaben_ansicht', a) } catch {}
   }
 
-  const [dialogTodo, setDialogTodo] = useState(null)  // null=zu, {}=neu, {…}=bearbeiten
+  const [dialogTodo, setDialogTodo] = useState(null)
+  // Rechte für die Oberfläche: Ohne Schreibrecht wird der Dialog gar nicht
+  // erst geöffnet. Vorher konnte man eine Aufgabe vollständig erfassen und
+  // erfuhr erst beim Speichern, dass man sie nicht anlegen darf — die Eingaben
+  // waren weg, und es sah aus wie ein Fehler statt nach einer Regel.
+  const { hasRecht } = useAuth()
+  const darfAnlegen = hasRecht('aufgaben', 'schreiben')
+  const neueAufgabe = () => {
+    if (!darfAnlegen) {
+      toast.error('Sie dürfen keine Aufgaben anlegen. '
+                  + 'Ein Administrator kann das Recht über die Rechtegruppen vergeben.')
+      return
+    }
+    setDialogTodo({})
+  }  // null=zu, {}=neu, {…}=bearbeiten
   const [mailPopup, setMailPopup] = useState(false)
   const [mailRefresh, setMailRefresh] = useState(0)   // remountet MailVorschlaege nach Scan
 
@@ -628,15 +643,20 @@ export default function AufgabenPage() {
             </button>
           ))}
         </div>
-        {/* Mail-Import: Konten anzeigen + manuell scannen */}
-        <button onClick={() => setMailPopup(true)} title="Mail-Import (Konten scannen)"
-          className="flex items-center px-3 py-1.5 rounded-lg border border-gray-300 bg-surface text-neutral-600 hover:bg-neutral-50">
-          <Mail size={15} />
-        </button>
+        {/* Mail-Import: Konten anzeigen + manuell scannen.
+            Setzt Schreibrecht voraus — aus den Vorschlägen entstehen Aufgaben.
+            Ohne das Recht wäre die Liste eine Sackgasse: Man sieht Vorschläge,
+            kann sie aber nicht übernehmen. */}
+        {darfAnlegen && (
+          <button onClick={() => setMailPopup(true)} title="Mail-Import (Konten scannen)"
+            className="flex items-center px-3 py-1.5 rounded-lg border border-gray-300 bg-surface text-neutral-600 hover:bg-neutral-50">
+            <Mail size={15} />
+          </button>
+        )}
       </PageHeader>
 
       {/* KI-Vorschläge aus E-Mails (nur sichtbar, wenn offene existieren) */}
-      <MailVorschlaege key={mailRefresh} onAccepted={load} />
+      {darfAnlegen && <MailVorschlaege key={mailRefresh} onAccepted={load} />}
 
       {/* Filterzeile */}
       <div className="flex flex-wrap items-center gap-2 mb-5">
@@ -663,14 +683,16 @@ export default function AufgabenPage() {
           <input type="checkbox" checked={erledigteZeigen} onChange={e => setErledigteZeigen(e.target.checked)}
             className="rounded border-gray-300" /> Erledigte
         </label>
-        <button onClick={() => setDialogTodo({})}
-          className="ml-auto hidden sm:flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg">
-          <Plus size={16} /> Neue Aufgabe
-        </button>
+        {darfAnlegen && (
+          <button onClick={neueAufgabe}
+            className="ml-auto hidden sm:flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg">
+            <Plus size={16} /> Neue Aufgabe
+          </button>
+        )}
       </div>
 
       {/* Primäraktion am Handy: einheitlicher runder FAB unten rechts */}
-      <Fab onClick={() => setDialogTodo({})} title="Neue Aufgabe" />
+      {darfAnlegen && <Fab onClick={neueAufgabe} title="Neue Aufgabe" />}
 
       {/* Inhalt je Ansicht */}
       {loading ? (

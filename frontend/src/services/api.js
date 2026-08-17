@@ -195,6 +195,31 @@ export const usersApi = {
   saveDashboard: (config) => api.put('/users/me/dashboard', { config }),
 }
 
+// ── Rechtegruppen (Migration 0055) ───────────────────────────────────────────
+export const groupsApi = {
+  // Beschreibung des Rechtemodells: Module, vergebbare Rechte, Umfänge.
+  // Kommt vom Server, damit die Rechtematrix nicht dieselbe Liste doppelt
+  // pflegt — die liefe sonst auseinander, sobald ein Modul dazukommt.
+  katalog: () => api.get('/groups/katalog'),
+
+  list:   () => api.get('/groups/'),
+  create: (data) => api.post('/groups/', data),
+  update: (id, data) => api.put(`/groups/${id}`, data),
+  delete: (id) => api.delete(`/groups/${id}`),
+
+  // Gruppenzugehörigkeit eines Benutzers ersetzen
+  setUserGroups: (userId, groupIds) =>
+    api.put(`/groups/users/${userId}/groups`, { group_ids: groupIds }),
+  // Individuelle Abweichungen (null löscht alle)
+  setOverrides: (userId, overrides) =>
+    api.put(`/groups/users/${userId}/overrides`, { overrides }),
+
+  // Effektive Rechte samt Herkunft — ohne diese Auskunft wird die
+  // Rechteverwaltung zur Ratesache.
+  userRechte: (userId) => api.get(`/groups/users/${userId}/rechte`),
+  meineRechte: () => api.get('/groups/me/rechte'),
+}
+
 export const dashboardApi = {
   // Sammelt die Kennzahlen aller sichtbaren Kacheln in einem Aufruf.
   // `bausteine` ist ein Array von Widget-Typen; leer/weggelassen = alle

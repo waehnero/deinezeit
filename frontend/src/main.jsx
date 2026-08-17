@@ -18,6 +18,7 @@ import MasterDataOverview from './pages/MasterDataOverview'
 import MasterDataDetail from './pages/MasterDataDetail'
 import ProfilePage from './pages/ProfilePage'
 import UserManagementPage from './pages/UserManagementPage'
+import GruppenPage from './pages/GruppenPage'
 import ZeiterfassungPage from './pages/ZeiterfassungPage'
 import ZeiterfassungFelder from './pages/ZeiterfassungFelder'
 import SettingsPage from './pages/SettingsPage'
@@ -108,6 +109,8 @@ function App() {
                       <Route path="/masterdata/:slug"     element={<ModuleRoute module="stammdaten"><MasterDataDetail /></ModuleRoute>} />
                       <Route path="/profile"              element={<ProfilePage />} />
                       <Route path="/users"                element={<UserManagementPage />} />
+                      {/* Rechtegruppen: nur Admin — wer Rechte verwaltet, kann sich selbst alles zuteilen */}
+                      <Route path="/users/gruppen"        element={<AdminRoute><GruppenPage /></AdminRoute>} />
                       <Route path="/zeiterfassung"        element={<ModuleRoute module="zeiterfassung"><ZeiterfassungPage /></ModuleRoute>} />
                       <Route path="/aufgaben"             element={<ModuleRoute module="aufgaben"><AufgabenPage /></ModuleRoute>} />
                       <Route path="/postecke"             element={<ModuleRoute module="postecke"><PosteckePage /></ModuleRoute>} />

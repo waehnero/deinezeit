@@ -12,11 +12,17 @@ import {
   EditProjectDialog, DuplicateProjectDialog, DeleteProjectDialog, ProjectActionsMenu,
 } from '../components/ProjektDialoge'
 
+import { useAuth } from '../contexts/AuthContext'
+
 export default function ProjektplanPage() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  // Ohne Schreibrecht gibt es keinen Weg, ein Projekt anzulegen — dann soll
+  // der Knopf auch nicht da sein. Verbindlich prüft der Server.
+  const { hasRecht } = useAuth()
+  const darfAnlegen = hasRecht('projekte', 'schreiben')
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
   const [statuses, setStatuses] = useState([])
@@ -128,10 +134,12 @@ export default function ProjektplanPage() {
           className="text-gray-400 hover:text-primary-600 transition" title="Projekt-Einstellungen">
           <Settings2 size={20} />
         </button>
-        <button onClick={() => setShowCreate(true)}
-          className="hidden sm:flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <Plus size={16} /> Neues Projekt
-        </button>
+        {darfAnlegen && (
+          <button onClick={() => setShowCreate(true)}
+            className="hidden sm:flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <Plus size={16} /> Neues Projekt
+          </button>
+        )}
       </PageHeader>
 
       {/* Tabs nach Kontakt-Typ */}
@@ -230,7 +238,7 @@ export default function ProjektplanPage() {
       {delProj && <DeleteProjectDialog project={delProj} onClose={() => setDelProj(null)} onArchived={load} onDeleted={load} />}
 
       {/* Primäraktion am Handy: einheitlicher runder FAB unten rechts */}
-      <Fab onClick={() => setShowCreate(true)} title="Neues Projekt" />
+      {darfAnlegen && <Fab onClick={() => setShowCreate(true)} title="Neues Projekt" />}
 
       {/* Anlegen-Sheet */}
       {showCreate && (

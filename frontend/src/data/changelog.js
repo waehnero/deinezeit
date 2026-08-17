@@ -4,6 +4,20 @@
  */
 export const changelog = [
   {
+    version: '1.12.61',
+    day: '18',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Neue Gruppenverwaltung: Rechte je Modul getrennt nach Ansehen, Ändern und Löschen vergeben',
+      'Umfang je Gruppe einstellbar — Mitarbeiter sehen wahlweise nur ihre eigenen Einträge',
+    ],
+    updates: [
+      'Benutzer bekommen ihre Rechte jetzt über Gruppen statt über einzelne Modul-Häkchen',
+      'Schaltflächen zum Anlegen erscheinen nur noch, wenn das Recht dazu vorhanden ist',
+    ],
+  },
+  {
     version: '1.12.60',
     day: '17',
     month: 'August',
