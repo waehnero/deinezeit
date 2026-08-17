@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Loader2, Rocket, Eye, EyeOff, ArrowRight, ArrowLeft, Check, Building2, ImagePlus } from 'lucide-react'
-import { setupApi, settingsApi } from '../services/api'
+import { setAccessToken, setupApi, settingsApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { version } from '../../package.json'
@@ -115,8 +115,9 @@ export default function SetupPage() {
         company: withCompany && company.firmenname.trim() ? company : null,
       }
       const res = await setupApi.init(payload)
-      localStorage.setItem('access_token', res.data.access_token)
-      localStorage.setItem('refresh_token', res.data.refresh_token)
+      // Wie beim normalen Anmelden: nur der kurzlebige Access-Token landet im
+      // Arbeitsspeicher, der Refresh-Token kommt als httpOnly-Cookie mit.
+      setAccessToken(res.data.access_token)
 
       // Logo optional hochladen (benötigt das eben erhaltene Token)
       if (withCompany && logoFile) {

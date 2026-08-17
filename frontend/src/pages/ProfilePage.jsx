@@ -8,6 +8,7 @@ import {
   Check, Loader2, Eye, EyeOff, Smartphone, Trash2
 } from 'lucide-react'
 import AnzeigeEinstellungen from '../components/AnzeigeEinstellungen'
+import SitzungsUebersicht from '../components/SitzungsUebersicht'
 
 export default function ProfilePage() {
   const { t, i18n } = useTranslation()
@@ -26,7 +27,9 @@ export default function ProfilePage() {
   const [savingPw, setSavingPw] = useState(false)
 
   // TOTP
-  const [totpStep, setTotpStep] = useState('idle')  // idle | setup | verify
+  const [totpStep, setTotpStep] = useState('idle')  // idle | setup | verify | codes
+  // Einmal-Codes im Klartext — nur direkt nach dem Erzeugen verfügbar.
+  const [recoveryCodes, setRecoveryCodes] = useState([])
   const [totpData, setTotpData] = useState(null)
   const [totpCode, setTotpCode] = useState('')
   const [totpLoading, setTotpLoading] = useState(false)
@@ -57,17 +60,28 @@ export default function ProfilePage() {
 
   const handleSavePassword = async (e) => {
     e.preventDefault()
-    if (newPassword.length < 8) {
-      toast.error('Passwort muss mindestens 8 Zeichen lang sein')
+    // Das aktuelle Passwort ist jetzt Pflicht. Vorher genügte eine gültige
+    // Sitzung, um das Passwort zu überschreiben — wer ein offenes Gerät
+    // vorfand, konnte damit das Konto übernehmen.
+    if (!currentPassword) {
+      toast.error('Bitte das aktuelle Passwort eingeben')
+      return
+    }
+    if (newPassword.length < 10) {
+      toast.error('Das neue Passwort muss mindestens 10 Zeichen lang sein')
       return
     }
     setSavingPw(true)
     try {
-      await usersApi.updateMe({ password: newPassword })
-      toast.success('Passwort erfolgreich geändert')
+      await authApi.changePassword(currentPassword, newPassword)
+      toast.success('Passwort geändert. Andere Geräte wurden abgemeldet.')
       setCurrentPassword(''); setNewPassword('')
-    } catch {
-      toast.error('Passwort konnte nicht geändert werden')
+    } catch (err) {
+      // Die Meldung kommt aus der Passwort-Richtlinie im Backend und sagt
+      // konkret, was zu ändern ist — die ist hilfreicher als ein pauschales
+      // „hat nicht geklappt".
+      toast.error(err.response?.data?.detail
+        || 'Passwort konnte nicht geändert werden')
     } finally {
       setSavingPw(false)
     }
@@ -89,12 +103,20 @@ export default function ProfilePage() {
   const handleEnableTotp = async () => {
     setTotpLoading(true)
     try {
-      await authApi.enableTotp(totpData.secret, totpCode)
+      // Das Secret wird nicht mehr mitgeschickt — der Server hat es beim
+      // Erzeugen des QR-Codes vorgemerkt. Vorher lief es als Query-Parameter
+      // zurück und landete damit in Zugriffslogs und im Browserverlauf.
+      const res = await authApi.enableTotp(totpCode)
       toast.success('2FA erfolgreich aktiviert!')
       setUser({ ...user, totp_enabled: true })
-      setTotpStep('idle'); setTotpCode('')
-    } catch {
-      toast.error('Code ungültig. Bitte erneut versuchen.')
+      // Die Einmal-Codes kommen direkt mit und werden genau einmal angezeigt.
+      // Ohne sie wäre ein Benutzer beim Verlust des Handys ausgesperrt.
+      setRecoveryCodes(res.data?.recovery_codes || [])
+      setTotpStep(res.data?.recovery_codes?.length ? 'codes' : 'idle')
+      setTotpCode('')
+    } catch (err) {
+      toast.error(err.response?.data?.detail
+        || 'Code ungültig. Bitte erneut versuchen.')
     } finally {
       setTotpLoading(false)
     }
@@ -227,6 +249,46 @@ export default function ProfilePage() {
             </button>
           )}
 
+          {/* Einmal-Codes — werden genau einmal gezeigt, direkt nach dem
+              Erzeugen. Danach sind nur noch die Hashes gespeichert. */}
+          {totpStep === 'codes' && recoveryCodes.length > 0 && (
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-amber-900 mb-1">
+                  Jetzt notieren — diese Codes werden nur dieses eine Mal angezeigt.
+                </p>
+                <p className="text-sm text-amber-800">
+                  Sie sind der Ersatz für Ihre Authenticator-App, wenn das Handy
+                  verloren geht oder neu aufgesetzt wird. Jeder Code
+                  funktioniert genau einmal. Am besten ausdrucken oder in einem
+                  Passwort-Manager ablegen.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 font-mono text-sm bg-gray-50 border border-gray-200 rounded-xl p-4">
+                {recoveryCodes.map((c) => (
+                  <div key={c} className="tracking-wider text-gray-800">{c}</div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(recoveryCodes.join('\n'))
+                    toast.success('Codes in die Zwischenablage kopiert')
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition"
+                >
+                  <Key size={14} /> Kopieren
+                </button>
+                <button
+                  onClick={() => { setRecoveryCodes([]); setTotpStep('idle') }}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white text-sm hover:bg-primary-600 rounded-xl transition"
+                >
+                  <Check size={14} /> Habe ich notiert
+                </button>
+              </div>
+            </div>
+          )}
+
           {totpStep === 'setup' && totpData && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
@@ -304,6 +366,11 @@ export default function ProfilePage() {
           <p className="text-xs text-gray-400 mt-2">
             Unterstützt Face ID (iPhone), Touch ID (Mac), Windows Hello und Android-Fingerabdruck.
           </p>
+        </div>
+
+        {/* ── Angemeldete Geräte und letzte Anmeldungen ── */}
+        <div className="bg-surface rounded-2xl border border-gray-200 p-6">
+          <SitzungsUebersicht />
         </div>
 
         {/* ── Mail-Import (persönliche Konten, Aufgabenmodul) ── */}

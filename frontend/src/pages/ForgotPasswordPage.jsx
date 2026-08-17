@@ -1,9 +1,48 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ShieldAlert, Mail, Phone } from 'lucide-react'
+import { ArrowLeft, ShieldAlert, Loader2, MailCheck } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { version } from '../../package.json'
+import { authApi } from '../services/api'
 
+/**
+ * „Passwort vergessen" — jetzt mit Funktion.
+ *
+ * Diese Seite existierte bereits, war aber eine reine Auskunftsseite („bitte
+ * wende dich an einen Administrator"). Der zugehörige Endpunkt fehlte im
+ * Backend vollständig. Für eine selbst-gehostete Installation ist das ein
+ * echtes Problem: Wenn der Administrator selbst sein Passwort vergisst, gibt
+ * es niemanden, der zurücksetzen kann.
+ */
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [laeuft, setLaeuft] = useState(false)
+  const [gesendet, setGesendet] = useState(false)
+
+  const absenden = async (e) => {
+    e.preventDefault()
+    if (!email.trim()) return
+    setLaeuft(true)
+    try {
+      const r = await authApi.forgotPassword(email.trim())
+      // Die Antwort ist absichtlich immer dieselbe — auch für unbekannte
+      // Adressen. Sonst ließe sich über diese Seite herausfinden, welche
+      // E-Mail-Adressen im System hinterlegt sind.
+      setGesendet(true)
+      toast.success(r.data?.message || 'Nachricht verschickt, falls ein Konto besteht.')
+    } catch (err) {
+      const status = err.response?.status
+      if (status === 429) {
+        toast.error('Zu viele Anfragen. Bitte versuchen Sie es später erneut.')
+      } else {
+        toast.error(err.response?.data?.detail
+          || 'Anfrage fehlgeschlagen. Bitte später erneut versuchen.')
+      }
+    } finally {
+      setLaeuft(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 flex">
@@ -44,35 +83,77 @@ export default function ForgotPasswordPage() {
             <ShieldAlert size={28} className="text-primary-500" />
           </div>
 
-          <h1 className="text-2xl font-bold text-neutral-900 mb-2">Passwort vergessen?</h1>
-          <p className="text-neutral-500 text-sm mb-8 leading-relaxed">
-            Passwörter können in DeineZeit nur von einem Administrator zurückgesetzt werden.
-            Bitte wende dich direkt an deine zuständige Ansprechperson.
-          </p>
+          {gesendet ? (
+            <>
+              <h1 className="text-2xl font-bold text-neutral-900 mb-2">
+                E-Mail unterwegs
+              </h1>
+              <div className="bg-primary-50 border border-primary-200 rounded-xl p-5 mb-8">
+                <div className="flex items-start gap-3">
+                  <MailCheck size={20} className="text-primary-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-neutral-700 space-y-2">
+                    <p>
+                      Falls ein Konto mit <strong>{email}</strong> besteht, ist eine
+                      Nachricht mit einem Link zum Zurücksetzen unterwegs.
+                    </p>
+                    <p>
+                      Der Link ist 30 Minuten gültig und funktioniert einmal.
+                      Bitte auch den Spam-Ordner prüfen.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-neutral-500 mb-6 leading-relaxed">
+                Keine E-Mail erhalten? Dann ist für diese Adresse kein Konto
+                hinterlegt, oder der E-Mail-Versand ist auf dem Server noch
+                nicht eingerichtet. In diesem Fall hilft ein Administrator
+                weiter — er kann das Passwort in der Benutzerverwaltung direkt
+                neu setzen.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold text-neutral-900 mb-2">Passwort vergessen?</h1>
+              <p className="text-neutral-500 text-sm mb-6 leading-relaxed">
+                E-Mail-Adresse eingeben — wir schicken einen Link, mit dem ein
+                neues Passwort gesetzt werden kann.
+              </p>
 
-          <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-5 space-y-4 mb-8">
-            <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Was der Administrator für dich erledigt</p>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-primary-700 text-xs font-bold">1</span>
+              <form onSubmit={absenden} className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                    E-Mail-Adresse
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="username"
+                    autoFocus
+                    required
+                    className="input w-full"
+                    placeholder="name@firma.at"
+                  />
                 </div>
-                <p className="text-sm text-neutral-700">Ein neues Passwort für deinen Account vergeben</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-primary-700 text-xs font-bold">2</span>
-                </div>
-                <p className="text-sm text-neutral-700">Bei Bedarf die 2-Faktor-Authentifizierung zurücksetzen</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-primary-700 text-xs font-bold">3</span>
-                </div>
-                <p className="text-sm text-neutral-700">Du kannst dich danach sofort wieder anmelden</p>
-              </div>
-            </div>
-          </div>
+                <button
+                  type="submit"
+                  disabled={laeuft}
+                  className="btn-primary w-full justify-center py-2.5"
+                >
+                  {laeuft
+                    ? <><Loader2 size={16} className="animate-spin" /> Wird gesendet…</>
+                    : 'Link zum Zurücksetzen senden'}
+                </button>
+              </form>
+
+              <p className="text-xs text-neutral-500 mb-6 leading-relaxed">
+                Kein Zugriff auf das E-Mail-Postfach? Dann kann ein
+                Administrator das Passwort in der Benutzerverwaltung direkt neu
+                setzen und bei Bedarf die 2-Faktor-Authentifizierung
+                zurücksetzen.
+              </p>
+            </>
+          )}
 
           <button
             onClick={() => navigate('/login')}

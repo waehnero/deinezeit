@@ -1,41 +1,177 @@
 import axios from 'axios'
 
+/* ════════════════════════════════════════════════════════════════════════════
+ * Token-Verwaltung
+ * ════════════════════════════════════════════════════════════════════════════
+ * Der Access-Token liegt seit der Sicherheits-Etappe nur noch im Arbeits-
+ * speicher dieses Moduls, nicht mehr in localStorage. Der langlebige
+ * Refresh-Token steckt in einem httpOnly-Cookie und ist für JavaScript
+ * grundsätzlich unerreichbar.
+ *
+ * Der Grund: In localStorage abgelegte Token kann jedes Skript lesen, das im
+ * Seitenkontext läuft. Eine einzige XSS-Lücke — auch in einer eingebundenen
+ * Fremdbibliothek — reichte damit aus, um eine sieben Tage gültige Sitzung
+ * mitzunehmen. Im Arbeitsspeicher ist der Token beim Neuladen der Seite weg
+ * und lebt ohnehin nur 30 Minuten.
+ *
+ * Dass die Anmeldung ein Neuladen übersteht, erledigt der Cookie: Beim Start
+ * holt die Anwendung über /auth/refresh einen frischen Access-Token
+ * (siehe sitzungWiederherstellen).
+ */
+
+let accessToken = null
+
+/** Merker, ob eine Anmeldung bestand — steuert nur die Oberfläche beim Start.
+ *  Enthält absichtlich kein Geheimnis, sondern nur „ja/nein". */
+const ANGEMELDET_FLAG = 'dz_angemeldet'
+
+export function setAccessToken(token) {
+  accessToken = token || null
+  if (token) localStorage.setItem(ANGEMELDET_FLAG, '1')
+}
+
+export function getAccessToken() {
+  return accessToken
+}
+
+export function warAngemeldet() {
+  return localStorage.getItem(ANGEMELDET_FLAG) === '1'
+}
+
+/** Lokalen Anmeldezustand verwerfen (ohne Server-Aufruf). */
+export function tokenVerwerfen() {
+  accessToken = null
+  localStorage.removeItem(ANGEMELDET_FLAG)
+  // Aufräumen: Bis zu dieser Etappe lagen hier echte Token. Auf Geräten, die
+  // schon länger im Einsatz sind, sollen sie nicht liegen bleiben.
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+}
+
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  // Damit der httpOnly-Cookie mitgeschickt wird, auch wenn Oberfläche und API
+  // unter verschiedenen Namen erreichbar sind.
+  withCredentials: true,
 })
 
-// Token automatisch mitsenden
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
   return config
 })
 
-// Bei 401: automatisch ausloggen
+/* ── Stiller Refresh ─────────────────────────────────────────────────────────
+ * Vorher warf der Interceptor bei jedem 401 sofort zur Anmeldeseite. Weil der
+ * Access-Token nach 30 Minuten abläuft und der Refresh-Token nie benutzt
+ * wurde, bedeutete das: mitten in der Arbeit, ohne Vorwarnung, ungespeicherte
+ * Eingaben verloren. Jetzt wird die Sitzung im Hintergrund erneuert und die
+ * fehlgeschlagene Anfrage wiederholt. Erst wenn auch das nicht klappt, ist
+ * die Sitzung wirklich zu Ende.
+ */
+
+let refreshLaeuft = null
+let abmeldeHandler = null
+
+/** Wird von der Anwendung gesetzt, damit dieses Modul die Oberfläche nicht
+ *  selbst per window.location umleiten muss. */
+export function setAbmeldeHandler(fn) {
+  abmeldeHandler = fn
+}
+
+async function tokenErneuern() {
+  // Mehrere gleichzeitig fehlschlagende Anfragen dürfen nur EINEN
+  // Erneuerungsvorgang auslösen. Sonst löst jede parallele Anfrage eine eigene
+  // Rotation aus, und weil dabei jeder Refresh-Token nur einmal gilt, würden
+  // die späteren als „bereits verbraucht" gewertet — der Server entwertet dann
+  // die ganze Sitzungskette und wirft den Benutzer hinaus.
+  if (!refreshLaeuft) {
+    refreshLaeuft = axios
+      .post('/api/auth/refresh', null, { withCredentials: true })
+      .then((r) => {
+        setAccessToken(r.data.access_token)
+        return r.data.access_token
+      })
+      .finally(() => { refreshLaeuft = null })
+  }
+  return refreshLaeuft
+}
+
+/** Beim Start der Anwendung: Sitzung aus dem Cookie wiederherstellen. */
+export async function sitzungWiederherstellen() {
+  try {
+    return await tokenErneuern()
+  } catch {
+    tokenVerwerfen()
+    return null
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
+  async (error) => {
+    const config = error.config || {}
+    const istAnmeldeAufruf = (config.url || '').includes('/auth/refresh')
+      || (config.url || '').includes('/auth/login')
+
+    if (error.response?.status === 401 && !config._erneuert && !istAnmeldeAufruf) {
+      config._erneuert = true
+      try {
+        const neuerToken = await tokenErneuern()
+        config.headers = { ...config.headers, Authorization: `Bearer ${neuerToken}` }
+        return api.request(config)
+      } catch {
+        tokenVerwerfen()
+        if (abmeldeHandler) abmeldeHandler()
+        else window.location.href = '/login'
+        return Promise.reject(error)
+      }
     }
+
     return Promise.reject(error)
   }
 )
 
 export const authApi = {
-  login: (email, password, totpCode) =>
-    api.post('/auth/login', { email, password, totp_code: totpCode }),
+  login: (email, password, totpCode, recoveryCode) =>
+    api.post('/auth/login', {
+      email, password, totp_code: totpCode, recovery_code: recoveryCode,
+    }),
   me: () => api.get('/auth/me'),
+
+  // ── Sitzungen ─────────────────────────────────────────────────────────────
+  refresh:   () => api.post('/auth/refresh'),
+  logout:    () => api.post('/auth/logout'),
+  logoutAll: () => api.post('/auth/logout-all'),
+  sessions:  () => api.get('/auth/sessions'),
+  revokeSession: (id) => api.delete(`/auth/sessions/${id}`),
+  events:    (limit = 30) => api.get('/auth/events', { params: { limit } }),
+
+  // ── Passwort ──────────────────────────────────────────────────────────────
+  forgotPassword: (email) => api.post('/auth/password/forgot', { email }),
+  resetPassword:  (token, newPassword) =>
+    api.post('/auth/password/reset', { token, new_password: newPassword }),
+  changePassword: (currentPassword, newPassword) =>
+    api.post('/auth/password/change', {
+      current_password: currentPassword, new_password: newPassword,
+    }),
+
+  // ── 2FA ───────────────────────────────────────────────────────────────────
   setupTotp: () => api.post('/auth/totp/setup'),
-  enableTotp: (secret, code) => api.post(`/auth/totp/enable?secret=${secret}`, { code }),
+  // Das Secret wird NICHT mehr mitgeschickt — der Server hat es vorgemerkt.
+  // Vorher hing es als Query-Parameter in der URL und landete damit in
+  // Zugriffslogs und im Browserverlauf.
+  enableTotp: (code) => api.post('/auth/totp/enable', { code }),
   disableTotp: (code) => api.post('/auth/totp/disable', { code }),
+  recoveryCodesNeu:    (code) => api.post('/auth/recovery-codes', { code }),
+  recoveryCodesStatus: () => api.get('/auth/recovery-codes/status'),
+
+  // ── Passkeys ──────────────────────────────────────────────────────────────
   webauthnRegisterBegin:    () => api.post('/auth/webauthn/register/begin'),
   webauthnRegisterComplete: (credential, deviceName) =>
     api.post('/auth/webauthn/register/complete', { credential, device_name: deviceName }),
-  webauthnLoginBegin:       (email) => api.post(`/auth/webauthn/login/begin?email=${email}`),
+  // E-Mail im Anfragetext statt im Query-String (URLs landen in Logs).
+  webauthnLoginBegin:       (email) => api.post('/auth/webauthn/login/begin', { email }),
   webauthnLoginComplete:    (email, credential) =>
     api.post('/auth/webauthn/login/complete', { email, credential }),
 }
@@ -52,6 +188,8 @@ export const usersApi = {
   updateMe: (data) => api.put('/users/me', data),
   updateByAdmin: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
+  // Kontosperre nach Fehlversuchen vorzeitig aufheben (nur Admin).
+  unlock: (id) => api.post(`/users/${id}/unlock`),
   // Persönliche Dashboard-Konfiguration (serverseitig, je Benutzer)
   getDashboard: () => api.get('/users/me/dashboard'),
   saveDashboard: (config) => api.put('/users/me/dashboard', { config }),

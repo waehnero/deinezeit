@@ -19,7 +19,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from app.db.base import get_db
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_loeschen
 from app.models.user import User
 from app.models.masterdata import EntityRecord
 from app.models.purchase import (PurchaseInvoice, PurchaseInvoiceTax,
@@ -353,12 +353,15 @@ async def update_invoice(
     return inv
 
 
-@router.post("/{invoice_id}/cancel", response_model=PurchaseInvoiceResponse)
+@router.post("/{invoice_id}/cancel", response_model=PurchaseInvoiceResponse,
+             dependencies=[Depends(require_loeschen("buchhaltung"))])
 async def cancel_invoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Wie beim Verkaufsbeleg: Stornieren ist fachlich ein Löschvorgang und
+    # verlangt daher das Löschrecht, nicht nur das Schreibrecht.
     """
     Storniert die Erfassung (Fehlbuchung, Doppelerfassung).
 

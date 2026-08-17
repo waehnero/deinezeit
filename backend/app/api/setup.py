@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import (APIRouter, Depends, HTTPException, Request, Response,
+                     status)
 from sqlalchemy.orm import Session
 
 from app.db.base import get_db
@@ -39,6 +40,7 @@ async def setup_status(db: Session = Depends(get_db)):
 @router.post("/init", response_model=SetupInitResponse)
 async def setup_init(
     request: Request,
+    response: Response,
     body: SetupInitRequest,
     db: Session = Depends(get_db),
 ):
@@ -62,8 +64,11 @@ async def setup_init(
         raise HTTPException(status_code=400, detail="Bitte eine gueltige E-Mail-Adresse angeben.")
     if not full_name:
         raise HTTPException(status_code=400, detail="Bitte einen Namen angeben.")
-    if len(body.admin_password or "") < 8:
-        raise HTTPException(status_code=400, detail="Das Passwort muss mindestens 8 Zeichen lang sein.")
+    # Das erste Konto ist der Administrator der gesamten Installation — hier
+    # gilt die Richtlinie erst recht (vorher genügten 8 beliebige Zeichen).
+    from app.core import passwort as pw_regeln
+    pw_regeln.pruefen_oder_fehler(body.admin_password or "", email=email,
+                                  name=full_name)
 
     # ── Ersten Admin anlegen ─────────────────────────────────────────────────
     user = auth_service.create_user(
@@ -103,9 +108,15 @@ async def setup_init(
         db.commit()
 
     # ── Direkt einloggen (Assistent geht nahtlos ins Dashboard) ──────────────
-    meta = {
-        "user_agent": request.headers.get("user-agent"),
-        "ip_address": request.client.host if request.client else None,
-    }
+    # Der Refresh-Token geht als httpOnly-Cookie mit, nicht im Antworttext —
+    # gleicher Weg wie bei /auth/login.
+    from app.api.auth import absender_meta, refresh_cookie_setzen
+    from app.core import auth_events as EV
+
+    meta = absender_meta(request)
     tokens = auth_service.create_tokens(db, user, meta)
-    return SetupInitResponse(company_contact_id=company_contact_id, **tokens)
+    refresh_cookie_setzen(response, tokens["refresh_token"])
+    auth_service.ereignis(db, EV.LOGIN_OK, user=user, meta=meta,
+                          detail="Erstinstallation")
+    return SetupInitResponse(company_contact_id=company_contact_id,
+                             access_token=tokens["access_token"])

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -8,10 +8,66 @@ from app.schemas.user import (
 )
 from app.services.auth_service import auth_service
 from app.api.deps import get_current_user, require_admin
-from app.models.user import User
-from app.core.security import get_password_hash
+from app.models.user import User, UserRole
+from app.core import auth_events as EV
+from app.core import passwort as pw_regeln
 
 router = APIRouter(prefix="/users", tags=["Benutzerverwaltung"])
+
+
+def _modulhaken_in_ausnahmen_uebertragen(db, user: User,
+                                         gewuenschte_module: list[str]) -> None:
+    """Die Modul-Häkchen der Benutzerverwaltung auf das Gruppenmodell abbilden.
+
+    Hintergrund: Bis Migration 0055 schrieb diese Oberfläche nach
+    ``users.allowed_modules``, und das war die Wahrheit. Seit 0055 kommen die
+    Rechte aus den Gruppen, und ``allowed_modules`` gilt nur noch für Benutzer
+    **ohne** Gruppe. Wer einem Gruppenmitglied hier ein Modul zuschaltete, sah
+    das Häkchen gesetzt — gewirkt hat es nicht. Ein Versprechen, das still
+    verfällt, ist schlimmer als eine Fehlermeldung.
+
+    Deshalb wird die Abweichung zwischen Wunsch und Gruppenrechten als
+    **individuelle Ausnahme** hinterlegt:
+
+    * Modul angehakt, Gruppe gibt es nicht → Lesen, Schreiben und Löschen
+      werden als Ausnahme gewährt (das alte Modell kannte kein
+      Lesen/Schreiben-Gefälle, weniger wäre eine stille Rechteminderung).
+    * Modul abgehakt, Gruppe gibt es → alle Rechte werden als Ausnahme
+      entzogen.
+    * Wunsch und Gruppe stimmen überein → keine Ausnahme; die Gruppe bleibt
+      die einzige Quelle, und das ist der Zustand, den man haben will.
+
+    Für abgestufte Rechte ist weiterhin die Gruppenverwaltung zuständig. Diese
+    Übertragung hält nur die bestehende Oberfläche wirksam, bis Teiletappe 2c
+    sie ersetzt.
+    """
+    from app.core import berechtigungen as B
+    from app.core.modules import MODULE_KEYS
+
+    gewuenscht = set(gewuenschte_module)
+
+    # Was die Gruppen allein hergeben — ohne die bisherigen Ausnahmen, sonst
+    # würde sich der Vergleich auf sich selbst beziehen und Ausnahmen ewig
+    # festschreiben.
+    gruppen_blatt = B.blaetter_vereinigen(
+        [g.rechte for g in user.groups or []]) if user.groups else None
+
+    if gruppen_blatt is None:
+        # Kein Gruppenmitglied: allowed_modules wirkt weiterhin unmittelbar,
+        # es braucht keine Ausnahme.
+        user.permission_overrides = None
+        return
+
+    ausnahmen: dict = {}
+    for modul in MODULE_KEYS:
+        aus_gruppe = bool(gruppen_blatt.get(modul, {}).get(B.LESEN))
+        soll = modul in gewuenscht
+        if soll == aus_gruppe:
+            continue
+        ausnahmen[modul] = {recht: soll
+                            for recht in B.rechte_fuer_modul(modul)}
+
+    user.permission_overrides = ausnahmen or None
 
 
 @router.get("/", response_model=List[UserResponse])
@@ -33,6 +89,10 @@ async def create_user(
     existing = auth_service.get_user_by_email(db, body.email)
     if existing:
         raise HTTPException(status_code=400, detail="E-Mail bereits vergeben")
+    # Die Passwort-Richtlinie gilt auch hier: Ein vom Administrator gesetztes
+    # „start123" ist genauso angreifbar wie ein selbst gewähltes.
+    pw_regeln.pruefen_oder_fehler(body.password, email=body.email,
+                                  name=body.full_name)
     return auth_service.create_user(db, body.email, body.full_name, body.password, body.role, body.language)
 
 
@@ -42,13 +102,29 @@ async def update_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Eigenes Profil aktualisieren (Sprache, Name, Passwort)."""
+    """Eigenes Profil aktualisieren (Sprache, Name).
+
+    **Das Passwort wird hier nicht mehr geändert.** Vorher genügte ein
+    gültiger Access-Token, um es zu überschreiben — ohne Kenntnis des alten
+    Passworts. Wer ein unbeaufsichtigtes Gerät vorfand oder einen Token
+    abgriff, konnte damit das Konto übernehmen und den rechtmäßigen Benutzer
+    aussperren. Zudem blieben alle bestehenden Anmeldungen weiter gültig, die
+    Änderung sperrte also niemanden aus.
+
+    Für Passwortänderungen gibt es ``POST /api/auth/password/change`` — dort
+    wird das aktuelle Passwort abgefragt, die Richtlinie geprüft und andere
+    Geräte werden abgemeldet.
+    """
     if body.full_name is not None:
         current_user.full_name = body.full_name
     if body.language is not None:
         current_user.language = body.language
     if body.password is not None:
-        current_user.hashed_password = get_password_hash(body.password)
+        raise HTTPException(
+            status_code=400,
+            detail=("Das Passwort wird über „Passwort ändern“ in den "
+                    "Sicherheitseinstellungen geändert — dort wird zur "
+                    "Sicherheit das aktuelle Passwort abgefragt."))
     db.commit()
     db.refresh(current_user)
     return current_user
@@ -82,26 +158,85 @@ async def save_my_dashboard(
 async def update_user_by_admin(
     user_id: UUID,
     body: AdminUserUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Benutzer bearbeiten (nur Admin): Name, Passwort, Rolle, 2FA, Modulrechte."""
+    """Benutzer bearbeiten (nur Admin): Name, Passwort, Rolle, 2FA, Modulrechte.
+
+    Änderungen mit Sicherheitswirkung ziehen jetzt Folgen nach sich, die vorher
+    fehlten: Ein neues Passwort und ein Deaktivieren beenden die bestehenden
+    Anmeldungen des Benutzers. Ohne das lief ein deaktiviertes Konto bis zum
+    Ablauf des Tokens weiter — „Zugang entziehen" hatte also bis zu sieben Tage
+    keine Wirkung. Jeder Eingriff landet außerdem im Prüfpfad.
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+
+    # Gemeinsame Auswertung der Weiterleitungs-Header (siehe dort, warum nicht
+    # einfach request.client.host): sonst steht im Prüfpfad die Adresse des
+    # nginx-Containers statt der des Administrators.
+    from app.api.auth import absender_meta
+    meta = absender_meta(request)
+    geaendert: list[str] = []
+
     if body.full_name is not None:
         user.full_name = body.full_name
+        geaendert.append("Name")
+
     if body.password is not None:
-        user.hashed_password = get_password_hash(body.password)
-    if body.role is not None:
+        pw_regeln.pruefen_oder_fehler(body.password, email=user.email,
+                                      name=user.full_name)
+        # passwort_setzen() entwertet alle Sitzungen des Benutzers — genau das
+        # ist bei einem vom Administrator zurückgesetzten Passwort gewollt.
+        auth_service.passwort_setzen(db, user, body.password,
+                                     grund="admin_reset")
+        geaendert.append("Passwort")
+
+    if body.role is not None and body.role != user.role:
+        # Sich selbst die Adminrechte zu nehmen ist der einfachste Weg, sich
+        # aus der eigenen Verwaltung auszuschließen — und wenn es der letzte
+        # Administrator war, kommt niemand mehr hinein.
+        if user.id == current_user.id and body.role != UserRole.admin:
+            raise HTTPException(
+                status_code=400,
+                detail=("Sie können sich die eigenen Administratorrechte nicht "
+                        "entziehen. Bitte lassen Sie das von einem anderen "
+                        "Administrator machen."))
+        if user.role == UserRole.admin and body.role != UserRole.admin:
+            weitere = db.query(User).filter(
+                User.role == UserRole.admin, User.is_active == True,  # noqa: E712
+                User.id != user.id).count()
+            if weitere == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=("Das ist der letzte Administrator. Bitte legen Sie "
+                            "zuerst einen weiteren an, sonst kann niemand mehr "
+                            "Benutzer und Rechte verwalten."))
         user.role = body.role
+        geaendert.append(f"Rolle → {body.role.value}")
+
     if body.language is not None:
         user.language = body.language
-    if body.is_active is not None:
+
+    if body.is_active is not None and body.is_active != user.is_active:
+        if user.id == current_user.id and not body.is_active:
+            raise HTTPException(status_code=400,
+                                detail="Das eigene Konto kann man nicht "
+                                       "deaktivieren.")
         user.is_active = body.is_active
+        geaendert.append("aktiviert" if body.is_active else "deaktiviert")
+        if not body.is_active:
+            db.commit()
+            auth_service.alle_sitzungen_widerrufen(db, user, "admin")
+
     if body.disable_totp:
-        user.totp_secret = None
-        user.totp_enabled = False
+        auth_service.disable_totp(db, user)
+        auth_service.ereignis(db, EV.TOTP_DISABLED, user=user, meta=meta,
+                              detail=f"durch Administrator {current_user.email}")
+        geaendert.append("2FA deaktiviert")
+
     if body.allowed_modules is not None:
         from app.core.modules import MODULE_KEYS
         invalid = [m for m in body.allowed_modules if m not in MODULE_KEYS]
@@ -115,7 +250,34 @@ async def update_user_by_admin(
         # künftig ergänzte Module automatisch mit erlaubt sind.
         user.allowed_modules = (None if set(body.allowed_modules) == set(MODULE_KEYS)
                                 else body.allowed_modules)
+        _modulhaken_in_ausnahmen_uebertragen(db, user, body.allowed_modules)
+        geaendert.append("Modulrechte")
+
     db.commit()
+    db.refresh(user)
+
+    auth_service.ereignis(
+        db, EV.ADMIN_USER_CHANGED, user=user, meta=meta,
+        detail=f"durch {current_user.email}: {', '.join(geaendert) or 'keine'}")
+    return user
+
+
+@router.post("/{user_id}/unlock", response_model=UserResponse)
+async def unlock_user(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Kontosperre vorzeitig aufheben (nur Admin).
+
+    Die Sperre nach Fehlversuchen läuft nach 15 Minuten von selbst ab. Dieser
+    Weg ist für den Fall gedacht, dass jemand nicht warten kann — etwa wenn ein
+    Mitarbeiter vor einem Kundentermin steht.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    auth_service.sperre_aufheben(db, user, durch=current_user)
     db.refresh(user)
     return user
 

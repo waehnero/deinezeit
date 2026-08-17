@@ -9,7 +9,7 @@ from slowapi.middleware import SlowAPIMiddleware
 import logging
 import os
 from app.core.config import settings
-from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard
+from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard, groups
 from app.api import settings as settings_api
 from app.services import storage_service
 from app.api.system import record_activity
@@ -73,18 +73,27 @@ except OSError as e:
 app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ── API-Router ────────────────────────────────────────────────────────────────
-# Modulrechte: Router ganzer Module werden hier mit require_module(<key>)
-# abgesichert (Admin hat immer alles; allowed_modules=NULL = alle erlaubt).
+# Modulrechte: Router ganzer Module werden hier abgesichert.
+#
+# Seit Migration 0055 prüft `_rm` nicht mehr nur „Modul freigeschaltet", sondern
+# das passende Recht zur HTTP-Methode: GET → Ansehen, POST/PUT/PATCH → Ändern,
+# DELETE → Löschen (siehe deps.require_modul_rechte). Ein Mitarbeiter mit
+# Leserecht auf Verkauf kann Belege damit ansehen, aber nicht mehr anlegen oder
+# stornieren — vorher war beides dasselbe Häkchen.
+#
 # Bewusst OHNE Modul-Sperre (Querbezüge, siehe core/modules.py):
 #   masterdata  → Lesen für alle (Auswahlfelder); Schreiben je Endpunkt gesperrt
 #   datacenter  → Anhänge je Datensatz für alle; nur Übersicht je Endpunkt gesperrt
 #   reports     → gehört fachlich zur Zeiterfassung
-from app.api.deps import require_module as _rm
+from app.api.deps import require_modul_rechte as _rm
 from fastapi import Depends as _Dep
 
 app.include_router(setup.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+# Rechtegruppen: bewusst OHNE Modul-Sperre — wer Rechte verwaltet, ist
+# Administrator, das prüfen die Endpunkte selbst (require_admin).
+app.include_router(groups.router, prefix="/api")
 app.include_router(masterdata.router, prefix="/api")
 app.include_router(zeiterfassung.router, prefix="/api",
                    dependencies=[_Dep(_rm("zeiterfassung"))])

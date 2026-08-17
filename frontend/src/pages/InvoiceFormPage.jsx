@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { invoiceApi, masterdataApi } from '../services/api'
+import { getAccessToken, invoiceApi, masterdataApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import {
@@ -505,7 +505,7 @@ export default function InvoiceFormPage() {
   }
   async function handleContractOpen(attId) {
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getAccessToken()
       const res = await fetch('/api/invoices/contract/' + attId + '/download', { headers: { Authorization: 'Bearer ' + token } })
       if (!res.ok) throw new Error()
       const blob = await res.blob()
@@ -538,7 +538,7 @@ export default function InvoiceFormPage() {
             <>
               <button onClick={async () => {
                 try {
-                  const token = localStorage.getItem('access_token')
+                  const token = getAccessToken()
                   const res = await fetch('/api/invoices/' + id + '/pdf', { headers: { Authorization: 'Bearer ' + token } })
                   const blob = new Blob([await res.arrayBuffer()], { type: 'application/pdf' })
                   const url = URL.createObjectURL(blob)
@@ -549,7 +549,7 @@ export default function InvoiceFormPage() {
               </button>
               <button onClick={async () => {
                 try {
-                  const token = localStorage.getItem('access_token')
+                  const token = getAccessToken()
                   const res = await fetch('/api/invoices/' + id + '/preview', { headers: { Authorization: 'Bearer ' + token } })
                   const html = await res.text()
                   const blob = new Blob([html], { type: 'text/html' })
@@ -1294,7 +1294,7 @@ function PositionImage({ pos, onChange }) {
     let abgebrochen = false
     ;(async () => {
       try {
-        const token = localStorage.getItem('access_token')
+        const token = getAccessToken()
         const res = await fetch(invoiceApi.positionImageUrl(pos.image_key, pos.image_provider),
                                 { headers: { Authorization: 'Bearer ' + token } })
         if (!res.ok) throw new Error(res.status)

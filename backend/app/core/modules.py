@@ -42,11 +42,26 @@ MODULE_LABELS = dict(MODULES)
 
 
 def user_modules(user: User) -> list[str]:
-    """Effektive Modul-Liste eines Benutzers (Admin: immer alle)."""
-    if user.role == UserRole.admin or user.allowed_modules is None:
-        return list(MODULE_KEYS)
-    return [m for m in user.allowed_modules if m in MODULE_KEYS]
+    """Module mit Lesezugriff (Admin: immer alle).
+
+    Seit Migration 0055 kommt die Antwort aus dem Gruppen-Rechtemodell
+    (``core/berechtigungen.py``). Die Funktion bleibt als Einstiegspunkt
+    bestehen, weil sie an vielen Stellen aufgerufen wird — sie liest nur nicht
+    mehr selbst ``allowed_modules``, sondern fragt die eine Stelle, an der die
+    Rechte zusammengerechnet werden. Zwei Auswertungen desselben Modells
+    laufen sonst mit der Zeit auseinander, und die Abweichung fällt genau dann
+    auf, wenn jemand etwas sehen kann, was er nicht sehen soll.
+    """
+    from app.core.berechtigungen import module_mit_zugang
+    return module_mit_zugang(user)
 
 
 def user_has_module(user: User, module: str) -> bool:
-    return module in user_modules(user)
+    """Lesezugriff auf ein Modul.
+
+    Entspricht dem alten Verhalten „Modul freigeschaltet". Für die Frage, ob
+    jemand auch *ändern* darf, gibt es ``berechtigungen.hat_recht(user, modul,
+    SCHREIBEN)``.
+    """
+    from app.core.berechtigungen import LESEN, hat_recht
+    return hat_recht(user, module, LESEN)

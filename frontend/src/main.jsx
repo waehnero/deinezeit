@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import SetupPage from './pages/SetupPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import MasterDataOverview from './pages/MasterDataOverview'
 import MasterDataDetail from './pages/MasterDataDetail'
@@ -38,16 +39,27 @@ import AufgabenPage from './pages/AufgabenPage'
 import PosteckePage from './pages/PosteckePage'
 import Layout, { homeRoute } from './components/Layout'
 
-function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('access_token')
-  return token ? children : <Navigate to="/login" replace />
-}
-
 const AuthSpinner = () => (
   <div className="flex items-center justify-center h-64">
     <Loader2 size={28} className="animate-spin text-primary-400" />
   </div>
 )
+
+/**
+ * Zugang nur für angemeldete Benutzer.
+ *
+ * Vorher wurde geprüft, ob ein Token in localStorage liegt. Das geht nicht
+ * mehr — der Access-Token lebt im Arbeitsspeicher und ist nach jedem Neuladen
+ * weg, während die Sitzung im httpOnly-Cookie weiterbesteht. Ohne das Warten
+ * auf `loadingAuth` würde jeder Seiten-Neuaufbau (F5, PWA-Start, Öffnen eines
+ * Lesezeichens) fälschlich auf die Anmeldemaske führen, obwohl der Benutzer
+ * angemeldet ist.
+ */
+function ProtectedRoute({ children }) {
+  const { istAngemeldet, loadingAuth } = useAuth()
+  if (loadingAuth) return <AuthSpinner />
+  return istAngemeldet ? children : <Navigate to="/login" replace />
+}
 
 /** Nur für Admins — zeigt Ladeindikator bis Auth geklärt, leitet sonst zur Startseite */
 function AdminRoute({ children }) {
@@ -82,6 +94,9 @@ function App() {
             <Route path="/setup" element={<SetupPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            {/* Ziel des Links aus der E-Mail. Der Pfad steht auch im Backend
+                (api/auth.py, password_forgot) — beide müssen zusammenpassen. */}
+            <Route path="/passwort-neu" element={<ResetPasswordPage />} />
             <Route
               path="/*"
               element={

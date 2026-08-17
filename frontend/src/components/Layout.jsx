@@ -50,7 +50,7 @@ export default function Layout({ children }) {
     })
   }
 
-  const { isAdmin, hasModule } = useAuth()
+  const { isAdmin, hasModule, logout } = useAuth()
   const { settings } = useSettings()
   const location = useLocation()
 
@@ -81,11 +81,10 @@ export default function Layout({ children }) {
   const navItems = NAV_ITEMS.filter(item => hasModule(item.module))
   const home = navItems.length ? navItems[0].to : '/profile'
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    navigate('/login')
-  }
+  // Abmelden beendet die Sitzung jetzt auch serverseitig (siehe AuthContext).
+  // Vorher wurde nur der Browser-Speicher geleert — der Refresh-Token blieb
+  // sieben Tage gültig, ein „Abmelden" sperrte also niemanden aus.
+  const handleLogout = () => { logout() }
 
   // Sidebar-Logo: wahlweise das Original-Logo oder das Favicon (Einstellungen → Allgemein)
   const logoUrl = (settings.sidebar_logo_source === 'favicon' && settings.logo_favicon_url)
