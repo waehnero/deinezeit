@@ -15,6 +15,7 @@ import VideoThumb from '../components/PosteckeVideoThumb'
 import PosteckeKanban from '../components/PosteckeKanban'
 import PosteckeKalender from '../components/PosteckeKalender'
 import ContactSearch from '../components/ContactSearch'
+import { useAuth } from '../contexts/AuthContext'
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Postecke – Etappe 1: Mobile Erfassung, KI-Vorschlag, assistiertes Posten
@@ -996,6 +997,15 @@ function PostEditor({ post, profile, onClose, onSaved }) {
 
 /* ── Hauptseite ─────────────────────────────────────────────────────────────── */
 export default function PosteckePage() {
+  const { isAdmin, hasRecht } = useAuth()
+  // Posts anlegen/ändern/veröffentlichen = Schreibrecht, Löschen = Löschrecht.
+  // Archivieren zählt hier bewusst als Ändern (nicht wie bei den Stammdaten als
+  // Löschen): Es setzt nur den Status und ist über „Wiederherstellen" mit einem
+  // Klick zurückgenommen — der Server behandelt es genauso (POST /status).
+  // Die Profilverwaltung bleibt Admin-Sache: dort liegen Zugangsdaten der Kanäle
+  // und der KI-Schlüssel.
+  const darfAendern = hasRecht('postecke', 'schreiben')
+  const darfLoeschen = hasRecht('postecke', 'loeschen')
   const [posts, setPosts] = useState([])
   const [profile, setProfile] = useState([])
   const [laden, setLaden] = useState(true)
@@ -1054,6 +1064,12 @@ export default function PosteckePage() {
     } catch { toast.error('Wiederherstellen fehlgeschlagen') }
   }
 
+  // Der Editor ist durchgehend eine Schreib-Oberfläche (KI-Vorschlag,
+  // Veröffentlichen, Ablegen). Ohne Änderungsrecht bliebe darin kein einziger
+  // Knopf übrig, deshalb wird er gar nicht erst geöffnet — die Liste zeigt
+  // Titel, Text, Status und Termin, und der Text lässt sich kopieren.
+  const oeffnen = (post) => { if (darfAendern) setEditor(post) }
+
   const kopieren = async (post) => {
     try {
       await navigator.clipboard.writeText(postText(post))
@@ -1095,14 +1111,16 @@ export default function PosteckePage() {
       {/* Kopfzeile */}
       <PageHeader icon={Megaphone} title="Postecke" subtitle="Posts mit KI vorbereiten und gezielt veröffentlichen">
         <div className="flex items-center gap-2">
-          <button onClick={() => setAnsicht(a => a === 'profile' ? 'posts' : 'profile')}
-            title="Profile verwalten"
-            className={`p-2 rounded-lg border ${ansicht === 'profile'
-              ? 'bg-primary-50 border-primary-300 text-primary-700'
-              : 'bg-surface border-neutral-200 text-neutral-500 hover:text-neutral-800'}`}>
-            <Settings2 size={17} />
-          </button>
-          {ansicht === 'posts' && (
+          {isAdmin && (
+            <button onClick={() => setAnsicht(a => a === 'profile' ? 'posts' : 'profile')}
+              title="Profile verwalten"
+              className={`p-2 rounded-lg border ${ansicht === 'profile'
+                ? 'bg-primary-50 border-primary-300 text-primary-700'
+                : 'bg-surface border-neutral-200 text-neutral-500 hover:text-neutral-800'}`}>
+              <Settings2 size={17} />
+            </button>
+          )}
+          {darfAendern && ansicht === 'posts' && (
             <button onClick={() => setEditor('neu')}
               className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700">
               <Plus size={15} /> Neuer Post
@@ -1111,9 +1129,9 @@ export default function PosteckePage() {
         </div>
       </PageHeader>
 
-      {ansicht === 'posts' && <Fab onClick={() => setEditor('neu')} title="Neuer Post" />}
+      {darfAendern && ansicht === 'posts' && <Fab onClick={() => setEditor('neu')} title="Neuer Post" />}
 
-      {ansicht === 'profile' ? (
+      {isAdmin && ansicht === 'profile' ? (
         <ProfilVerwaltung profile={profile} onReload={laden_} onClose={() => setAnsicht('posts')} />
       ) : (
         <>
@@ -1162,11 +1180,15 @@ export default function PosteckePage() {
               <Megaphone size={36} className="mx-auto text-neutral-300 mb-3" />
               <p className="text-neutral-500 text-sm mb-1">Noch keine Posts in der Postecke.</p>
               <p className="text-neutral-400 text-xs mb-4">
-                {profile.length === 0
-                  ? 'Lege zuerst über das Zahnrad ein Profil an (z.B. „Facebook privat").'
-                  : 'Fotos rein, kurz beschreiben — die KI macht den Vorschlag.'}
+                {profile.length > 0
+                  ? 'Fotos rein, kurz beschreiben — die KI macht den Vorschlag.'
+                  : isAdmin
+                    ? 'Lege zuerst über das Zahnrad ein Profil an (z.B. „Facebook privat").'
+                    /* Ohne Adminrolle gibt es kein Zahnrad — der Hinweis darauf
+                       würde ins Leere zeigen. */
+                    : 'Ein Administrator muss zuerst ein Profil anlegen (z.B. „Facebook privat").'}
               </p>
-              {profile.length > 0 && (
+              {darfAendern && profile.length > 0 && (
                 <button onClick={() => setEditor('neu')}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700">
                   <Plus size={15} /> Ersten Post erstellen
@@ -1177,12 +1199,13 @@ export default function PosteckePage() {
 
           {darstellung === 'board' && aktivePosts.length > 0 && (
             <PosteckeKanban posts={aktivePosts} profilName={profilName}
-              kanalLabel={profilKanal} onOpen={setEditor} onChanged={laden_}
-              onArchivieren={archivieren} onLoeschen={loeschen} />
+              kanalLabel={profilKanal} onOpen={oeffnen} onChanged={laden_}
+              onArchivieren={archivieren} onLoeschen={loeschen}
+              darfAendern={darfAendern} darfLoeschen={darfLoeschen} />
           )}
 
           {darstellung === 'kalender' && aktivePosts.length > 0 && (
-            <PosteckeKalender posts={aktivePosts} kanalVon={profilKanalId} onOpen={setEditor} />
+            <PosteckeKalender posts={aktivePosts} kanalVon={profilKanalId} onOpen={oeffnen} />
           )}
 
           {darstellung === 'liste' && (
@@ -1195,8 +1218,9 @@ export default function PosteckePage() {
                 <div className="space-y-2">
                   {g.eintraege.map(post => (
                     <div key={post.id}
-                      className="bg-surface rounded-xl border border-neutral-200 p-3 flex gap-3 items-start hover:border-neutral-300 cursor-pointer"
-                      onClick={() => setEditor(post)}>
+                      className={`bg-surface rounded-xl border border-neutral-200 p-3 flex gap-3 items-start hover:border-neutral-300 ${
+                        darfAendern ? 'cursor-pointer' : ''}`}
+                      onClick={() => oeffnen(post)}>
                       {post.fotos?.length > 0 ? (
                         <FotoThumb fotoId={post.fotos[0].id} className="w-14 h-14 rounded-lg flex-shrink-0" />
                       ) : post.video ? (
@@ -1254,7 +1278,7 @@ export default function PosteckePage() {
                             <Copy size={14} />
                           </button>
                         )}
-                        {post.status === 'archiviert' ? (
+                        {darfAendern && (post.status === 'archiviert' ? (
                           <button onClick={() => wiederherstellen(post)} title="Wiederherstellen"
                             className="p-1.5 rounded-lg text-neutral-400 hover:text-primary-600 hover:bg-primary-50">
                             <ArchiveRestore size={14} />
@@ -1264,11 +1288,13 @@ export default function PosteckePage() {
                             className="p-1.5 rounded-lg text-neutral-400 hover:text-amber-600 hover:bg-amber-50">
                             <Archive size={14} />
                           </button>
+                        ))}
+                        {darfLoeschen && (
+                          <button onClick={() => loeschen(post)} title="Löschen"
+                            className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50">
+                            <Trash2 size={14} />
+                          </button>
                         )}
-                        <button onClick={() => loeschen(post)} title="Löschen"
-                          className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50">
-                          <Trash2 size={14} />
-                        </button>
                       </div>
                     </div>
                   ))}

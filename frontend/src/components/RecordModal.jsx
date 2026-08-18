@@ -12,8 +12,14 @@ import { X, Loader2, Database } from 'lucide-react'
  * (z.B. Zeiterfassung: unbekannte Projektzeit direkt anlegen) nutzbar ist.
  *
  * initialValues: Vorbefüllung beim Neuanlegen (z.B. eingegebener Projektzeitname).
+ *
+ * nurLesen: Der Datensatz darf angesehen, aber nicht gespeichert werden (fehlendes
+ * Änderungsrecht auf Stammdaten). Bewusst als Vorschau statt als gesperrte Zeile:
+ * Wer die Liste sehen darf, darf auch den einzelnen Eintrag lesen. Standard ist
+ * `false`, damit die anderen Aufrufer (z.B. Zeiterfassung) unverändert bleiben.
  */
-export default function RecordModal({ entityType, record, onClose, onSaved, initialValues = null }) {
+export default function RecordModal({ entityType, record, onClose, onSaved,
+                                      initialValues = null, nurLesen = false }) {
   const isEdit = !!record
   const isProjektzeit = entityType.slug === 'projektzeiten'
   const [values, setValues] = useState(record?.data || initialValues || {})
@@ -61,7 +67,9 @@ export default function RecordModal({ entityType, record, onClose, onSaved, init
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">
-            {isEdit ? 'Datensatz bearbeiten' : `Neuen ${entityType.name.replace(/en$/, '').replace(/s$/, '')} anlegen`}
+            {nurLesen ? 'Datensatz ansehen'
+              : isEdit ? 'Datensatz bearbeiten'
+              : `Neuen ${entityType.name.replace(/en$/, '').replace(/s$/, '')} anlegen`}
           </h2>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
             <X size={20} />
@@ -70,6 +78,9 @@ export default function RecordModal({ entityType, record, onClose, onSaved, init
 
         {/* Formular */}
         <form onSubmit={handleSubmit}>
+          {/* fieldset disabled sperrt alle Eingabefelder auf einen Schlag —
+              zuverlässiger, als jedes Feld einzeln durchzureichen. */}
+          <fieldset disabled={nurLesen} className="contents">
           <div className="p-5">
             {entityType.fields.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
@@ -87,22 +98,30 @@ export default function RecordModal({ entityType, record, onClose, onSaved, init
             )}
           </div>
 
+          </fieldset>
+
           <div className="flex gap-3 p-5 border-t border-gray-100">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium transition">
-              Abbrechen
+              {nurLesen ? 'Schließen' : 'Abbrechen'}
             </button>
-            <button type="submit" disabled={loading || entityType.fields.length === 0}
-              className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition flex items-center justify-center gap-2">
-              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-              {isEdit ? 'Speichern' : 'Anlegen'}
-            </button>
+            {!nurLesen && (
+              <button type="submit" disabled={loading || entityType.fields.length === 0}
+                className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium rounded-xl transition flex items-center justify-center gap-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                {isEdit ? 'Speichern' : 'Anlegen'}
+              </button>
+            )}
           </div>
         </form>
 
         {/* Stundenkonten (Budget) – bei Projektzeiten in beiden Modi:
             beim Bearbeiten direkt über die API, beim Neuanlegen lokal
-            gesammelt und mit dem Datensatz gespeichert. */}
+            gesammelt und mit dem Datensatz gespeichert.
+            Bewusst NICHT an `nurLesen` gehängt: Stundenkonten gehören zur
+            Zeiterfassung und werden dort auch serverseitig geprüft. Wer
+            Zeiterfassung ändern darf, aber keine Stammdaten, muss ein Konto
+            trotzdem nachtragen können. */}
         {isProjektzeit && (
           <div className="px-5 pb-2 border-t border-gray-100">
             {isEdit ? (

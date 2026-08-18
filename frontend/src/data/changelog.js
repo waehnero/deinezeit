@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.63',
+    day: '18',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Knöpfe zum Anlegen, Ändern und Löschen erscheinen nur noch dort, wo die Gruppe des Benutzers das Recht dazu vorsieht — in Stammdaten, Postecke, Datacenter, Verkauf und Eingangsrechnungen.',
+    ],
+    updates: [
+      'Ansehen bleibt überall möglich: Belege, Dateien und Datensätze lassen sich weiterhin öffnen, herunterladen und drucken, auch ohne Änderungsrecht.',
+    ],
+  },
+  {
     version: '1.12.62',
     day: '18',
     month: 'August',

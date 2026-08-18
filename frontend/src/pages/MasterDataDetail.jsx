@@ -60,17 +60,30 @@ function formatFieldValue(field, value) {
 
 // Aktions-Knöpfe je Datensatz (Bearbeiten/Archivieren/Löschen) — von
 // ResponsiveTable rechts in der Tabellenzeile bzw. auf der Karte gerendert
+//
+// Rechte: Bearbeiten verlangt „Anlegen und ändern" aus der Gruppe. Archivieren,
+// Wiederherstellen und Löschen bleiben dagegen Admin-Sache — genau so prüft es
+// der Server (masterdata.py, Beschluss Löschregeln 11.07.2026). Das Gruppen-
+// Löschrecht taugt hier nicht: Wer keiner Gruppe angehört, bekommt über den
+// Rückfall auf allowed_modules alles, und damit wäre die Sperre in jeder noch
+// nicht gepflegten Installation wirkungslos.
+//
+// Ohne Änderungsrecht bleibt die Zeile trotzdem anklickbar: der Datensatz lässt
+// sich dann ansehen, nur nicht speichern.
 function RecordActions({ record, onEdit, onDelete, onArchive, onRestore,
-                         isAdmin = false, archivedView = false }) {
+                         darfAendern = true, istAdmin = false,
+                         archivedView = false }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
   return (
     <>
-      <button onClick={() => onEdit(record)}
-        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
-        <Pencil size={14} />
-      </button>
-      {isAdmin && archivedView && (
+      {darfAendern && (
+        <button onClick={() => onEdit(record)}
+          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+          <Pencil size={14} />
+        </button>
+      )}
+      {istAdmin && archivedView && (
         <button
           onClick={() => onRestore(record)}
           className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition"
@@ -78,7 +91,7 @@ function RecordActions({ record, onEdit, onDelete, onArchive, onRestore,
           <ArchiveRestore size={14} />
         </button>
       )}
-      {isAdmin && !archivedView && (
+      {istAdmin && !archivedView && (
         <button
           onClick={() => { if (confirmArchive) { onArchive(record); setConfirmArchive(false) } else setConfirmArchive(true) }}
           onBlur={() => setTimeout(() => setConfirmArchive(false), 200)}
@@ -89,7 +102,7 @@ function RecordActions({ record, onEdit, onDelete, onArchive, onRestore,
           <Archive size={14} />
         </button>
       )}
-      {isAdmin && (
+      {istAdmin && (
         <button
           onClick={() => { if (confirmDelete) onDelete(record); else setConfirmDelete(true) }}
           onBlur={() => setTimeout(() => setConfirmDelete(false), 200)}
@@ -108,7 +121,11 @@ function RecordActions({ record, onEdit, onDelete, onArchive, onRestore,
 export default function MasterDataDetail() {
   const { slug } = useParams()
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  const { isAdmin, hasRecht } = useAuth()
+  // Anlegen und Bearbeiten hängen am Gruppen-Schreibrecht. Feld-Definitionen
+  // (GridFieldBuilder) sowie Archivieren/Wiederherstellen/Löschen bleiben
+  // Admin-Sache — so prüft es auch der Server. Siehe Kommentar an RecordActions.
+  const darfAendern = hasRecht('stammdaten', 'schreiben')
 
   const [entityType, setEntityType] = useState(null)
   const [records, setRecords] = useState([])
@@ -121,7 +138,7 @@ export default function MasterDataDetail() {
   const [modalRecord, setModalRecord] = useState(undefined) // undefined=geschlossen, null=neu, obj=bearbeiten
   const [typFilter, setTypFilter] = useState('') // nur bei slug === 'kontakte' genutzt
   const [budgets, setBudgets] = useState({}) // nur bei slug === 'projektzeiten': { [recordId]: ProjectBudget }
-  const [showArchived, setShowArchived] = useState(false) // Archiv-Ansicht (nur Admin relevant)
+  const [showArchived, setShowArchived] = useState(false) // Archiv-Ansicht (nur mit Löschrecht)
 
   const isProjektzeiten = slug === 'projektzeiten'
 
@@ -258,14 +275,18 @@ export default function MasterDataDetail() {
             </button>
           )}
           <div className="flex items-center gap-2">
+            {/* Export ist ein Lesevorgang und bleibt frei; der Import schreibt
+                Datensätze und verlangt daher das Änderungsrecht. */}
             <CsvExportButton slug={entityType.slug} entityName={entityType.name} />
-            <CsvImportButton
-              slug={entityType.slug}
-              entityType={entityType}
-              onImported={() => loadRecords()}
-            />
+            {darfAendern && (
+              <CsvImportButton
+                slug={entityType.slug}
+                entityType={entityType}
+                onImported={() => loadRecords()}
+              />
+            )}
           </div>
-          {!showArchived && (
+          {darfAendern && !showArchived && (
             <button
               onClick={() => setModalRecord(null)}
               className="hidden sm:flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl font-medium transition"
@@ -274,7 +295,7 @@ export default function MasterDataDetail() {
               Neu anlegen
             </button>
           )}
-          {!showArchived && <Fab onClick={() => setModalRecord(null)} title="Neu anlegen" />}
+          {darfAendern && !showArchived && <Fab onClick={() => setModalRecord(null)} title="Neu anlegen" />}
         </div>
       </PageHeader>
 
@@ -335,7 +356,7 @@ export default function MasterDataDetail() {
                 : showArchived ? 'Keine archivierten Einträge'
                 : 'Noch keine Einträge vorhanden'}
             </p>
-            {!search && !showArchived && (
+            {darfAendern && !search && !showArchived && (
               <button onClick={() => setModalRecord(null)}
                 className="mt-3 text-primary-600 hover:underline text-sm">
                 Ersten Eintrag anlegen
@@ -363,7 +384,8 @@ export default function MasterDataDetail() {
             actions={r => (
               <RecordActions record={r} onEdit={x => setModalRecord(x)}
                 onDelete={handleDelete} onArchive={handleArchive} onRestore={handleRestore}
-                isAdmin={isAdmin} archivedView={showArchived} />
+                darfAendern={darfAendern} istAdmin={isAdmin}
+                archivedView={showArchived} />
             )}
           />
         )}
@@ -399,6 +421,7 @@ export default function MasterDataDetail() {
             if (isProjektzeiten) loadBudgets(records)
           }}
           onSaved={handleSaved}
+          nurLesen={!darfAendern}
         />
       )}
     </div>
