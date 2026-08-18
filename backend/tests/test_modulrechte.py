@@ -102,27 +102,46 @@ def test_datacenter_uebersicht_gesperrt_anhaenge_offen(client, db_session, test_
 
 # ── Verwaltung durch den Admin ────────────────────────────────────────────────
 
-def test_admin_setzt_module(client, db_session, test_user, admin_user):
+def test_admin_setzt_module_ueber_gruppen(client, db_session, test_user,
+                                          admin_user):
+    """Modulrechte vergibt der Administrator über Gruppen, nicht mehr je Benutzer.
+
+    Vorher setzte dieser Test ``allowed_modules`` unmittelbar. Seit Migration
+    0055 kommen die Rechte aus Gruppen, und seit Teiletappe 2c weist die
+    Benutzerverwaltung genau die zu. Das alte Feld wird ausdrücklich abgelehnt
+    statt still ignoriert — ein Häkchen, das gesetzt aussieht und nichts
+    bewirkt, hat hier schon einmal Zeit gekostet.
+    """
+    from app.core import berechtigungen as B
+    from app.models.user import PermissionGroup
+
     admin_headers = _login(client, admin_user.email)
 
+    # Das alte Feld wird nicht mehr angenommen.
     resp = client.put(f"/api/users/{test_user.id}",
                       json={"allowed_modules": ["zeiterfassung", "aufgaben"]},
                       headers=admin_headers)
-    assert resp.status_code == 200
-    assert sorted(resp.json()["modules"]) == ["aufgaben", "zeiterfassung"]
-
-    # Unbekanntes Modul → 400
-    resp = client.put(f"/api/users/{test_user.id}",
-                      json={"allowed_modules": ["quatsch"]},
-                      headers=admin_headers)
     assert resp.status_code == 400
+    assert "Rechtegruppen" in resp.json()["detail"]
 
-    # Vollständige Liste wird als NULL (= alle) gespeichert
-    resp = client.put(f"/api/users/{test_user.id}",
-                      json={"allowed_modules": list(MODULE_KEYS)},
+    # Der neue Weg: Gruppe anlegen und zuweisen.
+    blatt = B.leeres_rechteblatt()
+    for modul in ("zeiterfassung", "aufgaben"):
+        for recht in B.rechte_fuer_modul(modul):
+            blatt[modul][recht] = True
+    gruppe = PermissionGroup(name="Zeit und Aufgaben", rechte=blatt)
+    db_session.add(gruppe)
+    db_session.commit()
+
+    resp = client.put(f"/api/groups/users/{test_user.id}/groups",
+                      json={"group_ids": [str(gruppe.id)]},
                       headers=admin_headers)
-    assert resp.status_code == 200
-    assert resp.json()["allowed_modules"] is None
+    assert resp.status_code == 200, resp.text
+    assert sorted(resp.json()["module"]) == ["aufgaben", "zeiterfassung"]
+
+    # Und die Modul-Liste an /auth/me folgt derselben Quelle.
+    db_session.refresh(test_user)
+    assert sorted(test_user.modules) == ["aufgaben", "zeiterfassung"]
 
     # Normale Benutzer dürfen keine Benutzer bearbeiten
     user_headers = _login(client, test_user.email)

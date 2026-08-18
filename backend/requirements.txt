@@ -15,9 +15,13 @@ python-multipart==0.0.32
 # Feldverschlüsselung (app/core/crypto.py — verschlüsselt das TOTP-Secret).
 # War bisher schon über python-jose[cryptography] und webauthn installiert;
 # seit Migration 0054 verwenden wir es direkt und deklarieren es deshalb auch.
-# Bereich statt festem Stand, damit kein Konflikt mit den beiden Paketen
-# entsteht, die es ebenfalls verlangen.
-cryptography>=42.0,<47.0
+#
+# Untergrenze 48.0.1 wegen PYSEC-2026-3552/3553/3554 und GHSA-537c-gmf6-5ccf.
+# Die Lücken bestanden schon vorher — sie fielen nur nicht auf, weil das Paket
+# als transitive Abhängigkeit nicht in dieser Datei stand und pip-audit nur
+# prüft, was hier deklariert ist. Das Deklarieren hat den Befund also nicht
+# verursacht, sondern sichtbar gemacht.
+cryptography>=48.0.1,<51.0
 
 # 2FA (TOTP)
 pyotp==2.9.0
