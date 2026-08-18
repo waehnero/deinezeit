@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  authApi, getAccessToken, setAbmeldeHandler, sitzungWiederherstellen,
-  tokenVerwerfen, warAngemeldet,
+  authApi, groupsApi, getAccessToken, setAbmeldeHandler,
+  sitzungWiederherstellen, tokenVerwerfen, warAngemeldet,
 } from '../services/api'
 
 const AuthContext = createContext(null)
@@ -82,6 +82,42 @@ export function AuthProvider({ children }) {
 
   const isAdmin = currentUser?.role === 'admin'
 
+  /**
+   * Effektive Rechte des angemeldeten Benutzers.
+   *
+   * Damit lassen sich Knöpfe und Dialoge sperren, statt den Benutzer erst ein
+   * Formular ausfüllen zu lassen und ihn beim Speichern abzuweisen. Das ist
+   * ausdrücklich **kein** Sicherheitsmerkmal — verbindlich prüft der Server
+   * (deps.require_modul_rechte). Was hier passiert, ist reine Benutzerführung:
+   * Eine gesperrte Funktion muss vorher erkennbar sein, sonst hält man die
+   * Regel für einen Defekt.
+   */
+  const [rechte, setRechte] = useState(null)
+
+  useEffect(() => {
+    if (!currentUser) { setRechte(null); return }
+    let abgebrochen = false
+    groupsApi.meineRechte()
+      .then((r) => { if (!abgebrochen) setRechte(r.data.rechte) })
+      .catch(() => { /* Ohne Antwort bleibt die Oberfläche großzügig — der
+                        Server weist notfalls ab. Lieber ein Knopf zu viel als
+                        eine Anwendung, die nach einem Netzfehler leer wirkt. */ })
+    return () => { abgebrochen = true }
+  }, [currentUser])
+
+  /** Darf der angemeldete Benutzer das? `recht` = lesen | schreiben | loeschen */
+  const hasRecht = useCallback((modul, recht = 'lesen') => {
+    if (isAdmin) return true
+    if (!rechte) return true          // noch nicht geladen: nicht vorschnell sperren
+    return !!rechte[modul]?.[recht]
+  }, [isAdmin, rechte])
+
+  /** True, wenn der Benutzer in diesem Modul nur eigene Datensätze sieht. */
+  const nurEigene = useCallback((modul) => {
+    if (isAdmin || !rechte) return false
+    return rechte[modul]?.umfang === 'eigene'
+  }, [isAdmin, rechte])
+
   // Modulrechte: /auth/me liefert die effektive Modul-Liste (Admin: alle;
   // null/undefined z.B. vor dem Laden = großzügig alles erlauben, das
   // Backend prüft ohnehin verbindlich).
@@ -97,6 +133,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       currentUser, isAdmin, loadingAuth, reload, modules, hasModule,
       logout, istAngemeldet, setCurrentUser,
+      // Rechte für die Oberfläche (siehe hasRecht) — nicht sicherheitsrelevant
+      rechte, hasRecht, nurEigene,
     }}>
       {children}
     </AuthContext.Provider>

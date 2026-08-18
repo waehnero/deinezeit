@@ -293,73 +293,44 @@ def test_ausnahmen_setzen_bleibt_eine_ausnahme(client, admin_user, test_user,
     assert test_user.permission_overrides == {"verkauf": {"loeschen": False}}
 
 
-def test_modulhaken_wirken_auch_bei_gruppenmitgliedern(client, admin_user,
-                                                      test_user, db_session):
-    """Die Modul-Häkchen in Einstellungen → Benutzer müssen wirken.
+def test_alte_modulliste_wird_abgelehnt(client, admin_user, test_user,
+                                       db_session):
+    """Das alte Feld ``allowed_modules`` wird nicht mehr angenommen.
 
-    Der Fall aus dem Betrieb (17.08.2026): Ein Administrator hakte für einen
-    Mitarbeiter „Stammdaten" an, das Häkchen blieb gesetzt — und das Modul war
-    trotzdem nicht verfügbar. Ursache: Der Mitarbeiter war durch die
-    Übernahme in Migration 0055 in einer Gruppe, und ab dann ignoriert
-    ``effektive_rechte`` die Spalte ``allowed_modules`` vollständig.
+    Vorgeschichte in zwei Stufen — beide Male ging es um still verfallende
+    Versprechen:
 
-    Die Oberfläche gab damit ein Versprechen, das still verfiel. Jetzt wird die
-    Abweichung als individuelle Ausnahme hinterlegt.
+    1. Nach Migration 0055 schrieben die Modul-Häkchen der Benutzerverwaltung
+       weiter nach ``allowed_modules``, das bei Gruppenmitgliedern niemand
+       mehr liest. Das Häkchen sah gesetzt aus und bewirkte nichts.
+    2. Die Zwischenlösung übersetzte die Häkchen in individuelle Ausnahmen —
+       und setzte dabei für **jedes** abweichende Modul alle drei Rechte.
+       Diese Ausnahmen überschrieben anschließend die Gruppenrechte, ohne dass
+       es in der Gruppenansicht sichtbar war: Eine Gruppe stand auf „nur
+       ansehen", der Benutzer konnte trotzdem anlegen und löschen.
+
+    Seit die Benutzerverwaltung Gruppen zuweist, gibt es für beides keinen
+    Grund mehr. Das Feld wird jetzt mit einer erklärenden Meldung abgelehnt —
+    ein Fehler ist hier besser als ein wirkungsloses Häkchen.
     """
-    test_user.groups = [_gruppe(db_session, "Nur Zeiten",
-                                _blatt(zeiterfassung={"lesen": True,
-                                                      "umfang": "alle"}))]
-    db_session.commit()
-    assert B.hat_recht(test_user, "stammdaten", B.LESEN) is False
-
     kopf = _kopf(client, admin_user.email)
     resp = client.put(f"/api/users/{test_user.id}", headers=kopf,
                       json={"allowed_modules": ["zeiterfassung", "stammdaten"]})
-    assert resp.status_code == 200, resp.text
-
-    db_session.refresh(test_user)
-    assert B.hat_recht(test_user, "stammdaten", B.LESEN) is True
-    assert B.hat_recht(test_user, "stammdaten", B.SCHREIBEN) is True
-    # Nicht angehakte Module bleiben gesperrt.
-    assert B.hat_recht(test_user, "verkauf", B.LESEN) is False
+    assert resp.status_code == 400
+    assert "Rechtegruppen" in resp.json()["detail"]
 
 
-def test_modulhaken_entziehen_wirkt_gegen_die_gruppe(client, admin_user,
-                                                     test_user, db_session):
-    """Die Gegenrichtung: Abhaken muss ein Gruppenrecht auch wegnehmen."""
-    test_user.groups = [_gruppe(db_session, "Zeit und Aufgaben",
-                                _blatt(zeiterfassung={"lesen": True},
-                                       aufgaben={"lesen": True}))]
+def test_rechte_kommen_ausschliesslich_aus_gruppen(client, admin_user,
+                                                   test_user, db_session):
+    """Eine Gruppe auf „nur ansehen" darf nicht durch Altlasten aufgeweicht sein."""
+    test_user.groups = [_gruppe(db_session, "Nur ansehen",
+                                _blatt(projekte={"lesen": True, "umfang": "alle"}))]
+    test_user.permission_overrides = None
     db_session.commit()
 
-    kopf = _kopf(client, admin_user.email)
-    resp = client.put(f"/api/users/{test_user.id}", headers=kopf,
-                      json={"allowed_modules": ["zeiterfassung"]})
-    assert resp.status_code == 200, resp.text
-
-    db_session.refresh(test_user)
-    assert B.hat_recht(test_user, "aufgaben", B.LESEN) is False
-    assert B.hat_recht(test_user, "zeiterfassung", B.LESEN) is True
-
-
-def test_deckungsgleiche_haken_erzeugen_keine_ausnahme(client, admin_user,
-                                                      test_user, db_session):
-    """Stimmen Häkchen und Gruppe überein, bleibt die Gruppe die einzige Quelle.
-
-    Sonst würde jedes Speichern in der Benutzerverwaltung Ausnahmen anlegen,
-    und eine späterere Gruppenänderung ginge an dem Benutzer vorbei, ohne dass
-    jemand versteht, warum.
-    """
-    test_user.groups = [_gruppe(db_session, "Nur Zeiten",
-                                _blatt(zeiterfassung={"lesen": True}))]
-    db_session.commit()
-
-    kopf = _kopf(client, admin_user.email)
-    client.put(f"/api/users/{test_user.id}", headers=kopf,
-               json={"allowed_modules": ["zeiterfassung"]})
-
-    db_session.refresh(test_user)
-    assert test_user.permission_overrides is None
+    assert B.hat_recht(test_user, "projekte", B.LESEN) is True
+    assert B.hat_recht(test_user, "projekte", B.SCHREIBEN) is False
+    assert B.hat_recht(test_user, "projekte", B.LOESCHEN) is False
 
 
 def test_me_liefert_module_aus_dem_neuen_modell(client, test_user, db_session):

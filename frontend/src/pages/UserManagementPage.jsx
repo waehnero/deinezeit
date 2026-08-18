@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { usersApi, authApi } from '../services/api'
+import { groupsApi, usersApi, authApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import {
   Users, Plus, Trash2, UserCheck, UserX,
-  Loader2, X, Pencil, ShieldOff, KeyRound, Lock, LockOpen
+  Loader2, X, Pencil, ShieldOff, KeyRound, Lock, LockOpen, ShieldCheck
 } from 'lucide-react'
 
 const ROLE_LABELS = { admin: 'Administrator', employee: 'Mitarbeiter' }
@@ -98,7 +99,9 @@ function NewUserModal({ onClose, onCreated }) {
   )
 }
 
-// Modul-Liste — muss zu backend/app/core/modules.py passen
+// Modul-Beschriftungen für die Anzeige der wirksamen Rechte.
+// Die Rechtevergabe selbst läuft über Gruppen (/users/gruppen);
+// diese Liste dient nur noch der Lesbarkeit.
 const ALL_MODULES = [
   { key: 'dashboard',     label: 'Dashboard' },
   { key: 'zeiterfassung', label: 'Zeiterfassung' },
@@ -112,6 +115,7 @@ const ALL_MODULES = [
   { key: 'stammdaten',    label: 'Stammdaten' },
   { key: 'datacenter',    label: 'Datacenter' },
 ]
+const MODUL_LABELS = Object.fromEntries(ALL_MODULES.map(m => [m.key, m.label]))
 
 function EditUserModal({ user, onClose, onUpdated }) {
   const [form, setForm] = useState({
@@ -120,18 +124,42 @@ function EditUserModal({ user, onClose, onUpdated }) {
     language: user.language,
     password: '',
     disable_totp: false,
-    // null (= alle erlaubt) → volle Liste vorauswählen
-    modules: user.allowed_modules ?? ALL_MODULES.map(m => m.key),
+    group_ids: [],
   })
+  const [gruppen, setGruppen] = useState([])
+  const [rechte, setRechte] = useState(null)
   const [loading, setLoading] = useState(false)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const toggleModule = (key) => {
+  // Gruppen und die aktuell wirksamen Rechte laden. Die Zuordnung steht nicht
+  // im Benutzer-Datensatz, sondern in der Gruppentabelle — deshalb hier über
+  // die Mitgliederlisten ermitteln statt über user.gruppen_namen (Namen wären
+  // beim Speichern nicht eindeutig).
+  useEffect(() => {
+    let abgebrochen = false
+    Promise.all([
+      groupsApi.list(),
+      groupsApi.userRechte(user.id).catch(() => ({ data: null })),
+    ]).then(([g, r]) => {
+      if (abgebrochen) return
+      setGruppen(g.data)
+      setRechte(r.data)
+      setForm(f => ({
+        ...f,
+        group_ids: g.data
+          .filter(gr => gr.mitglieder.some(m => m.id === user.id))
+          .map(gr => gr.id),
+      }))
+    }).catch(() => toast.error('Gruppen konnten nicht geladen werden'))
+    return () => { abgebrochen = true }
+  }, [user.id])
+
+  const toggleGruppe = (id) => {
     setForm(f => ({
       ...f,
-      modules: f.modules.includes(key)
-        ? f.modules.filter(m => m !== key)
-        : [...f.modules, key],
+      group_ids: f.group_ids.includes(id)
+        ? f.group_ids.filter(g => g !== id)
+        : [...f.group_ids, id],
     }))
   }
 
@@ -144,10 +172,17 @@ function EditUserModal({ user, onClose, onUpdated }) {
         role: form.role,
         language: form.language,
         disable_totp: form.disable_totp || undefined,
-        allowed_modules: form.modules,
       }
       if (form.password) payload.password = form.password
       const res = await usersApi.updateByAdmin(user.id, payload)
+
+      // Gruppenzuordnung getrennt speichern — sie liegt in einer eigenen
+      // Tabelle und hat einen eigenen Endpunkt. Nur für Nicht-Administratoren:
+      // Admins haben ohnehin alle Rechte.
+      if (form.role !== 'admin') {
+        await groupsApi.setUserGroups(user.id, form.group_ids)
+      }
+
       toast.success(`${form.full_name} wurde aktualisiert`)
       onUpdated(res.data)
     } catch (err) {
@@ -190,30 +225,72 @@ function EditUserModal({ user, onClose, onUpdated }) {
             ))}
           </div>
         </div>
-        {/* Modulrechte: nur relevant für Mitarbeiter — Admins sehen immer alles */}
+        {/* Rechte: seit Migration 0055 über Gruppen, nicht mehr über eine
+            Modulliste je Benutzer. Zwei Oberflächen für dieselbe Sache liefen
+            auseinander — die Häkchen hier schrieben nach allowed_modules, was
+            bei Gruppenmitgliedern wirkungslos war. */}
         {form.role !== 'admin' && (
           <div>
-            <label className="label">Module <span className="text-neutral-400 font-normal">(was dieser Benutzer verwenden darf)</span></label>
-            <div className="grid grid-cols-2 gap-2">
-              {ALL_MODULES.map(({ key, label }) => {
-                const active = form.modules.includes(key)
-                return (
-                  <button key={key} type="button" onClick={() => toggleModule(key)}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border-2 transition text-left font-medium ${
-                      active
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-neutral-200 text-neutral-400 hover:border-neutral-300'
-                    }`}>
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${active ? 'bg-primary-500' : 'bg-neutral-300'}`} />
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-            {form.modules.length === 0 && (
+            <label className="label">
+              Rechtegruppen{' '}
+              <span className="text-neutral-400 font-normal">
+                (bestimmen, was dieser Benutzer darf)
+              </span>
+            </label>
+
+            {gruppen.length === 0 ? (
+              <p className="text-sm text-neutral-400 py-2">Keine Gruppen vorhanden.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto border border-neutral-200 rounded-xl p-2">
+                {gruppen.map((g) => (
+                  <label key={g.id}
+                         className="flex items-start gap-3 px-2 py-1.5 hover:bg-neutral-50 rounded-lg cursor-pointer">
+                    <input type="checkbox"
+                           checked={form.group_ids.includes(g.id)}
+                           onChange={() => toggleGruppe(g.id)}
+                           className="w-4 h-4 mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" />
+                    <span className="min-w-0">
+                      <span className="text-sm font-medium text-neutral-800">{g.name}</span>
+                      {g.beschreibung && (
+                        <span className="block text-xs text-neutral-400">{g.beschreibung}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {form.group_ids.length === 0 && (
               <p className="text-xs text-amber-600 mt-1.5">
-                Ohne Module sieht der Benutzer nach dem Login nur sein Profil.
+                Ohne Gruppe sieht der Benutzer nach dem Anmelden nur sein Profil.
               </p>
+            )}
+
+            {/* Herkunft der Rechte — bei Gruppen plus Ausnahmen kann sonst
+                niemand mehr nachvollziehen, warum jemand etwas darf. */}
+            {rechte && (
+              <div className="mt-3 bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-1">
+                  Wirksame Module
+                </p>
+                <p className="text-sm text-neutral-700">
+                  {rechte.module.length
+                    ? rechte.module.map((m) => MODUL_LABELS[m] || m).join(', ')
+                    : 'keine'}
+                </p>
+                {rechte.ausnahmen && Object.keys(rechte.ausnahmen).length > 0 && (
+                  <p className="text-xs text-amber-700 mt-1.5">
+                    Zusätzlich gelten individuelle Ausnahmen für:{' '}
+                    {Object.keys(rechte.ausnahmen)
+                      .map((m) => MODUL_LABELS[m] || m).join(', ')}.
+                    Sie überschreiben die Gruppenrechte.
+                  </p>
+                )}
+                <Link to="/users/gruppen"
+                      className="text-xs text-primary-600 hover:text-primary-700 mt-1.5 inline-block">
+                  Rechte der Gruppen bearbeiten →
+                </Link>
+              </div>
             )}
           </div>
         )}
@@ -315,9 +392,14 @@ export default function UserManagementPage() {
           <p className="text-neutral-400 text-sm mt-0.5">{users.length} Benutzer</p>
         </div>
         {isAdmin && (
-          <button onClick={() => setShowNewModal(true)} className="btn-primary">
-            <Plus size={16} /> Neuer Benutzer
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to="/users/gruppen" className="btn-secondary">
+              <ShieldCheck size={16} /> Rechtegruppen
+            </Link>
+            <button onClick={() => setShowNewModal(true)} className="btn-primary">
+              <Plus size={16} /> Neuer Benutzer
+            </button>
+          </div>
         )}
       </div>
 
@@ -354,6 +436,16 @@ export default function UserManagementPage() {
                   <span className={`text-xs font-medium px-2 py-1 rounded-full border ${ROLE_COLORS[user.role]}`}>
                     {ROLE_LABELS[user.role]}
                   </span>
+                  {user.role !== 'admin' && (
+                    <p className="text-xs text-neutral-400 mt-1">
+                      {user.gruppen_namen?.length
+                        ? user.gruppen_namen.join(', ')
+                        : 'keine Gruppe'}
+                      {user.permission_overrides && (
+                        <span className="text-amber-600" title="Für diesen Benutzer gelten individuelle Ausnahmen"> · Ausnahmen</span>
+                      )}
+                    </p>
+                  )}
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell">
                   <span className={`flex items-center gap-1.5 text-xs font-medium ${user.is_active ? 'text-green-600' : 'text-neutral-400'}`}>

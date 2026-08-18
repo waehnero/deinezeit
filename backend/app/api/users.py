@@ -15,61 +15,6 @@ from app.core import passwort as pw_regeln
 router = APIRouter(prefix="/users", tags=["Benutzerverwaltung"])
 
 
-def _modulhaken_in_ausnahmen_uebertragen(db, user: User,
-                                         gewuenschte_module: list[str]) -> None:
-    """Die Modul-Häkchen der Benutzerverwaltung auf das Gruppenmodell abbilden.
-
-    Hintergrund: Bis Migration 0055 schrieb diese Oberfläche nach
-    ``users.allowed_modules``, und das war die Wahrheit. Seit 0055 kommen die
-    Rechte aus den Gruppen, und ``allowed_modules`` gilt nur noch für Benutzer
-    **ohne** Gruppe. Wer einem Gruppenmitglied hier ein Modul zuschaltete, sah
-    das Häkchen gesetzt — gewirkt hat es nicht. Ein Versprechen, das still
-    verfällt, ist schlimmer als eine Fehlermeldung.
-
-    Deshalb wird die Abweichung zwischen Wunsch und Gruppenrechten als
-    **individuelle Ausnahme** hinterlegt:
-
-    * Modul angehakt, Gruppe gibt es nicht → Lesen, Schreiben und Löschen
-      werden als Ausnahme gewährt (das alte Modell kannte kein
-      Lesen/Schreiben-Gefälle, weniger wäre eine stille Rechteminderung).
-    * Modul abgehakt, Gruppe gibt es → alle Rechte werden als Ausnahme
-      entzogen.
-    * Wunsch und Gruppe stimmen überein → keine Ausnahme; die Gruppe bleibt
-      die einzige Quelle, und das ist der Zustand, den man haben will.
-
-    Für abgestufte Rechte ist weiterhin die Gruppenverwaltung zuständig. Diese
-    Übertragung hält nur die bestehende Oberfläche wirksam, bis Teiletappe 2c
-    sie ersetzt.
-    """
-    from app.core import berechtigungen as B
-    from app.core.modules import MODULE_KEYS
-
-    gewuenscht = set(gewuenschte_module)
-
-    # Was die Gruppen allein hergeben — ohne die bisherigen Ausnahmen, sonst
-    # würde sich der Vergleich auf sich selbst beziehen und Ausnahmen ewig
-    # festschreiben.
-    gruppen_blatt = B.blaetter_vereinigen(
-        [g.rechte for g in user.groups or []]) if user.groups else None
-
-    if gruppen_blatt is None:
-        # Kein Gruppenmitglied: allowed_modules wirkt weiterhin unmittelbar,
-        # es braucht keine Ausnahme.
-        user.permission_overrides = None
-        return
-
-    ausnahmen: dict = {}
-    for modul in MODULE_KEYS:
-        aus_gruppe = bool(gruppen_blatt.get(modul, {}).get(B.LESEN))
-        soll = modul in gewuenscht
-        if soll == aus_gruppe:
-            continue
-        ausnahmen[modul] = {recht: soll
-                            for recht in B.rechte_fuer_modul(modul)}
-
-    user.permission_overrides = ausnahmen or None
-
-
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
     db: Session = Depends(get_db),
@@ -238,20 +183,21 @@ async def update_user_by_admin(
         geaendert.append("2FA deaktiviert")
 
     if body.allowed_modules is not None:
-        from app.core.modules import MODULE_KEYS
-        invalid = [m for m in body.allowed_modules if m not in MODULE_KEYS]
-        if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unbekannte Module: {', '.join(invalid)}. "
-                       f"Erlaubt: {', '.join(MODULE_KEYS)}",
-            )
-        # Vollständige Liste = "alle erlaubt" → als NULL speichern, damit
-        # künftig ergänzte Module automatisch mit erlaubt sind.
-        user.allowed_modules = (None if set(body.allowed_modules) == set(MODULE_KEYS)
-                                else body.allowed_modules)
-        _modulhaken_in_ausnahmen_uebertragen(db, user, body.allowed_modules)
-        geaendert.append("Modulrechte")
+        # Seit Teiletappe 2c vergibt die Benutzerverwaltung Rechte über
+        # Gruppen. Dieses Feld kommt nur noch von einer zwischengespeicherten,
+        # älteren Oberfläche (PWA-Cache).
+        #
+        # Es wird ausdrücklich abgelehnt statt still ignoriert: Ein Häkchen,
+        # das gesetzt aussieht und nichts bewirkt, hat hier schon einmal Zeit
+        # gekostet. Und es wird nicht mehr in Ausnahmen übersetzt — dieser
+        # Übergangsweg hat für jedes abweichende Modul volle Rechte gesetzt und
+        # damit Gruppeneinstellungen unbemerkt ausgehebelt.
+        raise HTTPException(
+            status_code=400,
+            detail=("Modulrechte werden jetzt über Rechtegruppen vergeben "
+                    "(Benutzerverwaltung → Rechtegruppen). Falls Sie diese "
+                    "Meldung in der Oberfläche sehen, laden Sie die Seite bitte "
+                    "neu — Ihr Browser zeigt eine ältere Fassung."))
 
     db.commit()
     db.refresh(user)
