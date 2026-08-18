@@ -993,7 +993,12 @@ function RunningMin({ startedAt }) {
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 export default function ZeiterfassungPage() {
   const navigate = useNavigate()
-  const { currentUser, isAdmin } = useAuth()
+  const { currentUser, isAdmin, hasRecht } = useAuth()
+  // Alles, was einen Zeiteintrag entstehen lässt, setzt Schreibrecht voraus:
+  // Timer starten, per Sprache nachtragen, von Hand nachtragen.
+  // NICHT dazu gehört „Bericht erstellen" (reine Auswertung) und die
+  // Custom-Felder (eigene Admin-Route).
+  const darfErfassen = hasRecht('zeiterfassung', 'schreiben')
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [running, setRunning] = useState(null)
   const [stats, setStats] = useState(null)
@@ -1259,12 +1264,14 @@ export default function ZeiterfassungPage() {
       {/* Header */}
       <PageHeader icon={Clock} title="Zeiterfassung" subtitle="Projektzeiten erfassen und auswerten">
         <div className="flex items-center gap-2">
-          <button onClick={() => setVoiceOpen(true)} title="Projektzeit per Sprache nachtragen (KI)"
-            className="relative flex items-center gap-1.5 px-2.5 sm:px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition">
-            <Mic size={16} />
-            <Sparkles size={12} className="absolute top-1 right-1 sm:static sm:ml-0" />
-            <span className="hidden lg:inline">Sprach-Eintrag</span>
-          </button>
+          {darfErfassen && (
+            <button onClick={() => setVoiceOpen(true)} title="Projektzeit per Sprache nachtragen (KI)"
+              className="relative flex items-center gap-1.5 px-2.5 sm:px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition">
+              <Mic size={16} />
+              <Sparkles size={12} className="absolute top-1 right-1 sm:static sm:ml-0" />
+              <span className="hidden lg:inline">Sprach-Eintrag</span>
+            </button>
+          )}
           <button onClick={() => navigate('/zeiterfassung/felder')} title="Custom-Felder"
             className="p-2.5 border border-gray-300 rounded-xl text-gray-500 hover:bg-gray-50 transition">
             <Settings2 size={16} />
@@ -1274,16 +1281,18 @@ export default function ZeiterfassungPage() {
             <FileText size={16} />
             <span className="hidden sm:inline">Bericht erstellen</span>
           </button>
-          <button onClick={() => setModalEntry(null)} title="Projektzeit nachtragen"
-            className="hidden sm:flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-            <Plus size={16} />
-            <span className="hidden sm:inline">Projektzeit nachtragen</span>
-          </button>
+          {darfErfassen && (
+            <button onClick={() => setModalEntry(null)} title="Projektzeit nachtragen"
+              className="hidden sm:flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+              <Plus size={16} />
+              <span className="hidden sm:inline">Projektzeit nachtragen</span>
+            </button>
+          )}
         </div>
       </PageHeader>
 
       {/* Primäraktion am Handy: einheitlicher runder FAB unten rechts */}
-      <Fab onClick={() => setModalEntry(null)} title="Projektzeit nachtragen" />
+      {darfErfassen && <Fab onClick={() => setModalEntry(null)} title="Projektzeit nachtragen" />}
 
       {/* Timer-Bereich */}
       {running ? (
@@ -1296,13 +1305,13 @@ export default function ZeiterfassungPage() {
           onDelete={() => handleDelete(running)}
           onUpdate={handleUpdate}
         />
-      ) : (
+      ) : darfErfassen ? (
         <StartTimerCard onStart={handleStart}
           lastEndTime={(() => {
             const last = entries.find(e => e.ended_at)
             return last ? isoToTimeLocal(last.ended_at) : null
           })()} />
-      )}
+      ) : null}
 
       {/* Statistik-Ringe */}
       {stats && (
@@ -1362,7 +1371,7 @@ export default function ZeiterfassungPage() {
           <div className="text-center py-16 text-gray-400">
             <Clock size={40} className="mx-auto mb-3 text-gray-200" />
             <p className="font-medium">{search ? 'Keine Einträge gefunden' : 'Noch keine Zeiteinträge'}</p>
-            {!search && (
+            {!search && darfErfassen && (
               <button onClick={() => setModalEntry(null)} className="mt-3 text-primary-600 hover:underline text-sm">
                 Ersten Eintrag nachtragen
               </button>

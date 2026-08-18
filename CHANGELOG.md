@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.62] – 2026-08-18 – Rechte oberflaeche
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.61] – 2026-08-18 – Rechtegruppen in der Oberfläche
 
 ### Neu
