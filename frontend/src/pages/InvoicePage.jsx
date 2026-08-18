@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { invoiceApi, datacenterApi, masterdataApi } from '../services/api'
 import RichTextEditor from '../components/RichTextEditor'
 import toast from 'react-hot-toast'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Plus, Search, FileText, RefreshCw, Download,
   CheckCircle2, Clock, XCircle, Send, Eye,
@@ -78,6 +79,12 @@ function DocTypeBadge({ type }) {
 
 export default function InvoicePage() {
   const navigate = useNavigate()
+  // Belegarbeit = Änderungsrecht auf Verkauf; Stornieren und Löschen verlangen
+  // das Löschrecht (siehe ActionMenu). Belege ansehen und das PDF öffnen bleibt
+  // beim Leserecht.
+  const { hasRecht } = useAuth()
+  const darfAendern = hasRecht('verkauf', 'schreiben')
+  const darfLoeschen = hasRecht('verkauf', 'loeschen')
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('')
@@ -230,22 +237,24 @@ export default function InvoicePage() {
     <div className="">
       <PageHeader icon={Receipt} title="Verkauf" subtitle="Rechnungen · Angebote · Auftragsbestätigungen · Gutschriften · Lieferscheine">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          {selected.size > 0 && (
+          {darfAendern && selected.size > 0 && (
             <button onClick={() => setSendDialog({ invoices: invoices.filter(i => selected.has(i.id)), mode: 'bulk' })}
               className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <Mail size={15} /> {selected.size} Beleg{selected.size > 1 ? 'e' : ''} senden
             </button>
           )}
-          <div className="flex items-center gap-2">
-            {/* Offene Posten, Mahnlauf, Verkaufsbuch, Monatsabschluss und
-                Kontenplan liegen im Bereich Buchhaltung und werden über den
-                Menüpunkt erreicht. Hier steht nur noch die Belegarbeit. */}
-            <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
-              className="flex-1 hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-              <Plus size={15} /> Neu erstellen
-            </button>
-            <Fab onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))} title="Neu erstellen" />
-          </div>
+          {darfAendern && (
+            <div className="flex items-center gap-2">
+              {/* Offene Posten, Mahnlauf, Verkaufsbuch, Monatsabschluss und
+                  Kontenplan liegen im Bereich Buchhaltung und werden über den
+                  Menüpunkt erreicht. Hier steht nur noch die Belegarbeit. */}
+              <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))}
+                className="flex-1 hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                <Plus size={15} /> Neu erstellen
+              </button>
+              <Fab onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))} title="Neu erstellen" />
+            </div>
+          )}
         </div>
       </PageHeader>
 
@@ -285,17 +294,23 @@ export default function InvoicePage() {
           <div className="flex flex-col items-center justify-center py-16 text-neutral-400">
             <FileText size={40} className="mb-3 opacity-30" />
             <p className="text-sm">Keine Dokumente gefunden</p>
-            <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))} className="mt-3 text-sm text-primary-600 hover:underline">Erstes Dokument erstellen</button>
+            {darfAendern && (
+              <button onClick={() => navigate('/invoices/new' + (activeTab ? '?type=' + activeTab : ''))} className="mt-3 text-sm text-primary-600 hover:underline">Erstes Dokument erstellen</button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-100 bg-neutral-50">
-                <th className="px-3 py-3 w-10">
-                  <input type="checkbox" checked={selected.size === invoices.length && invoices.length > 0}
-                    onChange={toggleAll} className="w-4 h-4 rounded cursor-pointer" />
-                </th>
+                {/* Die Auswahlspalte dient allein dem Sammelversand — ohne
+                    Änderungsrecht gäbe es dazu keinen Knopf. */}
+                {darfAendern && (
+                  <th className="px-3 py-3 w-10">
+                    <input type="checkbox" checked={selected.size === invoices.length && invoices.length > 0}
+                      onChange={toggleAll} className="w-4 h-4 rounded cursor-pointer" />
+                  </th>
+                )}
                 <th className="text-left px-4 py-3 font-medium text-neutral-500 w-8"></th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500">Nummer</th>
                 <th className="text-left px-4 py-3 font-medium text-neutral-500 hidden md:table-cell">Datum</th>
@@ -312,9 +327,11 @@ export default function InvoicePage() {
                 <tr key={inv.id}
                   className={`hover:bg-neutral-50 cursor-pointer ${selected.has(inv.id) ? 'bg-blue-50' : ((inv.recurring_source_id || inv.is_recurring_template) ? 'bg-violet-50' : '')}`}
                   onClick={() => navigate(`/invoices/${inv.id}`)}>
-                  <td className="px-3 py-3" onClick={e => { e.stopPropagation(); toggleSelect(inv.id) }}>
-                    <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggleSelect(inv.id)} className="w-4 h-4 rounded cursor-pointer" />
-                  </td>
+                  {darfAendern && (
+                    <td className="px-3 py-3" onClick={e => { e.stopPropagation(); toggleSelect(inv.id) }}>
+                      <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggleSelect(inv.id)} className="w-4 h-4 rounded cursor-pointer" />
+                    </td>
+                  )}
                   <td className="px-4 py-3"><DocTypeBadge type={inv.doc_type} /></td>
                   <td className="px-4 py-3 font-mono font-medium text-neutral-800 whitespace-nowrap">
                     <span className="inline-flex items-center gap-1.5">
@@ -387,7 +404,8 @@ export default function InvoicePage() {
                           onPaid={() => { setActionMenu(null); setPaidDialog(inv) }}
                           onDuplicate={() => { setActionMenu(null); setDuplicateDialog(inv) }}
                           onDelete={() => { setActionMenu(null); handleDelete(inv) }}
-                          onEdit={() => navigate(`/invoices/${inv.id}/edit`)} />
+                          onEdit={() => navigate(`/invoices/${inv.id}/edit`)}
+                          darfAendern={darfAendern} darfLoeschen={darfLoeschen} />
                       )}
                     </div>
                   </td>
@@ -416,7 +434,7 @@ export default function InvoicePage() {
       )}
       {paidDialog && (
         <PaidDialog invoice={paidDialog} onClose={() => { setPaidDialog(null); load() }}
-          onConfirm={() => load()} />
+          onConfirm={() => load()} darfLoeschen={darfLoeschen} />
       )}
       {duplicateDialog && (
         <DuplicateDialog invoice={duplicateDialog} onClose={() => setDuplicateDialog(null)}
@@ -430,8 +448,15 @@ export default function InvoicePage() {
   )
 }
 
+// Rechte im Zeilenmenü: „Öffnen" bleibt immer da — den Beleg ansehen darf, wer
+// die Liste sehen darf. Alles, was den Beleg oder seinen Status verändert
+// (Duplizieren, Status setzen, Umwandeln, Anzahlung, Schlussrechnung, Versand,
+// Zahlungen), verlangt das Änderungsrecht. Stornieren und Löschen verlangen das
+// Löschrecht — so hält es auch der Server (invoice.cancel_invoice hängt
+// ausdrücklich an require_loeschen).
 function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, onConvertToInvoice,
-                      onAdvance, onFinal, onSend, onCancel, onPaid, onDuplicate, onDelete, onEdit }) {
+                      onAdvance, onFinal, onSend, onCancel, onPaid, onDuplicate, onDelete, onEdit,
+                      darfAendern = true, darfLoeschen = true }) {
   const menuRef = useRef(null)
   const MENU_WIDTH = 224 // w-56 = 14rem = 224px
 
@@ -465,8 +490,10 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
   return createPortal(
     <div ref={menuRef} style={style} className="bg-surface border border-neutral-200 rounded-lg shadow-lg py-1">
       <button onClick={onEdit} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
-        <Eye size={14} /> Öffnen / Bearbeiten
+        <Eye size={14} /> {darfAendern ? 'Öffnen / Bearbeiten' : 'Öffnen'}
       </button>
+      {darfAendern && (
+      <>
       <button onClick={onDuplicate} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">
         <Copy size={14} /> Duplizieren
       </button>
@@ -537,8 +564,10 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
           </button>
         </>
       )}
+      </>
+      )}
 
-      {isRe && !['storniert', 'bezahlt', 'entwurf'].includes(status) && (
+      {darfLoeschen && isRe && !['storniert', 'bezahlt', 'entwurf'].includes(status) && (
         <>
           <div className="border-t border-neutral-100 my-1" />
           <button onClick={onCancel} className="w-full text-left px-4 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2 text-red-500">
@@ -546,7 +575,7 @@ function ActionMenu({ invoice, anchorRect, onClose, onSetStatus, onConvertToAb, 
           </button>
         </>
       )}
-      {['entwurf', 'storniert'].includes(status) && (
+      {darfLoeschen && ['entwurf', 'storniert'].includes(status) && (
         <>
           <div className="border-t border-neutral-100 my-1" />
           <button onClick={onDelete} className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 flex items-center gap-2 text-red-500">
@@ -597,7 +626,7 @@ const ZAHLARTEN = [
  * Ratenzahlungen sind jetzt abbildbar, und eine Fehleingabe lässt sich
  * zurücknehmen.
  */
-function PaidDialog({ invoice, onClose, onConfirm }) {
+function PaidDialog({ invoice, onClose, onConfirm, darfLoeschen = true }) {
   const [stand, setStand] = useState(null)
   const [paidAt, setPaidAt] = useState(new Date().toISOString().slice(0, 10))
   const [betrag, setBetrag] = useState('')
@@ -705,8 +734,11 @@ function PaidDialog({ invoice, onClose, onConfirm }) {
                     {z.reference && ' · ' + z.reference}
                   </span>
                 </div>
-                <button onClick={() => zuruecknehmen(z.id)} title="Zahlung zurücknehmen"
-                  className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+                {/* Zurücknehmen ist serverseitig ein DELETE → Löschrecht. */}
+                {darfLoeschen && (
+                  <button onClick={() => zuruecknehmen(z.id)} title="Zahlung zurücknehmen"
+                    className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+                )}
               </div>
             ))}
           </div>

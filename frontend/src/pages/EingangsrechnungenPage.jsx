@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getAccessToken, purchaseApi, masterdataApi } from '../services/api'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/PageHeader'
+import { useAuth } from '../contexts/AuthContext'
 import {
   FileInput, ArrowLeft, RefreshCw, Plus, Trash2, Paperclip, Search,
   Wallet, X as XIcon, AlertTriangle,
@@ -42,6 +43,12 @@ const STATUS_FARBEN = {
  */
 export default function EingangsrechnungenPage() {
   const navigate = useNavigate()
+  // Eingangsrechnungen gehören zur Buchhaltung, nicht zum Verkauf (siehe
+  // main.py: purchase-Router hängt an _rm("buchhaltung")). Erfassen, Bearbeiten,
+  // Original hinterlegen und Zahlungen = Änderungsrecht; Stornieren = Löschrecht.
+  const { hasRecht } = useAuth()
+  const darfAendern = hasRecht('buchhaltung', 'schreiben')
+  const darfLoeschen = hasRecht('buchhaltung', 'loeschen')
   const [liste, setListe] = useState([])
   const [laden, setLaden] = useState(true)
   const [suche, setSuche] = useState('')
@@ -105,10 +112,12 @@ export default function EingangsrechnungenPage() {
         </button>
         <PageHeader icon={FileInput} title="Eingangsrechnungen"
           subtitle="Lieferantenrechnungen erfassen — Grundlage für den Vorsteuerabzug">
-          <button onClick={() => setFormular({})}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-            <Plus size={15} /> Erfassen
-          </button>
+          {darfAendern && (
+            <button onClick={() => setFormular({})}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+              <Plus size={15} /> Erfassen
+            </button>
+          )}
         </PageHeader>
       </div>
 
@@ -190,23 +199,30 @@ export default function EingangsrechnungenPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      {/* Original öffnen ist ein Lesevorgang; Hinterlegen nicht. */}
                       {b.has_file ? (
                         <button onClick={() => originalOeffnen(b)} title="Original öffnen"
                           className="p-1 text-primary-600 hover:text-primary-700"><Paperclip size={14} /></button>
-                      ) : (
+                      ) : darfAendern ? (
                         <label title="Original hinterlegen"
                           className="p-1 text-neutral-300 hover:text-neutral-600 cursor-pointer">
                           <Paperclip size={14} />
                           <input type="file" className="hidden" accept=".pdf,image/*"
                             onChange={e => dateiWaehlen(b, e.target.files?.[0])} />
                         </label>
-                      )}
+                      ) : null}
                       {b.status !== 'storniert' && (
                         <>
-                          <button onClick={() => setZahlung(b)} title="Zahlungen"
-                            className="p-1 text-neutral-400 hover:text-neutral-700"><Wallet size={14} /></button>
-                          <button onClick={() => stornieren(b)} title="Stornieren"
-                            className="p-1 text-neutral-400 hover:text-red-500"><XIcon size={14} /></button>
+                          {darfAendern && (
+                            <button onClick={() => setZahlung(b)} title="Zahlungen"
+                              className="p-1 text-neutral-400 hover:text-neutral-700"><Wallet size={14} /></button>
+                          )}
+                          {/* Stornieren zählt als Löschen — der Server verlangt an
+                              purchase.cancel_invoice ausdrücklich require_loeschen. */}
+                          {darfLoeschen && (
+                            <button onClick={() => stornieren(b)} title="Stornieren"
+                              className="p-1 text-neutral-400 hover:text-red-500"><XIcon size={14} /></button>
+                          )}
                         </>
                       )}
                     </div>
@@ -220,19 +236,26 @@ export default function EingangsrechnungenPage() {
 
       {formular && (
         <ErfassungsDialog beleg={formular} onClose={() => setFormular(null)}
-          onSaved={() => { setFormular(null); holen() }} />
+          onSaved={() => { setFormular(null); holen() }}
+          nurLesen={!darfAendern} />
       )}
       {zahlung && (
         <ZahlungsDialog beleg={zahlung} onClose={() => setZahlung(null)}
-          onChanged={holen} />
+          onChanged={holen} darfLoeschen={darfLoeschen} />
       )}
     </div>
   )
 }
 
 
-/** Erfassen und Bearbeiten. */
-function ErfassungsDialog({ beleg, onClose, onSaved }) {
+/** Erfassen und Bearbeiten.
+ *
+ * `nurLesen`: Ohne Änderungsrecht bleibt der Beleg einsehbar (Positionen,
+ * Steuersätze, Notiz), nur Speichern entfällt. Den Beleg ganz zu verstecken
+ * wäre falsch — wer die Liste sehen darf, muss auch nachsehen können, was in
+ * einer Zeile steht.
+ */
+function ErfassungsDialog({ beleg, onClose, onSaved, nurLesen = false }) {
   const neu = !beleg.id
   const [lieferanten, setLieferanten] = useState([])
   const [f, setF] = useState({
@@ -307,6 +330,7 @@ function ErfassungsDialog({ beleg, onClose, onSaved }) {
           {neu ? 'Eingangsrechnung erfassen' : `Eingangsrechnung ${beleg.internal_number}`}
         </h2>
 
+        <fieldset disabled={nurLesen} className="contents">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Lieferant</label>
@@ -422,12 +446,18 @@ function ErfassungsDialog({ beleg, onClose, onSaved }) {
           </p>
         )}
 
+        </fieldset>
+
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">Abbrechen</button>
-          <button onClick={speichern} disabled={speichert}
-            className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
-            {neu ? 'Erfassen' : 'Speichern'}
+          <button onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-neutral-50">
+            {nurLesen ? 'Schließen' : 'Abbrechen'}
           </button>
+          {!nurLesen && (
+            <button onClick={speichern} disabled={speichert}
+              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
+              {neu ? 'Erfassen' : 'Speichern'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -435,8 +465,12 @@ function ErfassungsDialog({ beleg, onClose, onSaved }) {
 }
 
 
-/** Zahlungsausgänge zu einer Eingangsrechnung. */
-function ZahlungsDialog({ beleg, onClose, onChanged }) {
+/** Zahlungsausgänge zu einer Eingangsrechnung.
+ *
+ * `darfLoeschen`: Eine erfasste Zahlung zurückzunehmen ist serverseitig ein
+ * DELETE und verlangt damit das Löschrecht — Erfassen allein genügt nicht.
+ */
+function ZahlungsDialog({ beleg, onClose, onChanged, darfLoeschen = true }) {
   const [stand, setStand] = useState(null)
   const [datum, setDatum] = useState(heute())
   const [betrag, setBetrag] = useState('')
@@ -502,8 +536,10 @@ function ZahlungsDialog({ beleg, onClose, onChanged }) {
                   <strong className="text-neutral-800">{fmtEuro(z.amount)}</strong>
                   <span className="text-neutral-400 ml-2">{fmtDate(z.paid_at)}</span>
                 </span>
-                <button onClick={() => zuruecknehmen(z.id)}
-                  className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+                {darfLoeschen && (
+                  <button onClick={() => zuruecknehmen(z.id)}
+                    className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
+                )}
               </div>
             ))}
           </div>

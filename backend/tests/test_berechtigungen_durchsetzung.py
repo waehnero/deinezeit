@@ -14,6 +14,7 @@ was am HTTP-Endpunkt wirklich passiert:
 import pytest
 
 from app.core import berechtigungen as B
+from app.models.masterdata import EntityRecord, EntityType
 from app.models.user import PermissionGroup
 from app.models.zeiterfassung import TimeEntry
 from tests.conftest import TEST_USER_EMAIL, TEST_USER_PASSWORD
@@ -240,6 +241,78 @@ def test_stammdaten_lesen_offen_schreiben_braucht_recht(client, test_user,
     resp = client.post("/api/masterdata/types/kunden/records", headers=kopf,
                        json={"data": {"name": "Nicht erlaubt"}})
     assert resp.status_code == 403
+
+
+def _stammdatensatz(db):
+    """Einen Stammdaten-Typ samt Datensatz anlegen (ohne Umweg über die API).
+
+    Über die API bräuchte es erst einen Typ mit Felddefinitionen; das prüft
+    dann das Anlege-Formular statt der Rechte.
+    """
+    typ = EntityType(name="Prüftypen", slug="pruef-typen")
+    db.add(typ)
+    db.flush()
+    satz = EntityRecord(entity_type_id=typ.id, data={"name": "Prüfsatz"})
+    db.add(satz)
+    db.commit()
+    return typ, satz
+
+
+def test_stammdaten_archivieren_bleibt_adminsache(client, test_user, admin_user,
+                                                  db_session):
+    """Archivieren und Löschen von Stammdaten verlangen die Adminrolle — auch
+    dann, wenn die Gruppe ausdrücklich das Löschrecht mitbringt.
+
+    Das sieht nach einer Lücke im Rechtemodell aus, ist aber Absicht (geprüft
+    und verworfen am 18.08.2026): Wer keiner Gruppe angehört, fällt auf
+    ``allowed_modules`` zurück, und ``NULL`` heißt dort „alles erlaubt".
+    Ein Wechsel auf ``hat_recht`` würde das Löschen von Stammdaten in jeder
+    Installation freigeben, in der die Gruppen noch nicht gepflegt sind — und
+    damit die Admin-Regel aus dem Beschluss Löschregeln (11.07.2026) still
+    zurücknehmen. Anlass des Beschlusses waren verlorene Projekte und
+    Stundenkonten auf dem Server.
+
+    Wenn dieser Test irgendwann fällt, weil jemand auf das Gruppenrecht
+    umstellt: Vorher muss der Rückfall auf ``allowed_modules`` weg.
+    """
+    typ, satz = _stammdatensatz(db_session)
+    _in_gruppe(db_session, test_user, "Stammdaten voll",
+               _blatt(stammdaten={"lesen": True, "schreiben": True,
+                                  "loeschen": True, "umfang": "alle"}))
+    kopf = _kopf(client)
+
+    weg = client.post(
+        f"/api/masterdata/types/{typ.slug}/records/{satz.id}/archive", headers=kopf)
+    assert weg.status_code == 403, weg.text
+
+    endgueltig = client.delete(
+        f"/api/masterdata/types/{typ.slug}/records/{satz.id}", headers=kopf)
+    assert endgueltig.status_code == 403, endgueltig.text
+
+    # Gegenprobe: Der Administrator kommt durch.
+    kopf_admin = _kopf(client, admin_user.email)
+    erlaubt = client.post(
+        f"/api/masterdata/types/{typ.slug}/records/{satz.id}/archive",
+        headers=kopf_admin)
+    assert erlaubt.status_code == 200, erlaubt.text
+
+
+def test_stammdaten_schreibrecht_reicht_zum_bearbeiten(client, test_user, db_session):
+    """Die Gegenrichtung: Anlegen und Ändern hängen sehr wohl am Gruppenrecht.
+
+    Sonst bliebe von der Trennung Ansehen/Ändern bei den Stammdaten nichts
+    übrig, und jede Pflege wäre wieder Adminarbeit.
+    """
+    typ, satz = _stammdatensatz(db_session)
+    _in_gruppe(db_session, test_user, "Stammdaten pflegen",
+               _blatt(stammdaten={"lesen": True, "schreiben": True,
+                                  "umfang": "alle"}))
+    kopf = _kopf(client)
+
+    geaendert = client.put(
+        f"/api/masterdata/types/{typ.slug}/records/{satz.id}", headers=kopf,
+        json={"data": {"name": "Geändert"}})
+    assert geaendert.status_code == 200, geaendert.text
 
 
 # ── Administratoren bleiben handlungsfähig ───────────────────────────────────

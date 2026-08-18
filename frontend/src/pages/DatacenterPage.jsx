@@ -10,6 +10,7 @@ import { datacenterApi } from '../services/api'
 import ContactSearch from '../components/ContactSearch'
 import ResponsiveTable from '../components/ResponsiveTable'
 import toast from 'react-hot-toast'
+import { useAuth } from '../contexts/AuthContext'
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
@@ -264,7 +265,10 @@ const FREIGABE_SPALTEN = [
   },
 ]
 
-function FreigabeAktionen({ attachment, onRevoke, onExtend, onCopy }) {
+// Link kopieren ist ein Lesevorgang; Verlängern ändert die Freigabe, Widerrufen
+// nimmt sie zurück (Löschen).
+function FreigabeAktionen({ attachment, onRevoke, onExtend, onCopy,
+                            darfAendern = true, darfLoeschen = true }) {
   const [confirmRevoke, setConfirmRevoke] = useState(false)
   return (
     <>
@@ -272,10 +276,13 @@ function FreigabeAktionen({ attachment, onRevoke, onExtend, onCopy }) {
         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
         <Copy size={14} />
       </button>
-      <button onClick={() => onExtend(attachment)} title="Verlängern"
-        className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
-        <CalendarClock size={14} />
-      </button>
+      {darfAendern && (
+        <button onClick={() => onExtend(attachment)} title="Verlängern"
+          className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
+          <CalendarClock size={14} />
+        </button>
+      )}
+      {darfLoeschen && (
       <button
         onClick={() => { if (confirmRevoke) onRevoke(attachment); else setConfirmRevoke(true) }}
         onBlur={() => setTimeout(() => setConfirmRevoke(false), 200)}
@@ -285,6 +292,7 @@ function FreigabeAktionen({ attachment, onRevoke, onExtend, onCopy }) {
         }`}>
         <Ban size={14} />
       </button>
+      )}
     </>
   )
 }
@@ -616,7 +624,16 @@ const DATEI_SPALTEN = [
   },
 ]
 
-function DateiAktionen({ attachment, onPreview, onDownload, onShare, onDelete, onEditContact }) {
+// Vorschau, Herunterladen und Öffnen sind Lesevorgänge und bleiben. Teilen legt
+// einen Freigabe-Link an, Kontakt zuordnen ändert den Datensatz — beides
+// Schreiben. Löschen verlangt das Löschrecht.
+//
+// Hinweis: Der Server prüft an diesen Endpunkten bewusst nichts, weil Anhänge
+// aus jedem Modul heraus funktionieren müssen (siehe core/modules.py). Auf der
+// Datacenter-Übersicht ist das reine Benutzerführung — wer die Seite über sein
+// Modulrecht erreicht, soll dort nicht mehr können, als seine Gruppe hergibt.
+function DateiAktionen({ attachment, onPreview, onDownload, onShare, onDelete, onEditContact,
+                         darfAendern = true, darfLoeschen = true }) {
   return (
     <>
       {kannVorschau(attachment) && (
@@ -637,20 +654,24 @@ function DateiAktionen({ attachment, onPreview, onDownload, onShare, onDelete, o
           <ExternalLink size={14} />
         </a>
       )}
-      {attachment.type === 'file' && (
+      {darfAendern && attachment.type === 'file' && (
         <button onClick={() => onShare(attachment)} title="Teilen"
           className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
           <Share2 size={14} />
         </button>
       )}
-      <button onClick={() => onEditContact(attachment)} title="Kontakt zuordnen"
-        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
-        <User size={14} />
-      </button>
-      <button onClick={() => onDelete(attachment)} title="Löschen"
-        className="p-1.5 rounded-lg transition text-gray-400 hover:text-red-500 hover:bg-red-50">
-        <Trash2 size={14} />
-      </button>
+      {darfAendern && (
+        <button onClick={() => onEditContact(attachment)} title="Kontakt zuordnen"
+          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+          <User size={14} />
+        </button>
+      )}
+      {darfLoeschen && (
+        <button onClick={() => onDelete(attachment)} title="Löschen"
+          className="p-1.5 rounded-lg transition text-gray-400 hover:text-red-500 hover:bg-red-50">
+          <Trash2 size={14} />
+        </button>
+      )}
     </>
   )
 }
@@ -758,6 +779,12 @@ function ContactEditDialog({ attachment, onClose, onSaved }) {
 // ── Hauptseite ────────────────────────────────────────────────────────────────
 
 export default function DatacenterPage() {
+  // Hochladen, Teilen und Kontakt zuordnen = Änderungsrecht, Löschen und
+  // Freigabe widerrufen = Löschrecht. Vorschau, Herunterladen, Öffnen und
+  // Link kopieren sind Lesevorgänge und bleiben frei. Siehe DateiAktionen.
+  const { hasRecht } = useAuth()
+  const darfAendern = hasRecht('datacenter', 'schreiben')
+  const darfLoeschen = hasRecht('datacenter', 'loeschen')
   const [folders, setFolders]         = useState({ total: 0, types: [] })
   const [foldersLoading, setFoldersLoading] = useState(true)
   const [viewMode, setViewMode]       = useState('module')  // 'module' | 'contact'
@@ -1070,8 +1097,9 @@ export default function DatacenterPage() {
           </button>
         </div>
 
-        {/* Upload-Zone (nur wenn Ordner ausgewählt, nicht in Freigaben-Ansicht) */}
-        {selected?.type && selected !== 'shared' && (
+        {/* Upload-Zone (nur wenn Ordner ausgewählt, nicht in Freigaben-Ansicht,
+            und nur mit Änderungsrecht auf Datacenter) */}
+        {darfAendern && selected?.type && selected !== 'shared' && (
           <div className="px-5 pt-4 flex-shrink-0">
             {uploading ? (
               <div className="border-2 border-dashed border-primary-300 rounded-xl p-5 bg-primary-50">
@@ -1120,6 +1148,8 @@ export default function DatacenterPage() {
                     onRevoke={handleRevokeShare}
                     onExtend={setExtendItem}
                     onCopy={handleCopyShareLink}
+                    darfAendern={darfAendern}
+                    darfLoeschen={darfLoeschen}
                   />
                 )}
                 emptyText="Keine aktiven Freigaben"
@@ -1144,6 +1174,8 @@ export default function DatacenterPage() {
                     onShare={setShareItem}
                     onDelete={setDeleteTarget}
                     onEditContact={setContactEditItem}
+                    darfAendern={darfAendern}
+                    darfLoeschen={darfLoeschen}
                   />
                 )}
                 emptyText="Keine Dateien vorhanden"

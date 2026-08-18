@@ -8,7 +8,7 @@ from uuid import UUID
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin, require_module
-from app.core.berechtigungen import LOESCHEN, SCHREIBEN, hat_recht
+from app.core.berechtigungen import SCHREIBEN, hat_recht
 from app.models.user import User
 from app.models.masterdata import EntityType, FieldDefinition, EntityRecord
 from app.schemas.masterdata import (
@@ -38,17 +38,24 @@ def _schreibrecht_pruefen(user: User) -> None:
                     "„Anlegen und ändern“."))
 
 
-def _loeschrecht_pruefen(user: User) -> None:
-    """Löschrecht auf Stammdaten verlangen (auch fürs Archivieren).
-
-    Archivieren ist in diesem Projekt das Löschen-Äquivalent (Beschluss
-    Löschregeln): Der Datensatz verschwindet aus den Auswahllisten. Es als
-    „Schreiben" zu behandeln, wäre eine Hintertür an der Löschsperre vorbei.
-    """
-    if not hat_recht(user, "stammdaten", LOESCHEN):
-        raise HTTPException(
-            status_code=403,
-            detail="Kein Zugriff — für „Stammdaten“ fehlt das Recht „Löschen“.")
+# Archivieren, Wiederherstellen und Löschen bleiben bewusst bei ``require_admin``
+# und hängen NICHT am Löschrecht der Gruppen (geprüft und verworfen 18.08.2026).
+#
+# Der Grund liegt nicht in der Fachlichkeit, sondern im Rechtemodell: Wer keiner
+# Gruppe angehört, fällt auf ``allowed_modules`` zurück, und ``NULL`` heißt dort
+# „alles erlaubt" — einschließlich Löschen. Ein Wechsel auf ``hat_recht`` würde
+# das Löschen von Stammdaten in jeder Installation freigeben, in der die Gruppen
+# noch nicht gepflegt sind. Genau davor schützt die Admin-Regel seit dem
+# Beschluss Löschregeln vom 11.07.2026 (Anlass: verlorene Projekte und
+# Stundenkonten auf dem Server).
+#
+# Archivieren zählt dabei als Löschen, nicht als Ändern: Der Datensatz
+# verschwindet aus allen Auswahllisten. Es als Schreiben zu führen, wäre eine
+# Hintertür an der Sperre vorbei.
+#
+# Sobald überall Gruppen gepflegt sind und der Rückfall auf ``allowed_modules``
+# entfallen kann, ist die Umstellung auf ``hat_recht(user, "stammdaten",
+# LOESCHEN)`` der richtige nächste Schritt — vorher nicht.
 
 
 # ─── Stammdaten-Typen ─────────────────────────────────────────────────────────
@@ -420,7 +427,7 @@ async def archive_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Datensatz archivieren (nur Admin).
+    """Datensatz archivieren (nur Admin — siehe Kommentar oben).
 
     Archivierte Datensätze verschwinden aus Listen und Auswahlfeldern,
     bleiben aber für die Historie erhalten (Zeiten, Belege, Projekte
@@ -442,7 +449,12 @@ async def restore_record(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    """Archivierten Datensatz wiederherstellen (nur Admin)."""
+    """Archivierten Datensatz wiederherstellen (nur Admin).
+
+    Wiederherstellen ist die Rücknahme des Archivierens und hängt deshalb am
+    selben Recht — wer nicht archivieren darf, soll es auch nicht rückgängig
+    machen können.
+    """
     record = masterdata_service.get_record(db, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")

@@ -39,8 +39,13 @@ function zeit(iso) {
 }
 
 // ── Eine Postkarte (ziehbar) ──────────────────────────────────────────────────
-function Card({ post, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: post.id })
+function Card({ post, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen,
+                darfAendern = true, darfLoeschen = true }) {
+  // Ohne Änderungsrecht ist die Karte nicht ziehbar — Ziehen ändert den Status
+  // und der Server weist das ab; ein Zurückspringen ohne Erklärung sieht sonst
+  // nach einem Fehler der Anwendung aus.
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({ id: post.id, disabled: !darfAendern })
   const style = {
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
     opacity: isDragging ? 0.4 : 1,
@@ -48,7 +53,8 @@ function Card({ post, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen 
   return (
     <div ref={setNodeRef} style={style}
       className="bg-surface border border-neutral-200 rounded-lg p-3 mb-2 shadow-sm select-none">
-      <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing">
+      <div {...listeners} {...attributes}
+        className={darfAendern ? 'cursor-grab active:cursor-grabbing' : ''}>
         {post.fotos?.length > 0 ? (
           <PosteckeFotoThumb fotoId={post.fotos[0].id} className="w-full h-28 rounded-md mb-2" />
         ) : post.video ? (
@@ -85,18 +91,24 @@ function Card({ post, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen 
         </div>
       </div>
       <div className="flex items-center justify-between pt-1 border-t border-neutral-100">
-        <button onClick={() => onOpen(post)} className="text-[11px] text-primary-600 hover:text-primary-700">
-          Öffnen
-        </button>
+        {darfAendern ? (
+          <button onClick={() => onOpen(post)} className="text-[11px] text-primary-600 hover:text-primary-700">
+            Öffnen
+          </button>
+        ) : <span />}
         <div className="flex gap-0.5">
-          <button onClick={() => onArchivieren(post)} title="Archivieren"
-            className="p-1 rounded text-neutral-300 hover:text-amber-600 hover:bg-amber-50">
-            <Archive size={13} />
-          </button>
-          <button onClick={() => onLoeschen(post)} title="Löschen"
-            className="p-1 rounded text-neutral-300 hover:text-red-600 hover:bg-red-50">
-            <Trash2 size={13} />
-          </button>
+          {darfAendern && (
+            <button onClick={() => onArchivieren(post)} title="Archivieren"
+              className="p-1 rounded text-neutral-300 hover:text-amber-600 hover:bg-amber-50">
+              <Archive size={13} />
+            </button>
+          )}
+          {darfLoeschen && (
+            <button onClick={() => onLoeschen(post)} title="Löschen"
+              className="p-1 rounded text-neutral-300 hover:text-red-600 hover:bg-red-50">
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -104,7 +116,8 @@ function Card({ post, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen 
 }
 
 // ── Eine Spalte (Drop-Ziel) ───────────────────────────────────────────────────
-function Column({ spalte, posts, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen }) {
+function Column({ spalte, posts, profilName, kanalLabel, onOpen, onArchivieren, onLoeschen,
+                  darfAendern = true, darfLoeschen = true }) {
   const { setNodeRef, isOver } = useDroppable({ id: spalte.value })
   return (
     <div className="shrink-0 w-64 md:w-auto md:shrink md:min-w-0">
@@ -120,7 +133,8 @@ function Column({ spalte, posts, profilName, kanalLabel, onOpen, onArchivieren, 
         ) : (
           posts.map(p => (
             <Card key={p.id} post={p} profilName={profilName} kanalLabel={kanalLabel}
-              onOpen={onOpen} onArchivieren={onArchivieren} onLoeschen={onLoeschen} />
+              onOpen={onOpen} onArchivieren={onArchivieren} onLoeschen={onLoeschen}
+              darfAendern={darfAendern} darfLoeschen={darfLoeschen} />
           ))
         )}
       </div>
@@ -159,7 +173,8 @@ function PlanenDialog({ post, onBestaetigen, onAbbrechen }) {
 }
 
 export default function PosteckeKanban({ posts, profilName, kanalLabel, onOpen, onChanged,
-                                          onArchivieren, onLoeschen }) {
+                                          onArchivieren, onLoeschen,
+                                          darfAendern = true, darfLoeschen = true }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const [activePost, setActivePost] = useState(null)
   const [planenFuer, setPlanenFuer] = useState(null)   // Post, der nach „geplant" gezogen wurde
@@ -210,7 +225,8 @@ export default function PosteckeKanban({ posts, profilName, kanalLabel, onOpen, 
           {SPALTEN.map(sp => (
             <Column key={sp.value} spalte={sp} posts={postsInSpalte(sp.value)}
               profilName={profilName} kanalLabel={kanalLabel} onOpen={onOpen}
-              onArchivieren={onArchivieren} onLoeschen={onLoeschen} />
+              onArchivieren={onArchivieren} onLoeschen={onLoeschen}
+              darfAendern={darfAendern} darfLoeschen={darfLoeschen} />
           ))}
         </div>
         <DragOverlay>

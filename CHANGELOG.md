@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.63] – 2026-08-18 – Rechte wirken jetzt in der ganzen Oberfläche
+
+### Neu
+- Knöpfe zum Anlegen, Ändern und Löschen erscheinen nur noch dort, wo die Gruppe des Benutzers das Recht dazu vorsieht — in Stammdaten, Postecke, Datacenter, Verkauf und Eingangsrechnungen.
+
+### Aktualisierungen
+- Ansehen bleibt überall möglich: Belege, Dateien und Datensätze lassen sich weiterhin öffnen, herunterladen und drucken, auch ohne Änderungsrecht.
+
+---
+
 ## [1.12.62] – 2026-08-18 – Rechte oberflaeche
 
 ### Aktualisierungen

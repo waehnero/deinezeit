@@ -214,7 +214,13 @@ export default function MasterDataOverview() {
         <div className="text-center py-16 text-gray-400">
           <Database size={48} className="mx-auto mb-3 text-gray-200" />
           <p className="font-medium">Noch keine Stammdaten-Typen vorhanden</p>
-          <p className="text-sm mt-1">Klicken Sie auf „Neuer Typ" um zu beginnen</p>
+          {/* Der Hinweis nennt einen Knopf, den nur Admins sehen — sonst sucht
+              man vergeblich. Neue Typen anzulegen ist Admin-Sache (der Server
+              verlangt dort require_admin), Datensätze darin nicht. */}
+          <p className="text-sm mt-1">
+            {isAdmin ? 'Klicken Sie auf „Neuer Typ" um zu beginnen'
+              : 'Ein Administrator kann hier neue Stammdaten-Typen anlegen'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
