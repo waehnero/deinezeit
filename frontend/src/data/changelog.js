@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.64',
+    day: '19',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Der Import-Assistent liest jetzt auch Excel-Dateien, prüft die Datei vor dem Schreiben und zeigt jede beanstandete Zeile mit Grund an. Über ein Abgleichsfeld (z.B. Kundennummer) werden vorhandene Datensätze aktualisiert statt ein zweites Mal angelegt.',
+    ],
+    updates: [
+      'Datum und Zahlen werden in der gewohnten Schreibweise verstanden (31.12.2026, 1.234,56). Beim Aktualisieren bleiben Felder, die in der Datei fehlen, unverändert erhalten.',
+    ],
+  },
+  {
     version: '1.12.63',
     day: '18',
     month: 'August',

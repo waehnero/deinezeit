@@ -15,9 +15,11 @@ from app.schemas.masterdata import (
     EntityTypeCreate, EntityTypeUpdate, EntityTypeResponse,
     FieldDefinitionCreate, FieldDefinitionUpdate, FieldDefinitionResponse,
     EntityRecordCreate, EntityRecordUpdate, EntityRecordResponse,
-    EntityRecordListResponse, UpdateFieldSortOrders
+    EntityRecordListResponse, UpdateFieldSortOrders,
+    ImportRequest, ImportReport, ImportIssue
 )
 from app.services.masterdata_service import masterdata_service
+from app.services.masterdata_import import masterdata_import
 from app.services import integrity
 
 router = APIRouter(prefix="/masterdata", tags=["Stammdaten"])
@@ -379,25 +381,51 @@ async def export_records_csv(
     )
 
 
-@router.post("/types/{slug}/records/import/csv")
-async def import_records_csv(
+@router.post("/types/{slug}/records/import", response_model=ImportReport)
+async def import_records(
     slug: str,
-    rows: List[dict],
+    body: ImportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Datensätze aus CSV importieren (erfordert Schreibrecht auf Stammdaten)."""
+    """Datensätze importieren — als Probelauf oder zum Schreiben.
+
+    Erfordert das Schreibrecht auf Stammdaten. Derselbe Endpunkt bedient beide
+    Durchgänge des Assistenten: ``dry_run=true`` liefert nur den Bericht,
+    ``dry_run=false`` schreibt. Dass beide Wege durch dieselbe Prüfung laufen,
+    ist der Punkt — ein Bericht, der anders prüft als der Schreibvorgang, wäre
+    schlimmer als keiner.
+
+    Neue Felder legt der Assistent vorab über die Feld-Endpunkte an (nur Admin);
+    hier kommen nur Zeilen an, deren Schlüssel bereits Felder sind.
+    """
     _schreibrecht_pruefen(current_user)
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")
 
-    created = 0
-    for row in rows:
-        masterdata_service.create_record(db, et, row, current_user.id)
-        created += 1
+    try:
+        bericht = masterdata_import.durchfuehren(
+            db, et, body.rows,
+            benutzer_id=current_user.id,
+            abgleichsfeld=body.match_field,
+            probelauf=body.dry_run,
+            fehlerhafte_ueberspringen=body.skip_invalid,
+        )
+    except ValueError as fehler:
+        raise HTTPException(status_code=400, detail=str(fehler))
 
-    return {"message": f"{created} Datensätze importiert", "count": created}
+    return ImportReport(
+        geprueft=bericht.geprueft,
+        anlegen=bericht.anlegen,
+        aktualisieren=bericht.aktualisieren,
+        angelegt=bericht.angelegt,
+        aktualisiert=bericht.aktualisiert,
+        uebersprungen=bericht.uebersprungen,
+        beanstandungen=[ImportIssue(zeile=b.zeile, feld=b.feld, wert=b.wert,
+                                    grund=b.grund)
+                        for b in bericht.beanstandungen],
+    )
 
 
 @router.get("/types/{slug}/records/{record_id}/references")

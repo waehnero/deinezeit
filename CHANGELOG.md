@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.64] – 2026-08-19 – Stammdaten aus Excel und CSV importieren
+
+### Neu
+- Der Import-Assistent liest jetzt auch Excel-Dateien, prüft die Datei vor dem Schreiben und zeigt jede beanstandete Zeile mit Grund an. Über ein Abgleichsfeld (z.B. Kundennummer) werden vorhandene Datensätze aktualisiert statt ein zweites Mal angelegt.
+
+### Aktualisierungen
+- Datum und Zahlen werden in der gewohnten Schreibweise verstanden (31.12.2026, 1.234,56). Beim Aktualisieren bleiben Felder, die in der Datei fehlen, unverändert erhalten.
+
+---
+
 ## [1.12.63] – 2026-08-18 – Rechte wirken jetzt in der ganzen Oberfläche
 
 ### Neu
