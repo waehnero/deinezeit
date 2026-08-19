@@ -1,6 +1,6 @@
 {
   "name": "deinezeit-frontend",
-  "version": "1.12.63",
+  "version": "1.12.64",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -24,6 +24,7 @@
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "papaparse": "^5.4.1",
+    "xlsx": "^0.18.5",
     "@tiptap/react": "^2.4.0",
     "@tiptap/starter-kit": "^2.4.0",
     "@tiptap/extension-underline": "^2.4.0",

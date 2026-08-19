@@ -139,3 +139,42 @@ class FieldSortOrder(BaseModel):
 
 class UpdateFieldSortOrders(BaseModel):
     orders: List[FieldSortOrder]
+
+
+# ── Import (CSV / Excel) ──────────────────────────────────────────────────────
+
+class ImportRequest(BaseModel):
+    """Ein Importlauf — als Probelauf oder zum Schreiben.
+
+    ``rows``: bereits zugeordnete Zeilen, Schlüssel sind Feld-Keys. Das Lesen
+    der Datei und die Spaltenzuordnung passieren im Browser; hierher kommt nur
+    das Ergebnis.
+    """
+    rows: List[Dict[str, Any]]
+    # Feld-Key, über den vorhandene Datensätze wiedererkannt werden. Ohne
+    # Angabe wird jede Zeile neu angelegt (altes Verhalten).
+    match_field: Optional[str] = None
+    # Vorgabe ist der Probelauf: Ein versehentlich abgeschickter Aufruf darf
+    # keine 2000 Datensätze anlegen.
+    dry_run: bool = True
+    # Nur wirksam außerhalb des Probelaufs: beanstandete Zeilen auslassen und
+    # den Rest schreiben. Ohne diese Zusage wird bei Beanstandungen nichts
+    # geschrieben.
+    skip_invalid: bool = False
+
+
+class ImportIssue(BaseModel):
+    zeile: int
+    feld: Optional[str] = None
+    wert: str = ""
+    grund: str
+
+
+class ImportReport(BaseModel):
+    geprueft: int
+    anlegen: int
+    aktualisieren: int
+    angelegt: int
+    aktualisiert: int
+    uebersprungen: int
+    beanstandungen: List[ImportIssue]

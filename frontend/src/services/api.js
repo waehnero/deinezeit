@@ -255,7 +255,10 @@ export const masterdataApi = {
   archiveRecord: (slug, id) => api.post(`/masterdata/types/${slug}/records/${id}/archive`),
   restoreRecord: (slug, id) => api.post(`/masterdata/types/${slug}/records/${id}/restore`),
   exportCsv: (slug) => api.get(`/masterdata/types/${slug}/records/export/csv`, { responseType: 'text' }),
-  importCsv: (slug, rows) => api.post(`/masterdata/types/${slug}/records/import/csv`, rows),
+  // Import: derselbe Aufruf für Probelauf und echten Lauf. `optionen` =
+  // { match_field, dry_run, skip_invalid }; ohne Angabe ist es ein Probelauf.
+  importRecords: (slug, rows, optionen = {}) =>
+    api.post(`/masterdata/types/${slug}/records/import`, { rows, ...optionen }),
 }
 
 export const zeiterfassungApi = {
