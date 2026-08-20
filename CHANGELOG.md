@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.65] – 2026-08-20 – Lasttest
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.64] – 2026-08-19 – Stammdaten aus Excel und CSV importieren
 
 ### Neu
