@@ -1,5 +1,5 @@
 """
-System-Verwaltung: Versionsprüfung, Update-Prozess, aktive Benutzer
+System-Verwaltung: Versionsprüfung, Update-Prozess, angemeldete Sitzungen
 """
 import asyncio
 import subprocess
@@ -7,15 +7,20 @@ import os
 import re
 import httpx
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import List, Optional
 from threading import Lock
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
-from app.models.user import User, UserRole
+from app.api.auth import absender_meta
+from app.core import auth_events as EV
+from app.models.user import User, UserRole, UserSession
+from app.schemas.user import AdminSessionResponse
+from app.services.auth_service import auth_service
 from app.core.config import settings
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -187,11 +192,103 @@ async def get_active_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Anzahl aktiver Benutzer (letzte 5 Minuten)."""
+    """Anzahl aktiver Benutzer (letzte 5 Minuten).
+
+    Achtung: zählt aus ``_active_sessions`` im Arbeitsspeicher und ist damit
+    nur bei EINEM Arbeitsprozess richtig. Für die Übersicht in den
+    Einstellungen gibt es ``/system/sitzungen`` — die liest ``user_sessions``
+    und stimmt auch mit mehreren uvicorn-Workern.
+    """
     count = get_active_user_count(minutes=5)
     # Eigenen User abziehen
     active_count = max(0, count - 1)
     return {"active_users": active_count, "total_including_me": count}
+
+
+# ── Angemeldete Sitzungen (Administrator) ─────────────────────────────────────
+#
+# Beantwortet zwei Fragen, die im Betrieb regelmäßig auftauchen: „Wer arbeitet
+# gerade?" (etwa vor einem Update oder einem Lasttest) und „Wer hat vergessen,
+# sich abzumelden?". Deshalb werden ALLE offenen Sitzungen gezeigt, nicht nur
+# die der letzten Minuten — die Vergessenen sind ja gerade die, die still sind.
+
+def _sitzung_darstellen(sitzung: UserSession, jetzt: datetime,
+                        aktuelle_id) -> AdminSessionResponse:
+    zuletzt = sitzung.last_used_at or sitzung.created_at
+    if zuletzt is not None and zuletzt.tzinfo is None:
+        zuletzt = zuletzt.replace(tzinfo=timezone.utc)
+    untaetig = int((jetzt - zuletzt).total_seconds() // 60) if zuletzt else None
+
+    return AdminSessionResponse(
+        id=sitzung.id,
+        user_id=sitzung.user_id,
+        user_name=sitzung.user.full_name if sitzung.user else "—",
+        user_email=sitzung.user.email if sitzung.user else "—",
+        device_label=sitzung.device_label,
+        ip_address=sitzung.ip_address,
+        created_at=sitzung.created_at,
+        last_used_at=sitzung.last_used_at,
+        expires_at=sitzung.expires_at,
+        untaetig_minuten=untaetig,
+        is_current=(sitzung.id == aktuelle_id),
+    )
+
+
+@router.get("/sitzungen", response_model=List[AdminSessionResponse])
+async def sitzungen_liste(request: Request, db: Session = Depends(get_db),
+                          _: User = Depends(require_admin)):
+    """Alle offenen Sitzungen, zuletzt aktive zuerst."""
+    jetzt = datetime.now(timezone.utc)
+    sitzungen = (db.query(UserSession)
+                 .filter(UserSession.revoked_at.is_(None),
+                         UserSession.expires_at > jetzt)
+                 .order_by(UserSession.last_used_at.desc().nullslast(),
+                           UserSession.created_at.desc())
+                 .all())
+    aktuelle = getattr(request.state, "session_id", None)
+    return [_sitzung_darstellen(s, jetzt, aktuelle) for s in sitzungen]
+
+
+@router.delete("/sitzungen/{session_id}")
+async def sitzung_beenden(session_id: UUID, request: Request,
+                          db: Session = Depends(get_db),
+                          admin: User = Depends(require_admin)):
+    """Eine einzelne Sitzung beenden — das vergessene Gerät.
+
+    Der Widerruf wirkt sofort: Jeder Zugriff prüft, ob die Sitzung noch lebt
+    (Migration 0054). Der Betroffene landet beim nächsten Aufruf auf der
+    Anmeldeseite.
+    """
+    sitzung = auth_service.sitzung_laden(db, session_id)
+    if sitzung is None or sitzung.revoked_at is not None:
+        raise HTTPException(status_code=404, detail="Sitzung nicht gefunden")
+
+    betroffener = sitzung.user
+    auth_service.sitzung_widerrufen(db, sitzung, "admin")
+    # In den Prüfpfad des BETROFFENEN, nicht des Administrators: Wer sich
+    # wundert, warum er abgemeldet wurde, sieht es in seiner eigenen Liste.
+    auth_service.ereignis(db, EV.SESSION_REVOKED, user=betroffener,
+                          meta=absender_meta(request), session_id=session_id,
+                          detail=f"durch Administrator {admin.email}")
+    return {"message": "Sitzung beendet"}
+
+
+@router.delete("/sitzungen/benutzer/{user_id}")
+async def benutzer_abmelden(user_id: UUID, request: Request,
+                            db: Session = Depends(get_db),
+                            admin: User = Depends(require_admin)):
+    """Alle Geräte eines Benutzers abmelden."""
+    betroffener = db.query(User).filter(User.id == user_id).first()
+    if not betroffener:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+
+    # Der Dienst kennt den Vorgang bereits (ein Commit für alle Sitzungen)
+    anzahl = auth_service.alle_sitzungen_widerrufen(db, betroffener, "admin")
+
+    auth_service.ereignis(db, EV.LOGOUT_ALL, user=betroffener,
+                          meta=absender_meta(request),
+                          detail=f"durch Administrator {admin.email}")
+    return {"message": f"{anzahl} Sitzungen beendet", "anzahl": anzahl}
 
 
 @router.get("/update-status")

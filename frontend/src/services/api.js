@@ -383,6 +383,13 @@ export const systemApi = {
   getUpdateStatus: () => api.get('/system/update-status'),
   startUpdate:     () => api.post('/system/update/start'),
   cancelUpdate:    () => api.post('/system/update/cancel'),
+
+  // Angemeldete Sitzungen (nur Administrator). Grundlage ist user_sessions,
+  // nicht die Zählung im Arbeitsspeicher — die stimmt mit mehreren
+  // Arbeitsprozessen nicht mehr.
+  listSitzungen:      () => api.get('/system/sitzungen'),
+  beendeSitzung:      (id) => api.delete(`/system/sitzungen/${id}`),
+  beendeBenutzer:     (userId) => api.delete(`/system/sitzungen/benutzer/${userId}`),
 }
 
 export const invoiceApi = {

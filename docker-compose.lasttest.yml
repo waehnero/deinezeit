@@ -1,0 +1,31 @@
+# Lasttest-Werkzeug (Locust)
+#
+# Läuft NEBEN der lokalen Umgebung, nicht statt ihr:
+#
+#   docker compose -f docker-compose.local.yml up -d          # Anwendung
+#   docker compose -f docker-compose.lasttest.yml up          # Messwerkzeug
+#
+# Oberfläche danach: http://localhost:8089
+#
+# Bewusst eine eigene Datei: Das Messwerkzeug hat im Produktions- und im
+# Entwicklungs-Compose nichts verloren. Wer es nicht startet, merkt nichts
+# davon — und es kann auch nicht versehentlich mit deployt werden.
+services:
+  locust:
+    image: locustio/locust:2.31.5
+    container_name: deinezeit-locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./lasttest:/mnt/locust:ro
+    # host.docker.internal zeigt aus dem Container auf den Mac — also auf
+    # nginx unter http://localhost. Der Weg über nginx ist Absicht: gemessen
+    # wird die Kette, die auch der Benutzer durchläuft.
+    command: >
+      -f /mnt/locust/locustfile.py
+      --host http://host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      LASTTEST_PASSWORT: ${LASTTEST_PASSWORT:-Lasttest-Kaffee-42!}
+      LASTTEST_BENUTZER: ${LASTTEST_BENUTZER:-100}

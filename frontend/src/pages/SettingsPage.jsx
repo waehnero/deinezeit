@@ -7,6 +7,8 @@ import RichTextEditor from '../components/RichTextEditor'
 import UserManagementPage from './UserManagementPage'
 import MailKonten, { KiEinstellungen } from '../components/MailImportVerwaltung'
 import DatenschutzEinstellungen from './DatenschutzEinstellungen'
+import LasttestAnleitung from '../components/LasttestAnleitung'
+import SystemSitzungen from '../components/SystemSitzungen'
 import { DESIGN_TEMPLATES } from '../data/designs'
 import {
   Settings2, Building2, Palette, HardDrive, Mail,
@@ -1679,6 +1681,12 @@ function TabSystem() {
           </>
         )}
       </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Angemeldete Sitzungen — auch nützlich vor einem Update oder Lasttest:
+          Erst nachsehen, wer arbeitet, dann neu starten. */}
+      <SystemSitzungen />
     </div>
   )
 }
@@ -2295,11 +2303,36 @@ function TabParameter() {
   )
 }
 
+// ── Tab: Lasttest ─────────────────────────────────────────────────────────────
+// Nur die Anleitung, kein Startknopf — die Begründung steht in der Komponente.
+// Die passende Variante (Server/lokal) wird aus `local_mode` vorausgewählt,
+// bleibt aber umschaltbar: Man liest die Server-Anleitung oft am Notebook.
+function TabLasttest() {
+  const [istLokal, setIstLokal] = useState(null)
+
+  useEffect(() => {
+    systemApi.getVersion()
+      .then(res => setIstLokal(res.data?.local_mode === true))
+      .catch(() => setIstLokal(false))
+  }, [])
+
+  if (istLokal === null) {
+    return (
+      <div className="flex items-center justify-center py-10 text-gray-400">
+        <Loader2 size={22} className="animate-spin" />
+      </div>
+    )
+  }
+  return <LasttestAnleitung istLokal={istLokal} />
+}
+
+
 // ── Tab: System + Backup (horizontale Unter-Tabs) ────────────────────────────
 function TabSystemWrapper({ settings, onSaved }) {
   const [sub, setSub] = useState('system')
   const subTabs = [
     { id: 'system',   label: 'System' },
+    { id: 'lasttest', label: 'Lasttest' },
     { id: 'backup',   label: 'Backup' },
     { id: 'email',    label: 'E-Mail' },
     { id: 'ki',       label: 'KI & Mail-Import' },
@@ -2316,6 +2349,7 @@ function TabSystemWrapper({ settings, onSaved }) {
         ))}
       </div>
       {sub === 'system'   && <TabSystem />}
+      {sub === 'lasttest' && <TabLasttest />}
       {sub === 'backup'   && <TabBackup   settings={settings} onSaved={onSaved} />}
       {sub === 'email'    && <TabEmail    settings={settings} onSaved={onSaved} />}
       {sub === 'ki' && (
