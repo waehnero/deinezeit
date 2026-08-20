@@ -3,12 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import logging
 import os
 from app.core.config import settings
+from app.core.netz import echte_ip
 from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard, groups
 from app.api import settings as settings_api
 from app.services import storage_service
@@ -33,7 +33,20 @@ _app_logger.setLevel(getattr(logging, _log_level, logging.INFO))
 # es gibt also keine doppelten Zeilen — und pytest (caplog) kann mitlesen.
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────
-limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+# Schlüssel ist die echte Absenderadresse (core/netz.echte_ip), NICHT
+# ``get_remote_address``: Hinter nginx liefert das immer die Adresse des
+# Proxy-Containers, und dann gelten die 200 Anfragen pro Minute für die gesamte
+# Installation gemeinsam statt je Benutzer. In einem Betrieb mit zehn Leuten
+# heißt das „zu viele Anfragen“ im Alltag, ohne dass jemand etwas falsch macht.
+limiter = Limiter(key_func=echte_ip, default_limits=["200/minute"])
+# Abschaltbar für Messläufe (Lasttest kommt von einer einzigen Adresse).
+# Vorgabe ist an; siehe RATE_LIMIT_AKTIV in .env.example.
+limiter.enabled = settings.RATE_LIMIT_AKTIV
+if not limiter.enabled:
+    _app_logger.warning(
+        "Rate-Limiting ist abgeschaltet (RATE_LIMIT_AKTIV=false). "
+        "Das gehört in Messläufe, nicht in den Regelbetrieb."
+    )
 
 # ── App — API-Docs in Produktion deaktivieren ─────────────────────────────────
 _is_dev = os.environ.get("APP_ENV", "production").lower() == "development"

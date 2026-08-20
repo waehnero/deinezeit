@@ -5,7 +5,7 @@ from typing import List
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "DeineZeit"
-    APP_VERSION: str = "1.12.64"
+    APP_VERSION: str = "1.12.65"
     DEBUG: bool = False
 
     # Datenbank
@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Rate-Limiting. Vorgabe an — abschalten ist ausschließlich für Messläufe
+    # gedacht (ein Lasttest kommt von einer einzigen Adresse und liefe sonst
+    # nur gegen die Bremse). Im Regelbetrieb bleibt das an, sonst steht die
+    # Anmeldung offen für Rateversuche.
+    RATE_LIMIT_AKTIV: bool = True
 
     # CORS
     FRONTEND_URL: str = "http://localhost:3000"

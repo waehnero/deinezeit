@@ -31,12 +31,12 @@ from uuid import UUID
 from fastapi import (APIRouter, Depends, HTTPException, Request, Response,
                      status)
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.core import auth_events as EV
 from app.core import passwort as pw_regeln
 from app.core.config import settings
+from app.core.netz import echte_ip
 from app.core.security import verify_password
 from app.db.base import get_db
 from app.api.deps import get_current_user
@@ -56,7 +56,12 @@ from app.services.auth_service import (RECOVERY_ANZAHL, REFRESH_COOKIE_NAME,
                                        auth_service)
 
 logger = logging.getLogger(__name__)
-limiter = Limiter(key_func=get_remote_address)
+# Eigene Limiter-Instanz für die Anmelde-Endpunkte (strengere Grenzwerte als
+# die App-Vorgabe). Schlüssel ist die echte Absenderadresse — mit
+# ``get_remote_address`` wäre es hinter nginx die Adresse des Proxys, und dann
+# teilten sich alle Benutzer die zehn Anmeldungen pro Minute.
+limiter = Limiter(key_func=echte_ip)
+limiter.enabled = settings.RATE_LIMIT_AKTIV
 
 router = APIRouter(prefix="/auth", tags=["Authentifizierung"])
 
@@ -73,40 +78,16 @@ FEHLER_ANMELDUNG = "E-Mail oder Passwort falsch"
 def absender_meta(request: Request) -> dict:
     """Absender-Angaben für Prüfpfad und Sitzung.
 
-    Hinter nginx ist ``request.client.host`` die Adresse des Proxy-Containers.
-    Ohne Auswertung der Weiterleitungs-Header stünde im Prüfpfad bei jeder
-    Anmeldung dieselbe interne Adresse — für die Frage „woher kam dieser
-    Zugriff?" wertlos.
-
-    Die Reihenfolge ist bewusst gewählt und **nicht** beliebig:
-
-    1. ``X-Real-IP`` — nginx setzt den Header selbst aus ``$remote_addr`` und
-       überschreibt dabei einen vom Client mitgeschickten Wert. Er ist damit
-       die einzige Quelle, die ein Aufrufer nicht bestimmen kann.
-    2. ``X-Forwarded-For``, und daraus der **letzte** Eintrag. Dieser Header
-       ist eine Kette, an die jeder Proxy den vorherigen Absender anhängt —
-       der Client kann also bereits mit einem gefüllten Header ankommen. Der
-       vorderste Eintrag stammt dann von ihm selbst und ist frei erfunden;
-       den letzten hat unser eigener nginx angehängt. Ein Prüfpfad, in den
-       sich jeder seine Wunschadresse schreiben kann, wäre schlimmer als
-       keiner: Er sieht belastbar aus, ohne es zu sein.
-    3. ``request.client.host`` als Rückfall, wenn die Anwendung ohne Proxy
-       läuft (Tests, direkter uvicorn-Start).
-
-    Bei mehr als einem vertrauenswürdigen Proxy vor nginx (z. B. einem
-    vorgeschalteten Dienst des Hosters) müsste Punkt 2 um dessen Anzahl
-    zurückzählen. Für die aktuelle Aufstellung — genau ein eigener nginx —
-    ist der letzte Eintrag richtig.
+    Die Ermittlung der Adresse steht seit 18.08.2026 in ``core/netz.echte_ip``
+    — dieselbe Frage stellt sich beim Rate-Limiting, und zwei Auswertungen
+    derselben Header laufen mit der Zeit auseinander. Ein Prüfpfad, in den sich
+    jeder seine Wunschadresse schreiben kann, wäre schlimmer als keiner: Er
+    sieht belastbar aus, ohne es zu sein. Die Begründung der Reihenfolge steht
+    dort.
     """
-    ip = (request.headers.get("x-real-ip") or "").strip()
-
-    if not ip:
-        kette = request.headers.get("x-forwarded-for", "")
-        teile = [t.strip() for t in kette.split(",") if t.strip()]
-        ip = teile[-1] if teile else ""
-
-    if not ip:
-        ip = request.client.host if request.client else ""
+    ip = echte_ip(request)
+    if ip == "unbekannt":
+        ip = ""
 
     return {
         "user_agent": request.headers.get("user-agent"),
