@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.66] – 2026-08-20 – Angemeldete Benutzer sehen und abmelden
+
+### Neu
+- Unter Einstellungen → System zeigt eine neue Übersicht alle angemeldeten Geräte mit Name, Adresse und letzter Aktivität. Vergessene Anmeldungen fallen sofort auf und lassen sich einzeln oder für einen Benutzer gesammelt beenden.
+
+### Aktualisierungen
+- Neuer Reiter „Lasttest“ mit einer Schritt-für-Schritt-Anleitung, wie sich die Belastbarkeit der eigenen Installation messen lässt — getrennt für Server und lokale Umgebung.
+
+---
+
 ## [1.12.65] – 2026-08-20 – Lasttest
 
 ### Aktualisierungen

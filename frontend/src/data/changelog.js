@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.66',
+    day: '20',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Unter Einstellungen → System zeigt eine neue Übersicht alle angemeldeten Geräte mit Name, Adresse und letzter Aktivität. Vergessene Anmeldungen fallen sofort auf und lassen sich einzeln oder für einen Benutzer gesammelt beenden.',
+    ],
+    updates: [
+      'Neuer Reiter „Lasttest“ mit einer Schritt-für-Schritt-Anleitung, wie sich die Belastbarkeit der eigenen Installation messen lässt — getrennt für Server und lokale Umgebung.',
+    ],
+  },
+  {
     version: '1.12.65',
     day: '20',
     month: 'August',

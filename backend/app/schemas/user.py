@@ -228,6 +228,36 @@ class SessionResponse(BaseModel):
         from_attributes = True
 
 
+class AdminSessionResponse(BaseModel):
+    """Eine offene Sitzung in der Administrator-Übersicht.
+
+    Anders als ``SessionResponse`` (die eigenen Geräte) nennt diese Sicht auch
+    den Benutzer — sie beantwortet die Frage „wer ist gerade angemeldet, und
+    wer hat vergessen sich abzumelden?".
+
+    Grundlage ist ``user_sessions``, nicht die Zählung im Arbeitsspeicher:
+    Sobald das Backend mit mehreren Arbeitsprozessen läuft, hätte jeder Prozess
+    seine eigene Zählung, und die Anzeige spränge je nachdem, wer antwortet.
+    """
+    id: UUID
+    user_id: UUID
+    user_name: str
+    user_email: str
+    device_label: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    expires_at: datetime
+    #: Minuten seit der letzten Aktivität — die Oberfläche macht daraus
+    #: „gerade aktiv" oder „seit 6 Stunden untätig".
+    untaetig_minuten: Optional[int] = None
+    #: Die Sitzung, aus der die Anfrage gerade kommt.
+    is_current: bool = False
+
+    class Config:
+        from_attributes = True
+
+
 class RefreshResponse(BaseModel):
     """Antwort auf ``/auth/refresh``. Der neue Refresh-Token steckt im Cookie."""
     access_token: str
