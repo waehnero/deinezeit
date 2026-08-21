@@ -5,11 +5,16 @@ from typing import List
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "DeineZeit"
-    APP_VERSION: str = "1.12.66"
+    APP_VERSION: str = "1.12.67"
     DEBUG: bool = False
 
     # Datenbank
     DATABASE_URL: str
+    # Verbindungspool (siehe db/base.py). Die SQLAlchemy-Vorgabe von 5+10 ist
+    # für eine WebApp mit mehreren gleichzeitigen Benutzern knapp; PostgreSQL
+    # verträgt in der Standardkonfiguration 100 Verbindungen insgesamt.
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
 
     # Sicherheit
     SECRET_KEY: str

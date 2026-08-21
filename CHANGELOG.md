@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.67] – 2026-08-21 – System lasttest sitzungen
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.66] – 2026-08-20 – Angemeldete Benutzer sehen und abmelden
 
 ### Neu
