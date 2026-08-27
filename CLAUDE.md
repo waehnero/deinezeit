@@ -233,6 +233,26 @@ git config core.hooksPath .githooks
   `docker compose build` + `alembic upgrade head` + Neustart + Healthcheck.
   Nötige Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`.
 
+### SSL-Zertifikat (nicht anfassen ohne Grund)
+
+Das HTTPS-Zertifikat ist am 27.08.2026 abgelaufen, obwohl eine Erneuerung
+eingerichtet war. Zwei Fehler wirkten zusammen — dem certbot-Container fehlte
+die `restart`-Policy (nach einem Server-Neustart lief die Erneuerungsschleife
+nie wieder an), und **nginx liest ein erneuertes Zertifikat nicht von selbst
+neu ein**. Seither sichern drei unabhängige Ebenen das Zertifikat ab:
+
+1. `docker-compose.yml` — certbot mit `restart: unless-stopped` (Prüfung alle
+   12 h) und nginx mit einer Selbst-Reload-Schleife (alle 6 h).
+2. `scripts/ssl-renew.sh`, täglich per `deinezeit-ssl.timer` (eingerichtet mit
+   `scripts/install-ssl-timer.sh`). Greift auch dann, wenn Docker steht.
+3. `backend/app/services/ssl_service.py` — überwacht Restlaufzeit **und** ob
+   die Automatik noch läuft; warnt ab 21 Tagen per E-Mail an alle Admins.
+   Sichtbar unter Einstellungen → System.
+
+Beim Ändern dieser Stellen beide Fallstricke im Kopf behalten: ein Container
+ohne `restart`-Policy kommt nach einem Reboot nicht wieder, und ein erneuertes
+Zertifikat ohne `nginx -s reload` wirkt nicht.
+
 ### Automatisierte Tests (Backend)
 
 Es gibt **pytest-Tests** im Backend (`backend/tests/`). Lokal ausführen (Mac):

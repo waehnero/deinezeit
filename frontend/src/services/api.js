@@ -380,6 +380,7 @@ export const systemApi = {
   getVersion:      () => api.get('/system/version'),
   getChangelog:    () => api.get('/system/changelog'),
   getActiveUsers:  () => api.get('/system/active-users'),
+  getSslStatus:    () => api.get('/system/ssl-status'),
   getUpdateStatus: () => api.get('/system/update-status'),
   startUpdate:     () => api.post('/system/update/start'),
   cancelUpdate:    () => api.post('/system/update/cancel'),

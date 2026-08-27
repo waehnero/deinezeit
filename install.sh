@@ -500,15 +500,29 @@ echo "✓ HTTPS ist jetzt aktiv! Erreichbar unter: https://$DOMAIN"
 EOF
     chmod +x "$INSTALL_DIR/scripts/renew-ssl.sh"
     chmod +x "$INSTALL_DIR/scripts/deploy.sh"
+    chmod +x "$INSTALL_DIR/scripts/ssl-renew.sh" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/scripts/install-ssl-timer.sh" 2>/dev/null || true
 }
 
 # ── Automatische Zertifikatserneuerung ────────────────────────────────────────
+# Drei voneinander unabhängige Ebenen sichern das Zertifikat ab:
+#   1. certbot-Container mit Dauerschleife (docker-compose.yml, alle 12 h) und
+#      nginx, das sich alle 6 h selbst neu lädt.
+#   2. Dieser systemd-Timer am Server (täglich) — greift auch dann, wenn der
+#      Docker-Verbund steht oder der certbot-Container ausgefallen ist.
+#   3. Die Anwendung selbst überwacht die Restlaufzeit und warnt per E-Mail.
+#
+# Der frühere wöchentliche Cron-Job war zu wenig: er lief nur montags, holte
+# einen verpassten Termin nie nach und niemand konnte sehen, ob er noch lief.
 setup_cron() {
     print_step "Automatische Zertifikatserneuerung wird eingerichtet..."
 
-    # Cron-Job: Jeden Montag um 3:30 Uhr Zertifikat prüfen und ggf. erneuern
-    (crontab -l 2>/dev/null; echo "30 3 * * 1 cd $INSTALL_DIR && docker compose run --rm certbot renew --quiet && docker compose restart nginx") | crontab -
-    print_ok "Automatische Erneuerung eingerichtet (jeden Montag, 03:30 Uhr)"
+    if bash "$INSTALL_DIR/scripts/install-ssl-timer.sh" >/dev/null 2>&1; then
+        print_ok "Automatische Erneuerung eingerichtet (täglich, plus Prüfschleife in Docker)"
+    else
+        print_warn "Timer konnte nicht eingerichtet werden. Bitte nachholen mit:"
+        echo "    sudo bash $INSTALL_DIR/scripts/install-ssl-timer.sh"
+    fi
 }
 
 # ── Abschlussmeldung ──────────────────────────────────────────────────────────

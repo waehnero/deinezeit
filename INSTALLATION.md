@@ -89,6 +89,37 @@ docker compose run --rm certbot certonly \
   -d ihre-domain.at
 ```
 
+### Automatische Erneuerung einrichten (wichtig!)
+
+Ein Let's-Encrypt-Zertifikat gilt nur **90 Tage**. Läuft es ab, kommt niemand
+mehr auf die Seite — der Browser zeigt statt der Anmeldung eine
+Sicherheitswarnung. Dieser eine Befehl sorgt dafür, dass sich das Zertifikat
+von selbst erneuert:
+
+```bash
+sudo bash scripts/install-ssl-timer.sh
+```
+
+Danach sichern **drei voneinander unabhängige Ebenen** das Zertifikat ab:
+
+| Ebene | Was sie tut | Wenn sie ausfällt |
+|-------|-------------|-------------------|
+| certbot-Container | prüft alle 12 Stunden, nginx liest alle 6 Stunden neu ein | fängt der Timer ab |
+| systemd-Timer am Server | prüft täglich, startet auch ausgefallene Container wieder | fängt die Anwendung ab |
+| Anwendung | überwacht die Restlaufzeit, schreibt E-Mails an die Administratoren | — |
+
+Den aktuellen Stand sehen Sie jederzeit in der Anwendung unter
+**Einstellungen → System → HTTPS-Zertifikat**. Dort steht auch, ob die
+automatische Erneuerung noch läuft.
+
+Falls doch einmal etwas klemmt, repariert dieser Befehl alles auf einmal
+(Zertifikat erneuern, ausgefallene Automatik starten, nginx neu einlesen
+lassen):
+
+```bash
+sudo bash /opt/deinezeit/scripts/ssl-renew.sh
+```
+
 ---
 
 ## Schritt 5: Programm starten

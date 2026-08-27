@@ -16,7 +16,7 @@ import {
   CheckCircle, Eye, EyeOff, RefreshCw, Cloud,
   ImageIcon, Link2, Monitor, Cpu, ArrowUpCircle,
   Users, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp,
-  Receipt, FileText, BookOpen, Plus, ShieldCheck
+  Receipt, FileText, BookOpen, Plus, ShieldCheck, ShieldAlert, Lock
 } from 'lucide-react'
 
 // ── Farbthemen ────────────────────────────────────────────────────────────────
@@ -1432,6 +1432,64 @@ function TabEmail({ settings, onSaved }) {
 }
 
 // ── Tab: System & Updates ─────────────────────────────────────────────────────
+// ── Karte: Zustand des HTTPS-Zertifikats ──────────────────────────────────────
+// Beantwortet in einem Blick beide Fragen, die im Ernstfall zählen: Wie lange
+// ist das Zertifikat noch gültig — und kümmert sich die Automatik noch darum?
+// Die zweite Frage ist die wichtigere: fällt die Erneuerung aus, bleibt das
+// Zertifikat noch wochenlang gültig, und niemand merkt etwas.
+function SslKarte({ status }) {
+  const STILE = {
+    ok:         { box: 'bg-green-50 border-green-200',  text: 'text-green-800',  icon: ShieldCheck },
+    warnung:    { box: 'bg-amber-50 border-amber-200',  text: 'text-amber-800',  icon: AlertTriangle },
+    kritisch:   { box: 'bg-red-50 border-red-200',      text: 'text-red-800',    icon: ShieldAlert },
+    abgelaufen: { box: 'bg-red-50 border-red-200',      text: 'text-red-800',    icon: ShieldAlert },
+  }
+  const stil = STILE[status.status] || STILE.warnung
+  const Icon = stil.icon
+  const inOrdnung = status.status === 'ok'
+
+  const datum = status.gueltig_bis
+    ? new Date(status.gueltig_bis).toLocaleDateString('de-DE',
+        { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null
+
+  return (
+    <div className={`border rounded-xl p-4 space-y-3 ${stil.box}`}>
+      <p className={`text-sm font-medium flex items-start gap-2 ${stil.text}`}>
+        <Icon size={16} className="mt-0.5 shrink-0" />
+        <span>{status.meldung}</span>
+      </p>
+
+      <div className={`text-xs space-y-1 ${stil.text} opacity-90`}>
+        {datum && (
+          <div>
+            Gültig bis <strong>{datum}</strong>
+            {typeof status.tage_verbleibend === 'number' &&
+              ` (noch ${status.tage_verbleibend} Tage)`}
+          </div>
+        )}
+        {status.automatik_laeuft === true && (
+          <div>Automatische Erneuerung: <strong>aktiv</strong></div>
+        )}
+        {status.automatik_laeuft === false && (
+          <div>Automatische Erneuerung: <strong>ausgefallen</strong></div>
+        )}
+      </div>
+
+      {!inOrdnung && (
+        <div className={`text-xs ${stil.text}`}>
+          <p className="mb-1.5">Auf dem Server ausführen — das erneuert das
+            Zertifikat, startet die Automatik wieder und lässt den Webserver das
+            neue Zertifikat einlesen:</p>
+          <code className="block bg-white/60 px-3 py-2 rounded-lg font-mono">
+            sudo bash /opt/deinezeit/scripts/ssl-renew.sh
+          </code>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TabSystem() {
   const [versionInfo, setVersionInfo]     = useState(null)
   const [changelog, setChangelog]         = useState('')
@@ -1442,11 +1500,20 @@ function TabSystem() {
   const [starting, setStarting]           = useState(false)
   const [cancelling, setCancelling]       = useState(false)
   const [updateStatus, setUpdateStatus]   = useState(null)
+  const [sslStatus, setSslStatus]         = useState(null)
 
   useEffect(() => {
     loadVersionInfo()
     loadActiveUsers()
+    loadSslStatus()
   }, [])
+
+  const loadSslStatus = async () => {
+    try {
+      const res = await systemApi.getSslStatus()
+      setSslStatus(res.data)
+    } catch { /* ignorieren — die System-Seite soll deswegen nicht leer bleiben */ }
+  }
 
   const loadVersionInfo = async () => {
     setLoading(true)
@@ -1609,6 +1676,24 @@ function TabSystem() {
       </div>
 
       <hr className="border-gray-100" />
+
+      {/* HTTPS-Zertifikat — Restlaufzeit und ob sich die Erneuerung noch von
+          selbst kümmert. Steht bewusst weit oben: ein abgelaufenes Zertifikat
+          sperrt alle Benutzer aus, und man sieht es sonst erst, wenn es zu
+          spät ist. */}
+      {sslStatus && sslStatus.status !== 'nicht_konfiguriert' && (
+        <div>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Lock size={16} className="text-primary-500" />
+            HTTPS-Zertifikat
+          </h3>
+          <SslKarte status={sslStatus} />
+        </div>
+      )}
+
+      {sslStatus && sslStatus.status !== 'nicht_konfiguriert' && (
+        <hr className="border-gray-100" />
+      )}
 
       {/* Update starten */}
       <div>

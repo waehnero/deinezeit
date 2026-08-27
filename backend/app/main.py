@@ -197,6 +197,15 @@ async def startup_event():
         start_backup_worker()
     except Exception as e:
         print(f"[WARN] Backup-Worker konnte nicht gestartet werden: {e}")
+    # HTTPS-Zertifikat überwachen und die Administratoren rechtzeitig warnen.
+    # Dritte Sicherungsebene: certbot erneuert (Container), der systemd-Timer
+    # springt bei Ausfall ein — und dieser Worker meldet sich, falls trotzdem
+    # etwas durchrutscht. In Tests deaktiviert.
+    try:
+        from app.services.ssl_service import start_ssl_worker
+        start_ssl_worker()
+    except Exception as e:
+        print(f"[WARN] SSL-Überwachung konnte nicht gestartet werden: {e}")
 
 
 @app.get("/api/health")

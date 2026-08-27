@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.68] – 2026-08-27 – Ssl automatik
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.67] – 2026-08-21 – System lasttest sitzungen
 
 ### Aktualisierungen
