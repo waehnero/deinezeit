@@ -44,10 +44,15 @@ services:
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
       INSTALL_DIR: /opt/deinezeit
-      APP_VERSION: ${APP_VERSION:-1.12.67}
+      APP_VERSION: ${APP_VERSION:-1.12.68}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/deinezeit:/opt/deinezeit
+      # Nur-Lese-Zugriff auf die Let's-Encrypt-Zertifikate. Damit kann das
+      # Backend die Restlaufzeit auslesen und rechtzeitig warnen, BEVOR das
+      # Zertifikat abläuft (Einstellungen → System, plus E-Mail an die
+      # Administratoren). Schreiben darf es nichts — das bleibt bei certbot.
+      - certbot_conf:/etc/letsencrypt:ro
     networks:
       - internal
     healthcheck:
@@ -90,14 +95,36 @@ services:
     networks:
       - internal
       - external
+    # ── Zertifikat neu einlesen ───────────────────────────────────────────────
+    # nginx hält das SSL-Zertifikat im Arbeitsspeicher. Erneuert certbot die
+    # Datei auf der Platte, merkt nginx davon von sich aus NICHTS und liefert
+    # weiter das alte Zertifikat aus — bis es abläuft. Deshalb lädt nginx sich
+    # hier alle 6 Stunden selbst neu (`nginx -s reload`, unterbrechungsfrei:
+    # laufende Anfragen werden zu Ende bedient).
+    command: >
+      /bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g "daemon off;"'
 
   certbot:
     image: certbot/certbot
     container_name: deinezeit_certbot
+    # WICHTIG: Ohne restart-Policy lief dieser Container nach einem Server-
+    # Neustart nicht wieder an — die Erneuerungsschleife war dann still tot und
+    # das Zertifikat lief unbemerkt ab (genau das ist am 27.08.2026 passiert).
+    restart: unless-stopped
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_conf:/etc/letsencrypt
-    command: /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'
+    # Alle 12 Stunden prüfen. Let's Encrypt erneuert erst ab 30 Tagen Restlauf-
+    # zeit — es bleiben also ~60 Versuche, bevor es kritisch wird. Der
+    # Zeitstempel im Log macht in `docker compose logs certbot` sofort sichtbar,
+    # ob die Schleife überhaupt noch läuft.
+    command: >
+      /bin/sh -c 'trap exit TERM;
+      while :; do
+      echo "[certbot] $$(date -Iseconds) Erneuerung wird geprueft";
+      certbot renew --webroot --webroot-path /var/www/certbot;
+      sleep 12h & wait $${!};
+      done'
 
 
 volumes:

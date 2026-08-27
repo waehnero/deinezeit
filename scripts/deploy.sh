@@ -95,6 +95,25 @@ if [ -n "${GIT_SHA:-}" ]; then
     exit 1
   fi
 
+  # ── Zertifikats-Automatik prüfen ────────────────────────────────────────────
+  # Reine Kontrolle, die den Deploy niemals scheitern lässt. Sie beantwortet
+  # bei jedem Deploy die Frage "erneuert sich das Zertifikat noch von selbst?".
+  # Genau hier hatte es geklemmt: der certbot-Container lief nach einem
+  # Server-Neustart nicht mehr, und es fiel monatelang niemandem auf.
+  echo "▶ Prüfe die automatische Zertifikatserneuerung..."
+  if docker compose ps --status running --services 2>/dev/null | grep -qx certbot; then
+    echo "   certbot-Container: läuft"
+  else
+    echo "   ⚠ certbot-Container läuft NICHT — wird gestartet."
+    docker compose up -d certbot || true
+  fi
+  if systemctl is-enabled deinezeit-ssl.timer >/dev/null 2>&1; then
+    echo "   systemd-Timer: aktiv"
+  else
+    echo "   ⚠ systemd-Timer fehlt. Einmalig einrichten mit:"
+    echo "     sudo bash $DEPLOY_PATH/scripts/install-ssl-timer.sh"
+  fi
+
   echo "✓ Deployment abgeschlossen!"
   exit 0
 fi

@@ -187,6 +187,28 @@ async def get_changelog():
     return {"content": "Changelog konnte nicht geladen werden."}
 
 
+@router.get("/ssl-status")
+async def get_ssl_status(admin: User = Depends(require_admin)):
+    """Zustand des HTTPS-Zertifikats: Restlaufzeit und ob die Automatik läuft.
+
+    Nur für Administratoren — die Restlaufzeit eines Zertifikats ist zwar
+    öffentlich einsehbar, ob die Erneuerungsautomatik ausgefallen ist aber
+    nicht: das wäre ein Hinweis darauf, wann der Server angreifbar wird."""
+    from app.services.ssl_service import zertifikat_status
+    try:
+        return zertifikat_status()
+    except Exception as e:                                       # noqa: BLE001
+        # Die System-Seite darf an einer Zertifikatsprüfung nicht scheitern.
+        return {
+            "status": "nicht_konfiguriert",
+            "domain": None,
+            "gueltig_bis": None,
+            "tage_verbleibend": None,
+            "automatik_laeuft": None,
+            "meldung": f"Zertifikatsstatus nicht ermittelbar: {e}",
+        }
+
+
 @router.get("/active-users")
 async def get_active_users(
     db: Session = Depends(get_db),
