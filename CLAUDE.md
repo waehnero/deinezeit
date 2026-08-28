@@ -236,10 +236,21 @@ git config core.hooksPath .githooks
 ### SSL-Zertifikat (nicht anfassen ohne Grund)
 
 Das HTTPS-Zertifikat ist am 27.08.2026 abgelaufen, obwohl eine Erneuerung
-eingerichtet war. Zwei Fehler wirkten zusammen — dem certbot-Container fehlte
-die `restart`-Policy (nach einem Server-Neustart lief die Erneuerungsschleife
-nie wieder an), und **nginx liest ein erneuertes Zertifikat nicht von selbst
-neu ein**. Seither sichern drei unabhängige Ebenen das Zertifikat ab:
+eingerichtet schien. Drei Fehler wirkten zusammen:
+
+1. **Die entrypoint-Falle (Hauptursache).** Das Image `certbot/certbot` hat
+   `ENTRYPOINT ["certbot"]`. Ohne `entrypoint: /bin/sh` beim Dienst wird der
+   `command` nicht als Shell ausgeführt, sondern als Argumentliste an certbot
+   durchgereicht: der Container startete als `certbot /bin/sh -c 'while …'`
+   und starb sofort mit Exit-Code 2. Die Dauerschleife lief **kein einziges
+   Mal**. Kontrolle: `docker compose ps certbot` — in der Spalte COMMAND muss
+   `/bin/sh` stehen, nicht `certbot /bin/sh`.
+2. Dem Container fehlte die `restart`-Policy, also fiel der Dauerausfall auch
+   nach Neustarts nicht auf.
+3. **nginx liest ein erneuertes Zertifikat nicht von selbst neu ein** — ohne
+   `nginx -s reload` bleibt das alte im Speicher, bis der Container neu startet.
+
+Seither sichern drei unabhängige Ebenen das Zertifikat ab:
 
 1. `docker-compose.yml` — certbot mit `restart: unless-stopped` (Prüfung alle
    12 h) und nginx mit einer Selbst-Reload-Schleife (alle 6 h).
@@ -249,9 +260,11 @@ neu ein**. Seither sichern drei unabhängige Ebenen das Zertifikat ab:
    die Automatik noch läuft; warnt ab 21 Tagen per E-Mail an alle Admins.
    Sichtbar unter Einstellungen → System.
 
-Beim Ändern dieser Stellen beide Fallstricke im Kopf behalten: ein Container
-ohne `restart`-Policy kommt nach einem Reboot nicht wieder, und ein erneuertes
-Zertifikat ohne `nginx -s reload` wirkt nicht.
+Beim Ändern dieser Stellen die drei Fallstricke im Kopf behalten: ein Image mit
+eigenem ENTRYPOINT führt `command` nicht als Shell aus, ein Container ohne
+`restart`-Policy kommt nach einem Reboot nicht wieder, und ein erneuertes
+Zertifikat ohne `nginx -s reload` wirkt nicht. Alle drei haben gemeinsam, dass
+sie **still** scheitern — deshalb Ebene 3.
 
 ### Automatisierte Tests (Backend)
 

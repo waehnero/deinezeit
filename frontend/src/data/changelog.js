@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '1.12.69',
+    day: '28',
+    month: 'August',
+    year: '2026',
+    features: [],
+    updates: [
+      '(Release-Notes ergänzen)',
+    ],
+  },
+  {
     version: '1.12.68',
     day: '27',
     month: 'August',

@@ -44,7 +44,7 @@ services:
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
       INSTALL_DIR: /opt/deinezeit
-      APP_VERSION: ${APP_VERSION:-1.12.68}
+      APP_VERSION: ${APP_VERSION:-1.12.69}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/deinezeit:/opt/deinezeit
@@ -107,24 +107,35 @@ services:
   certbot:
     image: certbot/certbot
     container_name: deinezeit_certbot
-    # WICHTIG: Ohne restart-Policy lief dieser Container nach einem Server-
-    # Neustart nicht wieder an — die Erneuerungsschleife war dann still tot und
-    # das Zertifikat lief unbemerkt ab (genau das ist am 27.08.2026 passiert).
+    # Ohne restart-Policy kommt dieser Container nach einem Server-Neustart
+    # nicht wieder — die Erneuerungsschleife wäre dann still tot.
     restart: unless-stopped
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_conf:/etc/letsencrypt
-    # Alle 12 Stunden prüfen. Let's Encrypt erneuert erst ab 30 Tagen Restlauf-
-    # zeit — es bleiben also ~60 Versuche, bevor es kritisch wird. Der
-    # Zeitstempel im Log macht in `docker compose logs certbot` sofort sichtbar,
-    # ob die Schleife überhaupt noch läuft.
-    command: >
-      /bin/sh -c 'trap exit TERM;
-      while :; do
-      echo "[certbot] $$(date -Iseconds) Erneuerung wird geprueft";
-      certbot renew --webroot --webroot-path /var/www/certbot;
-      sleep 12h & wait $${!};
-      done'
+    # ── entrypoint NICHT entfernen ────────────────────────────────────────────
+    # Das Image certbot/certbot hat ENTRYPOINT ["certbot"]. Ohne die folgende
+    # Zeile wird `command` NICHT als Shell-Befehl ausgeführt, sondern als
+    # Argumentliste an certbot durchgereicht — der Container startete dann als
+    #     certbot /bin/sh -c 'while :; do …'
+    # und beendete sich binnen Sekunden mit Exit-Code 2. Genau daran ist die
+    # Erneuerung gescheitert: die Schleife lief kein einziges Mal, und weil
+    # niemand nach dem Container sah, fiel es erst auf, als das Zertifikat am
+    # 27.08.2026 abgelaufen war. Prüfen lässt sich das jederzeit mit
+    #     docker compose ps certbot     → COMMAND muss mit "/bin/sh" beginnen
+    entrypoint: /bin/sh
+    # Alle 12 Stunden prüfen. Let's Encrypt erneuert ab 30 Tagen Restlaufzeit —
+    # es bleiben also rund 60 Versuche, bevor es eng wird. Der Zeitstempel im
+    # Log zeigt in `docker compose logs certbot` sofort, ob die Schleife lebt.
+    command:
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          echo "[certbot] $$(date '+%Y-%m-%d %H:%M:%S') Erneuerung wird geprueft"
+          certbot renew --webroot --webroot-path /var/www/certbot
+          sleep 12h & wait $${!}
+        done
 
 
 volumes:

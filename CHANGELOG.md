@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.69] – 2026-08-28 – Ssl automatik
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.68] – 2026-08-27 – Ssl automatik
 
 ### Aktualisierungen

@@ -48,6 +48,25 @@ fi
 if ! docker compose ps --status running --services 2>/dev/null | grep -qx certbot; then
     log "⚠ certbot-Container läuft NICHT — wird gestartet (Erneuerungsschleife war ausgefallen)"
     docker compose up -d certbot >> "$LOG_FILE" 2>&1 || log "✗ certbot konnte nicht gestartet werden"
+
+    # Nachfassen: Ein gestarteter Container ist noch kein laufender. Fällt er
+    # sofort wieder um, ist meist der entrypoint schuld — das Image hat
+    # ENTRYPOINT ["certbot"], und ohne `entrypoint: /bin/sh` in der
+    # docker-compose.yml wird die Schleife an certbot durchgereicht statt
+    # ausgeführt. Der Container stirbt dann mit Exit-Code 2. Ohne diese
+    # Nachkontrolle meldet das Skript fälschlich Erfolg.
+    sleep 5
+    if ! docker compose ps --status running --services 2>/dev/null | grep -qx certbot; then
+        code="$(docker inspect -f '{{.State.ExitCode}}' deinezeit_certbot 2>/dev/null || echo '?')"
+        log "✗ certbot ist sofort wieder beendet worden (Exit-Code $code)."
+        log "  Die Dauerschleife läuft NICHT. Prüfen mit:  docker compose ps certbot"
+        log "  In der Spalte COMMAND muss '/bin/sh' stehen, nicht 'certbot /bin/sh'."
+        log "  Steht dort 'certbot /bin/sh', fehlt in docker-compose.yml die Zeile"
+        log "  'entrypoint: /bin/sh' beim Dienst certbot."
+        log "  Die Erneuerung selbst läuft weiter über diesen täglichen Timer."
+    else
+        log "✓ certbot-Container läuft wieder"
+    fi
 fi
 
 # ── 3. Erneuerung anstoßen ───────────────────────────────────────────────────
