@@ -17,13 +17,45 @@ INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
 # ── CI-Modus ────────────────────────────────────────────────────────────────
 # Wird der Deploy aus GitHub Actions per SSH aufgerufen (Env GIT_SHA gesetzt),
 # läuft ein schlanker, robuster Pfad: kein git pull (rsync hat den Code schon
-# übertragen), No-Cache-Build mit GIT_SHA-Cache-Buster, erzwungenes Recreate
-# und eine Verifikation, dass die Container wirklich neu sind. Schlägt etwas
-# fehl, endet das Skript mit Exit != 0 -> der GitHub-Step wird ROT.
+# übertragen), Build mit GIT_SHA-Cache-Buster, erzwungenes Recreate und eine
+# Verifikation, dass die Container wirklich neu sind. Schlägt etwas fehl, endet
+# das Skript mit Exit != 0 -> der GitHub-Step wird ROT.
 if [ -n "${GIT_SHA:-}" ]; then
   DEPLOY_PATH="${DEPLOY_PATH:-$INSTALL_DIR}"
   cd "$DEPLOY_PATH"
   export GIT_SHA
+
+  # ── Zeitmessung je Schritt ──────────────────────────────────────────────────
+  # Ohne Zahlen ist jede Optimierung geraten. Am Ende des Laufs steht in der
+  # GitHub-Action, welcher Schritt wie lange gedauert hat — dort sieht man
+  # sofort, wo sich ein Eingriff überhaupt lohnt.
+  _T_START=$(date +%s); _T_LETZTER=$_T_START; _SCHRITT=""
+  _zeiten=""
+  # Zeilenumbruch als Variable: eine Kommando-Ersetzung $( ) verschluckt
+  # abschließende Zeilenumbrüche, sonst landet die ganze Tabelle in einer Zeile.
+  _NL=$'\n'
+  schritt() {
+    local jetzt; jetzt=$(date +%s)
+    if [ -n "$_SCHRITT" ]; then
+      local dauer=$(( jetzt - _T_LETZTER ))
+      _zeiten="${_zeiten}$(printf '%6ss  %s' "$dauer" "$_SCHRITT")${_NL}"
+    fi
+    _SCHRITT="$1"; _T_LETZTER=$jetzt
+    echo "▶ $1"
+  }
+  zeiten_ausgeben() {
+    local jetzt; jetzt=$(date +%s)
+    if [ -n "$_SCHRITT" ]; then
+      _zeiten="${_zeiten}$(printf '%6ss  %s' "$(( jetzt - _T_LETZTER ))" "$_SCHRITT")${_NL}"
+    fi
+    echo ""
+    echo "── Zeitaufwand ────────────────────────────────────"
+    printf '%s' "$_zeiten"
+    printf '%6ss  GESAMT\n' "$(( jetzt - _T_START ))"
+    echo "───────────────────────────────────────────────────"
+  }
+  trap zeiten_ausgeben EXIT
+  schritt "Vorbereitung"
 
   # ── nginx-Domain in die Config einsetzen ────────────────────────────────────
   # Der rsync überschreibt nginx/conf.d/app.conf bei JEDEM Deploy mit der
@@ -49,25 +81,42 @@ if [ -n "${GIT_SHA:-}" ]; then
     exit 1
   fi
 
-  echo "▶ Neue Images bauen (Cache-Buster GIT_SHA=$GIT_SHA)..."
-  docker compose build --no-cache --build-arg GIT_SHA="$GIT_SHA"
+  # ── Images bauen ────────────────────────────────────────────────────────────
+  # BEWUSST OHNE --no-cache. Der Cache-Buster GIT_SHA erledigt dasselbe, aber
+  # gezielt: Im Frontend-Dockerfile steht `ARG GIT_SHA` vor `COPY . .`, dadurch
+  # wird ab dort alles neu gebaut, sobald sich der Commit ändert. Im Backend
+  # übernimmt das `COPY . .` von selbst, weil Docker den Dateiinhalt vergleicht.
+  #
+  # `--no-cache` warf zusätzlich die teuren Schichten weg, die sich fast nie
+  # ändern: apt-get (build-essential, ffmpeg, docker-ce-cli, die WeasyPrint-
+  # Bibliotheken), `pip install` und `npm install`. Die wurden bei JEDEM Deploy
+  # neu gebaut — das war der Löwenanteil der Wartezeit, ohne jeden Gewinn.
+  #
+  # Ändern sich requirements.txt oder package.json, greift der Cache dort
+  # ohnehin nicht mehr und die Pakete werden neu geholt. Genau so soll es sein.
+  schritt "Neue Images bauen (Cache-Buster GIT_SHA=$GIT_SHA)"
+  docker compose build --build-arg GIT_SHA="$GIT_SHA"
 
   # nginx-Config VOR dem Neustart validieren. Schlägt der Test fehl (z.B. Domain/
   # Zertifikat passen nicht), bricht der Deploy hier ab - der laufende nginx wird
   # NICHT ersetzt und die Seite bleibt online.
-  echo "▶ nginx-Konfiguration testen (nginx -t)..."
+  schritt "nginx-Konfiguration testen (nginx -t)"
   docker compose run --rm --entrypoint nginx nginx -t
 
-  echo "▶ Datenbank-Migrationen..."
+  # Läuft bewusst VOR dem Umschalten, obwohl entrypoint.sh die Migrationen beim
+  # Start ohnehin ausführt: Schlägt eine Migration fehl, bricht der Deploy hier
+  # ab und die laufende Version bleibt unangetastet online. Diese Doppelung
+  # kostet ein paar Sekunden und ist es wert.
+  schritt "Datenbank-Migrationen"
   docker compose run --rm backend alembic upgrade head
 
-  echo "▶ Dienste neu erstellen (aus neuen Images)..."
+  schritt "Dienste neu erstellen (aus neuen Images)"
   docker compose up -d --force-recreate --remove-orphans
 
-  echo "▶ Alte Images aufräumen..."
+  schritt "Alte Images aufräumen"
   docker image prune -f || true
 
-  echo "▶ Prüfe, dass Container wirklich neu erstellt wurden..."
+  schritt "Prüfe, dass Container wirklich neu erstellt wurden"
   for svc in frontend backend; do
     cid="$(docker compose ps -q "$svc")"
     if [ -z "$cid" ]; then
@@ -85,7 +134,7 @@ if [ -n "${GIT_SHA:-}" ]; then
   done
 
   # nginx muss nach dem Recreate wirklich laufen (nicht crash-loopen).
-  echo "▶ Prüfe nginx-Status..."
+  schritt "Prüfe nginx-Status"
   sleep 3
   nginx_state="$(docker inspect -f '{{.State.Status}}' "$(docker compose ps -q nginx)" 2>/dev/null || echo unknown)"
   echo "   nginx: $nginx_state"
@@ -100,7 +149,7 @@ if [ -n "${GIT_SHA:-}" ]; then
   # bei jedem Deploy die Frage "erneuert sich das Zertifikat noch von selbst?".
   # Genau hier hatte es geklemmt: der certbot-Container lief nach einem
   # Server-Neustart nicht mehr, und es fiel monatelang niemandem auf.
-  echo "▶ Prüfe die automatische Zertifikatserneuerung..."
+  schritt "Prüfe die automatische Zertifikatserneuerung"
   if docker compose ps --status running --services 2>/dev/null | grep -qx certbot; then
     echo "   certbot-Container: läuft"
   else

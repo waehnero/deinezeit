@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.70] – 2026-08-29 – Schnellere Auslieferung von Updates
+
+### Aktualisierungen
+- Interne Verbesserung: Aktualisierungen werden schneller eingespielt und geprüft.
+
+---
+
 ## [1.12.69] – 2026-08-28 – Ssl automatik
 
 ### Aktualisierungen

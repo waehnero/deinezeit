@@ -5,11 +5,25 @@
 
 name: CI – Qualitätsprüfung
 
+# Ein offener Pull Request löste bisher bei jedem Push ZWEI komplette Läufe aus
+# (einmal über `push: "**"`, einmal über `pull_request`) — doppelte Wartezeit
+# und doppelter Verbrauch an Actions-Minuten, ohne zusätzliche Sicherheit.
+# Jetzt prüft der Pull Request, und `main` wird nach dem Merge nochmals geprüft.
+# Wer einen Feature-Branch ohne PR testen will, startet den Lauf von Hand
+# (Actions -> CI -> Run workflow).
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+# Bei mehreren Pushes kurz hintereinander wird der ältere, überholte Lauf
+# abgebrochen. Sonst blockieren sich drei Läufe desselben Branches gegenseitig
+# die Runner — und man wartet auf ein Ergebnis, das ohnehin veraltet ist.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ── 1. Python-Sicherheitsprüfung ──────────────────────────────────────────
