@@ -4,8 +4,9 @@ Gemeinsame Test-Fixtures für DeineZeit (pytest).
 Grundidee:
 - Die Tests laufen gegen eine ECHTE PostgreSQL-Test-Datenbank (nicht SQLite),
   weil die Modelle Postgres-spezifische Typen nutzen (UUID, JSONB).
-- Vor jedem Test werden die Tabellen frisch angelegt und danach wieder
-  verworfen → jeder Test startet auf einer sauberen DB (keine Seiteneffekte).
+- Das Schema wird EINMAL pro Testlauf angelegt; vor jedem einzelnen Test werden
+  nur die Daten geleert → jeder Test startet auf einer sauberen DB (keine
+  Seiteneffekte), ohne dass 45 Tabellen 786-mal neu gebaut werden.
 - Die FastAPI-Dependency `get_db` wird auf die Test-Session umgebogen, sodass
   die App im Test gegen die Test-DB arbeitet.
 
@@ -16,7 +17,7 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 # Alle Modelle importieren, damit Base.metadata sämtliche Tabellen kennt.
@@ -25,6 +26,20 @@ from app.db.base import Base, get_db
 from app.api.deps import get_current_user
 from app.main import app
 from app.services.auth_service import auth_service
+
+
+# ── Passwort-Hashing für Tests entschärfen ────────────────────────────────────
+# bcrypt ist mit Absicht langsam — im Betrieb ist genau das seine Aufgabe. In
+# den Tests ist es der grösste einzelne Zeitfresser: Jedes Anlegen eines
+# Benutzers und jede Anmeldung kostet mit den Standard-12-Runden rund eine
+# Drittelsekunde, und die Fixtures tun beides hunderte Male.
+#
+# Vier Runden statt zwölf bedeutet 2^8 = 256-mal schneller. Gehasht und geprüft
+# wird weiterhin echt mit bcrypt, nur eben mit weniger Wiederholungen — die
+# Tests prüfen also unverändert denselben Code. Der Produktivbetrieb ist davon
+# nicht berührt: diese Datei wird ausschliesslich von pytest geladen.
+from app.core.security import pwd_context                       # noqa: E402
+pwd_context.update(bcrypt__rounds=4)
 
 
 # ── Test-Datenbank ────────────────────────────────────────────────────────────
@@ -38,16 +53,63 @@ engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-@pytest.fixture()
-def db_session():
-    """Frische DB pro Test: Tabellen anlegen, Session liefern, danach aufräumen."""
+@pytest.fixture(scope="session")
+def _schema():
+    """Legt das Schema EINMAL für den gesamten Testlauf an.
+
+    Vorher geschah das pro Test: 45 Tabellen anlegen und wieder verwerfen, mal
+    786 Tests — rund 70.000 DDL-Anweisungen für ein Schema, das sich während
+    des Laufs kein einziges Mal ändert.
+
+    Das `drop_all` zu Beginn räumt Reste eines abgebrochenen früheren Laufs
+    weg; ohne das würde ein veraltetes Schema stehenbleiben und die Tests mit
+    schwer deutbaren Fehlern scheitern lassen.
+    """
+    try:
+        Base.metadata.drop_all(bind=engine)
+    except Exception:                                            # noqa: BLE001
+        pass            # z.B. Tabellen aus einer alten Schema-Version
     Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
+_TABELLENLISTE = None
+
+
+def _tabellenliste() -> str:
+    """Alle Tabellennamen als eine Aufzählung für ein einziges TRUNCATE."""
+    global _TABELLENLISTE
+    if _TABELLENLISTE is None:
+        _TABELLENLISTE = ", ".join(f'"{t.name}"'
+                                   for t in Base.metadata.sorted_tables)
+    return _TABELLENLISTE
+
+
+@pytest.fixture()
+def db_session(_schema):
+    """Saubere DB pro Test: Daten leeren, Session liefern, danach schliessen.
+
+    `TRUNCATE ... RESTART IDENTITY CASCADE` über alle Tabellen in einer
+    einzigen Anweisung ist gleichwertig zum früheren Neuaufbau des Schemas —
+    die Tabellen sind leer und die Zähler stehen wieder am Anfang — kostet
+    aber Millisekunden statt Sekunden.
+
+    Geleert wird VOR dem Test, nicht danach: So startet auch der Test sauber,
+    der auf einen abgestürzten Vorgänger folgt.
+    """
+    with engine.begin() as conn:
+        # Ohne Zeitlimit würde ein vergessener offener Zugriff aus einem
+        # früheren Test hier ewig warten und der Testlauf bliebe stumm hängen.
+        # Mit Limit gibt es stattdessen eine klare Fehlermeldung.
+        conn.execute(text("SET lock_timeout = '15s'"))
+        conn.execute(text(f"TRUNCATE {_tabellenliste()} RESTART IDENTITY CASCADE"))
+
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture()

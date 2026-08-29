@@ -25,6 +25,13 @@ on:
   # Actions-Großstörung ein.
   workflow_dispatch:
 
+# Deploys stellen sich in eine Reihe, statt sich zu überholen. Ein laufender
+# Deploy wird NICHT abgebrochen (anders als in der CI): mittendrin abgewürgt
+# hinterlässt er halb ersetzte Container und eine tote Seite.
+concurrency:
+  group: deploy-produktion
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: "Auf Server deployen"
