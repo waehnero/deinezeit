@@ -20,6 +20,21 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+# ── Umgebung für den Testlauf festnageln ──────────────────────────────────────
+# MUSS vor dem ersten Import aus ``app`` stehen: Die Einstellungen werden beim
+# Import gelesen, spätere Änderungen kämen zu spät.
+#
+# Warum: Der Refresh-Token liegt in einem Cookie, dessen ``secure``-Kennzeichen
+# aus ``FRONTEND_URL`` abgeleitet wird (``_cookie_sicher()`` in api/auth.py).
+# Läuft die Testreihe auf dem Server, steht dort ``https://…`` in der ``.env``,
+# das Cookie wird ``secure`` gesetzt — und der Testclient spricht ``http``,
+# schickt es also nie zurück. ``/api/auth/refresh`` antwortet dann völlig
+# korrekt mit 401, und vier Tests scheitern an der Maschine statt am Code.
+#
+# Eine Testreihe, die je nach Rechner anders ausgeht, ist wertlos: Man gewöhnt
+# sich an die roten Zeilen und übersieht die erste echte.
+os.environ["FRONTEND_URL"] = "http://testserver"
+
 # Alle Modelle importieren, damit Base.metadata sämtliche Tabellen kennt.
 from app.models import *  # noqa: F401,F403
 from app.db.base import Base, get_db

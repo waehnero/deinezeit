@@ -1,17 +1,24 @@
-# Lasttest-Werkzeug (Locust)
+# Lasttest-Werkzeug (Locust) — STILLGELEGT (29.08.2026)
+# =====================================================
 #
-# Läuft NEBEN der lokalen Umgebung, nicht statt ihr:
+# Der Lasttest ist auf Olivers Wunsch vorerst außer Betrieb. Die erste
+# Erprobung überzeugte nicht: Der Prüfdaten-Generator scheiterte an der
+# Passwortregel und an fest verdrahteten Stammdatenfeldern, und die Läufe
+# hinterließen Prüfdaten in der Produktivinstallation. Das Thema wird zu einem
+# späteren Zeitpunkt neu aufgesetzt.
 #
-#   docker compose -f docker-compose.local.yml up -d          # Anwendung
-#   docker compose -f docker-compose.lasttest.yml up          # Messwerkzeug
+# Der Dienst hängt deshalb an einem Profil, das niemand aktiviert. Ein
+#     docker compose -f docker-compose.lasttest.yml up
+# startet dadurch NICHTS mehr ("no service selected") — auch nicht aus
+# Versehen, und auch nicht am Server.
 #
-# Oberfläche danach: http://localhost:8089
-#
-# Bewusst eine eigene Datei: Das Messwerkzeug hat im Produktions- und im
-# Entwicklungs-Compose nichts verloren. Wer es nicht startet, merkt nichts
-# davon — und es kann auch nicht versehentlich mit deployt werden.
+# WIEDER IN BETRIEB NEHMEN: die Zeile `profiles:` samt Wert entfernen. Dann
+# aber bitte auch die Riegel in lasttest/pruefdaten.py und
+# lasttest/locustfile.py lösen und den Reiter in der Oberfläche wieder
+# freischalten (frontend/src/pages/SettingsPage.jsx).
 services:
   locust:
+    profiles: ["stillgelegt"]
     image: locustio/locust:2.31.5
     container_name: deinezeit-locust
     ports:
@@ -27,5 +34,5 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      LASTTEST_PASSWORT: ${LASTTEST_PASSWORT:-Lasttest-Kaffee-42!}
+      LASTTEST_PASSWORT: ${LASTTEST_PASSWORT:-Zimt-Regenschirm-7719}
       LASTTEST_BENUTZER: ${LASTTEST_BENUTZER:-100}

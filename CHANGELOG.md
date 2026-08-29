@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.71] – 2026-08-29 – Pipeline schneller
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.70] – 2026-08-29 – Schnellere Auslieferung von Updates
 
 ### Aktualisierungen

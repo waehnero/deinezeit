@@ -2417,7 +2417,12 @@ function TabSystemWrapper({ settings, onSaved }) {
   const [sub, setSub] = useState('system')
   const subTabs = [
     { id: 'system',   label: 'System' },
-    { id: 'lasttest', label: 'Lasttest' },
+    // Stillgelegt am 29.08.2026: Der Reiter bleibt sichtbar, aber ausgegraut.
+    // Verstecken wäre unehrlich — man soll sehen, dass es die Funktion gibt
+    // und dass sie gerade überarbeitet wird, statt sich zu fragen, ob man sie
+    // sich eingebildet hat.
+    { id: 'lasttest', label: 'Lasttest', deaktiviert: true,
+      hinweis: 'Wird überarbeitet — vorerst nicht verfügbar' },
     { id: 'backup',   label: 'Backup' },
     { id: 'email',    label: 'E-Mail' },
     { id: 'ki',       label: 'KI & Mail-Import' },
@@ -2427,13 +2432,24 @@ function TabSystemWrapper({ settings, onSaved }) {
     <div>
       <div className="flex flex-wrap gap-1 bg-neutral-100 p-1 rounded-lg mb-5 w-fit max-w-full">
         {subTabs.map(t => (
-          <button key={t.id} onClick={() => setSub(t.id)}
-            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${sub === t.id ? 'bg-surface text-neutral-900 shadow-sm font-medium' : 'text-neutral-600 hover:text-neutral-800'}`}>
+          <button key={t.id}
+            onClick={() => !t.deaktiviert && setSub(t.id)}
+            disabled={t.deaktiviert}
+            title={t.hinweis || undefined}
+            className={`px-4 py-1.5 text-sm rounded-md transition-all whitespace-nowrap ${
+              t.deaktiviert
+                ? 'text-neutral-400 cursor-not-allowed'
+                : sub === t.id
+                  ? 'bg-surface text-neutral-900 shadow-sm font-medium'
+                  : 'text-neutral-600 hover:text-neutral-800'}`}>
             {t.label}
           </button>
         ))}
       </div>
       {sub === 'system'   && <TabSystem />}
+      {/* 'lasttest' ist stillgelegt und über den Reiter nicht erreichbar.
+          Die Zeile bleibt stehen, damit beim Wiederfreischalten nur das
+          `deaktiviert` oben entfernt werden muss. */}
       {sub === 'lasttest' && <TabLasttest />}
       {sub === 'backup'   && <TabBackup   settings={settings} onSaved={onSaved} />}
       {sub === 'email'    && <TabEmail    settings={settings} onSaved={onSaved} />}

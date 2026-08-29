@@ -32,7 +32,10 @@ import urllib.error
 import urllib.request
 from datetime import date, timedelta
 
-BENUTZER_PASSWORT = "Lasttest-Kaffee-42!"   # erfüllt die Passwortregeln
+# Bewusst OHNE „Lasttest" im Passwort: Die Passwortregel lehnt ab, sobald ein
+# Namensteil ab vier Zeichen darin vorkommt — und die Konten heißen „Lasttest
+# Benutzer 001". Am 29.08.2026 scheiterten daran alle 100 Anlagen auf einmal.
+BENUTZER_PASSWORT = "Zimt-Regenschirm-7719"
 KONTAKT_ANZAHL = 200
 PROJEKT_ANZAHL = 30
 BELEG_ANZAHL = 50
@@ -91,23 +94,86 @@ def benutzer_anlegen(basis, token, anzahl):
     print(f"  Benutzer: {angelegt} neu, {vorhanden} schon vorhanden")
 
 
+def _wert_fuer(feld, bezeichnung, nummer):
+    """Einen zum Feldtyp passenden Wert erfinden.
+
+    Jede Installation hat eigene Stammdaten-Felder — feste Spaltennamen wie
+    „name" und „typ" gehen deshalb ins Leere. Am 29.08.2026 lief der Import
+    genau deshalb mit Status 200 durch und legte trotzdem nichts an: Alle
+    Zeilen wurden wegen fehlender Pflichtfelder beanstandet.
+    """
+    typ = feld.get("field_type")
+    if typ in ("text", "textarea"):
+        return bezeichnung
+    if typ == "number":
+        return str(100 + nummer)
+    if typ == "date":
+        return date.today().isoformat()
+    if typ == "email":
+        return f"lasttest{nummer:03d}@pruefung.local"
+    if typ == "phone":
+        return "+43 660 0000000"
+    if typ == "url":
+        return "https://beispiel.at"
+    if typ == "checkbox":
+        return "nein"
+    if typ == "dropdown":
+        optionen = feld.get("options") or []
+        return str(optionen[0]) if optionen else ""
+    # relation: braucht einen bestehenden Zieldatensatz — nicht raten.
+    return ""
+
+
+def _importieren(basis, token, slug, bezeichner, anzahl, was):
+    status, typ = ruf(basis, f"/api/masterdata/types/{slug}", token)
+    if status != 200 or not isinstance(typ, dict):
+        print(f"  {was}: Typ „{slug}“ nicht gefunden ({status}) — übersprungen")
+        return
+
+    felder = typ.get("fields") or []
+    # Pflichtfelder müssen gefüllt sein, dazu das erste Textfeld: Aus ihm bildet
+    # der Server den Anzeigenamen, sonst heißen alle Datensätze gleich (nämlich
+    # gar nicht) und man findet sie später nicht wieder.
+    erstes_text = next((f for f in felder if f.get("field_type") == "text"), None)
+    noetig = [f for f in felder if f.get("is_required")]
+    if erstes_text and erstes_text not in noetig:
+        noetig.insert(0, erstes_text)
+
+    if not noetig:
+        print(f"  {was}: „{slug}“ hat keine befüllbaren Felder — übersprungen")
+        return
+
+    zeilen = []
+    for i in range(1, anzahl + 1):
+        zeilen.append({f["key"]: _wert_fuer(f, f"{bezeichner} {i:03d}", i)
+                       for f in noetig})
+
+    status, antwort = ruf(basis, f"/api/masterdata/types/{slug}/records/import",
+                          token, {"rows": zeilen, "dry_run": False})
+    if status != 200 or not isinstance(antwort, dict):
+        print(f"  {was}: {status} {antwort}")
+        return
+
+    angelegt = antwort.get("angelegt", 0)
+    beanstandet = antwort.get("beanstandungen") or []
+    print(f"  {was}: {angelegt} angelegt"
+          + (f", {len(beanstandet)} beanstandet" if beanstandet else ""))
+    # Den Grund zeigen, sonst steht da nur eine Null und niemand weiß warum.
+    for b in beanstandet[:3]:
+        print(f"      Zeile {b['zeile']}, {b.get('feld') or '—'}: {b['grund']}")
+
+
 def stammdaten_anlegen(basis, token):
     """Kontakte und Projektzeiten über den Import-Endpunkt.
 
     Der schreibt in einer Transaktion und ist damit um ein Vielfaches schneller
-    als 200 Einzelaufrufe.
+    als 200 Einzelaufrufe. Welche Felder gefüllt werden, fragt das Skript vorher
+    beim Server ab — feste Spaltennamen passen nicht zu jeder Installation.
     """
-    kontakte = [{"name": f"Lasttest Kunde {i:03d}",
-                 "typ": "Kunde"} for i in range(1, KONTAKT_ANZAHL + 1)]
-    status, antwort = ruf(basis, "/api/masterdata/types/kontakte/records/import",
-                          token, {"rows": kontakte, "dry_run": False})
-    print(f"  Kontakte: {status} {antwort if status != 200 else antwort.get('angelegt')}")
-
-    projekte = [{"name": f"Lasttest Projekt {i:02d}"}
-                for i in range(1, PROJEKT_ANZAHL + 1)]
-    status, antwort = ruf(basis, "/api/masterdata/types/projektzeiten/records/import",
-                          token, {"rows": projekte, "dry_run": False})
-    print(f"  Projekte: {status} {antwort if status != 200 else antwort.get('angelegt')}")
+    _importieren(basis, token, "kontakte", "Lasttest Kunde",
+                 KONTAKT_ANZAHL, "Kontakte")
+    _importieren(basis, token, "projektzeiten", "Lasttest Projekt",
+                 PROJEKT_ANZAHL, "Projekte")
 
 
 def belege_anlegen(basis, token, anzahl):
@@ -134,7 +200,35 @@ def belege_anlegen(basis, token, anzahl):
     print(f"  Belege: {angelegt} von {anzahl}")
 
 
+# ── Riegel ───────────────────────────────────────────────────────────────────
+# Stillgelegt am 29.08.2026 auf Olivers Wunsch. Das Skript hat bei der ersten
+# Erprobung Prüfdaten in der Produktivinstallation hinterlassen (50 Belege je
+# Lauf), während Benutzer und Stammdaten an der Passwortregel und an fest
+# verdrahteten Feldnamen scheiterten. Bis das Thema neu aufgesetzt ist, darf es
+# nirgends mehr laufen — auch nicht lokal, damit niemand aus Gewohnheit den
+# falschen Befehl erwischt.
+#
+# WIEDER FREIGEBEN: STILLGELEGT auf False setzen.
+STILLGELEGT = True
+
+HINWEIS = """
+Der Lasttest ist vorerst stillgelegt (29.08.2026).
+
+Grund: Die erste Erprobung war nicht brauchbar — der Generator scheiterte an
+der Passwortregel und an fest verdrahteten Stammdatenfeldern, und die Läufe
+hinterließen Prüfdaten in echten Beständen.
+
+Das Thema wird zu einem späteren Zeitpunkt neu aufgesetzt. Wer weiß, was er
+tut: STILLGELEGT in dieser Datei auf False setzen, den Riegel in
+lasttest/locustfile.py lösen und in docker-compose.lasttest.yml die Zeile
+`profiles:` entfernen.
+"""
+
+
 def main():
+    if STILLGELEGT:
+        sys.exit(HINWEIS)
+
     p = argparse.ArgumentParser(description="Prüfdaten für den Lasttest anlegen")
     p.add_argument("--basis", default="http://localhost", help="Adresse der Anwendung")
     p.add_argument("--admin", required=True, help="E-Mail eines Administrators")
