@@ -26,11 +26,29 @@ Siehe README.md in diesem Ordner.
 """
 import os
 import random
+import sys
 from datetime import datetime, timedelta, timezone
 
 from locust import HttpUser, between, events, task
 
-PASSWORT = os.environ.get("LASTTEST_PASSWORT", "Lasttest-Kaffee-42!")
+# ── Riegel ───────────────────────────────────────────────────────────────────
+# Stillgelegt am 29.08.2026 (siehe docker-compose.lasttest.yml). Der Riegel
+# sitzt zusätzlich hier, weil sich locust auch ohne Compose starten lässt —
+# ein Profil allein wäre also nur ein halber Verschluss.
+#
+# WIEDER FREIGEBEN: STILLGELEGT auf False setzen.
+STILLGELEGT = True
+
+if STILLGELEGT and not os.environ.get("LASTTEST_TROTZDEM"):
+    sys.exit(
+        "\nDer Lasttest ist vorerst stillgelegt (29.08.2026).\n"
+        "Die erste Erprobung war nicht brauchbar; das Thema wird später neu\n"
+        "aufgesetzt. Zum Freigeben: STILLGELEGT in dieser Datei auf False\n"
+        "setzen — oder für einen einmaligen Versuch LASTTEST_TROTZDEM=1\n"
+        "setzen und wissen, was man tut.\n"
+    )
+
+PASSWORT = os.environ.get("LASTTEST_PASSWORT", "Zimt-Regenschirm-7719")
 BENUTZER_ANZAHL = int(os.environ.get("LASTTEST_BENUTZER", "100"))
 
 # Wird beim Start einmal gefüllt: IDs, auf die die Aufgaben zugreifen.

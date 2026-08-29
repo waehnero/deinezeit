@@ -245,3 +245,29 @@ def test_deaktiviertes_konto_verliert_zugang(client, test_user, db_session):
 
     assert client.get("/api/auth/me", headers=kopf).status_code == 401
     assert client.post("/api/auth/refresh").status_code == 401
+
+
+# ── Cookie-Kennzeichen ───────────────────────────────────────────────────────
+
+def test_refresh_cookie_ist_ueber_https_geschuetzt(monkeypatch):
+    """Das ``secure``-Kennzeichen des Refresh-Cookies hängt am Schema.
+
+    Diese Prüfung steht hier, weil genau dieser Zusammenhang die Testreihe auf
+    dem Server rot gemacht hat: Dort steht ``https://…`` in der ``.env``, das
+    Cookie wird ``secure`` — und der Testclient spricht ``http``, schickt es
+    also nie zurück. Behoben ist das in ``conftest.py``, indem die Testreihe
+    ``FRONTEND_URL`` selbst festlegt.
+
+    Der naheliegende „Fix", ``_cookie_sicher()`` einfach auf ``False`` zu
+    setzen, wäre ein Sicherheitsfehler: Der Refresh-Token liefe dann im
+    Produktivbetrieb unverschlüsselt über die Leitung. Dieser Test hält das
+    fest.
+    """
+    from app.api import auth as auth_api
+
+    monkeypatch.setattr(auth_api.settings, "FRONTEND_URL",
+                        "https://dz.example.online")
+    assert auth_api._cookie_sicher() is True
+
+    monkeypatch.setattr(auth_api.settings, "FRONTEND_URL", "http://localhost")
+    assert auth_api._cookie_sicher() is False

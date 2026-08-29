@@ -1,4 +1,24 @@
-# Lasttest
+# Lasttest — VORERST STILLGELEGT (29.08.2026)
+
+> **Diese Anleitung ist außer Kraft.** Der Lasttest ist auf Olivers Wunsch
+> stillgelegt, weil die erste Erprobung nicht überzeugte:
+>
+> * Der Prüfdaten-Generator scheiterte an der Passwortregel (das Passwort
+>   enthielt einen Teil des Kontonamens) und an fest verdrahteten
+>   Stammdatenfeldern, die es so nicht in jeder Installation gibt.
+> * Beide Läufe hinterließen je 50 Belege in einer **Produktivinstallation**.
+>   Die Warnung des Skripts greift nicht, wenn man es auf dem Server selbst
+>   aufruft — von dort aus ist die Adresse `localhost`.
+>
+> Das Thema wird zu einem späteren Zeitpunkt neu aufgesetzt. Bis dahin sind
+> drei Riegel gesetzt: `profiles:` in `docker-compose.lasttest.yml`,
+> `STILLGELEGT` in `pruefdaten.py` und in `locustfile.py`. Der Reiter in den
+> Einstellungen ist ausgegraut.
+>
+> Der folgende Text beschreibt den Stand vor der Stilllegung und bleibt als
+> Ausgangspunkt für die Neufassung stehen.
+
+---
 
 Antwortet DeineZeit noch brauchbar, wenn 5, 10, 20 oder 100 Leute gleichzeitig
 arbeiten? Diese Messung beantwortet das mit Zahlen statt mit Gefühl.
