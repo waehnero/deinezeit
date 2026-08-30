@@ -32,6 +32,7 @@ import MahnlaufPage from './pages/MahnlaufPage'
 import AuswertungenPage from './pages/AuswertungenPage'
 import BuchhaltungPage from './pages/BuchhaltungPage'
 import KontenplanPage from './pages/KontenplanPage'
+import ArtikelgruppenPage from './pages/ArtikelgruppenPage'
 import EingangsrechnungenPage from './pages/EingangsrechnungenPage'
 import ProjektplanPage from './pages/ProjektplanPage'
 import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
@@ -106,6 +107,10 @@ function App() {
                     <Routes>
                       <Route path="/dashboard"            element={<ModuleRoute module="dashboard"><DashboardPage /></ModuleRoute>} />
                       <Route path="/masterdata"           element={<ModuleRoute module="stammdaten"><MasterDataOverview /></ModuleRoute>} />
+                      {/* MUSS vor /masterdata/:slug stehen — sonst fängt der
+                          Platzhalter „artikelgruppen" ab und sucht einen
+                          Stammdaten-Typ, den es nicht gibt. */}
+                      <Route path="/masterdata/artikelgruppen" element={<ModuleRoute module="stammdaten"><ArtikelgruppenPage /></ModuleRoute>} />
                       <Route path="/masterdata/:slug"     element={<ModuleRoute module="stammdaten"><MasterDataDetail /></ModuleRoute>} />
                       <Route path="/profile"              element={<ProfilePage />} />
                       <Route path="/users"                element={<UserManagementPage />} />

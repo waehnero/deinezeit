@@ -141,6 +141,32 @@ def _verknuepfung(wert: str, feld: FieldDefinition, db: Session) -> str:
     return str(treffer[0].id)
 
 
+def _verzeichnis(text: str, feld: FieldDefinition, db: Session) -> str:
+    """lookup-Feld: Schlüssel gegen sein Verzeichnis prüfen.
+
+    Gespeichert wird der Schlüssel selbst (Kontonummer, Gruppenkurzschlüssel) —
+    nicht eine Kennung wie bei ``relation``. Geprüft wird trotzdem: Eine
+    Kontonummer, die es nicht gibt, fällt im Beleg erst beim Export auf, und
+    dort ist der Import längst vergessen.
+    """
+    from app.models.accounting import AccountingAccount
+    from app.models.masterdata import ArticleGroup
+
+    if feld.lookup_source == "konten":
+        vorhanden = (db.query(AccountingAccount)
+                     .filter(AccountingAccount.nr == text).first())
+        if not vorhanden:
+            raise Wertfehler("steht nicht im Kontenplan")
+        return text
+    if feld.lookup_source == "artikelgruppen":
+        vorhanden = (db.query(ArticleGroup)
+                     .filter(ArticleGroup.nr == text).first())
+        if not vorhanden:
+            raise Wertfehler("ist keine bekannte Artikelgruppe")
+        return text
+    raise Wertfehler(f"unbekannte Auswahlquelle „{feld.lookup_source}“")
+
+
 def wert_deuten(wert: Any, feld: FieldDefinition, db: Session) -> Any:
     """Einen Tabellenwert in die Form bringen, in der er gespeichert wird."""
     text = "" if wert is None else str(wert).strip()
@@ -160,6 +186,14 @@ def wert_deuten(wert: Any, feld: FieldDefinition, db: Session) -> Any:
         return _auswahl(text, feld)
     if feld.field_type == "relation":
         return _verknuepfung(text, feld, db)
+    if feld.field_type == "lookup":
+        return _verzeichnis(text, feld, db)
+    if feld.field_type == "image":
+        # Bilder lassen sich nicht aus einer Tabelle importieren — sie hängen an
+        # einem Speicher-Schlüssel, den erst der Upload erzeugt. Eine Spalte mit
+        # Dateinamen still zu übernehmen, würde einen Wert erzeugen, den keine
+        # Ansicht anzeigen kann.
+        raise Wertfehler("Bilder lassen sich nicht importieren")
     if feld.field_type == "email":
         if not EMAIL_MUSTER.match(text):
             raise Wertfehler("keine gültige E-Mail-Adresse")
@@ -264,6 +298,25 @@ class MasterDataImport:
                         gesehen[text] = nummer
                         vorhanden = self._vorhandene_suchen(
                             db, entity_type, abgleichsfeld, text)
+
+            # Eindeutige Felder (z.B. die Artikelnummer) auch beim Import
+            # prüfen. Der Import legt Datensätze direkt an und geht damit an
+            # ``create_record`` vorbei — ohne diese Stelle könnte eine Datei
+            # zweimal dieselbe Artikelnummer in den Bestand schreiben, und das
+            # fiele erst im Belegbuch auf.
+            if not zeilenfehler:
+                for schluessel, feld in felder.items():
+                    if not feld.is_unique or schluessel == abgleichsfeld:
+                        continue        # das Abgleichsfeld darf treffen
+                    wert = str(daten.get(schluessel) or "").strip()
+                    if not wert:
+                        continue
+                    treffer = self._vorhandene_suchen(db, entity_type,
+                                                      schluessel, wert)
+                    if treffer is not None and treffer is not vorhanden:
+                        zeilenfehler.append(Beanstandung(
+                            zeile=nummer, feld=feld.name, wert=wert,
+                            grund="ist bereits vergeben"))
 
             if zeilenfehler:
                 bericht.beanstandungen.extend(zeilenfehler)

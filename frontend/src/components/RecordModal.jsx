@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { masterdataApi, zeiterfassungApi } from '../services/api'
 import toast from 'react-hot-toast'
 import DynamicForm from './DynamicForm'
@@ -22,11 +22,35 @@ export default function RecordModal({ entityType, record, onClose, onSaved,
                                       initialValues = null, nurLesen = false }) {
   const isEdit = !!record
   const isProjektzeit = entityType.slug === 'projektzeiten'
+  const isArtikel = entityType.slug === 'artikel'
   const [values, setValues] = useState(record?.data || initialValues || {})
   const [loading, setLoading] = useState(false)
   // Beim Neuanlegen einer Projektzeit: hier erfasste Stundenkonten werden
   // nach dem Anlegen des Datensatzes gespeichert (brauchen die Datensatz-ID).
   const [pendingKonten, setPendingKonten] = useState([])
+  const [nummernVorschlag, setNummernVorschlag] = useState(null)
+
+  // Nummernvorschlag beim Neuanlegen eines Artikels: Sobald eine Artikelgruppe
+  // gewählt ist, zeigt das Formular, welche Nummer der Artikel bekommen wird.
+  //
+  // Der Vorschlag wird NICHT ins Feld geschrieben. Vergeben wird die Nummer
+  // erst beim Speichern, serverseitig unter einer Sperre — bis dahin kann sie
+  // ein anderer Benutzer verbrauchen. Stünde sie schon im Feld, würde das
+  // Formular sie als von Hand gesetzt mitschicken und die Kollision erzwingen,
+  // statt ihr auszuweichen. Wer eine bestimmte Nummer will (Altdaten), tippt
+  // sie ins Feld — dann gilt sie.
+  const gruppe = values.artikelgruppe
+  const angefragt = useRef(null)
+  useEffect(() => {
+    if (!isArtikel || isEdit || !gruppe) { setNummernVorschlag(null); return }
+    if (angefragt.current === gruppe) return
+    angefragt.current = gruppe
+    let abgebrochen = false
+    masterdataApi.naechsteArtikelnummer(gruppe)
+      .then(res => { if (!abgebrochen) setNummernVorschlag(res.data.artikelnummer) })
+      .catch(() => { if (!abgebrochen) setNummernVorschlag(null) })
+    return () => { abgebrochen = true }
+  }, [gruppe, isArtikel, isEdit])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -89,12 +113,20 @@ export default function RecordModal({ entityType, record, onClose, onSaved,
                 <p className="text-sm">Klicken Sie auf „Felder verwalten" um Felder hinzuzufügen.</p>
               </div>
             ) : (
-              <DynamicForm
-                fields={entityType.fields}
-                tabs={entityType.tabs || []}
-                values={values}
-                onChange={setValues}
-              />
+              <>
+                {nummernVorschlag && !String(values.artikelnummer || '').trim() && (
+                  <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
+                    Artikelnummer <span className="font-mono font-semibold">{nummernVorschlag}</span> wird
+                    beim Anlegen vergeben. Eine eigene Nummer im Feld hat Vorrang.
+                  </div>
+                )}
+                <DynamicForm
+                  fields={entityType.fields}
+                  tabs={entityType.tabs || []}
+                  values={values}
+                  onChange={setValues}
+                />
+              </>
             )}
           </div>
 

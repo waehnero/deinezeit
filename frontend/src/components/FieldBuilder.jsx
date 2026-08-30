@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { masterdataApi } from '../services/api'
+import OptionsEditor from './OptionsEditor'
 import toast from 'react-hot-toast'
 import {
   Plus, Trash2, GripVertical, ChevronDown, ChevronUp,
   Type, Hash, Calendar, Mail, Phone, List, CheckSquare,
-  AlignLeft, Link, Loader2, Pencil, Check, X, GitMerge
+  AlignLeft, Link, Loader2, Pencil, Check, X, GitMerge,
+  BookText, Image as ImageIcon, Lock
 } from 'lucide-react'
 
 // Feldtypen mit Icon und Label
@@ -19,7 +21,41 @@ export const FIELD_TYPES = [
   { key: 'checkbox', label: 'Ja/Nein',            icon: CheckSquare },
   { key: 'url',      label: 'Webseite (URL)',     icon: Link },
   { key: 'relation', label: 'Verknüpfung',        icon: GitMerge },
+  { key: 'lookup',   label: 'Auswahl aus Verzeichnis', icon: BookText },
+  { key: 'image',    label: 'Bild',               icon: ImageIcon },
 ]
+
+// Verzeichnisse für den Feldtyp „lookup". Anders als bei „Verknüpfung" wird
+// nicht auf einen Stammdatensatz gezeigt, sondern der fachliche Schlüssel
+// selbst gespeichert (Kontonummer, Gruppenkurzschlüssel) — damit Beleg und
+// Buchhaltungs-Export ihn ohne zweite Abfrage lesen können.
+export const LOOKUP_SOURCES = [
+  { key: 'konten',         label: 'Kontenplan' },
+  { key: 'artikelgruppen', label: 'Artikelgruppen' },
+]
+
+/**
+ * Auswahlliste vor dem Speichern prüfen.
+ *
+ * Eine leere oder doppelte Option ist im Auswahlfeld nicht bedienbar: Beim
+ * Doppel entscheidet der Zufall, welche gespeichert wird, und die leere lässt
+ * sich nicht von „nichts gewählt" unterscheiden. Deshalb hier abfangen und
+ * nicht erst den Server ablehnen lassen — der prüft es nicht.
+ */
+export function pruefeOptionen(optionen) {
+  const werte = (optionen || []).map(o => String(o).trim())
+  if (werte.some(o => !o)) {
+    toast.error('Eine Auswahlmöglichkeit ist leer')
+    return false
+  }
+  const klein = werte.map(o => o.toLowerCase())
+  const doppelt = klein.find((o, i) => klein.indexOf(o) !== i)
+  if (doppelt) {
+    toast.error(`„${werte[klein.indexOf(doppelt)]}" kommt doppelt vor`)
+    return false
+  }
+  return true
+}
 
 // Neues Feld hinzufügen – Formular
 function AddFieldForm({ slug, onAdded, onCancel }) {
@@ -27,9 +63,13 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
   const [fieldType, setFieldType] = useState('text')
   const [isRequired, setIsRequired] = useState(false)
   const [showInList, setShowInList] = useState(true)
-  const [options, setOptions] = useState('')  // kommagetrennt für Dropdown
+  // Früher ein kommagetrennter Text. Das machte eine Option mit Komma darin
+  // unmöglich („Stk, gross") und wich vom Bearbeiten-Formular ab. Jetzt
+  // beidesmal derselbe Editor und dieselbe Datenform.
+  const [options, setOptions] = useState([])
   const [placeholder, setPlaceholder] = useState('')
   const [linkedTypeSlug, setLinkedTypeSlug] = useState('')
+  const [lookupSource, setLookupSource] = useState('konten')
   const [availableTypes, setAvailableTypes] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -49,6 +89,13 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
       toast.error('Bitte einen Ziel-Typ für die Verknüpfung auswählen')
       return
     }
+    if (fieldType === 'dropdown') {
+      if (!options.length) {
+        toast.error('Eine Auswahlliste braucht mindestens eine Möglichkeit')
+        return
+      }
+      if (!pruefeOptionen(options)) return
+    }
     setLoading(true)
     try {
       const payload = {
@@ -58,10 +105,9 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
         is_required: isRequired,
         show_in_list: showInList,
         placeholder: placeholder || null,
-        options: fieldType === 'dropdown'
-          ? options.split(',').map(o => o.trim()).filter(Boolean)
-          : null,
+        options: fieldType === 'dropdown' ? options.map(o => o.trim()) : null,
         linked_type_slug: fieldType === 'relation' ? linkedTypeSlug : null,
+        lookup_source: fieldType === 'lookup' ? lookupSource : null,
       }
       const res = await masterdataApi.addField(slug, payload)
       toast.success(`Feld '${name}' wurde hinzugefügt`)
@@ -69,9 +115,10 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
       setName('')
       setFieldType('text')
       setIsRequired(false)
-      setOptions('')
+      setOptions([])
       setPlaceholder('')
       setLinkedTypeSlug('')
+      setLookupSource('konten')
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Fehler beim Hinzufügen')
     } finally {
@@ -122,17 +169,28 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
 
         {/* Dropdown-Optionen */}
         {fieldType === 'dropdown' && (
+          <OptionsEditor optionen={options} onChange={setOptions} />
+        )}
+
+        {/* Lookup: Verzeichnis auswählen */}
+        {fieldType === 'lookup' && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Optionen (kommagetrennt) *
+              Auswahl aus *
             </label>
-            <input
-              type="text"
-              value={options}
-              onChange={(e) => setOptions(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Option 1, Option 2, Option 3"
-            />
+            <select
+              value={lookupSource}
+              onChange={(e) => setLookupSource(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
+            >
+              {LOOKUP_SOURCES.map(({ key, label }) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-500 mt-1">
+              Gespeichert wird der Schlüssel selbst (Kontonummer bzw.
+              Gruppenkurzschlüssel) — nicht eine Verknüpfung.
+            </p>
           </div>
         )}
 
@@ -227,26 +285,36 @@ function FieldRow({ field, slug, onUpdated, onDeleted }) {
   const [name, setName] = useState(field.name)
   const [isRequired, setIsRequired] = useState(field.is_required)
   const [showInList, setShowInList] = useState(field.show_in_list)
+  const [optionen, setOptionen] = useState(field.options || [])
   const [loading, setLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const TypeInfo = FIELD_TYPES.find(t => t.key === field.field_type) || FIELD_TYPES[0]
   const TypeIcon = TypeInfo.icon
+  const istAuswahl = field.field_type === 'dropdown'
 
   const handleSave = async () => {
     if (!name.trim()) return
+    if (istAuswahl && !pruefeOptionen(optionen)) return
     setLoading(true)
     try {
-      const res = await masterdataApi.updateField(slug, field.id, {
+      // Die Optionen nur bei Auswahlfeldern mitschicken. Der Server schreibt
+      // ``options`` auch dann, wenn der Wert leer ist — bei einem Textfeld
+      // wäre das Übertragen also nicht bloß überflüssig, sondern eine
+      // Änderung, die niemand angefordert hat.
+      const nutzlast = {
         name: name.trim(),
         is_required: isRequired,
         show_in_list: showInList,
-      })
+      }
+      if (istAuswahl) nutzlast.options = optionen.map(o => o.trim())
+
+      const res = await masterdataApi.updateField(slug, field.id, nutzlast)
       toast.success('Feld aktualisiert')
       onUpdated(res.data)
       setEditing(false)
-    } catch {
-      toast.error('Fehler beim Speichern')
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Fehler beim Speichern')
     } finally {
       setLoading(false)
     }
@@ -296,13 +364,18 @@ function FieldRow({ field, slug, onUpdated, onDeleted }) {
               In Liste anzeigen
             </label>
           </div>
+          {istAuswahl && (
+            <div className="pt-2 border-t border-gray-100">
+              <OptionsEditor optionen={optionen} onChange={setOptionen} />
+            </div>
+          )}
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={loading}
               className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white text-xs rounded-lg transition hover:bg-primary-700">
               {loading ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
               Speichern
             </button>
-            <button onClick={() => { setEditing(false); setName(field.name) }}
+            <button onClick={() => { setEditing(false); setName(field.name); setOptionen(field.options || []) }}
               className="px-3 py-1.5 border border-gray-300 text-gray-600 text-xs rounded-lg hover:bg-gray-50 transition">
               Abbrechen
             </button>
@@ -326,6 +399,12 @@ function FieldRow({ field, slug, onUpdated, onDeleted }) {
                   In Liste
                 </span>
               )}
+              {field.is_system && (
+                <span className="flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full"
+                      title="Andere Module lesen dieses Feld — es kann nicht gelöscht werden.">
+                  <Lock size={10} /> Systemfeld
+                </span>
+              )}
               {field.options?.length > 0 && (
                 <span className="text-xs text-gray-400 truncate max-w-[200px]">
                   {field.options.join(', ')}
@@ -338,18 +417,23 @@ function FieldRow({ field, slug, onUpdated, onDeleted }) {
               className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
               <Pencil size={14} />
             </button>
-            <button
-              onClick={handleDelete}
-              disabled={loading}
-              className={`p-1.5 rounded-lg transition ${
-                confirmDelete
-                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-              }`}
-              title={confirmDelete ? 'Nochmal klicken zum Bestätigen' : 'Feld entfernen'}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-            </button>
+            {/* Systemfelder haben keine Lösch-Schaltfläche. Das Backend lehnt
+                den Aufruf ohnehin ab; die Schaltfläche gar nicht erst
+                anzubieten erspart den Weg über eine Fehlermeldung. */}
+            {!field.is_system && (
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className={`p-1.5 rounded-lg transition ${
+                  confirmDelete
+                    ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                    : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                }`}
+                title={confirmDelete ? 'Nochmal klicken zum Bestätigen' : 'Feld entfernen'}
+              >
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              </button>
+            )}
           </div>
         </div>
       )}
