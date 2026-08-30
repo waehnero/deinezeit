@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.72] – 2026-08-30 – Artikelstamm mit Gruppen und automatischer Nummer
+
+### Neu
+- Artikelgruppen mit eigenem Nummernkreis: Artikelnummern werden automatisch vergeben (z.B. DL-0001).
+- Erlös- und Aufwandskonto lassen sich je Artikelgruppe hinterlegen und gelten für alle Artikel der Gruppe.
+- Artikelstamm um Einheit, USt-Satz, Einkaufsdaten, Lagerangaben und ein Artikelbild erweitert.
+- Auswahllisten von Feldern — etwa die Mengeneinheiten — lassen sich jetzt jederzeit bearbeiten.
+
+### Aktualisierungen
+- Beim Einfügen eines Artikels in einen Beleg werden Konto, Steuersatz und Einheit automatisch übernommen.
+- Fehler behoben: Beim Umbenennen eines Auswahlfeldes ging dessen Auswahlliste verloren.
+
+---
+
 ## [1.12.71] – 2026-08-29 – Pipeline schneller
 
 ### Aktualisierungen

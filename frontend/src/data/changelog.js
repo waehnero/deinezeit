@@ -4,6 +4,22 @@
  */
 export const changelog = [
   {
+    version: '1.12.72',
+    day: '30',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Artikelgruppen mit eigenem Nummernkreis: Artikelnummern werden automatisch vergeben (z.B. DL-0001).',
+      'Erlös- und Aufwandskonto lassen sich je Artikelgruppe hinterlegen und gelten für alle Artikel der Gruppe.',
+      'Artikelstamm um Einheit, USt-Satz, Einkaufsdaten, Lagerangaben und ein Artikelbild erweitert.',
+      'Auswahllisten von Feldern — etwa die Mengeneinheiten — lassen sich jetzt jederzeit bearbeiten.',
+    ],
+    updates: [
+      'Beim Einfügen eines Artikels in einen Beleg werden Konto, Steuersatz und Einheit automatisch übernommen.',
+      'Fehler behoben: Beim Umbenennen eines Auswahlfeldes ging dessen Auswahlliste verloren.',
+    ],
+  },
+  {
     version: '1.12.71',
     day: '29',
     month: 'August',

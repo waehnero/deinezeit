@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Text
+from sqlalchemy import (Column, String, Boolean, DateTime, Integer, Numeric,
+                        ForeignKey, Text)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -71,6 +72,21 @@ class FieldDefinition(Base):
     # Für Relation-Felder: Slug des verknüpften EntityType (z.B. "kunden")
     linked_type_slug = Column(String(100), nullable=True)
 
+    # Für lookup-Felder: Quelle der Auswahlliste außerhalb der Stammdaten.
+    # "konten" = Kontenplan (accounting_accounts), "artikelgruppen" = article_groups.
+    # Abgegrenzt von ``relation``: Das zeigt auf einen EntityRecord und speichert
+    # {id, display_name}; ``lookup`` speichert den fachlichen Schlüssel selbst
+    # (Kontonummer, Gruppennummer), damit Belege und Export ihn direkt lesen
+    # können, ohne eine zweite Abfrage.
+    lookup_source = Column(String(50), nullable=True)
+
+    # Systemfeld: von einer Migration angelegt und von anderen Modulen
+    # vorausgesetzt (der Belegpicker liest z.B. preis, einheit, erloes_konto).
+    # Solche Felder dürfen weder gelöscht noch umgeschlüsselt werden — sonst
+    # läuft der Beleg still ins Leere, ohne dass irgendwo ein Fehler erscheint.
+    # Umbenennen, verschieben und ausblenden bleibt erlaubt.
+    is_system = Column(Boolean, nullable=False, default=False)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     entity_type = relationship("EntityType", back_populates="fields")
@@ -113,3 +129,57 @@ class EntityRecord(Base):
     archived_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     entity_type = relationship("EntityType", back_populates="records")
+
+
+class ArticleGroup(Base):
+    """
+    Artikelgruppe (Warengruppe) — Sortimentsstruktur *und* Buchungsvorgabe.
+
+    Bewusst eine eigene Tabelle statt eines weiteren ``EntityType``: An der
+    Gruppe hängen Buchhaltungslogik (Erlös-/Aufwandskonto) und ein laufender
+    Zähler für die Artikelnummer. Beides braucht feste, typisierte Spalten und
+    zeilenweise Sperren beim Hochzählen — im JSONB-Baukasten der EntityRecords
+    ließe sich weder das eine prüfen noch das andere sicher machen. Der
+    Kontenplan (``accounting_accounts``) ist aus demselben Grund eine eigene
+    Tabelle.
+
+    Die Artikel selbst bleiben ``EntityRecord``: Sie sollen weiter frei um
+    eigene Felder erweiterbar sein.
+    """
+    __tablename__ = "article_groups"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Kurzschlüssel, unter dem die Gruppe im Artikel steht — z.B. "DL".
+    # Die Artikel speichern diesen Schlüssel, nicht die UUID: So bleibt der
+    # CSV-Export lesbar und der Import kann ohne Vorabauflösung zuordnen.
+    nr = Column(String(20), nullable=False, unique=True)
+    name = Column(String(200), nullable=False)
+    beschreibung = Column(String(500), nullable=True)
+
+    # ── Nummernkreis ──────────────────────────────────────────────────────────
+    # Präfix + laufende Nummer, z.B. "DL" + 7 + 4 Stellen → "DL-0007".
+    praefix = Column(String(10), nullable=True)
+    naechste_nummer = Column(Integer, nullable=False, default=1)
+    stellen = Column(Integer, nullable=False, default=4)
+
+    # ── Buchungsvorgabe ───────────────────────────────────────────────────────
+    # Kontonummern, keine Fremdschlüssel: ``invoice_positions.account_nr`` führt
+    # ebenfalls die Nummer, und der BMD-Export liest sie. Ein FK würde außerdem
+    # das Löschen eines Kontos an dieser Stelle stillschweigend zur
+    # Kettenreaktion machen — genau das war beim Löschregeln-Beschluss
+    # ausgeschlossen worden. Geprüft wird stattdessen beim Speichern.
+    erloes_konto_nr = Column(String(20), nullable=True)
+    aufwand_konto_nr = Column(String(20), nullable=True)
+
+    # Vorgabewerte, die der Artikel erben kann
+    ust_satz = Column(Numeric(5, 2), nullable=True)      # NULL = keine Vorgabe
+    artikelart = Column(String(30), nullable=True)       # ware | dienstleistung
+    einheit = Column(String(30), nullable=True)          # Stk, h, m², …
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))

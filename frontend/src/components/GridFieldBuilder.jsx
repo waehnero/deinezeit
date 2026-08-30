@@ -25,7 +25,8 @@ import {
   ChevronDown, ChevronUp, Loader2, List,
   Layers, FolderPlus, ChevronRight
 } from 'lucide-react'
-import { FIELD_TYPES } from './FieldBuilder'
+import { FIELD_TYPES, pruefeOptionen } from './FieldBuilder'
+import OptionsEditor from './OptionsEditor'
 
 // Spaltenbreiten-Optionen
 const COL_OPTIONS = [
@@ -71,25 +72,33 @@ function SortableField({ field, slug, tabs, activeTab, onUpdated, onDeleted, onC
   const [name, setName]               = useState(field.name)
   const [isRequired, setIsRequired]   = useState(field.is_required)
   const [showInList, setShowInList]   = useState(field.show_in_list)
+  const [optionen, setOptionen]       = useState(field.options || [])
   const [loading, setLoading]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const TypeInfo = FIELD_TYPES.find(t => t.key === field.field_type) || FIELD_TYPES[0]
   const TypeIcon = TypeInfo.icon
+  const istAuswahl = field.field_type === 'dropdown'
 
   const handleSave = async () => {
+    if (istAuswahl && !pruefeOptionen(optionen)) return
     setLoading(true)
     try {
-      const res = await masterdataApi.updateField(slug, field.id, {
+      // Optionen nur bei Auswahlfeldern mitschicken — siehe Kommentar in
+      // FieldBuilder: der Server schreibt ``options`` auch leer.
+      const nutzlast = {
         name: name.trim(),
         is_required: isRequired,
         show_in_list: showInList,
-      })
+      }
+      if (istAuswahl) nutzlast.options = optionen.map(o => o.trim())
+
+      const res = await masterdataApi.updateField(slug, field.id, nutzlast)
       toast.success('Feld gespeichert')
       onUpdated(res.data)
       setEditing(false)
-    } catch {
-      toast.error('Fehler beim Speichern')
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Fehler beim Speichern')
     } finally {
       setLoading(false)
     }
@@ -135,12 +144,17 @@ function SortableField({ field, slug, tabs, activeTab, onUpdated, onDeleted, onC
                   In Liste
                 </label>
               </div>
+              {istAuswahl && (
+                <div className="pt-2 border-t border-gray-100">
+                  <OptionsEditor optionen={optionen} onChange={setOptionen} />
+                </div>
+              )}
               <div className="flex gap-1.5">
                 <button onClick={handleSave} disabled={loading}
                   className="flex items-center gap-1 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 transition">
                   {loading ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} OK
                 </button>
-                <button onClick={() => { setEditing(false); setName(field.name) }}
+                <button onClick={() => { setEditing(false); setName(field.name); setOptionen(field.options || []) }}
                   className="px-2 py-1 border border-gray-300 text-gray-500 text-xs rounded-lg hover:bg-gray-50 transition">
                   <X size={11} />
                 </button>
@@ -162,19 +176,35 @@ function SortableField({ field, slug, tabs, activeTab, onUpdated, onDeleted, onC
                   <span className="text-xs text-gray-400">{TypeInfo.label}</span>
                   {field.is_required && <span className="text-xs bg-red-50 text-red-500 px-1 rounded">Pflicht</span>}
                   {field.show_in_list && <span className="text-xs bg-blue-50 text-blue-500 px-1 rounded">Liste</span>}
+                  {field.is_system && (
+                    <span className="text-xs bg-amber-50 text-amber-700 px-1 rounded"
+                          title="Andere Module lesen dieses Feld — es kann nicht gelöscht werden.">
+                      System
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+              {/* Früher ``opacity-0 group-hover:opacity-100``: Der Stift war
+                  nur beim Darüberfahren mit der Maus sichtbar — auf Tablet und
+                  Handy also überhaupt nicht, und selbst am Rechner fand man ihn
+                  nur zufällig. Wer die Auswahlliste eines Feldes pflegen will,
+                  muss die Schaltfläche sehen können, ohne sie zu suchen. */}
+              <div className="flex gap-0.5 opacity-70 group-hover:opacity-100 transition flex-shrink-0">
                 <button onClick={() => setEditing(true)}
                   className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
                   <Pencil size={12} />
                 </button>
-                <button onClick={handleDelete} disabled={loading}
-                  className={`p-1 rounded-lg transition ${
-                    confirmDelete ? 'bg-red-100 text-red-500' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                  }`} title={confirmDelete ? 'Nochmal klicken' : 'Löschen'}>
-                  {loading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                </button>
+                {/* Systemfelder: kein Löschknopf. Verschieben, umbenennen und
+                    die Breite ändern bleibt möglich — nur das Entfernen nicht,
+                    weil Belegpicker und Kontenkaskade darauf zugreifen. */}
+                {!field.is_system && (
+                  <button onClick={handleDelete} disabled={loading}
+                    className={`p-1 rounded-lg transition ${
+                      confirmDelete ? 'bg-red-100 text-red-500' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                    }`} title={confirmDelete ? 'Nochmal klicken' : 'Löschen'}>
+                    {loading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -686,13 +716,17 @@ export default function GridFieldBuilder({ entityType, onFieldsChanged }) {
           </div>
           <div className="text-left">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-gray-900 text-sm">Formular-Layout verwalten</p>
+              {/* „Formular-Layout" beschrieb nur die halbe Wahrheit: Hier
+                  werden auch die Auswahllisten der Felder gepflegt — etwa die
+                  Mengeneinheiten am Artikel. Unter dem alten Namen hat das
+                  niemand gesucht. */}
+              <p className="font-semibold text-gray-900 text-sm">Felder &amp; Formular-Layout verwalten</p>
               {saving && <Loader2 size={13} className="animate-spin text-primary-400" />}
             </div>
             <p className="text-xs text-gray-500">
               {fields.length} Felder
               {tabs.length > 0 && ` · ${tabs.length} Register`}
-              {' · Ziehen zum Sortieren · Breite frei wählbar'}
+              {' · Sortieren, Breite, Auswahllisten'}
             </p>
           </div>
         </div>

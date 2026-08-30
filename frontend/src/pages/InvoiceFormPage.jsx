@@ -163,10 +163,34 @@ function ArticleSearch({ onSelect }) {
         <div className="absolute z-50 top-full left-0 right-0 bg-surface border border-neutral-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
           {results.map(r => (
             <button key={r.id} className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 border-b last:border-0"
-              onMouseDown={() => {
-                // Erlöskonto des Artikels mitnehmen — genau dafür gibt es das
-                // Stammdatenfeld, es wurde bisher nur nie durchgereicht (A-16).
-                onSelect({ article_id: r.id, description: r.display_name, unit_price: r.data?.preis != null ? String(r.data.preis) : '0', unit: r.data?.einheit || 'Stk', detail: r.data?.beschreibung || '', account_nr: r.data?.erloes_konto || null })
+              onMouseDown={async () => {
+                // Grundwerte sofort übernehmen, damit die Position auch dann
+                // entsteht, wenn die Vorgaben-Abfrage scheitert.
+                const basis = {
+                  article_id: r.id,
+                  description: r.display_name,
+                  unit_price: r.data?.preis != null ? String(r.data.preis) : '0',
+                  unit: r.data?.einheit || 'Stk',
+                  detail: r.data?.beschreibung || '',
+                  account_nr: r.data?.erloes_konto || null,
+                }
+                // Konto, USt-Satz und Einheit über die Kaskade auflösen
+                // (Artikel → Artikelgruppe → Standard-Erlöskonto). Die
+                // Auflösung macht der Server: Läge sie hier, gäbe es zwei
+                // Auslegungen davon, welches Konto gilt — und die im Browser
+                // wäre die, die keiner prüft.
+                try {
+                  const { data: v } = await masterdataApi.artikelVorgaben(r.id)
+                  basis.account_nr = v.erloes_konto || basis.account_nr
+                  basis.unit = v.einheit || basis.unit
+                  // Reverse Charge heißt: gar kein Steuersatz, nicht 0 %.
+                  // Eine Null erschiene in der UVA als steuerfreier Umsatz.
+                  // Im Formular steht dafür der Leerstring — beim Speichern
+                  // wird daraus NULL (siehe Aufbereitung der Positionen).
+                  if (v.reverse_charge) basis.tax_rate = ''
+                  else if (v.ust_satz != null) basis.tax_rate = String(Number(v.ust_satz))
+                } catch { /* Vorgaben sind Komfort — die Position entsteht auch ohne */ }
+                onSelect(basis)
                 setSearch(''); setOpen(false)
               }}>
               <p className="font-medium text-neutral-800">{r.display_name}</p>

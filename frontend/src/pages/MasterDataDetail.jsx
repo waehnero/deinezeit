@@ -9,7 +9,7 @@ import { fmtBudgetMinutes } from '../components/StundenkontenPanel'
 import {
   Plus, Search, ArrowLeft, Trash2, Pencil,
   Loader2, Database, ChevronLeft, ChevronRight,
-  AlertTriangle, Archive, ArchiveRestore
+  AlertTriangle, Archive, ArchiveRestore, Layers
 } from 'lucide-react'
 import { CsvExportButton, CsvImportButton } from '../components/CsvImportExport'
 import PageHeader from '../components/PageHeader'
@@ -47,6 +47,14 @@ function formatFieldValue(field, value) {
   if (field.field_type === 'relation') {
     if (typeof value === 'object' && value?.display_name) return value.display_name
     return '—'
+  }
+  // lookup speichert den Schlüssel selbst (Kontonummer, Gruppenkurzschlüssel).
+  // In der Liste bleibt er, wie er ist: Ihn zum Klartext aufzulösen hieße, für
+  // jede Zeile das Verzeichnis abzufragen — und die Nummer ist genau das, was
+  // in der Buchhaltung ohnehin gesucht wird.
+  if (field.field_type === 'lookup') return <span className="font-mono text-xs">{value}</span>
+  if (field.field_type === 'image') {
+    return typeof value === 'object' && value?.key ? '🖼 Bild' : '—'
   }
   if (field.field_type === 'url') return (
     <a href={value} target="_blank" rel="noopener noreferrer"
@@ -261,6 +269,15 @@ export default function MasterDataDetail() {
             className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border bg-surface text-gray-600 border-gray-300 hover:bg-neutral-50 transition">
             <ArrowLeft size={16} /> Zurück
           </button>
+          {/* Die Artikelgruppen liegen in einer eigenen Tabelle und damit
+              außerhalb des Stammdaten-Baukastens — von hier führt der einzige
+              Weg dorthin. */}
+          {slug === 'artikel' && (
+            <button onClick={() => navigate('/masterdata/artikelgruppen')}
+              className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border bg-surface text-gray-600 border-gray-300 hover:border-primary-400 hover:text-primary-600 transition">
+              <Layers size={16} /> Artikelgruppen
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => { setShowArchived(v => !v); setPage(1) }}

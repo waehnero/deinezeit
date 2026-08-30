@@ -259,6 +259,31 @@ export const masterdataApi = {
   // { match_field, dry_run, skip_invalid }; ohne Angabe ist es ein Probelauf.
   importRecords: (slug, rows, optionen = {}) =>
     api.post(`/masterdata/types/${slug}/records/import`, { rows, ...optionen }),
+
+  // Artikelgruppen — eigene Tabelle, siehe Modell ArticleGroup
+  listArticleGroups:  (params) => api.get('/masterdata/artikelgruppen', { params }),
+  createArticleGroup: (data) => api.post('/masterdata/artikelgruppen', data),
+  updateArticleGroup: (id, data) => api.put(`/masterdata/artikelgruppen/${id}`, data),
+  deleteArticleGroup: (id) => api.delete(`/masterdata/artikelgruppen/${id}`),
+
+  // Artikel: Nummernvorschlag (verbraucht den Zähler NICHT) und aufgelöste
+  // Vorgabewerte für die Belegposition
+  naechsteArtikelnummer: (gruppe) =>
+    api.get('/masterdata/artikel/naechste-nummer', { params: { gruppe } }),
+  artikelVorgaben: (recordId) => api.get(`/masterdata/artikel/${recordId}/vorgaben`),
+
+  // Bilder an Stammdatensätzen (Feldtyp „image")
+  uploadBild: (datei, size = 'mittel') => {
+    const form = new FormData()
+    form.append('file', datei)
+    return api.post('/masterdata/bild', form, {
+      params: { size },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  bildUrl: (key, provider) =>
+    `/api/masterdata/bild?key=${encodeURIComponent(key)}` +
+    (provider ? `&provider=${encodeURIComponent(provider)}` : ''),
 }
 
 export const zeiterfassungApi = {

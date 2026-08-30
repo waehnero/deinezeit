@@ -1,7 +1,8 @@
 from app.models.user import (User, WebAuthnCredential, UserSession,
                              AuthEvent, WebAuthnChallenge, TotpRecoveryCode,
                              PasswordResetToken, PermissionGroup, user_groups)
-from app.models.masterdata import EntityType, FieldDefinition, EntityRecord
+from app.models.masterdata import (EntityType, FieldDefinition, EntityRecord,
+                                   ArticleGroup)
 from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
 from app.models.settings import Setting
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,

@@ -198,7 +198,11 @@ export default function ZeiterfassungFelder() {
                 onChange={(e) => setNewType(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
               >
-                {FIELD_TYPES.filter(t => t.key !== 'relation').map(t => (
+                {/* Die Zeiterfassung hat einen eigenen, schlanken Feld-Renderer
+                    (kein DynamicForm). Typen, die er nicht darstellen kann,
+                    gar nicht erst anzubieten, ist ehrlicher, als sie später
+                    als leeres Textfeld erscheinen zu lassen. */}
+                {FIELD_TYPES.filter(t => !['relation', 'lookup', 'image'].includes(t.key)).map(t => (
                   <option key={t.key} value={t.key}>{t.label}</option>
                 ))}
               </select>

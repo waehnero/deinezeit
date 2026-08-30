@@ -175,8 +175,41 @@ class MasterDataService:
     def get_record(self, db: Session, record_id: UUID) -> Optional[EntityRecord]:
         return db.query(EntityRecord).filter(EntityRecord.id == record_id).first()
 
+    def pruefe_eindeutigkeit(self, db: Session, entity_type: EntityType,
+                             data: Dict[str, Any],
+                             ausser_id: UUID = None) -> None:
+        """Felder mit ``is_unique`` dürfen ihren Wert nur einmal führen.
+
+        Das Kennzeichen gab es seit Migration 0010 an der Felddefinition, aber
+        geprüft hat es nie jemand — es war ein Versprechen ohne Deckung. Mit der
+        automatischen Artikelnummer wird daraus ein Erfordernis: Trägt jemand
+        eine Nummer von Hand ein, die schon vergeben ist, muss das *hier*
+        auffallen und nicht später als zwei Artikel gleicher Nummer im
+        Belegbuch.
+
+        Archivierte Datensätze zählen mit: Ihre Nummer steht in alten Belegen.
+        Anonymisierte (DSGVO-Tombstones) nicht — dort ist ``data`` geleert.
+        """
+        for feld in entity_type.fields:
+            if not feld.is_unique:
+                continue
+            wert = data.get(feld.key)
+            if wert is None or str(wert).strip() == "":
+                continue                      # Leer ist nicht „doppelt leer"
+            wert = str(wert).strip()
+
+            q = (db.query(EntityRecord)
+                 .filter(EntityRecord.entity_type_id == entity_type.id,
+                         EntityRecord.data[feld.key].astext == wert))
+            if ausser_id is not None:
+                q = q.filter(EntityRecord.id != ausser_id)
+            if db.query(q.exists()).scalar():
+                raise ValueError(
+                    f"„{wert}“ ist als {feld.name} bereits vergeben.")
+
     def create_record(self, db: Session, entity_type: EntityType,
                       data: Dict[str, Any], user_id: UUID = None) -> EntityRecord:
+        self.pruefe_eindeutigkeit(db, entity_type, data)
         display_name = self._extract_display_name(entity_type, data)
 
         record = EntityRecord(
@@ -193,6 +226,8 @@ class MasterDataService:
 
     def update_record(self, db: Session, record: EntityRecord,
                       data: Dict[str, Any], user_id: UUID = None) -> EntityRecord:
+        self.pruefe_eindeutigkeit(db, record.entity_type, data,
+                                  ausser_id=record.id)
         record.data = data
         record.display_name = self._extract_display_name(record.entity_type, data)
         record.updated_by = user_id

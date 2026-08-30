@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { FIELD_TYPES } from './FieldBuilder'
-import { masterdataApi } from '../services/api'
+import { masterdataApi, accountingApi, getAccessToken } from '../services/api'
 import toast from 'react-hot-toast'
-import { Search, X, Plus, Loader2, GitMerge, ExternalLink } from 'lucide-react'
+import { Search, X, Plus, Loader2, GitMerge, ExternalLink,
+         Upload, Image as ImageIcon, Trash2 } from 'lucide-react'
 
 /**
  * Generiert ein Formular automatisch aus den Felddefinitionen.
@@ -340,6 +341,168 @@ function RelationField({ field, value, onChange, disabled }) {
   )
 }
 
+// ── Auswahl aus einem Verzeichnis (Kontenplan / Artikelgruppen) ───────────────
+//
+// Unterschied zur Verknüpfung: Gespeichert wird der fachliche Schlüssel selbst
+// — die Kontonummer bzw. der Gruppenkurzschlüssel —, nicht {id, display_name}.
+// So kann die Belegposition ihn unverändert übernehmen und der BMD-Export ihn
+// direkt schreiben, ohne den Stammsatz nachzuschlagen.
+//
+// Die Verzeichnisse werden je Feld einmal geladen und sind klein (Kontenplan
+// ~25 Zeilen, Artikelgruppen eine Handvoll) — deshalb ein einfaches select
+// statt einer Suche mit Nachladen.
+function LookupField({ field, value, onChange, disabled }) {
+  const [eintraege, setEintraege] = useState([])
+  const [laedt, setLaedt] = useState(true)
+
+  useEffect(() => {
+    let abgebrochen = false
+    ;(async () => {
+      setLaedt(true)
+      try {
+        if (field.lookup_source === 'konten') {
+          const res = await accountingApi.listAccounts({ active_only: true })
+          if (!abgebrochen) setEintraege(res.data.map(k => ({
+            key: k.nr, label: `${k.nr} — ${k.name}`, typ: k.typ,
+          })))
+        } else if (field.lookup_source === 'artikelgruppen') {
+          const res = await masterdataApi.listArticleGroups({ active_only: true })
+          if (!abgebrochen) setEintraege(res.data.map(g => ({
+            key: g.nr, label: `${g.nr} — ${g.name}`,
+          })))
+        } else {
+          if (!abgebrochen) setEintraege([])
+        }
+      } catch {
+        if (!abgebrochen) setEintraege([])
+      } finally {
+        if (!abgebrochen) setLaedt(false)
+      }
+    })()
+    return () => { abgebrochen = true }
+  }, [field.lookup_source])
+
+  const baseInput = "w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition disabled:bg-gray-50 disabled:text-gray-500"
+
+  // Ein gespeicherter Wert, den es im Verzeichnis nicht (mehr) gibt, darf nicht
+  // stillschweigend verschwinden: Sonst würde das Feld beim nächsten Speichern
+  // geleert, ohne dass jemand es angefasst hat.
+  const unbekannt = value && !laedt && !eintraege.some(e => e.key === value)
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.name}
+        {field.is_required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled || laedt}
+        required={field.is_required}
+        className={`${baseInput} appearance-none bg-surface`}
+      >
+        <option value="">{laedt ? 'lädt…' : '— keine Vorgabe —'}</option>
+        {unbekannt && <option value={value}>{value} (nicht im Verzeichnis)</option>}
+        {eintraege.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+      </select>
+      {unbekannt && (
+        <p className="text-xs text-amber-600 mt-1">
+          „{value}“ steht nicht (mehr) im Verzeichnis — bitte prüfen.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Bild am Datensatz ─────────────────────────────────────────────────────────
+//
+// Gespeichert wird { key, provider, name }. Der Provider muss mit: Nach einem
+// Wechsel des Speicherziels liegen ältere Bilder weiter im alten Speicher —
+// ohne die Angabe würde am falschen Ort gesucht (Lehre aus Migration 0039).
+function ImageField({ field, value, onChange, disabled }) {
+  const [vorschau, setVorschau] = useState(null)
+  const [laeuft, setLaeuft] = useState(false)
+  const dateiRef = useRef(null)
+  const bild = value && typeof value === 'object' && value.key ? value : null
+
+  // Ein <img src="/api/…"> schickt keinen Anmelde-Token mit und bekäme 401.
+  // Deshalb per fetch holen und als Objekt-URL einhängen — dasselbe Muster wie
+  // beim Positionsbild im Beleg.
+  useEffect(() => {
+    if (!bild) { setVorschau(null); return }
+    let url = null
+    let abgebrochen = false
+    ;(async () => {
+      try {
+        const res = await fetch(masterdataApi.bildUrl(bild.key, bild.provider),
+                                { headers: { Authorization: 'Bearer ' + getAccessToken() } })
+        if (!res.ok) throw new Error(res.status)
+        const blob = await res.blob()
+        if (abgebrochen) return
+        url = URL.createObjectURL(blob)
+        setVorschau(url)
+      } catch { setVorschau(null) }
+    })()
+    return () => { abgebrochen = true; if (url) URL.revokeObjectURL(url) }
+  }, [bild?.key, bild?.provider])
+
+  async function hochladen(datei) {
+    if (!datei) return
+    setLaeuft(true)
+    try {
+      const res = await masterdataApi.uploadBild(datei, 'gross')
+      onChange({ key: res.data.key, provider: res.data.provider, name: res.data.name })
+      toast.success('Bild hinterlegt')
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Upload fehlgeschlagen')
+    } finally {
+      setLaeuft(false)
+      if (dateiRef.current) dateiRef.current.value = ''
+    }
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.name}
+        {field.is_required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="flex items-start gap-3">
+        <div className="w-28 h-28 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+          {vorschau
+            ? <img src={vorschau} alt={bild?.name || field.name} className="max-w-full max-h-full object-contain" />
+            : <ImageIcon size={22} className="text-gray-300" />}
+        </div>
+        <div className="flex-1 space-y-2">
+          <input ref={dateiRef} type="file" accept="image/*" disabled={disabled || laeuft}
+                 onChange={(e) => hochladen(e.target.files?.[0])}
+                 className="hidden" id={`bild-${field.id}`} />
+          <label htmlFor={`bild-${field.id}`}
+                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition ${
+                   disabled || laeuft
+                     ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                     : 'border-gray-300 text-gray-600 hover:bg-gray-50 cursor-pointer'
+                 }`}>
+            {laeuft ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+            {bild ? 'Bild ersetzen' : 'Bild wählen'}
+          </label>
+          {bild && !disabled && (
+            <button type="button" onClick={() => onChange(null)}
+              className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-neutral-500 hover:text-red-600 transition">
+              <Trash2 size={13} /> Entfernen
+            </button>
+          )}
+          <p className="text-[11px] text-gray-400">
+            JPEG, PNG, WebP oder GIF, höchstens 15 MB. Das Bild wird beim
+            Hochladen verkleinert.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Einzelnes Feld rendern ────────────────────────────────────────────────────
 function FieldInput({ field, value, onChange, disabled }) {
   const TypeInfo = FIELD_TYPES.find(t => t.key === field.field_type)
@@ -364,6 +527,12 @@ function FieldInput({ field, value, onChange, disabled }) {
           disabled={disabled}
         />
       )
+
+    case 'lookup':
+      return <LookupField field={field} value={value} onChange={onChange} disabled={disabled} />
+
+    case 'image':
+      return <ImageField field={field} value={value} onChange={onChange} disabled={disabled} />
 
     case 'textarea':
       return (
