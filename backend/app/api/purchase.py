@@ -26,6 +26,7 @@ from app.models.purchase import (PurchaseInvoice, PurchaseInvoiceTax,
                                  PurchasePayment, TAX_KINDS)
 from app.services import period_service
 from app.services import vorsteuer as vorsteuer_service
+from app.services import kreditor
 from app.schemas.purchase import (
     PurchaseInvoiceCreate, PurchaseInvoiceUpdate, PurchaseInvoiceResponse,
     PurchaseInvoiceListItem, PurchasePaymentCreate, PurchasePaymentResponse,
@@ -278,13 +279,22 @@ async def create_invoice(
     _pruefe_eingaben(body)
     period_service.pruefe_periode_offen(db, body.date, "erfasst")
 
+    # Aufwandskonto vorbelegen, wenn keines angegeben wurde: Ein Lieferant wird
+    # fast immer auf dasselbe Konto gebucht, und das steht seit Migration 0057
+    # am Kontakt. Nur beim **Anlegen** — beim Ändern heißt ein leeres Feld, dass
+    # jemand das Konto absichtlich entfernt hat, und es wortlos wieder zu
+    # füllen wäre eine Änderung gegen den erklärten Willen.
+    konto = body.account_nr
+    if not str(konto or "").strip():
+        konto = kreditor.aufwandskonto_fuer_lieferant(db, body.supplier_id)
+
     nummer, lfd = _naechste_nummer(db, body.date.year)
     inv = PurchaseInvoice(
         internal_number=nummer, year=body.date.year, sequence=lfd,
         supplier_number=body.supplier_number, date=body.date,
         delivery_date=body.delivery_date, due_date=body.due_date,
         tax_kind=body.tax_kind, vat_deductible=body.vat_deductible,
-        vat_note=body.vat_note, account_nr=body.account_nr,
+        vat_note=body.vat_note, account_nr=konto,
         title=body.title, note=body.note, currency=body.currency,
         created_by=current_user.email, updated_by=current_user.email,
     )

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAccessToken, purchaseApi, masterdataApi } from '../services/api'
+import { getAccessToken, purchaseApi, masterdataApi, accountingApi } from '../services/api'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/PageHeader'
 import { useAuth } from '../contexts/AuthContext'
@@ -258,6 +258,7 @@ export default function EingangsrechnungenPage() {
 function ErfassungsDialog({ beleg, onClose, onSaved, nurLesen = false }) {
   const neu = !beleg.id
   const [lieferanten, setLieferanten] = useState([])
+  const [aufwandskonten, setAufwandskonten] = useState([])
   const [f, setF] = useState({
     supplier_id: beleg.supplier_id || '',
     supplier_number: beleg.supplier_number || '',
@@ -282,7 +283,30 @@ function ErfassungsDialog({ beleg, onClose, onSaved, nurLesen = false }) {
     masterdataApi.listRecords('kontakte', { limit: 500 })
       .then(r => setLieferanten(r.data.items || r.data || []))
       .catch(() => {})
+    // Nur Aufwandskonten anbieten. Auf ein Erlöskonto zu buchen wäre in einer
+    // Eingangsrechnung immer falsch — die Auswahl gar nicht erst zu zeigen
+    // erspart den Fehler, statt ihn später melden zu müssen.
+    accountingApi.listAccounts({ active_only: true })
+      .then(r => setAufwandskonten((r.data || []).filter(k => k.typ === 'aufwand')))
+      .catch(() => {})
   }, [])
+
+  /** Lieferant wechseln — und sein Standard-Aufwandskonto übernehmen.
+   *
+   * Nur, solange kein Konto gewählt ist: Wer bereits eines gesetzt hat, soll
+   * es nicht dadurch verlieren, dass er den Lieferanten korrigiert. Beim
+   * Anlegen entscheidet ohnehin der Server, falls das Feld leer bleibt — hier
+   * geht es nur darum, dass man den Vorschlag vor dem Speichern sieht.
+   */
+  function lieferantSetzen(id) {
+    const kontakt = lieferanten.find(l => l.id === id)
+    const vorschlag = (kontakt?.data?.aufwand_konto || '').trim()
+    setF(alt => ({
+      ...alt,
+      supplier_id: id,
+      account_nr: alt.account_nr?.trim() ? alt.account_nr : vorschlag,
+    }))
+  }
 
   const netto = zeilen.reduce((s, z) => s + (parseFloat(z.net_amount) || 0), 0)
   const steuer = zeilen.reduce((s, z) => s + (parseFloat(z.tax_amount) || 0), 0)
@@ -334,7 +358,7 @@ function ErfassungsDialog({ beleg, onClose, onSaved, nurLesen = false }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Lieferant</label>
-            <select value={f.supplier_id} onChange={e => setF({ ...f, supplier_id: e.target.value })}
+            <select value={f.supplier_id} onChange={e => lieferantSetzen(e.target.value)}
               className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm">
               <option value="">— ohne Kontakt —</option>
               {lieferanten.map(l => (
@@ -365,9 +389,26 @@ function ErfassungsDialog({ beleg, onClose, onSaved, nurLesen = false }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Aufwandskonto</label>
-            <input value={f.account_nr} onChange={e => setF({ ...f, account_nr: e.target.value })}
-              placeholder="z.B. 7600"
-              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm" />
+            {/* War ein freies Textfeld mit dem Platzhalter „z.B. 7600" — einer
+                Kontonummer, die im mitgelieferten EKR gar nicht vorkommt. Ein
+                Zahlendreher fiel damit erst beim Export an die Buchhaltung auf. */}
+            <select value={f.account_nr} onChange={e => setF({ ...f, account_nr: e.target.value })}
+              className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm bg-surface">
+              <option value="">— kein Konto —</option>
+              {/* Ein am Beleg gespeichertes Konto, das es im Kontenplan nicht
+                  (mehr) gibt, darf nicht stillschweigend verschwinden: Sonst
+                  leert das nächste Speichern die Buchungsangabe eines alten
+                  Belegs, ohne dass jemand sie angefasst hat. */}
+              {f.account_nr && !aufwandskonten.some(k => k.nr === f.account_nr) && (
+                <option value={f.account_nr}>{f.account_nr} (nicht im Kontenplan)</option>
+              )}
+              {aufwandskonten.map(k => (
+                <option key={k.nr} value={k.nr}>{k.nr} — {k.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-neutral-400 mt-1">
+              Vorbelegt aus dem Lieferanten (Kontakt → Finanz)
+            </p>
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-neutral-700 mb-1">Betreff</label>

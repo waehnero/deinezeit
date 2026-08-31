@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '1.12.73',
+    day: '31',
+    month: 'August',
+    year: '2026',
+    features: [
+      'Am Kontakt lässt sich ein Standard-Aufwandskonto hinterlegen; neue Eingangsrechnungen übernehmen es automatisch.',
+    ],
+    updates: [
+      'Das Aufwandskonto in der Eingangsrechnung wird jetzt aus dem Kontenplan gewählt statt von Hand getippt.',
+    ],
+  },
+  {
     version: '1.12.72',
     day: '30',
     month: 'August',

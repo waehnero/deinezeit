@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.12.73] – 2026-08-31 – Aufwandskonto am Lieferanten
+
+### Neu
+- Am Kontakt lässt sich ein Standard-Aufwandskonto hinterlegen; neue Eingangsrechnungen übernehmen es automatisch.
+
+### Aktualisierungen
+- Das Aufwandskonto in der Eingangsrechnung wird jetzt aus dem Kontenplan gewählt statt von Hand getippt.
+
+---
+
 ## [1.12.72] – 2026-08-30 – Artikelstamm mit Gruppen und automatischer Nummer
 
 ### Neu

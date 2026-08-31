@@ -513,7 +513,82 @@ def test_eingangsrechnungen_verlangen_das_modul_buchhaltung(client, db_session, 
     assert client.get("/api/purchase-invoices/open-items", headers=kopf).status_code == 403
 
 
+# ── Aufwandskonto aus dem Lieferanten (Etappe 2) ──────────────────────────────
+#
+# Die Eingangsrechnung hat keine Positionen und damit keinen Artikelbezug —
+# das Konto kann nur vom Lieferanten kommen. Gepflegt wird es am Kontakt im
+# Feld ``aufwand_konto`` (Migration 0057).
+
+def test_konto_wird_aus_dem_lieferanten_vorbelegt(auth_client, db_session):
+    lieferant = _make_lieferant(db_session, aufwand_konto="5000")
+    beleg = _erfassen(auth_client, lieferant)
+    assert beleg["account_nr"] == "5000"
+
+
+def test_eigene_angabe_hat_vorrang(auth_client, db_session):
+    """Die Vorbelegung ist ein Vorschlag, keine Vorschrift."""
+    lieferant = _make_lieferant(db_session, aufwand_konto="5000")
+    beleg = _erfassen(auth_client, lieferant, account_nr="7200")
+    assert beleg["account_nr"] == "7200"
+
+
+def test_lieferant_ohne_konto_bleibt_leer(auth_client, db_session):
+    """Kein geratenes Vorgabekonto.
+
+    Beim Erlös ist 4000 eine vertretbare Annahme — im Aufwand nicht: Miete,
+    Wareneinsatz und Personalaufwand sind verschiedene Konten. Eine sichtbare
+    Lücke ist besser als eine stille Falschbuchung.
+    """
+    beleg = _erfassen(auth_client, _make_lieferant(db_session))
+    assert not beleg["account_nr"]
+
+
+def test_leeres_kontofeld_am_kontakt_zaehlt_als_nicht_gesetzt(auth_client, db_session):
+    """Ein leeres Formularfeld kommt als "" an, nicht als None."""
+    lieferant = _make_lieferant(db_session, aufwand_konto="   ")
+    beleg = _erfassen(auth_client, lieferant)
+    assert not beleg["account_nr"]
+
+
+def test_ohne_lieferant_kein_konto(auth_client):
+    beleg = _erfassen(auth_client, None)
+    assert not beleg["account_nr"]
+
+
+def test_aendern_fuellt_ein_geleertes_konto_nicht_wieder(auth_client, db_session):
+    """Beim Ändern heißt leer: absichtlich entfernt.
+
+    Würde die Vorbelegung auch hier greifen, ließe sich ein falsch
+    zugeordnetes Konto nie entfernen — es käme beim nächsten Speichern wortlos
+    zurück. Deshalb greift sie nur beim Anlegen.
+    """
+    lieferant = _make_lieferant(db_session, aufwand_konto="5000")
+    beleg = _erfassen(auth_client, lieferant)
+    assert beleg["account_nr"] == "5000"
+
+    resp = auth_client.put(f"/api/purchase-invoices/{beleg['id']}", json={
+        "supplier_id": str(lieferant.id),
+        "date": beleg["date"],
+        "account_nr": None,
+        "taxes": [{"tax_rate": "20", "net_amount": "1000", "tax_amount": "200"}],
+    })
+    assert resp.status_code == 200, resp.text
+    assert not resp.json()["account_nr"]
+
+
 # ── Dienst-Ebene ──────────────────────────────────────────────────────────────
+
+def test_kontofindung_ohne_lieferant(db_session):
+    from app.services import kreditor
+    assert kreditor.aufwandskonto_fuer_lieferant(db_session, None) is None
+
+
+def test_kontofindung_bei_unbekanntem_kontakt(db_session):
+    """Ein Verweis ins Leere darf keinen Fehler werfen, nur nichts liefern."""
+    import uuid as _uuid
+    from app.services import kreditor
+    assert kreditor.aufwandskonto_fuer_lieferant(db_session, _uuid.uuid4()) is None
+
 
 def test_kennzahlen_vorgaben_sind_belegt():
     """060, 065, 057 und 070 sind belegt; der Rest bleibt bewusst offen."""
