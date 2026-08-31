@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.74] – 2026-08-31 – Steuerfall matrix
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.73] – 2026-08-31 – Aufwandskonto am Lieferanten
 
 ### Neu

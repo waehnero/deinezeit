@@ -12,7 +12,7 @@ from app.core.berechtigungen import SCHREIBEN, hat_recht
 from app.models.user import User
 from app.models.accounting import AccountingAccount
 from app.models.masterdata import (EntityType, FieldDefinition, EntityRecord,
-                                   ArticleGroup)
+                                   ArticleGroup, ArticleGroupAccount)
 from app.schemas.masterdata import (
     EntityTypeCreate, EntityTypeUpdate, EntityTypeResponse,
     FieldDefinitionCreate, FieldDefinitionUpdate, FieldDefinitionResponse,
@@ -20,12 +20,14 @@ from app.schemas.masterdata import (
     EntityRecordListResponse, UpdateFieldSortOrders,
     ImportRequest, ImportReport, ImportIssue,
     ArticleGroupCreate, ArticleGroupUpdate, ArticleGroupResponse,
-    ArtikelVorgaben,
+    ArticleGroupAccountBase, ArticleGroupAccountResponse,
+    ArtikelVorgaben, SteuerfallInfo,
 )
 from app.services.masterdata_service import masterdata_service
 from app.services.masterdata_import import masterdata_import
 from app.services import integrity
 from app.services import artikelstamm
+from app.services import steuerfall as steuerfall_service
 
 router = APIRouter(prefix="/masterdata", tags=["Stammdaten"])
 
@@ -642,7 +644,7 @@ async def delete_record(
 
 
 def _gruppe_antwort(db: Session, gruppe: ArticleGroup) -> ArticleGroupResponse:
-    """Gruppe samt Artikelzahl und Vorschau der nächsten Nummer."""
+    """Gruppe samt Artikelzahl, Nummernvorschau und Konten je Steuerfall."""
     antwort = ArticleGroupResponse.model_validate(gruppe)
     antwort.artikel_anzahl = _artikel_in_gruppe(db, gruppe.nr)
     try:
@@ -650,7 +652,28 @@ def _gruppe_antwort(db: Session, gruppe: ArticleGroup) -> ArticleGroupResponse:
             db, gruppe, festschreiben=False)
     except ValueError:
         antwort.naechste_artikelnummer = None
+
+    # Immer alle Steuerfälle ausliefern, auch die ungepflegten. Sonst müsste
+    # das Formular die fehlenden Zeilen selbst erfinden — und eine fehlende
+    # Zeile sähe aus wie „gibt es nicht" statt „noch nicht hinterlegt".
+    vorhandene = {k.steuerfall: k for k in gruppe.konten}
+    antwort.konten = []
+    for kennung, name in steuerfall_service.STEUERFAELLE:
+        k = vorhandene.get(kennung)
+        antwort.konten.append(ArticleGroupAccountResponse(
+            id=k.id if k else uuid_leer(),
+            steuerfall=kennung,
+            bezeichnung=name,
+            konto_nr=k.konto_nr if k else None,
+            ust_satz=k.ust_satz if k else None,
+            ohne_steuer=bool(k.ohne_steuer) if k else False,
+        ))
     return antwort
+
+
+def uuid_leer() -> UUID:
+    """Platzhalter-Kennung für einen noch nicht gespeicherten Steuerfall."""
+    return UUID("00000000-0000-0000-0000-000000000000")
 
 
 def _artikel_in_gruppe(db: Session, gruppen_nr: str) -> int:
@@ -782,6 +805,77 @@ async def update_article_group(
     return _gruppe_antwort(db, gruppe)
 
 
+@router.put("/artikelgruppen/{group_id}/konten", response_model=ArticleGroupResponse)
+async def set_article_group_accounts(
+    group_id: UUID,
+    body: List[ArticleGroupAccountBase],
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Konten je Steuerfall einer Artikelgruppe setzen (nur Admin).
+
+    Ersetzt die Zeilen vollständig — das Formular schickt immer alle vier
+    Steuerfälle. Eine teilweise Aktualisierung wäre hier gefährlicher als
+    bequem: Fehlte eine Zeile im Aufruf, bliebe unklar, ob sie unverändert
+    bleiben oder gelöscht werden soll, und im Zweifel bucht eine
+    stehengebliebene Zeile weiter auf ein Konto, das niemand mehr wollte.
+
+    Eine Zeile ohne Konto, ohne Satz und ohne „kein Satz"-Kennzeichen wird
+    nicht gespeichert: Sie sagt nichts aus, und die Kaskade würde sie
+    ohnehin überspringen.
+    """
+    gruppe = db.query(ArticleGroup).filter(ArticleGroup.id == group_id).first()
+    if not gruppe:
+        raise HTTPException(status_code=404, detail="Artikelgruppe nicht gefunden")
+
+    gesehen = set()
+    for zeile in body:
+        if not steuerfall_service.ist_gueltig(zeile.steuerfall):
+            raise HTTPException(
+                status_code=400,
+                detail=(f"Unbekannter Steuerfall „{zeile.steuerfall}“. "
+                        f"Erlaubt: {steuerfall_service.KENNUNGEN}"))
+        if zeile.steuerfall in gesehen:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Steuerfall „{zeile.steuerfall}“ kommt doppelt vor.")
+        gesehen.add(zeile.steuerfall)
+        _konto_pruefen(db, zeile.konto_nr, "Erlöskonto")
+        if zeile.ohne_steuer and zeile.ust_satz is not None:
+            raise HTTPException(
+                status_code=400,
+                detail=("„Kein Steuersatz“ und ein Steuersatz schließen "
+                        "einander aus — Reverse Charge hat keinen Satz, auch "
+                        "nicht null."))
+
+    db.query(ArticleGroupAccount).filter(
+        ArticleGroupAccount.article_group_id == gruppe.id).delete()
+
+    for zeile in body:
+        leer = (not zeile.konto_nr and zeile.ust_satz is None
+                and not zeile.ohne_steuer)
+        if leer:
+            continue
+        db.add(ArticleGroupAccount(
+            article_group_id=gruppe.id,
+            steuerfall=zeile.steuerfall,
+            konto_nr=(zeile.konto_nr or None),
+            ust_satz=zeile.ust_satz,
+            ohne_steuer=zeile.ohne_steuer,
+        ))
+
+    db.commit()
+    db.refresh(gruppe)
+    return _gruppe_antwort(db, gruppe)
+
+
+@router.get("/steuerfaelle", response_model=List[SteuerfallInfo])
+async def list_steuerfaelle(_: User = Depends(get_current_user)):
+    """Die möglichen Steuerfälle — feste Liste, siehe services/steuerfall.py."""
+    return [SteuerfallInfo(kennung=k, bezeichnung=n)
+            for k, n in steuerfall_service.STEUERFAELLE]
+
+
 @router.delete("/artikelgruppen/{group_id}")
 async def delete_article_group(
     group_id: UUID,
@@ -839,19 +933,25 @@ async def naechste_artikelnummer(
 @router.get("/artikel/{record_id}/vorgaben", response_model=ArtikelVorgaben)
 async def artikel_vorgaben(
     record_id: UUID,
+    contact_id: Optional[UUID] = Query(
+        None, description="Kunde des Belegs — bestimmt den Steuerfall"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     """Aufgelöste Vorgabewerte eines Artikels für die Belegposition.
 
-    Konto, USt-Satz und Einheit nach der Kaskade Artikel → Gruppe → Standard.
+    Konto, USt-Satz und Einheit nach der Kaskade Artikel →
+    Artikelgruppe×Steuerfall → Artikelgruppe → Standard. Der Steuerfall kommt
+    vom Kunden; ohne ``contact_id`` gilt das Inland.
+
     Der Beleg fragt hier nach, statt die Kaskade selbst nachzubauen — sonst
     gäbe es zwei Auslegungen davon, welches Konto gilt.
     """
     record = masterdata_service.get_record(db, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
-    return ArtikelVorgaben(**artikelstamm.vorgaben_fuer_artikel(db, record.data))
+    return ArtikelVorgaben(**artikelstamm.vorgaben_fuer_artikel(
+        db, record.data, contact_id=contact_id))
 
 
 # ─── Bilder an Stammdatensätzen ───────────────────────────────────────────────

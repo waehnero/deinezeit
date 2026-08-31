@@ -235,9 +235,35 @@ class ArticleGroupUpdate(BaseModel):
     sort_order: Optional[int] = None
 
 
+class ArticleGroupAccountBase(BaseModel):
+    """Konto und Steuerangabe einer Artikelgruppe für einen Steuerfall.
+
+    ``ohne_steuer`` und ``ust_satz`` sind nicht dasselbe: ``ohne_steuer``
+    heißt „kein Satz" (Reverse Charge), ``ust_satz = 0`` heißt „steuerfrei mit
+    Satz null" (IG-Lieferung, Ausfuhr). Beides leer heißt „es gilt der Satz des
+    Artikels" — der Inlandsfall.
+    """
+    steuerfall: str
+    konto_nr: Optional[str] = None
+    ust_satz: Optional[Decimal] = None
+    ohne_steuer: bool = False
+
+
+class ArticleGroupAccountResponse(ArticleGroupAccountBase):
+    id: UUID
+    # Anzeigename des Steuerfalls, damit das Frontend keine eigene
+    # Übersetzungstabelle führen muss, die auseinanderlaufen kann.
+    bezeichnung: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ArticleGroupResponse(ArticleGroupBase):
     id: UUID
     naechste_nummer: int
+    # Konten je Steuerfall; leer, solange nichts gepflegt ist.
+    konten: List[ArticleGroupAccountResponse] = []
     # Wie viele Artikel hängen an der Gruppe? Entscheidet im Frontend darüber,
     # ob Löschen angeboten wird.
     artikel_anzahl: int = 0
@@ -250,10 +276,21 @@ class ArticleGroupResponse(ArticleGroupBase):
 
 
 class ArtikelVorgaben(BaseModel):
-    """Aufgelöste Vorgabewerte eines Artikels (Kaskade Artikel → Gruppe → Standard)."""
+    """Aufgelöste Vorgabewerte eines Artikels.
+
+    Kaskade: Artikel → Artikelgruppe×Steuerfall → Artikelgruppe → Standard.
+    """
     erloes_konto: Optional[str] = None
     aufwand_konto: Optional[str] = None
     ust_satz: Optional[Decimal] = None
     reverse_charge: bool = False
     einheit: str = "Stk"
     artikelart: Optional[str] = None
+    # Zugrunde gelegter Steuerfall — damit das Belegformular anzeigen kann,
+    # *warum* dieses Konto gilt, statt es nur zu setzen.
+    steuerfall: str = "inland"
+
+
+class SteuerfallInfo(BaseModel):
+    kennung: str
+    bezeichnung: str

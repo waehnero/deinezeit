@@ -29,7 +29,9 @@ from typing import Any, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.models.accounting import AccountingAccount
-from app.models.masterdata import ArticleGroup, EntityRecord, EntityType
+from app.models.masterdata import (ArticleGroup, ArticleGroupAccount,
+                                   EntityRecord, EntityType)
+from app.services import steuerfall as steuerfall_service
 
 # Slug des Stammdaten-Typs „Artikel" (angelegt in Migration 0010)
 ARTIKEL_SLUG = "artikel"
@@ -126,24 +128,57 @@ def standard_erloeskonto(db: Session) -> Optional[str]:
     return konto.nr if konto else None
 
 
-def konten_fuer_artikel(db: Session, artikel_data: Dict[str, Any]
+def steuerfall_zeile(db: Session, gruppe: Optional[ArticleGroup],
+                     fall: str) -> Optional[ArticleGroupAccount]:
+    """Die Konten-Zeile einer Artikelgruppe für einen Steuerfall."""
+    if not gruppe:
+        return None
+    return (db.query(ArticleGroupAccount)
+            .filter(ArticleGroupAccount.article_group_id == gruppe.id,
+                    ArticleGroupAccount.steuerfall == fall)
+            .first())
+
+
+def konten_fuer_artikel(db: Session, artikel_data: Dict[str, Any],
+                        fall: str = None
                         ) -> Tuple[Optional[str], Optional[str]]:
     """
     ``(erloes_konto_nr, aufwand_konto_nr)`` für einen Artikel-Datensatz.
 
-    Reihenfolge: Artikel → Artikelgruppe → Vorgabe aus dem Kontenplan (nur für
-    den Erlös; ein Standard-Aufwandskonto gibt es bewusst nicht, weil ein
-    falsch geratenes Aufwandskonto im Einkauf schwerer auffällt als ein leeres).
+    Reihenfolge des Erlöskontos:
+    Artikel → Artikelgruppe×Steuerfall → Artikelgruppe → Vorgabe aus dem
+    Kontenplan.
+
+    **Ausnahme, die man kennen muss:** Ist der Steuerfall *nicht* das Inland,
+    gewinnt die Steuerfall-Zeile gegen ein am Artikel eingetragenes Konto. Der
+    Steuerfall ist eine rechtliche Eigenschaft des Geschäfts, das Artikelkonto
+    dagegen eine Einordnung des Sortiments. Ein Artikel mit fest hinterlegtem
+    4000 dürfte sonst eine innergemeinschaftliche Lieferung auf das
+    Inlandserlöskonto buchen — und das wäre nicht „so eingestellt", sondern
+    falsch. Im Inlandsfall gilt weiterhin das Artikelkonto.
+
+    Ein Standard-Aufwandskonto gibt es weiterhin bewusst nicht: Ein falsch
+    geratenes Aufwandskonto fällt im Einkauf schwerer auf als ein leeres.
     """
     artikel_data = artikel_data or {}
+    fall = steuerfall_service.normieren(fall)
+
     erloes = _nicht_leer(artikel_data.get("erloes_konto"))
     aufwand = _nicht_leer(artikel_data.get("aufwand_konto"))
 
-    if erloes is None or aufwand is None:
-        gruppe = gruppe_nach_nr(db, _nicht_leer(artikel_data.get("artikelgruppe")))
-        if gruppe:
-            erloes = erloes if erloes is not None else _nicht_leer(gruppe.erloes_konto_nr)
-            aufwand = aufwand if aufwand is not None else _nicht_leer(gruppe.aufwand_konto_nr)
+    gruppe = gruppe_nach_nr(db, _nicht_leer(artikel_data.get("artikelgruppe")))
+    zeile = steuerfall_zeile(db, gruppe, fall)
+
+    if fall in steuerfall_service.OHNE_INLANDSSTEUER and zeile and zeile.konto_nr:
+        erloes = _nicht_leer(zeile.konto_nr)
+    elif erloes is None and zeile:
+        erloes = _nicht_leer(zeile.konto_nr)
+
+    if gruppe:
+        if erloes is None:
+            erloes = _nicht_leer(gruppe.erloes_konto_nr)
+        if aufwand is None:
+            aufwand = _nicht_leer(gruppe.aufwand_konto_nr)
 
     if erloes is None:
         erloes = standard_erloeskonto(db)
@@ -151,23 +186,60 @@ def konten_fuer_artikel(db: Session, artikel_data: Dict[str, Any]
     return erloes, aufwand
 
 
-def vorgaben_fuer_artikel(db: Session, artikel_data: Dict[str, Any]) -> Dict[str, Any]:
+def steuerfall_des_kontakts(db: Session, contact_id) -> str:
+    """Steuerfall eines Kontakts; ohne Angabe gilt das Inland.
+
+    Bewusst das Inland als Rückfall: Wer fälschlich Inland bucht, zahlt zu viel
+    Steuer — wer fälschlich steuerfrei bucht, schuldet sie nach. Von den beiden
+    möglichen Irrtümern ist nur der erste heilbar, ohne dass es weh tut.
+    """
+    if not contact_id:
+        return steuerfall_service.VORGABE
+    rec = db.query(EntityRecord).filter(EntityRecord.id == contact_id).first()
+    if not rec:
+        return steuerfall_service.VORGABE
+    return steuerfall_service.normieren((rec.data or {}).get("steuerfall"))
+
+
+def vorgaben_fuer_artikel(db: Session, artikel_data: Dict[str, Any],
+                          contact_id=None) -> Dict[str, Any]:
     """
     Aufgelöste Vorgabewerte eines Artikels für die Belegposition.
 
     Liefert ``erloes_konto``, ``aufwand_konto``, ``ust_satz`` (als Zahl oder
-    ``None`` für Reverse Charge), ``einheit`` und ``artikelart`` — jeweils nach
-    derselben Kaskade. Der Beleg soll diese Auflösung nicht selbst nachbauen
-    müssen; genau das ist bisher schiefgegangen, als das Erlöskonto zwar im
-    Stammsatz stand, aber nie in der Position ankam.
+    ``None`` bei fehlendem Satz), ``reverse_charge``, ``einheit``,
+    ``artikelart`` und den zugrunde gelegten ``steuerfall``.
+
+    ``contact_id`` ist der Kunde des Belegs. Ohne ihn gilt das Inland — dann
+    verhält sich die Auflösung wie vor der Steuerfall-Matrix.
+
+    Der Beleg soll diese Auflösung nicht selbst nachbauen: Zwei Auslegungen
+    davon, welches Konto gilt, sind eine zu viel. Genau daran ist es vorher
+    gescheitert, als das Erlöskonto zwar im Stammsatz stand, aber nie in der
+    Position ankam.
     """
     artikel_data = artikel_data or {}
-    erloes, aufwand = konten_fuer_artikel(db, artikel_data)
-    gruppe = gruppe_nach_nr(db, _nicht_leer(artikel_data.get("artikelgruppe")))
+    fall = steuerfall_des_kontakts(db, contact_id)
 
-    ust_roh = _nicht_leer(artikel_data.get("ust_satz"))
-    if ust_roh is None and gruppe and gruppe.ust_satz is not None:
-        ust_roh = str(gruppe.ust_satz)
+    erloes, aufwand = konten_fuer_artikel(db, artikel_data, fall)
+    gruppe = gruppe_nach_nr(db, _nicht_leer(artikel_data.get("artikelgruppe")))
+    zeile = steuerfall_zeile(db, gruppe, fall)
+
+    # Steuerangabe. Die Steuerfall-Zeile gewinnt, sobald sie etwas sagt — beim
+    # Auslandsgeschäft ist der Satz eine Eigenschaft des Geschäfts, nicht des
+    # Artikels. Sagt sie nichts (Inlandsfall), zählt der Artikel, dann die
+    # Gruppe.
+    ohne_satz = False
+    satz = None
+    if zeile is not None and (zeile.ohne_steuer or zeile.ust_satz is not None):
+        ohne_satz = bool(zeile.ohne_steuer)
+        satz = None if ohne_satz else zeile.ust_satz
+    else:
+        ust_roh = _nicht_leer(artikel_data.get("ust_satz"))
+        if ust_roh is None and gruppe and gruppe.ust_satz is not None:
+            ust_roh = str(gruppe.ust_satz)
+        ohne_satz = ist_reverse_charge(ust_roh)
+        satz = ust_satz_als_zahl(ust_roh)
 
     einheit = _nicht_leer(artikel_data.get("einheit"))
     if einheit is None and gruppe:
@@ -180,10 +252,11 @@ def vorgaben_fuer_artikel(db: Session, artikel_data: Dict[str, Any]) -> Dict[str
     return {
         "erloes_konto":  erloes,
         "aufwand_konto": aufwand,
-        "ust_satz":      ust_satz_als_zahl(ust_roh),
-        "reverse_charge": ist_reverse_charge(ust_roh),
+        "ust_satz":      satz,
+        "reverse_charge": ohne_satz,
         "einheit":       einheit or "Stk",
         "artikelart":    artikelart,
+        "steuerfall":    fall,
     }
 
 
