@@ -183,3 +183,58 @@ class ArticleGroup(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))
+
+    konten = relationship("ArticleGroupAccount", back_populates="gruppe",
+                          cascade="all, delete-orphan")
+
+
+class ArticleGroupAccount(Base):
+    """
+    Erlöskonto und Steuerangabe einer Artikelgruppe **je Steuerfall**.
+
+    Die zweite Dimension der Kontenfindung: Welches Konto gilt, hängt nicht nur
+    davon ab, *was* verkauft wird (Artikelgruppe), sondern auch *an wen*
+    (Steuerfall des Kunden). Dieselbe Beratungsleistung gehört im Inland auf
+    4000 mit 20 %, an einen EU-Unternehmer auf 4060 ohne Steuersatz.
+
+    Eine eigene Tabelle statt vier weiterer Spaltenpaare an ``ArticleGroup``:
+    An jedem Steuerfall hängt nicht nur ein Konto, sondern auch eine
+    Steuerangabe — acht zusätzliche Spalten wären der Punkt, an dem die
+    Gruppentabelle unlesbar wird.
+    """
+    __tablename__ = "article_group_accounts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    article_group_id = Column(UUID(as_uuid=True),
+                              ForeignKey("article_groups.id", ondelete="CASCADE"),
+                              nullable=False)
+
+    # Kennung aus ``services/steuerfall.py`` —
+    # inland | ig_lieferung | drittland | reverse_charge
+    steuerfall = Column(String(30), nullable=False)
+
+    konto_nr = Column(String(20), nullable=True)
+
+    # Steuerangabe mit DREI Zuständen, und das ist kein Versehen:
+    #
+    #   ohne_steuer = True   → kein Steuersatz (``tax_rate = NULL``).
+    #                          Reverse Charge: Die Steuerschuld geht über, es
+    #                          gibt keinen Satz — auch nicht null.
+    #   ust_satz = 0         → steuerfrei mit Satz null. IG-Lieferung und
+    #                          Ausfuhr sind echt steuerbefreit und erscheinen
+    #                          in der Voranmeldung mit Bemessungsgrundlage.
+    #   beides leer          → kein eigener Satz; es gilt der des Artikels.
+    #                          Das ist der Inlandsfall: 20, 13 oder 10 hängen
+    #                          am Artikel, nicht am Kunden.
+    #
+    # Würde man die ersten beiden zusammenlegen, erschiene jeder
+    # Reverse-Charge-Umsatz in der Voranmeldung als steuerfreier Umsatz — genau
+    # der Fehler, den ``tax_rates.py`` schon für den Steuersatz beschreibt.
+    ust_satz = Column(Numeric(5, 2), nullable=True)
+    ohne_steuer = Column(Boolean, nullable=False, default=False)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))
+
+    gruppe = relationship("ArticleGroup", back_populates="konten")

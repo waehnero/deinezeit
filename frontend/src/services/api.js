@@ -270,7 +270,15 @@ export const masterdataApi = {
   // Vorgabewerte für die Belegposition
   naechsteArtikelnummer: (gruppe) =>
     api.get('/masterdata/artikel/naechste-nummer', { params: { gruppe } }),
-  artikelVorgaben: (recordId) => api.get(`/masterdata/artikel/${recordId}/vorgaben`),
+  // contactId bestimmt den Steuerfall und damit Konto und Steuersatz.
+  artikelVorgaben: (recordId, contactId) =>
+    api.get(`/masterdata/artikel/${recordId}/vorgaben`,
+            { params: contactId ? { contact_id: contactId } : {} }),
+
+  // Erlöskonten je Steuerfall an einer Artikelgruppe
+  setArticleGroupAccounts: (id, konten) =>
+    api.put(`/masterdata/artikelgruppen/${id}/konten`, konten),
+  listSteuerfaelle: () => api.get('/masterdata/steuerfaelle'),
 
   // Bilder an Stammdatensätzen (Feldtyp „image")
   uploadBild: (datei, size = 'mittel') => {

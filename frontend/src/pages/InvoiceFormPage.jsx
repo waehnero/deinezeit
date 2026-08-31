@@ -143,7 +143,7 @@ function ContactSearch({ value, label, onChange }) {
   )
 }
 
-function ArticleSearch({ onSelect }) {
+function ArticleSearch({ onSelect, contactId }) {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -180,7 +180,8 @@ function ArticleSearch({ onSelect }) {
                 // Auslegungen davon, welches Konto gilt — und die im Browser
                 // wäre die, die keiner prüft.
                 try {
-                  const { data: v } = await masterdataApi.artikelVorgaben(r.id)
+                  // Der Kunde bestimmt den Steuerfall und damit Konto und Satz.
+                  const { data: v } = await masterdataApi.artikelVorgaben(r.id, contactId)
                   basis.account_nr = v.erloes_konto || basis.account_nr
                   basis.unit = v.einheit || basis.unit
                   // Reverse Charge heißt: gar kein Steuersatz, nicht 0 %.
@@ -451,6 +452,68 @@ export default function InvoiceFormPage() {
     })
   }
   function updatePosition(i, field, value) { setPositions(p => p.map((pos, idx) => idx === i ? { ...pos, [field]: value } : pos)) }
+  /**
+   * Kunde wechseln — und die Positionen an seinen Steuerfall anpassen.
+   *
+   * Der Steuerfall (Inland, innergemeinschaftlich, Drittland, Reverse Charge)
+   * hängt am Kontakt und entscheidet über Erlöskonto und Steuersatz. Wird der
+   * Kunde nachträglich gewechselt, passen die schon erfassten Positionen
+   * womöglich nicht mehr.
+   *
+   * Neu bestimmt werden nur **unberührte** Positionen: solche, deren Konto und
+   * Satz noch genau dem entsprechen, was die Auflösung für den alten Kunden
+   * ergeben hätte. Wer ein Konto bewusst abweichend gesetzt hat, behält es —
+   * ein Sonderkonto für ein Projekt darf nicht dadurch verschwinden, dass
+   * jemand den Kunden korrigiert.
+   *
+   * Was geändert wurde, wird anschließend gemeldet. Eine stille Umbuchung wäre
+   * hier das Schlimmste: Sie beträfe die Konten, auf denen der Umsatz landet.
+   */
+  async function kontaktWechseln(cid, name) {
+    const alterKontakt = contactId
+    setContactId(cid)
+    setContactLabel(name)
+
+    const kandidaten = positions
+      .map((pos, i) => ({ pos, i }))
+      .filter(({ pos }) => pos.article_id)
+    if (!kandidaten.length || cid === alterKontakt) return
+
+    try {
+      const geaendert = []
+      const neu = [...positions]
+
+      for (const { pos, i } of kandidaten) {
+        const [alt, jetzt] = await Promise.all([
+          masterdataApi.artikelVorgaben(pos.article_id, alterKontakt),
+          masterdataApi.artikelVorgaben(pos.article_id, cid),
+        ])
+        const altSatz = alt.data.reverse_charge ? '' : (alt.data.ust_satz != null ? String(Number(alt.data.ust_satz)) : '')
+        const unberuehrt = (pos.account_nr || null) === (alt.data.erloes_konto || null)
+                        && String(pos.tax_rate ?? '') === altSatz
+        if (!unberuehrt) continue
+
+        const neuerSatz = jetzt.data.reverse_charge ? '' : (jetzt.data.ust_satz != null ? String(Number(jetzt.data.ust_satz)) : '')
+        if ((jetzt.data.erloes_konto || null) === (pos.account_nr || null)
+            && neuerSatz === String(pos.tax_rate ?? '')) continue
+
+        neu[i] = { ...pos, account_nr: jetzt.data.erloes_konto || null, tax_rate: neuerSatz }
+        geaendert.push(pos.description || `Position ${i + 1}`)
+      }
+
+      if (geaendert.length) {
+        setPositions(neu)
+        toast.success(
+          `Steuerfall geändert — Konto und Steuersatz angepasst: ${geaendert.join(', ')}`,
+          { duration: 7000 })
+      }
+    } catch {
+      toast.error('Der Steuerfall des neuen Kunden konnte nicht geprüft werden — '
+                + 'bitte Konten und Steuersätze der Positionen kontrollieren.',
+                { duration: 8000 })
+    }
+  }
+
   function addTimeEntries(entries) {
     setPositions(p => [...p, ...entries.map(e => ({ ...EMPTY_POSITION, pos_type: 'time_entry', description: e.description || 'Zeitaufwand', quantity: String(e.duration_hours), unit: 'h', unit_price: '0', time_entry_id: e.id }))])
   }
@@ -629,7 +692,7 @@ export default function InvoiceFormPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Kontakt</label>
-              <ContactSearch value={contactId} label={contactLabel} onChange={(cid, name) => { setContactId(cid); setContactLabel(name) }} />
+              <ContactSearch value={contactId} label={contactLabel} onChange={kontaktWechseln} />
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Titel / Betreff</label>
@@ -851,7 +914,7 @@ export default function InvoiceFormPage() {
             <h2 className="text-sm font-semibold text-neutral-700">Positionen</h2>
             <TimeEntryPicker contactId={contactId} onAdd={addTimeEntries} />
           </div>
-          <div className="mb-3"><ArticleSearch onSelect={art => addPosition(art)} /></div>
+          <div className="mb-3"><ArticleSearch contactId={contactId} onSelect={art => addPosition(art)} /></div>
           <div className="space-y-2">
             {positions.map((pos, i) => (
               <PositionRow key={i} pos={pos} index={i} taxMode={taxMode} taxRates={taxRates}

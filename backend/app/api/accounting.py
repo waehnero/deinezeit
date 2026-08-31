@@ -189,7 +189,15 @@ def _debitor_konto(db: Session) -> str:
     return acc.nr if acc else "2000"
 
 
-def _ust_gruppen(inv, default_erloes: str, steuersaetze) -> dict:
+def _konto_ust_code(konto_codes, konto_nr) -> Optional[str]:
+    """USt-Code, den das Konto selbst im Kontenplan trägt (z.B. 4050 → UIG)."""
+    if not konto_codes or not konto_nr:
+        return None
+    return konto_codes.get(str(konto_nr)) or None
+
+
+def _ust_gruppen(inv, default_erloes: str, steuersaetze,
+                 konto_codes_map=None) -> dict:
     """
     Buchungsgruppen eines Belegs: ``{(Erlöskonto, USt-Code): {net, tax, rate}}``.
 
@@ -234,6 +242,21 @@ def _ust_gruppen(inv, default_erloes: str, steuersaetze) -> dict:
             ust_code = tax_rates_service.ust_code_for(steuersaetze, 0)
         else:
             ust_code = tax_rates_service.ust_code_for(steuersaetze, rate)
+            # Bei steuerfreien Umsätzen sagt der Satz allein nicht, *warum*
+            # keine Steuer anfällt: Ausfuhr, innergemeinschaftliche Lieferung
+            # und Steuerbefreiung nach § 6 laufen über verschiedene Codes, und
+            # alle drei kommen als „0 %" hier an — vergeben wurde bisher für
+            # alle U00. Das Konto weiß es besser, denn 4040, 4050 und 4060
+            # tragen im Kontenplan ihren eigenen USt-Code.
+            #
+            # Nur für Satz 0: Bei einem echten Satz bleibt der Satz maßgeblich.
+            # Sonst würde eine 10-%-Position auf dem Konto 4000 (U20) still auf
+            # den Normalsatz gebucht — der Fehler, den ``ust_code_for`` gerade
+            # verhindert.
+            if rate is not None and Decimal(str(rate)) == 0:
+                konto_code = _konto_ust_code(konto_codes_map, konto)
+                if konto_code:
+                    ust_code = konto_code
 
         eintrag = gruppen[(konto, ust_code)]
         eintrag["net"] += net
@@ -452,6 +475,11 @@ async def export_bmd(
     default_erloes = _default_erloes_konto(db)
     default_debitor = _debitor_konto(db)
     steuersaetze = tax_rates_service.get_tax_rates(db)
+    # USt-Codes des Kontenplans, einmal gelesen: 4050 trägt UIG, 4060 URC,
+    # 4040 U00. Bei steuerfreien Positionen entscheidet dieser Code, weil der
+    # Steuersatz allein den Sachverhalt nicht kennt.
+    konto_codes = {k.nr: k.ust_code for k in db.query(AccountingAccount).all()
+                   if k.ust_code}
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
@@ -477,7 +505,7 @@ async def export_bmd(
         # Artikel > Vorgabe). Die Regel steckt in _ust_gruppen, weil der
         # Skonto-Durchlauf weiter unten dieselbe Aufteilung braucht.
         from decimal import Decimal
-        ust_groups = _ust_gruppen(inv, default_erloes, steuersaetze)
+        ust_groups = _ust_gruppen(inv, default_erloes, steuersaetze, konto_codes)
 
         for (erloes_konto, ust_code), amounts in ust_groups.items():
             net = amounts["net"]

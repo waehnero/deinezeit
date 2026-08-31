@@ -45,8 +45,11 @@ export default function ArtikelgruppenPage() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
   const [gruppen, setGruppen] = useState([])
-  const [konten, setKonten] = useState([])
+  const [kontenplan, setKontenplan] = useState([])
   const [einheiten, setEinheiten] = useState(EINHEITEN_NOTNAGEL)
+  // Konten je Steuerfall der gerade bearbeiteten Gruppe — nicht zu verwechseln
+  // mit dem Kontenplan darüber.
+  const [konten, setKonten] = useState([])
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState(null)
   const [formular, setFormular] = useState(LEER)
@@ -65,7 +68,7 @@ export default function ArtikelgruppenPage() {
         masterdataApi.getType('artikel').catch(() => null),
       ])
       setGruppen(g.data)
-      setKonten(k.data)
+      setKontenplan(k.data)
       const feld = typ?.data?.fields?.find(f => f.key === 'einheit')
       if (feld?.options?.length) setEinheiten(feld.options)
     } catch {
@@ -76,12 +79,21 @@ export default function ArtikelgruppenPage() {
   }
   useEffect(() => { laden() }, [])
 
-  const erloeskonten = konten.filter(k => k.typ === 'ertrag')
-  const aufwandskonten = konten.filter(k => k.typ === 'aufwand')
+  const erloeskonten = kontenplan.filter(k => k.typ === 'ertrag')
+  const aufwandskonten = kontenplan.filter(k => k.typ === 'aufwand')
 
   function bearbeitenStarten(g) {
     setNeu(false)
     setEditId(g.id)
+    // Das Backend liefert immer alle vier Steuerfälle, auch die ungepflegten —
+    // so muss das Formular keine fehlenden Zeilen erfinden.
+    setKonten((g.konten || []).map(k => ({
+      steuerfall: k.steuerfall,
+      bezeichnung: k.bezeichnung,
+      konto_nr: k.konto_nr || '',
+      ust_satz: k.ust_satz ?? '',
+      ohne_steuer: !!k.ohne_steuer,
+    })))
     setFormular({
       nr: g.nr, name: g.name, beschreibung: g.beschreibung || '',
       praefix: g.praefix || '', stellen: g.stellen,
@@ -94,7 +106,19 @@ export default function ArtikelgruppenPage() {
   }
 
   function abbrechen() {
-    setEditId(null); setNeu(false); setFormular(LEER)
+    setEditId(null); setNeu(false); setFormular(LEER); setKonten([])
+  }
+
+  function kontoZeileSetzen(fall, feld, wert) {
+    setKonten(l => l.map(k => k.steuerfall !== fall ? k : {
+      ...k,
+      [feld]: wert,
+      // „Kein Steuersatz" und ein Satz schließen einander aus. Reverse Charge
+      // hat keinen Satz — auch nicht null; eine Null erschiene in der UVA als
+      // steuerfreier Umsatz statt als übergegangene Steuerschuld.
+      ...(feld === 'ohne_steuer' && wert ? { ust_satz: '' } : {}),
+      ...(feld === 'ust_satz' && wert !== '' ? { ohne_steuer: false } : {}),
+    }))
   }
 
   // Leere Zeichenketten sind „nicht gesetzt", nicht „leerer Wert" — sonst
@@ -127,6 +151,16 @@ export default function ArtikelgruppenPage() {
         toast.success(`Artikelgruppe „${formular.name}" angelegt`)
       } else {
         await masterdataApi.updateArticleGroup(editId, nutzlast())
+        // Die Konten je Steuerfall werden vollständig ersetzt — das Formular
+        // schickt immer alle vier Fälle. Eine teilweise Aktualisierung ließe
+        // offen, ob eine fehlende Zeile unverändert bleiben oder verschwinden
+        // soll, und im Zweifel bucht eine stehengebliebene Zeile weiter.
+        await masterdataApi.setArticleGroupAccounts(editId, konten.map(k => ({
+          steuerfall: k.steuerfall,
+          konto_nr: k.konto_nr || null,
+          ust_satz: k.ust_satz === '' ? null : Number(k.ust_satz),
+          ohne_steuer: !!k.ohne_steuer,
+        })))
         toast.success('Gespeichert')
       }
       abbrechen()
@@ -271,6 +305,71 @@ export default function ArtikelgruppenPage() {
               </label>
             </div>
           </div>
+
+          {/* Konten je Steuerfall — nur beim Bearbeiten: Die Gruppe muss erst
+              gespeichert sein, bevor Zeilen daran hängen können. Nach dem
+              Anlegen erscheint der Block beim ersten Bearbeiten. */}
+          {!neu && konten.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-primary-200">
+              <h4 className="text-sm font-semibold text-primary-900 mb-1">
+                Erlöskonten je Steuerfall
+              </h4>
+              <p className="text-xs text-neutral-500 mb-3 max-w-2xl">
+                Welches Konto gilt, hängt auch davon ab, an wen verkauft wird.
+                Der Steuerfall steht am Kontakt (Register Finanz). Bleibt eine
+                Zeile leer, gilt das Erlöskonto der Gruppe von oben.
+              </p>
+
+              <div className="space-y-2">
+                {konten.map(k => (
+                  <div key={k.steuerfall} className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-12 sm:col-span-4 text-sm text-neutral-700">
+                      {k.bezeichnung}
+                    </div>
+                    <div className="col-span-7 sm:col-span-5">
+                      <select value={k.konto_nr}
+                        onChange={e => kontoZeileSetzen(k.steuerfall, 'konto_nr', e.target.value)}
+                        className={INPUT}>
+                        <option value="">— wie Gruppe —</option>
+                        {k.konto_nr && !erloeskonten.some(e2 => e2.nr === k.konto_nr) && (
+                          <option value={k.konto_nr}>{k.konto_nr} (nicht im Kontenplan)</option>
+                        )}
+                        {erloeskonten.map(e2 => (
+                          <option key={e2.nr} value={e2.nr}>{e2.nr} — {e2.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-5 sm:col-span-2">
+                      <input type="number" step="0.01" value={k.ust_satz}
+                        disabled={k.ohne_steuer}
+                        onChange={e => kontoZeileSetzen(k.steuerfall, 'ust_satz', e.target.value)}
+                        placeholder="USt %"
+                        className={`${INPUT} disabled:bg-neutral-100 disabled:text-neutral-400`} />
+                    </div>
+                    <div className="col-span-12 sm:col-span-1">
+                      <label className="flex items-center gap-1.5 text-xs text-neutral-600 cursor-pointer whitespace-nowrap"
+                        title="Reverse Charge: gar kein Steuersatz — nicht null Prozent">
+                        <input type="checkbox" checked={k.ohne_steuer}
+                          onChange={e => kontoZeileSetzen(k.steuerfall, 'ohne_steuer', e.target.checked)}
+                          className="w-3.5 h-3.5 accent-primary-600" />
+                        o. St.
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-[11px] text-neutral-400 mt-2 max-w-2xl">
+                „o. St." heißt <em>kein</em> Steuersatz (Reverse Charge) und ist
+                nicht dasselbe wie 0 %. Innergemeinschaftliche Lieferung und
+                Ausfuhr sind steuerfrei mit 0 % und erscheinen in der
+                Voranmeldung mit Bemessungsgrundlage; bei Reverse Charge geht
+                die Steuerschuld über. Bleibt der Satz leer, gilt der des
+                Artikels — das ist der Inlandsfall, wo 20, 13 oder 10 am Artikel
+                hängen.
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-2 mt-4">
             <button onClick={speichern} disabled={speichert}
