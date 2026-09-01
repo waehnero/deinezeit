@@ -28,6 +28,7 @@ from app.services.masterdata_import import masterdata_import
 from app.services import integrity
 from app.services import artikelstamm
 from app.services import steuerfall as steuerfall_service
+from app.core.zeitprojekte import ZEITPROJEKTE_SLUG
 
 router = APIRouter(prefix="/masterdata", tags=["Stammdaten"])
 
@@ -60,18 +61,27 @@ def _csv_wert(wert, feld) -> str:
     return wert
 
 
-def _schreibrecht_pruefen(user: User) -> None:
+def _schreibrecht_pruefen(user: User, slug: Optional[str] = None) -> None:
     """Schreibrecht auf Stammdaten verlangen.
 
     Der Router hat bewusst keine Modulsperre: Stammdaten müssen aus jedem
     anderen Modul heraus *lesbar* sein (Auswahlfelder in Zeiterfassung,
     Belegen, Aufgaben). Nur das Ändern ist eingeschränkt — und zwar seit
     Migration 0055 über das Schreibrecht statt über die reine Modulfreigabe.
+
+    Ausnahme Zeitprojekte: Sie sind aus den Stammdaten in die Zeiterfassung
+    gewandert (Beschluss 01.09.2026) und hängen deshalb am Schreibrecht des
+    Moduls „Zeiterfassung". Wer Zeiten bucht, legt das Projekt dazu an — ohne
+    dafür Kontakte und Artikel ändern zu dürfen. Ohne diese Fallunterscheidung
+    stünde die Seite im Zeiterfassungs-Menü, ließe sich aber nur mit
+    Stammdaten-Recht bedienen; das fällt erst beim Speichern auf.
     """
-    if not hat_recht(user, "stammdaten", SCHREIBEN):
+    modul = ("zeiterfassung" if slug == ZEITPROJEKTE_SLUG else "stammdaten")
+    if not hat_recht(user, modul, SCHREIBEN):
+        beschriftung = "Zeiterfassung" if modul == "zeiterfassung" else "Stammdaten"
         raise HTTPException(
             status_code=403,
-            detail=("Kein Zugriff — für „Stammdaten“ fehlt das Recht "
+            detail=(f"Kein Zugriff — für „{beschriftung}“ fehlt das Recht "
                     "„Anlegen und ändern“."))
 
 
@@ -391,8 +401,9 @@ async def create_record(
     Lesen bleibt für alle offen (Auswahlfelder in anderen Modulen) —
     Anlegen nur mit Schreibrecht auf Stammdaten. Vor Migration 0055 genügte
     hier die Modulfreigabe, die auch reines Ansehen einschloss.
+    Zeitprojekte hängen am Schreibrecht der Zeiterfassung (s. Prüffunktion).
     """
-    _schreibrecht_pruefen(current_user)
+    _schreibrecht_pruefen(current_user, slug)
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")
@@ -443,8 +454,8 @@ async def update_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Datensatz bearbeiten (erfordert Schreibrecht auf Stammdaten)."""
-    _schreibrecht_pruefen(current_user)
+    """Datensatz bearbeiten (Schreibrecht auf Stammdaten bzw. Zeiterfassung)."""
+    _schreibrecht_pruefen(current_user, slug)
     record = masterdata_service.get_record(db, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Datensatz nicht gefunden")
@@ -506,7 +517,7 @@ async def import_records(
     Neue Felder legt der Assistent vorab über die Feld-Endpunkte an (nur Admin);
     hier kommen nur Zeilen an, deren Schlüssel bereits Felder sind.
     """
-    _schreibrecht_pruefen(current_user)
+    _schreibrecht_pruefen(current_user, slug)
     et = masterdata_service.get_entity_type(db, slug)
     if not et:
         raise HTTPException(status_code=404, detail="Stammdaten-Typ nicht gefunden")

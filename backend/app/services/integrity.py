@@ -2,7 +2,7 @@
 Datenintegrität: zentrale Referenzprüfung für Stammdaten
 ========================================================
 
-Stammdaten (EntityRecords: Kontakte, Projektzeiten, Artikel, …) werden aus
+Stammdaten (EntityRecords: Kontakte, Zeitprojekte, Artikel, …) werden aus
 vielen Modulen heraus referenziert — bewusst ohne harte Foreign Keys, damit
 die Stammdaten flexibel bleiben. Die Kehrseite: Die Datenbank verhindert
 verwaiste Verweise nicht selbst.

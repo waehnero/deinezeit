@@ -11,6 +11,7 @@ from app.models.user import User, UserRole
 from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
 from app.models.masterdata import EntityRecord, EntityType
 from app.services.ki import load_ki_settings, call_ki
+from app.core import zeitprojekte
 from app.models.invoice import Invoice, InvoicePosition
 from app.schemas.zeiterfassung import (
     TimeEntryFieldCreate, TimeEntryFieldUpdate, TimeEntryFieldResponse,
@@ -197,6 +198,14 @@ async def list_entries(
     project_id: Optional[UUID] = Query(None),
     contact_id: Optional[UUID] = Query(None),
     search: Optional[str] = Query(None),
+    # Filter der Berichtsseite „Projektzeiten". Bewusst nach Namen und nicht
+    # nur nach Kennung: Der Bericht filtert über die Auswahllisten, die aus den
+    # Zeiteinträgen selbst stammen — dort steht der Name, unter dem gebucht
+    # wurde (auch bei inzwischen archivierten Zeitprojekten).
+    project_name: Optional[str] = Query(None),
+    contact_name: Optional[str] = Query(None),
+    billable: Optional[str] = Query(None, description="all | yes | no"),
+    status: Optional[str] = Query(None, description="veraenderbar | gesperrt | freigegeben | abgerechnet"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -234,6 +243,16 @@ async def list_entries(
         q = q.filter(TimeEntry.project_id == project_id)
     if contact_id:
         q = q.filter(TimeEntry.contact_id == contact_id)
+    if project_name:
+        q = q.filter(TimeEntry.project_name.ilike(f"%{project_name}%"))
+    if contact_name:
+        q = q.filter(TimeEntry.contact_name.ilike(f"%{contact_name}%"))
+    if billable == "yes":
+        q = q.filter(TimeEntry.billable == True)   # noqa: E712
+    elif billable == "no":
+        q = q.filter(TimeEntry.billable == False)  # noqa: E712
+    if status:
+        q = q.filter(TimeEntry.status == status)
     if search:
         term = f"%{search}%"
         q = q.filter(or_(
@@ -700,13 +719,13 @@ async def ki_nachtragen(
 ):
     """Transkript einer Sprachaufnahme per KI auswerten.
 
-    Liefert einen Vorschlag für „Projektzeit nachtragen" (Projektzeit,
-    Kontakt, Datum, Von/Bis, Pause, Notiz) inkl. Stammdaten-Abgleich.
-    Gespeichert wird NICHTS — der Vorschlag wird im Dialog zur Kontrolle,
-    Anpassung und Freigabe angezeigt.
+    Liefert einen Vorschlag für „Projektzeit nachtragen" (Zeitprojekt,
+    Kontakt, Datum, Von/Bis, Pause, Notiz) inkl. Abgleich mit den
+    Zeitprojekten. Gespeichert wird NICHTS — der Vorschlag wird im Dialog zur
+    Kontrolle, Anpassung und Freigabe angezeigt.
     """
-    # Projektzeiten-Stammdaten als Abgleich-Kontext laden
-    typ = db.query(EntityType).filter(EntityType.slug == "projektzeiten").first()
+    # Zeitprojekte als Abgleich-Kontext laden
+    typ = zeitprojekte.typ_holen(db)
     projekte = []
     if typ:
         records = (

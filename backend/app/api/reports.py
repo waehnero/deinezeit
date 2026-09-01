@@ -6,9 +6,9 @@ import base64
 import os
 import math
 import logging
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse, HTMLResponse
@@ -23,6 +23,7 @@ from app.models.user import User
 from app.models.zeiterfassung import TimeEntry
 from app.models.settings import Setting
 from app.models.masterdata import EntityRecord, FieldDefinition
+from app.api.berichtsvorlage import bericht_html
 
 router = APIRouter(prefix="/reports", tags=["Berichte"])
 
@@ -46,6 +47,33 @@ def _round_minutes(minutes: int, round_to: int, direction: str) -> int:
         return math.ceil(minutes / round_to) * round_to
     else:
         return math.floor(minutes / round_to) * round_to
+
+
+def _zeitgrenze(text: str, ende: bool = False) -> datetime:
+    """Eine Zeitraumgrenze aus dem Bericht einlesen.
+
+    Angenommen werden zwei Formen:
+
+      ``2026-08-01``                  reines Datum  → Tagesgrenze in UTC
+      ``2026-08-01T00:00:00+02:00``   Zeitstempel   → genau so übernommen
+
+    Die zweite Form schickt die Oberfläche, seit aufgefallen ist, dass der
+    Bericht für August einen Eintrag vom 1. September enthielt: Ein Eintrag,
+    der um 01:15 Ortszeit beginnt, liegt in UTC noch im Vormonat. Wird die
+    Grenze als UTC-Mitternacht gelesen, verschiebt sich der ganze Zeitraum um
+    die Zeitzone — vorne fehlen Einträge, hinten kommen fremde dazu.
+
+    Das reine Datum bleibt zulässig, damit ältere Lesezeichen und direkte
+    Aufrufe der Schnittstelle weiter funktionieren.
+    """
+    wert = datetime.fromisoformat(text)          # wirft ValueError bei Unsinn
+    if len(text.strip()) == 10:                  # nur Datum → Tagesgrenze
+        wert = (wert.replace(hour=23, minute=59, second=59, microsecond=999999)
+                if ende else
+                wert.replace(hour=0, minute=0, second=0, microsecond=0))
+    if wert.tzinfo is None:
+        wert = wert.replace(tzinfo=timezone.utc)
+    return wert
 
 
 def _fmt_dt(dt: datetime) -> str:
@@ -77,24 +105,19 @@ def _logo_base64(settings: dict) -> str:
     return f"data:{mime};base64,{data}"
 
 
-def _load_contact_address(db: Session, settings: dict) -> dict:
-    """
-    Liest Adressdaten aus dem verknüpften Stammdaten-Kontakt.
-    Gibt dict mit keys: name, street, zip_city, country zurück.
-    Felder werden anhand ihrer Bezeichnung erkannt (sprachunabhängig).
-    """
-    contact_id = settings.get("company_contact_id", "")
-    result = {
-        "name":     settings.get("company_name", ""),
-        "street":   "",
-        "zip_city": "",
-        "country":  "",
-    }
+def _adresse_aus_record(db: Session, record, vorgabe_name: str = "") -> dict:
+    """Adressfelder eines Kontakt-Datensatzes erkennen.
 
-    if not contact_id:
-        return result
+    Die Felder der Kontakte sind frei konfigurierbar — es gibt keine feste
+    Spalte „Straße". Erkannt wird deshalb über Feldbezeichnung *und*
+    Feldschlüssel; das überlebt Umbenennungen und andere Sprachen.
 
-    record = db.query(EntityRecord).filter(EntityRecord.id == contact_id).first()
+    Genutzt für den Absender (eigene Firma) und seit 01.09.2026 auch für den
+    Empfänger (Kunde im Kopf des Berichts) — beide brauchen dieselbe Erkennung,
+    und zwei Kopien davon würden bei der nächsten Feldumbenennung auseinander
+    laufen.
+    """
+    result = {"name": vorgabe_name, "street": "", "zip_city": "", "country": ""}
     if not record or not record.data:
         return result
 
@@ -119,10 +142,13 @@ def _load_contact_address(db: Session, settings: dict) -> dict:
     zip_val  = ""
     city_val = ""
 
-    # Rohdaten des Kontakts loggen (für Diagnose)
-    logger.info(
-        "Kontakt-Rohdaten: id=%r display_name=%r data=%r field_map=%r",
-        str(record.id), record.display_name, data, field_map
+    # Diagnose-Ausgabe: bewusst DEBUG und ohne die Feldinhalte. Auf INFO
+    # schrieb jeder erzeugte Bericht Adresse, E-Mail und Telefon des Kontakts
+    # ins Container-Log — personenbezogene Daten, die dort dauerhaft liegen
+    # bleiben und in keinem Löschkonzept auftauchen.
+    logger.debug(
+        "Kontakt-Adressfelder: id=%r felder=%r",
+        str(record.id), sorted(field_map.keys())
     )
 
     for key, label in field_map.items():
@@ -149,35 +175,34 @@ def _load_contact_address(db: Session, settings: dict) -> dict:
     if zip_city:
         result["zip_city"] = zip_city
 
-    logger.info(
-        "Kontakt-Adresse geladen: name=%r street=%r zip=%r city=%r zip_city=%r",
-        result["name"], result["street"], zip_val, city_val, result["zip_city"]
-    )
+    logger.debug("Kontakt-Adresse erkannt: %s Zeilen gefüllt",
+                 sum(1 for v in result.values() if v))
     return result
 
 
-def _company_address_html(addr: dict) -> str:
-    """Baut die Firmenadresse als HTML-Zeilen (rechtsbündig)."""
-    lines = []
-    if addr.get("name"):
-        lines.append(f'<div class="co-name">{addr["name"]}</div>')
-    # Straße und PLZ/Ort auf einer Zeile mit Komma getrennt
-    street   = addr.get("street", "").strip()
-    zip_city = addr.get("zip_city", "").strip()
-    if street and zip_city:
-        lines.append(f'<div>{street}, {zip_city}</div>')
-    elif street:
-        lines.append(f'<div>{street}</div>')
-    elif zip_city:
-        lines.append(f'<div>{zip_city}</div>')
-    if addr.get("country"):
-        lines.append(f'<div>{addr["country"]}</div>')
-    return "\n".join(lines)
+def _kunde_adresse(db: Session, name: str) -> dict:
+    """Empfängeradresse: Kontakt-Stammsatz zum Namen aus den Zeiteinträgen.
+
+    Die Zeiteinträge führen den Kontakt denormalisiert als Text mit — für den
+    Empfängerblock wird daraus der Stammsatz gesucht. Findet sich keiner
+    (Kontakt gelöscht, Name von Hand getippt), bleibt der Name ohne Adresse
+    stehen: Ein Bericht ohne Anschrift ist brauchbar, ein Bericht mit falscher
+    Anschrift nicht.
+    """
+    if not db or not name:
+        return {"name": name or "", "street": "", "zip_city": "", "country": ""}
+    record = (
+        db.query(EntityRecord)
+        .filter(EntityRecord.display_name.ilike(name.strip()),
+                EntityRecord.anonymized_at.is_(None))
+        .first()
+    )
+    return _adresse_aus_record(db, record, name)
 
 
 def _build_html(
     entries: list,
-    group_by: str,           # "aufgabe" | "benutzer"
+    group_by: str,           # "aufgabe" (= Zeitprojekt) | "benutzer"
     settings: dict,
     filters: dict,
     current_user_name: str,
@@ -185,38 +210,20 @@ def _build_html(
     round_to: int = 0,
     round_dir: str = "up",
 ) -> str:
-    """Baut das vollständige HTML für den Projektzeitbericht (Vorlage-konform)."""
+    """HTML des Projektzeitberichts — für die Vorschau und für das PDF.
 
-    # ── Daten gruppieren ──────────────────────────────────────────────────────
-    groups: dict = defaultdict(list)
-    for e in entries:
-        if group_by == "benutzer":
-            key = getattr(e.user, "full_name", "") or "Unbekannt"
-        else:
-            key = e.project_name or "(keine Aufgabe)"
-        groups[key].append(e)
-    groups = dict(sorted(groups.items()))
+    Die Gestaltung liegt in ``berichtsvorlage.py``; hier werden nur die Daten
+    zusammengetragen (Firmenkopf, Logo) und die Formatier-/Rundungsfunktionen
+    hineingereicht. So rechnet der Bericht nachweislich wie die Auswertung:
+    dieselbe ``_round_minutes``, dieselbe ``_fmt_minutes``.
+    """
+    logo_src = _logo_base64(settings)
 
-    # ── Gerundete Dauer ───────────────────────────────────────────────────────
-    def dur(e):
-        return _round_minutes(e.duration_minutes or 0, round_to, round_dir)
-
-    # ── Zusammenfassung ───────────────────────────────────────────────────────
-    summary = []
-    total_bill = 0
-    total_non  = 0
-    for grp_name, grp_entries in groups.items():
-        bill = sum(dur(e) for e in grp_entries if e.billable)
-        non  = sum(dur(e) for e in grp_entries if not e.billable)
-        total_bill += bill
-        total_non  += non
-        summary.append((grp_name, bill, non, bill + non))
-
-    # ── Firmendaten aus verknüpftem Kontakt ──────────────────────────────────
-    logo_src  = _logo_base64(settings)
-    addr      = _load_contact_address(db, settings) if db else {"name": settings.get("company_name",""), "street":"", "zip_city":"", "country":""}
-    company_addr = _company_address_html(addr)
-
+    # Ohne hinterlegtes Logo bleibt der Firmenname als Text stehen — sonst wäre
+    # der Kopf links leer und der Bericht ohne Absenderhinweis.
+    # Kein Logo im Bericht? Dann fehlt in Einstellungen → Allgemein das
+    # Kopf-Logo (600×120), oder die hinterlegte Datei liegt nicht mehr im
+    # static-Verzeichnis (siehe _logo_base64).
     if logo_src:
         logo_html = f'<img src="{logo_src}" class="logo" alt="Logo">'
     elif settings.get("company_name"):
@@ -224,275 +231,45 @@ def _build_html(
     else:
         logo_html = ""
 
-    # ── Filterzeilen ─────────────────────────────────────────────────────────
-    filter_rows = [
-        ("Datum von", filters.get("date_from", "")),
-        ("Datum bis", filters.get("date_to",   "")),
-    ]
-    if filters.get("contact_name"):
-        filter_rows.append(("Kontakt / Kunde", filters["contact_name"]))
-    if filters.get("project_name"):
-        filter_rows.append(("Aufgabe", filters["project_name"]))
-    if filters.get("user_name"):
-        filter_rows.append(("Benutzer", filters["user_name"]))
-    if filters.get("billable_label"):
-        filter_rows.append(("Verrechenbar", filters["billable_label"]))
+    # ── Empfänger (Kunde) ────────────────────────────────────────────────────
+    # Der Bericht geht in aller Regel an genau einen Kunden. Enthalten die
+    # Einträge nur einen Kontakt — sei es durch den Filter oder weil im
+    # Zeitraum nur für ihn gearbeitet wurde —, steht er als Anschriftfeld im
+    # Kopf. Bei mehreren Kunden entfällt der Block: Eine willkürlich gewählte
+    # Anschrift wäre schlimmer als gar keine.
+    kontakte = {(e.contact_name or "").strip() for e in entries}
+    kontakte.discard("")
+    empfaenger_html = ""
+    if len(kontakte) == 1:
+        adresse = _kunde_adresse(db, next(iter(kontakte)))
+        zeilen = [f'<div class="empf-name">{adresse["name"]}</div>']
+        if adresse["street"]:
+            zeilen.append(f'<div>{adresse["street"]}</div>')
+        if adresse["zip_city"]:
+            zeilen.append(f'<div>{adresse["zip_city"]}</div>')
+        if adresse["country"]:
+            zeilen.append(f'<div>{adresse["country"]}</div>')
+        empfaenger_html = "\n".join(zeilen)
 
-    filter_html = "".join(
-        f"<tr><td class='fk'>{k}</td><td class='fv'>{v}</td></tr>"
-        for k, v in filter_rows
+    # Rundung gehört in den Kopf des Berichts: Wer die Stunden nachrechnet,
+    # muss sehen, dass gerundet wurde — sonst gilt der Bericht als falsch.
+    if round_to > 0:
+        richtung = "aufgerundet" if round_dir == "up" else "abgerundet"
+        filters = {**filters,
+                   "rounding_label": f" · je Eintrag auf {round_to} min {richtung}"}
+
+    return bericht_html(
+        entries=entries,
+        group_by=group_by,
+        settings=settings,
+        filters=filters,
+        current_user_name=current_user_name,
+        logo_html=logo_html,
+        empfaenger_html=empfaenger_html,
+        fmt_minutes=_fmt_minutes,
+        fmt_dt=_fmt_dt,
+        runde=lambda e: _round_minutes(e.duration_minutes or 0, round_to, round_dir),
     )
-
-    # ── Zusammenfassung-Tabelle ───────────────────────────────────────────────
-    grp_col = "Benutzer" if group_by == "benutzer" else "Aufgabe"
-
-    summary_rows_html = "".join(
-        f"<tr>"
-        f"<td class='s-name'>{name}</td>"
-        f"<td class='s-num'>{_fmt_minutes(bill)}</td>"
-        f"<td class='s-num'>{_fmt_minutes(non)}</td>"
-        f"<td class='s-num'>{_fmt_minutes(total)}</td>"
-        f"</tr>"
-        for name, bill, non, total in summary
-    )
-
-    # ── Detail-Abschnitte ─────────────────────────────────────────────────────
-    col_header = "Benutzer" if group_by == "aufgabe" else "Aufgabe"
-
-    def entry_rows(grp_entries):
-        rows = ""
-        for e in sorted(grp_entries, key=lambda x: x.started_at):
-            user_or_task = (
-                getattr(e.user, "full_name", "") if group_by == "aufgabe"
-                else (e.project_name or "(keine Aufgabe)")
-            )
-            note  = (e.note or "").replace("\n", "<br>")
-            pause = _fmt_minutes(e.pause_minutes or 0)
-            dauer = _fmt_minutes(dur(e))
-            verr  = "Ja" if e.billable else "Nein"
-            rows += (
-                f"<tr>"
-                f"<td class='eu'>{user_or_task}</td>"
-                f"<td class='en'>{note}</td>"
-                f"<td class='et2'>{_fmt_dt(e.started_at)}</td>"
-                f"<td class='et2'>{_fmt_dt(e.ended_at)}</td>"
-                f"<td class='ed'>{pause}</td>"
-                f"<td class='ed'>{dauer}</td>"
-                f"<td class='ev'>{verr}</td>"
-                f"</tr>"
-            )
-        return rows
-
-    sections_html = ""
-    for grp_name, grp_entries in groups.items():
-        grp_total = sum(dur(e) for e in grp_entries)
-        rows      = entry_rows(grp_entries)
-        sections_html += f"""
-<div class="grp">
-  <div class="grp-title">{grp_name}</div>
-  <table class="et">
-    <thead><tr>
-      <th class="eu">{col_header}</th>
-      <th class="en">Notiz</th>
-      <th class="et2">Startzeit</th>
-      <th class="et2">Endzeit</th>
-      <th class="ed">Pause</th>
-      <th class="ed">Dauer</th>
-      <th class="ev">Verr.</th>
-    </tr></thead>
-    <tbody>{rows}</tbody>
-  </table>
-  <div class="grp-total">Gesamt: <strong>{_fmt_minutes(grp_total)}</strong></div>
-</div>
-"""
-
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
-
-    # ── Vollständiges HTML ────────────────────────────────────────────────────
-    return f"""<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<style>
-  @page {{
-    size: A4;
-    margin: 1.8cm 1.6cm 2.4cm 1.6cm;
-    @bottom-left   {{ content: "Ersteller: {current_user_name}"; font-size: 7.5pt; color: #555; font-family: Arial, sans-serif; }}
-    @bottom-center {{ content: "Seite " counter(page) " von " counter(pages); font-size: 7.5pt; color: #555; font-family: Arial, sans-serif; }}
-    @bottom-right  {{ content: "Erstellt am: {now_str}"; font-size: 7.5pt; color: #555; font-family: Arial, sans-serif; }}
-  }}
-
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-
-  body {{
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 9pt;
-    color: #1a1a1a;
-    line-height: 1.45;
-  }}
-
-  /* ── Logo oben rechts ───────────────────────────────── */
-  .hdr-logo {{ overflow: hidden; margin-bottom: 0.3cm; }}
-  .logo {{ float: right; display: block; max-height: 66px; max-width: 330px; object-fit: contain; }}
-  .logo-text {{ float: right; font-size: 14pt; font-weight: bold; color: #333; }}
-
-  /* ── Berichtstitel ──────────────────────────────────── */
-  h1 {{
-    font-size: 18pt;
-    font-weight: bold;
-    color: #1a1a1a;
-    border-bottom: 2px solid #1a1a1a;
-    padding-bottom: 0.18cm;
-    margin-bottom: 0.5cm;
-  }}
-
-  /* ── Filterbereich + Adresse ────────────────────────── */
-  .info {{
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    border-bottom: 1px solid #999;
-    padding-bottom: 0.45cm;
-    margin-bottom: 0.55cm;
-  }}
-
-  .info-left .ftitle {{ display: none; }}
-  table.ft {{ border-collapse: collapse; }}
-  table.ft td {{ padding: 1.5px 12px 1.5px 0; font-size: 8.5pt; vertical-align: top; }}
-  .fk {{ font-weight: bold; white-space: nowrap; min-width: 80px; }}
-  .fv {{ color: #333; }}
-
-  .info-right {{
-    text-align: right;
-    font-size: 8.5pt;
-    color: #333;
-    line-height: 1.65;
-    white-space: nowrap;
-  }}
-  .info-right .co-name {{ font-weight: bold; font-size: 9pt; }}
-
-  /* ── Zusammenfassung ────────────────────────────────── */
-  .sec-title {{
-    font-size: 13pt;
-    font-weight: bold;
-    margin-bottom: 0.25cm;
-  }}
-
-  table.st {{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 9pt;
-    margin-bottom: 0.75cm;
-  }}
-  table.st thead tr {{ border-bottom: 1.5px solid #1a1a1a; }}
-  table.st th {{
-    padding: 3px 0 5px 0;
-    font-weight: bold;
-    text-align: left;
-  }}
-  table.st th.r, table.st td.s-num {{ text-align: right; }}
-  table.st td {{
-    padding: 3px 0;
-    border-bottom: 0.5px solid #ddd;
-  }}
-  table.st td.s-name {{ padding-right: 8px; }}
-  table.st tr.tot td {{
-    font-weight: bold;
-    border-top: 1.5px solid #1a1a1a;
-    border-bottom: none;
-    padding-top: 5px;
-  }}
-
-  /* ── Gruppen-Abschnitte ─────────────────────────────── */
-  .grp {{
-    margin-bottom: 0.65cm;
-    page-break-inside: avoid;
-  }}
-  .grp-title {{
-    font-size: 11.5pt;
-    font-weight: bold;
-    border-bottom: 1px solid #1a1a1a;
-    padding-bottom: 2px;
-    margin-bottom: 0.18cm;
-  }}
-
-  /* ── Eintrags-Tabelle ───────────────────────────────── */
-  table.et {{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 8.5pt;
-  }}
-  table.et thead tr {{ border-bottom: 1px solid #666; }}
-  table.et th {{
-    text-align: left;
-    padding: 3px 6px 4px 0;
-    font-weight: bold;
-    white-space: nowrap;
-  }}
-  table.et td {{
-    padding: 3px 6px 3px 0;
-    border-bottom: 0.5px solid #e8e8e8;
-    vertical-align: top;
-  }}
-  table.et tbody tr:last-child td {{ border-bottom: 1px solid #888; }}
-
-  /* Spaltenbreiten */
-  .eu  {{ width: 13%; }}
-  .en  {{ width: 41%; }}
-  .et2 {{ width: 12%; white-space: nowrap; }}
-  .ed  {{ width: 6%;  text-align: right; white-space: nowrap; }}
-  .ev  {{ width: 5%;  text-align: center; }}
-
-  /* Gesamt-Zeile unter der Tabelle */
-  .grp-total {{
-    text-align: right;
-    padding: 4px 0 0 0;
-    font-size: 9pt;
-  }}
-</style>
-</head>
-<body>
-
-<!-- Logo oben rechts (float:right ist in WeasyPrint am zuverlässigsten) -->
-<div class="hdr-logo">{logo_html}</div>
-
-<!-- Berichtstitel -->
-<h1>Projektzeitbericht</h1>
-
-<!-- Filter links / Firmenadresse rechts -->
-<div class="info">
-  <div class="info-left">
-    <div class="ftitle">Filterkriterien</div>
-    <table class="ft"><tbody>{filter_html}</tbody></table>
-  </div>
-  <div class="info-right">{company_addr}</div>
-</div>
-
-<!-- Zusammenfassung -->
-<div class="sec-title">Zusammenfassung</div>
-<table class="st">
-  <thead><tr>
-    <th>{grp_col}</th>
-    <th class="r">Verrechenbar</th>
-    <th class="r">Nicht verrechenbar</th>
-    <th class="r">Gesamt</th>
-  </tr></thead>
-  <tbody>
-    {summary_rows_html}
-    <tr class="tot">
-      <td>Gesamt:</td>
-      <td class="s-num">{_fmt_minutes(total_bill)}</td>
-      <td class="s-num">{_fmt_minutes(total_non)}</td>
-      <td class="s-num">{_fmt_minutes(total_bill + total_non)}</td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- Detail-Abschnitte -->
-{sections_html}
-
-</body>
-</html>"""
 
 
 # ── Report-Endpoint ───────────────────────────────────────────────────────────
@@ -501,7 +278,7 @@ def _build_html(
 async def report_zeiterfassung(
     date_from:    str           = Query(...,       description="Von-Datum ISO (YYYY-MM-DD)"),
     date_to:      str           = Query(...,       description="Bis-Datum ISO (YYYY-MM-DD)"),
-    group_by:     str           = Query("aufgabe", description="aufgabe | benutzer"),
+    group_by:     str           = Query("aufgabe", description="aufgabe (= Zeitprojekt) | benutzer | kontakt"),
     contact_name: Optional[str] = Query(None,      description="Filter: Kontakt/Kunde"),
     project_name: Optional[str] = Query(None,      description="Filter: Aufgabe/Projektname"),
     user_id:      Optional[str] = Query(None,      description="Filter: Benutzer-UUID"),
@@ -517,29 +294,16 @@ async def report_zeiterfassung(
 
     # ── Datum parsen ──────────────────────────────────────────────────────────
     try:
-        dt_from = datetime.fromisoformat(date_from).replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
-        dt_to   = datetime.fromisoformat(date_to).replace(
-            hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
+        dt_from = _zeitgrenze(date_from)
+        dt_to   = _zeitgrenze(date_to, ende=True)
     except ValueError:
         raise HTTPException(400, "Ungültiges Datumsformat (YYYY-MM-DD erwartet)")
 
     # ── Einträge abfragen ─────────────────────────────────────────────────────
-    q = db.query(TimeEntry).filter(
-        TimeEntry.started_at >= dt_from,
-        TimeEntry.started_at <= dt_to,
-        TimeEntry.ended_at.isnot(None),
-    )
-    if contact_name:
-        q = q.filter(TimeEntry.contact_name.ilike(f"%{contact_name}%"))
-    if project_name:
-        q = q.filter(TimeEntry.project_name.ilike(f"%{project_name}%"))
-    if user_id:
-        q = q.filter(TimeEntry.user_id == user_id)
-    if billable == "yes":
-        q = q.filter(TimeEntry.billable == True)
-    elif billable == "no":
-        q = q.filter(TimeEntry.billable == False)
+    # Gemeinsame Abfrage mit der Auswertung (``_entry_query``) — inklusive der
+    # Beschränkung auf eigene Einträge beim Umfang „nur eigene".
+    q = _entry_query(db, current_user, dt_from, dt_to, contact_name,
+                     project_name, user_id, billable)
 
     entries = q.order_by(TimeEntry.started_at).all()
 
@@ -558,8 +322,10 @@ async def report_zeiterfassung(
     billable_label = {"yes": "Ja", "no": "Nein"}.get(billable or "all", "Alle")
 
     filters = {
-        "date_from":     datetime.fromisoformat(date_from).strftime("%d.%m.%Y"),
-        "date_to":       datetime.fromisoformat(date_to).strftime("%d.%m.%Y"),
+        # aus den bereits gelesenen Grenzen, nicht erneut aus dem Text —
+        # sonst steht im Kopf des Berichts ein anderes Datum, als abgefragt wurde
+        "date_from":     dt_from.strftime("%d.%m.%Y"),
+        "date_to":       dt_to.strftime("%d.%m.%Y"),
         "contact_name":  contact_name or "",
         "project_name":  project_name or "",
         "user_name":     user_name_filter,
@@ -621,13 +387,19 @@ async def report_contact_list(
     return {"contacts": [r[0] for r in rows]}
 
 
-# ── Aufgabenliste für Filter-Dropdown ────────────────────────────────────────
+# ── Zeitprojekt-Liste für Filter-Dropdown ────────────────────────────────────
 
 @router.get("/zeiterfassung/tasks")
 async def report_task_list(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
+    """Namen aller Zeitprojekte, auf die gebucht wurde (Filter-Auswahl).
+
+    Bewusst aus den Zeiteinträgen und nicht aus den Stammdaten: Gefiltert
+    werden soll, was tatsächlich vorkommt — auch Buchungen auf inzwischen
+    archivierte Zeitprojekte.
+    """
     from sqlalchemy import distinct
     rows = (
         db.query(distinct(TimeEntry.project_name))
@@ -636,3 +408,187 @@ async def report_task_list(
         .all()
     )
     return {"tasks": [r[0] for r in rows]}
+
+
+# ── Auswertung: Summen je Benutzer / Zeitprojekt / Kontakt ───────────────────
+
+def _entry_query(db: Session, current_user: User, dt_from: datetime, dt_to: datetime,
+                 contact_name: Optional[str], project_name: Optional[str],
+                 user_id: Optional[str], billable: Optional[str]):
+    """Grundabfrage für abgeschlossene Zeiteinträge im Zeitraum.
+
+    Dieselben Filter wie im PDF-Bericht — absichtlich in einer Funktion, damit
+    Auswertung und Bericht nicht auseinanderlaufen. Zwei Stellen, die dieselbe
+    Frage verschieden beantworten, sind schlimmer als eine unbequeme.
+
+    Der Umfang „nur eigene" (Rechtemodell seit Migration 0055) hat Vorrang vor
+    jedem Filter: Sonst wäre der Bericht der bequemste Weg, an die
+    Arbeitszeiten des ganzen Betriebs zu kommen — die Einträge-Liste im Modul
+    schränkt seit 0055 ein, die Auswertung tat es bis 01.09.2026 nicht.
+    """
+    from app.core.berechtigungen import darf_nur_eigene
+
+    q = db.query(TimeEntry).filter(
+        TimeEntry.started_at >= dt_from,
+        TimeEntry.started_at <= dt_to,
+        TimeEntry.ended_at.isnot(None),
+    )
+    if darf_nur_eigene(current_user, "zeiterfassung"):
+        q = q.filter(TimeEntry.user_id == current_user.id)
+    elif user_id:
+        q = q.filter(TimeEntry.user_id == user_id)
+    if contact_name:
+        q = q.filter(TimeEntry.contact_name.ilike(f"%{contact_name}%"))
+    if project_name:
+        q = q.filter(TimeEntry.project_name.ilike(f"%{project_name}%"))
+    if billable == "yes":
+        q = q.filter(TimeEntry.billable == True)   # noqa: E712
+    elif billable == "no":
+        q = q.filter(TimeEntry.billable == False)  # noqa: E712
+    return q
+
+
+@router.get("/zeiterfassung/uebersicht")
+async def report_uebersicht(
+    date_from:    str           = Query(...,         description="Von-Datum ISO (YYYY-MM-DD)"),
+    date_to:      str           = Query(...,         description="Bis-Datum ISO (YYYY-MM-DD)"),
+    group_by:     str           = Query("benutzer",  description="benutzer | zeitprojekt | kontakt"),
+    contact_name: Optional[str] = Query(None,        description="Filter: Kontakt"),
+    project_name: Optional[str] = Query(None,        description="Filter: Zeitprojekt"),
+    user_id:      Optional[str] = Query(None,        description="Filter: Benutzer-UUID"),
+    billable:     Optional[str] = Query(None,        description="all | yes | no"),
+    round_to:     int           = Query(0,           description="Auf X Minuten runden (0 = keine)"),
+    round_dir:    str           = Query("up",        description="up | down"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Summen je Benutzer, Zeitprojekt oder Kontakt für einen Zeitraum.
+
+    Grundlage der Auswertungsseiten unter Zeiterfassung → Berichte. Anders als
+    ``/zeiterfassung`` (PDF) liefert dieser Endpunkt Zahlen statt Papier: die
+    Antwort trägt je Zeile Gesamt, verrechenbar und nicht verrechenbar sowie
+    — bei Gruppierung nach Zeitprojekt — den Stand des Stundenkontos.
+
+    Gruppiert wird nach Kennung, nicht nach Namen: Wird ein Zeitprojekt
+    umbenannt, bleiben alte Buchungen unter ihrem damaligen Namen gespeichert
+    (denormalisiert) und würden sonst als zweite Zeile erscheinen. Nur wo
+    keine Kennung mitgeschrieben wurde (Altbestand), dient der Name als
+    Rückfall.
+    """
+    if group_by not in ("benutzer", "zeitprojekt", "kontakt"):
+        raise HTTPException(400, "group_by muss benutzer, zeitprojekt oder kontakt sein")
+
+    try:
+        dt_from = _zeitgrenze(date_from)
+        dt_to   = _zeitgrenze(date_to, ende=True)
+    except ValueError:
+        raise HTTPException(400, "Ungültiges Datumsformat (YYYY-MM-DD erwartet)")
+
+    entries = _entry_query(db, current_user, dt_from, dt_to, contact_name,
+                           project_name, user_id, billable).all()
+
+    # ── Gruppieren ────────────────────────────────────────────────────────────
+    zeilen: dict = {}
+    for e in entries:
+        if group_by == "benutzer":
+            schluessel = str(e.user_id)
+            name = getattr(e.user, "full_name", "") or "Unbekannt"
+            zusatz = ""
+        elif group_by == "zeitprojekt":
+            schluessel = str(e.project_id) if e.project_id else f"name:{e.project_name or ''}"
+            name = e.project_name or "(ohne Zeitprojekt)"
+            zusatz = e.contact_name or ""
+        else:
+            schluessel = str(e.contact_id) if e.contact_id else f"name:{e.contact_name or ''}"
+            name = e.contact_name or "(ohne Kontakt)"
+            zusatz = ""
+
+        zeile = zeilen.setdefault(schluessel, {
+            "schluessel": schluessel,
+            "name": name,
+            "zusatz": zusatz,
+            "project_id": str(e.project_id) if (group_by == "zeitprojekt" and e.project_id) else None,
+            "eintraege": 0,
+            "minuten": 0,
+            "verrechenbar_minuten": 0,
+            "nicht_verrechenbar_minuten": 0,
+        })
+        # Neuester Name gewinnt: Nach einer Umbenennung soll die Zeile so
+        # heißen, wie das Zeitprojekt heute heißt.
+        zeile["name"] = name or zeile["name"]
+        if zusatz:
+            zeile["zusatz"] = zusatz
+
+        minuten = _round_minutes(e.duration_minutes or 0, round_to, round_dir)
+        zeile["eintraege"] += 1
+        zeile["minuten"] += minuten
+        if e.billable:
+            zeile["verrechenbar_minuten"] += minuten
+        else:
+            zeile["nicht_verrechenbar_minuten"] += minuten
+
+    # ── Stundenkonto je Zeitprojekt ergänzen ─────────────────────────────────
+    if group_by == "zeitprojekt":
+        from app.api.zeiterfassung import _compute_budget
+        for zeile in zeilen.values():
+            if not zeile["project_id"]:
+                zeile["budget"] = None
+                continue
+            budget = _compute_budget(db, UUID(zeile["project_id"]))
+            zeile["budget"] = {
+                "has_budget": budget.has_budget,
+                "budget_minutes": budget.budget_minutes,
+                "consumed_minutes": budget.consumed_minutes,
+                "remaining_minutes": budget.remaining_minutes,
+                "exhausted": budget.exhausted,
+            }
+
+    # Größte Summe zuerst — die Auswertung soll zeigen, wo die Zeit hingeht.
+    liste = sorted(zeilen.values(), key=lambda z: (-z["minuten"], z["name"].lower()))
+    for zeile in liste:
+        zeile["anteil_verrechenbar"] = (
+            round(zeile["verrechenbar_minuten"] * 100 / zeile["minuten"])
+            if zeile["minuten"] else 0
+        )
+        zeile["dauer"] = _fmt_minutes(zeile["minuten"])
+
+    summe_minuten = sum(z["minuten"] for z in liste)
+    summe_bill    = sum(z["verrechenbar_minuten"] for z in liste)
+
+    # ── Jetzt aktiv (laufende Timer) ─────────────────────────────────────────
+    from app.core.berechtigungen import darf_nur_eigene
+
+    jetzt = datetime.now(timezone.utc)
+    laufend_q = db.query(TimeEntry).filter(TimeEntry.ended_at.is_(None))
+    if darf_nur_eigene(current_user, "zeiterfassung"):
+        laufend_q = laufend_q.filter(TimeEntry.user_id == current_user.id)
+    laufend = []
+    for e in laufend_q.all():
+        laufend.append({
+            "id": str(e.id),
+            "benutzer": getattr(e.user, "full_name", "") or "Unbekannt",
+            "zeitprojekt": e.project_name or "",
+            "kontakt": e.contact_name or "",
+            "notiz": e.note or "",
+            "startzeit": e.started_at.isoformat(),
+            "dauer_minuten": max(0, int((jetzt - e.started_at).total_seconds() // 60)
+                                 - (e.pause_minutes or 0)),
+        })
+    laufend.sort(key=lambda x: x["startzeit"])
+
+    return {
+        "von": date_from,
+        "bis": date_to,
+        "group_by": group_by,
+        "zeilen": liste,
+        "summe": {
+            "eintraege": sum(z["eintraege"] for z in liste),
+            "minuten": summe_minuten,
+            "dauer": _fmt_minutes(summe_minuten),
+            "verrechenbar_minuten": summe_bill,
+            "nicht_verrechenbar_minuten": summe_minuten - summe_bill,
+            "anteil_verrechenbar": (round(summe_bill * 100 / summe_minuten)
+                                    if summe_minuten else 0),
+        },
+        "laufend": laufend,
+    }

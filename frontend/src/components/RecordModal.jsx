@@ -5,13 +5,14 @@ import DynamicForm from './DynamicForm'
 import AttachmentPanel from './AttachmentPanel'
 import StundenkontenPanel from './StundenkontenPanel'
 import { X, Loader2, Database } from 'lucide-react'
+import { ZEITPROJEKTE_SLUG } from '../utils/zeitprojekte'
 
 /**
  * Generisches Anlege-/Bearbeiten-Modal für Stammdaten-Datensätze.
  * Aus MasterDataDetail ausgelagert, damit es auch aus anderen Modulen
- * (z.B. Zeiterfassung: unbekannte Projektzeit direkt anlegen) nutzbar ist.
+ * (z.B. Zeiterfassung: unbekanntes Zeitprojekt direkt anlegen) nutzbar ist.
  *
- * initialValues: Vorbefüllung beim Neuanlegen (z.B. eingegebener Projektzeitname).
+ * initialValues: Vorbefüllung beim Neuanlegen (z.B. eingegebener Name des Zeitprojekts).
  *
  * nurLesen: Der Datensatz darf angesehen, aber nicht gespeichert werden (fehlendes
  * Änderungsrecht auf Stammdaten). Bewusst als Vorschau statt als gesperrte Zeile:
@@ -21,11 +22,11 @@ import { X, Loader2, Database } from 'lucide-react'
 export default function RecordModal({ entityType, record, onClose, onSaved,
                                       initialValues = null, nurLesen = false }) {
   const isEdit = !!record
-  const isProjektzeit = entityType.slug === 'projektzeiten'
+  const isZeitprojekt = entityType.slug === ZEITPROJEKTE_SLUG
   const isArtikel = entityType.slug === 'artikel'
   const [values, setValues] = useState(record?.data || initialValues || {})
   const [loading, setLoading] = useState(false)
-  // Beim Neuanlegen einer Projektzeit: hier erfasste Stundenkonten werden
+  // Beim Neuanlegen eines Zeitprojekts: hier erfasste Stundenkonten werden
   // nach dem Anlegen des Datensatzes gespeichert (brauchen die Datensatz-ID).
   const [pendingKonten, setPendingKonten] = useState([])
   const [nummernVorschlag, setNummernVorschlag] = useState(null)
@@ -62,7 +63,7 @@ export default function RecordModal({ entityType, record, onClose, onSaved,
         toast.success('Datensatz aktualisiert')
       } else {
         res = await masterdataApi.createRecord(entityType.slug, values)
-        // Vorerfasste Stundenkonten jetzt zur neuen Projektzeit speichern
+        // Vorerfasste Stundenkonten jetzt zum neuen Zeitprojekt speichern
         let kontenFehler = 0
         for (const k of pendingKonten) {
           try {
@@ -147,14 +148,14 @@ export default function RecordModal({ entityType, record, onClose, onSaved,
           </div>
         </form>
 
-        {/* Stundenkonten (Budget) – bei Projektzeiten in beiden Modi:
+        {/* Stundenkonten (Budget) – bei Zeitprojekten in beiden Modi:
             beim Bearbeiten direkt über die API, beim Neuanlegen lokal
             gesammelt und mit dem Datensatz gespeichert.
             Bewusst NICHT an `nurLesen` gehängt: Stundenkonten gehören zur
             Zeiterfassung und werden dort auch serverseitig geprüft. Wer
             Zeiterfassung ändern darf, aber keine Stammdaten, muss ein Konto
             trotzdem nachtragen können. */}
-        {isProjektzeit && (
+        {isZeitprojekt && (
           <div className="px-5 pb-2 border-t border-gray-100">
             {isEdit ? (
               <StundenkontenPanel projectId={record.id} />

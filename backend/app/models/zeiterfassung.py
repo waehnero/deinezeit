@@ -94,11 +94,11 @@ class TimeEntry(Base):
 
 class Stundenkonto(Base):
     """
-    Vom Kunden im Voraus erworbenes Stundenpaket für eine Projektzeit
-    (EntityRecord vom Typ 'projektzeiten').
+    Vom Kunden im Voraus erworbenes Stundenpaket für ein Zeitprojekt
+    (EntityRecord vom Typ 'zeitprojekte').
 
-    Das verfügbare Budget einer Projektzeit ergibt sich aus der Summe
-    aller ihrer Stundenkonten. Verbraucht wird das Budget durch
+    Das verfügbare Budget eines Zeitprojekts ergibt sich aus der Summe
+    aller seiner Stundenkonten. Verbraucht wird das Budget durch
     verrechenbare Zeiteinträge auf diesem Projekt. Ist es aufgebraucht,
     soll dem Kunden ein neues Stundenkonto angeboten werden.
     """
@@ -106,8 +106,8 @@ class Stundenkonto(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # Projektzeit (EntityRecord aus Stammdaten)
-    # RESTRICT: eine Projektzeit mit Stundenkonten darf nicht gelöscht werden —
+    # Zeitprojekt (EntityRecord vom Typ 'zeitprojekte')
+    # RESTRICT: ein Zeitprojekt mit Stundenkonten darf nicht gelöscht werden —
     # sonst gingen vom Kunden erworbene Stundenpakete kommentarlos verloren.
     project_id = Column(UUID(as_uuid=True),
                         ForeignKey("entity_records.id", ondelete="RESTRICT"),
