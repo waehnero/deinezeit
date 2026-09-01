@@ -339,6 +339,8 @@ export const reportsApi = {
     api.get('/reports/zeiterfassung', { params: { ...params, format: 'html' }, responseType: 'text' }),
   getContacts: () => api.get('/reports/zeiterfassung/contacts'),
   getTasks:    () => api.get('/reports/zeiterfassung/tasks'),
+  // Auswertung: Summen je Benutzer / Zeitprojekt / Kontakt (Berichtsseiten)
+  uebersicht:  (params) => api.get('/reports/zeiterfassung/uebersicht', { params }),
 }
 
 export const settingsApi = {

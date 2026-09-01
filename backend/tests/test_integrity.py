@@ -430,12 +430,12 @@ def test_normaler_anhang_loeschbar(client, db_session, test_user, admin_user):
 # ── Stundenkonten-FK (RESTRICT) ───────────────────────────────────────────────
 
 def test_projektzeit_mit_stundenkonto_nicht_loeschbar_db(db_session, test_user):
-    """Die DB selbst verhindert das Löschen einer Projektzeit mit Stundenkonten."""
+    """Die DB selbst verhindert das Löschen eines Zeitprojekts mit Stundenkonten."""
     from datetime import date
     from sqlalchemy.exc import IntegrityError
     from app.models.zeiterfassung import Stundenkonto
 
-    rec = _make_record(db_session, slug="projektzeiten", name="Projekt X")
+    rec = _make_record(db_session, slug="zeitprojekte", name="Projekt X")
     konto = Stundenkonto(project_id=rec.id, stunden=Decimal("10"),
                          erworben_am=date(2026, 7, 1))
     db_session.add(konto)
@@ -451,7 +451,7 @@ def test_integrity_service_zaehlt_stundenkonten(db_session, test_user):
     from datetime import date
     from app.models.zeiterfassung import Stundenkonto
 
-    rec = _make_record(db_session, slug="projektzeiten", name="Projekt Y")
+    rec = _make_record(db_session, slug="zeitprojekte", name="Projekt Y")
     db_session.add(Stundenkonto(project_id=rec.id, stunden=Decimal("5"),
                                 erworben_am=date(2026, 7, 1)))
     db_session.commit()

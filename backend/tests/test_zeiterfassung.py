@@ -3,7 +3,7 @@ Tests für das Modul Zeiterfassung: Stundenkonten & Projekt-Budgets.
 
 Fachlogik:
 - Stundenkonten sind vom Kunden im Voraus erworbene Stundenpakete je
-  Projektzeit (EntityRecord vom Typ 'projektzeiten').
+  Zeitprojekt (EntityRecord vom Typ 'zeitprojekte').
 - Budget = Summe der Stundenkonten.
 - Verbraucht wird das Budget NUR durch verrechenbare, abgeschlossene
   Zeiteinträge auf dem Projekt.
@@ -15,14 +15,15 @@ from datetime import datetime, timezone, timedelta
 import pytest
 
 from app.models.masterdata import EntityType, EntityRecord
+from app.core.zeitprojekte import ZEITPROJEKTE_SLUG
 
 
 # ── Hilfen ────────────────────────────────────────────────────────────────────
 
 @pytest.fixture()
 def projektzeit(db_session):
-    """Legt Stammdaten-Typ 'projektzeiten' + eine Projektzeit an."""
-    typ = EntityType(name="Projektzeiten", slug="projektzeiten")
+    """Legt den Stammdaten-Typ 'zeitprojekte' + ein Zeitprojekt an."""
+    typ = EntityType(name="Zeitprojekte", slug=ZEITPROJEKTE_SLUG)
     db_session.add(typ)
     db_session.flush()
     record = EntityRecord(entity_type_id=typ.id, data={"name": "WWIntern"},

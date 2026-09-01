@@ -12,6 +12,26 @@ import { useAuth } from '../contexts/AuthContext'
 import { masterdataApi } from '../services/api'
 import UpdateBanner from './UpdateBanner'
 import CommandPalette from './CommandPalette'
+import { ZEITPROJEKTE_SLUG, ZEITPROJEKTE_ALTE_SLUGS, ZEITPROJEKTE_PFAD } from '../utils/zeitprojekte'
+
+// Untermenü der Zeiterfassung. Die Zeitprojekte lagen bis 01.09.2026 unter
+// Stammdaten — sie gehören fachlich hierher: Ohne Zeitprojekt lässt sich keine
+// Projektzeit buchen, und die Berichte werten beides gemeinsam aus.
+//
+// „Berichte" ist eine Zwischenüberschrift, kein eigener Menüpunkt: Die drei
+// Auswertungen sind gleichrangig, und „Zeitprojekte" (Stammsätze) darf nicht
+// direkt neben „Projektzeiten" (Bericht über Zeiteinträge) stehen — die beiden
+// Wörter sind zu ähnlich für zwei so verschiedene Ziele.
+const ZEITERFASSUNG_SUB = [
+  { to: '/zeiterfassung',                        label: 'Erfassung', end: true },
+  { to: ZEITPROJEKTE_PFAD,                       label: 'Zeitprojekte' },
+  { gruppe: 'Berichte' },
+  // ``palette``: In der ⌘K-Suche steht die Zeile ohne die Überschrift
+  // „Berichte" — ohne Zusatz gäbe es dort zweimal „Zeitprojekte".
+  { to: '/zeiterfassung/berichte/projektzeiten', label: 'Projektzeiten', palette: 'Bericht: Projektzeiten' },
+  { to: '/zeiterfassung/berichte/benutzer',      label: 'Benutzer',      palette: 'Bericht: Benutzer-Auswertung' },
+  { to: '/zeiterfassung/berichte/zeitprojekte',  label: 'Zeitprojekte',  palette: 'Bericht: Zeitprojekt-Auswertung' },
+]
 
 
 // module = Schlüssel der Modulrechte (backend/app/core/modules.py);
@@ -60,16 +80,26 @@ export default function Layout({ children }) {
   useEffect(() => {
     if (!hasModule('stammdaten')) return
     masterdataApi.listTypes()
-      .then(res => setMdTypes(res.data || []))
+      // Zeitprojekte sind aus den Stammdaten in die Zeiterfassung gewandert
+      // und dürfen hier nicht ein zweites Mal auftauchen. Die alten Slugs
+      // stehen mit in der Liste, damit die Zeile auch dann verschwindet, wenn
+      // Migration 0059 (noch) nicht gelaufen ist.
+      .then(res => setMdTypes((res.data || []).filter(
+        t => ![ZEITPROJEKTE_SLUG, ...ZEITPROJEKTE_ALTE_SLUGS].includes(t.slug))))
       .catch(() => setMdTypes([]))
     // Bei Routenwechsel innerhalb der Stammdaten neu laden (neue Typen sichtbar)
   }, [hasModule('stammdaten'), location.pathname.startsWith('/masterdata')])
   const mdOpen = location.pathname.startsWith('/masterdata')
+  const zeOpen = location.pathname.startsWith('/zeiterfassung')
 
   // Einträge der ⌘K-Befehlspalette: Module, Stammdaten-Typen, Aktionen
   const paletteItems = [
     ...NAV_ITEMS.filter(item => hasModule(item.module))
       .map(item => ({ label: item.label, icon: item.icon, to: item.to, group: 'Module' })),
+    ...(hasModule('zeiterfassung')
+      ? ZEITERFASSUNG_SUB.filter(s => s.to && s.to !== '/zeiterfassung')
+          .map(s => ({ label: s.palette || s.label, icon: Clock, to: s.to, group: 'Zeiterfassung' }))
+      : []),
     ...mdTypes.map(t2 => ({ label: t2.name, icon: Database, to: `/masterdata/${t2.slug}`, group: 'Stammdaten' })),
     ...(isAdmin ? [{ label: 'Einstellungen', icon: Settings2, to: '/settings', group: 'Aktionen' }] : []),
     { label: 'Mein Profil', icon: User, to: '/profile', group: 'Aktionen' },
@@ -131,7 +161,7 @@ export default function Layout({ children }) {
           <div key={to}>
             <NavLink to={to} onClick={() => setMobileOpen(false)}
               title={mini ? label : undefined}
-              end={module === 'stammdaten'}
+              end={module === 'stammdaten' || module === 'zeiterfassung'}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150 group ${
                   mini ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
@@ -149,10 +179,42 @@ export default function Layout({ children }) {
                       ? <ChevronDown size={14} className="ml-auto text-sidebar-text/60" />
                       : <ChevronRight size={14} className="ml-auto text-sidebar-text/60" />
                   )}
-                  {!mini && module !== 'stammdaten' && isActive && <ChevronRight size={14} className="ml-auto text-primary-400" />}
+                  {!mini && module === 'zeiterfassung' && (
+                    zeOpen
+                      ? <ChevronDown size={14} className="ml-auto text-sidebar-text/60" />
+                      : <ChevronRight size={14} className="ml-auto text-sidebar-text/60" />
+                  )}
+                  {!mini && module !== 'stammdaten' && module !== 'zeiterfassung' && isActive
+                    && <ChevronRight size={14} className="ml-auto text-primary-400" />}
                 </>
               )}
             </NavLink>
+
+            {/* Zeiterfassungs-Untermenü: Erfassung, Zeitprojekte und die drei
+                Berichte — aufgeklappt, sobald man im Bereich ist. Aufbau in
+                ZEITERFASSUNG_SUB (oben). */}
+            {module === 'zeiterfassung' && !mini && zeOpen && (
+              <div className="ml-8 mt-0.5 space-y-0.5">
+                {ZEITERFASSUNG_SUB.map((s, i) => s.gruppe ? (
+                  <p key={`g${i}`} className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-text/50 px-3 pt-2 pb-1">
+                    {s.gruppe}
+                  </p>
+                ) : (
+                  <NavLink key={s.to} to={s.to} end={s.end} onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] transition-colors ${
+                        isActive
+                          ? 'bg-sidebar-active text-sidebar-active-text font-medium'
+                          : 'text-sidebar-text/80 hover:bg-sidebar-hover hover:text-sidebar-text-hover'
+                      }`
+                    }
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60 flex-shrink-0" />
+                    <span className="truncate">{s.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            )}
 
             {/* Stammdaten-Untermenü: Typen (Kontakte, Artikel, …) aufgeklappt,
                 sobald man sich im Stammdaten-Bereich befindet */}

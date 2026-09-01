@@ -7,8 +7,9 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import {
   Users, Package, FolderOpen, Database, Plus, Settings,
-  ChevronRight, Hash, Loader2
+  ChevronRight, Hash, Loader2, Clock
 } from 'lucide-react'
+import { ZEITPROJEKTE_SLUG, ZEITPROJEKTE_ALTE_SLUGS, ZEITPROJEKTE_PFAD } from '../utils/zeitprojekte'
 
 // Icon-Mapping: Backend-Name → Lucide-Komponente
 export const ICONS = {
@@ -175,7 +176,14 @@ export default function MasterDataOverview() {
   const loadTypes = async () => {
     try {
       const res = await masterdataApi.listTypes()
-      setTypes(res.data)
+      // Zeitprojekte sind ins Zeiterfassungs-Modul gewandert (01.09.2026) und
+      // erscheinen hier nicht mehr als Karte. Statt sie kommentarlos
+      // verschwinden zu lassen, steht unten ein Hinweis mit dem neuen Weg —
+      // wer sie zwei Jahre lang in den Stammdaten gesucht hat, sucht sie beim
+      // ersten Mal auch dort. Die alten Slugs stehen mit in der Liste, damit
+      // die Karte auch vor Migration 0059 verschwindet.
+      setTypes((res.data || []).filter(
+        typ => ![ZEITPROJEKTE_SLUG, ...ZEITPROJEKTE_ALTE_SLUGS].includes(typ.slug)))
     } catch (err) {
       toast.error('Stammdaten konnten nicht geladen werden')
     } finally {
@@ -261,6 +269,20 @@ export default function MasterDataOverview() {
           })}
         </div>
       )}
+
+      {/* Wegweiser zu den Zeitprojekten */}
+      <button
+        onClick={() => navigate(ZEITPROJEKTE_PFAD)}
+        className="mt-4 w-full flex items-start gap-3 text-left bg-primary-50 border border-primary-200 rounded-2xl px-4 py-3 hover:bg-primary-100/70 transition"
+      >
+        <Clock size={17} className="text-primary-600 mt-0.5 flex-shrink-0" />
+        <span className="text-sm text-primary-800">
+          <b>Zeitprojekte</b> findest du jetzt unter <b>Zeiterfassung</b> — sie gehören zu den
+          Projektzeiten, die darauf gebucht werden.
+          <span className="block text-primary-600/80 text-xs mt-0.5">Hier klicken, um sie zu öffnen</span>
+        </span>
+        <ChevronRight size={16} className="text-primary-400 ml-auto mt-0.5 flex-shrink-0" />
+      </button>
 
       {isAdmin && showNewModal && (
         <NewTypeModal

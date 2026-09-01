@@ -178,9 +178,9 @@ class KiNachtragenRequest(BaseModel):
 class KiNachtragenResponse(BaseModel):
     """Von der KI extrahierter Vorschlag — wird im Dialog zur Kontrolle angezeigt."""
     transcript: str
-    project_id: Optional[UUID] = None      # gesetzt, wenn Projektzeit gefunden
+    project_id: Optional[UUID] = None      # gesetzt, wenn Zeitprojekt gefunden
     project_name: Optional[str] = None     # Name aus den Stammdaten (oder gesprochener Name)
-    contact_name: Optional[str] = None     # Kontakt der gefundenen Projektzeit
+    contact_name: Optional[str] = None     # Kontakt des gefundenen Zeitprojekts
     date: Optional[str] = None             # YYYY-MM-DD
     end_date: Optional[str] = None         # YYYY-MM-DD (falls über Mitternacht)
     start_time: Optional[str] = None       # HH:MM
@@ -188,11 +188,11 @@ class KiNachtragenResponse(BaseModel):
     pause_minutes: int = 0
     note: Optional[str] = None
     billable: bool = True
-    warnings: List[str] = []               # z.B. "Projektzeit 'X' nicht gefunden"
+    warnings: List[str] = []               # z.B. "Zeitprojekt 'X' nicht gefunden"
 
 
 class ProjectBudget(BaseModel):
-    """Budget-Stand einer Projektzeit (Budget = Summe der Stundenkonten,
+    """Budget-Stand eines Zeitprojekts (Budget = Summe der Stundenkonten,
     Verbrauch = verrechenbare Zeiteinträge)."""
     project_id: UUID
     has_budget: bool                 # False = keine Stundenkonten erfasst

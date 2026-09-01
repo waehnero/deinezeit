@@ -14,10 +14,10 @@ export function fmtBudgetMinutes(min) {
 }
 
 /**
- * Verwaltung der Stundenkonten einer Projektzeit.
+ * Verwaltung der Stundenkonten eines Zeitprojekts.
  *
  * Stundenkonten sind vom Kunden im Voraus erworbene Stundenpakete.
- * Das Budget der Projektzeit = Summe der Konten; verbraucht wird es
+ * Das Budget des Zeitprojekts = Summe der Konten; verbraucht wird es
  * durch verrechenbare Zeiteinträge. Ist es aufgebraucht, wird darauf
  * hingewiesen, dem Kunden ein neues Stundenkonto anzubieten.
  *
@@ -191,7 +191,7 @@ export default function StundenkontenPanel({ projectId = null, pending = [], onP
       {/* Liste der Konten */}
       {items.length === 0 ? (
         <p className="text-sm text-gray-400 py-2">
-          Noch keine Stundenkonten erfasst. Ohne Stundenkonto wird für diese Projektzeit kein Budget geführt.
+          Noch keine Stundenkonten erfasst. Ohne Stundenkonto wird für dieses Zeitprojekt kein Budget geführt.
         </p>
       ) : (
         <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">

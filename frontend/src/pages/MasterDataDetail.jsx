@@ -16,8 +16,9 @@ import PageHeader from '../components/PageHeader'
 import ResponsiveTable from '../components/ResponsiveTable'
 import Fab from '../components/Fab'
 import { ICONS } from './MasterDataOverview'
+import { ZEITPROJEKTE_SLUG } from '../utils/zeitprojekte'
 
-// ── Rest-Budget-Zelle (nur Projektzeiten) ─────────────────────────────────────
+// ── Rest-Budget-Zelle (nur Zeitprojekte) ──────────────────────────────────────
 function BudgetCell({ budget }) {
   if (!budget || !budget.has_budget) return <span className="text-gray-300">—</span>
   if (budget.exhausted) {
@@ -126,14 +127,27 @@ function RecordActions({ record, onEdit, onDelete, onArchive, onRestore,
 }
 
 // ── Hauptseite ────────────────────────────────────────────────────────────────
-export default function MasterDataDetail() {
-  const { slug } = useParams()
+/**
+ * @param {string} festerSlug  Slug fest vorgeben statt aus der Route lesen.
+ *                             Genutzt von der Seite „Zeitprojekte", die im
+ *                             Zeiterfassungs-Menü hängt und keinen
+ *                             Platzhalter in der Adresse hat.
+ * @param {string} zurueckZu   Ziel des „Zurück"-Knopfes.
+ */
+export default function MasterDataDetail({ festerSlug, zurueckZu = '/masterdata' }) {
+  const params = useParams()
+  const slug = festerSlug || params.slug
   const navigate = useNavigate()
   const { isAdmin, hasRecht } = useAuth()
   // Anlegen und Bearbeiten hängen am Gruppen-Schreibrecht. Feld-Definitionen
   // (GridFieldBuilder) sowie Archivieren/Wiederherstellen/Löschen bleiben
   // Admin-Sache — so prüft es auch der Server. Siehe Kommentar an RecordActions.
-  const darfAendern = hasRecht('stammdaten', 'schreiben')
+  //
+  // Zeitprojekte sind aus den Stammdaten in die Zeiterfassung gewandert und
+  // hängen deshalb am Schreibrecht dieses Moduls — genau wie serverseitig in
+  // api/masterdata.py (_schreibrecht_pruefen). Beide Seiten müssen dieselbe
+  // Regel anwenden, sonst zeigt die Oberfläche Knöpfe, die am Server scheitern.
+  const darfAendern = hasRecht(slug === ZEITPROJEKTE_SLUG ? 'zeiterfassung' : 'stammdaten', 'schreiben')
 
   const [entityType, setEntityType] = useState(null)
   const [records, setRecords] = useState([])
@@ -145,19 +159,19 @@ export default function MasterDataDetail() {
 
   const [modalRecord, setModalRecord] = useState(undefined) // undefined=geschlossen, null=neu, obj=bearbeiten
   const [typFilter, setTypFilter] = useState('') // nur bei slug === 'kontakte' genutzt
-  const [budgets, setBudgets] = useState({}) // nur bei slug === 'projektzeiten': { [recordId]: ProjectBudget }
+  const [budgets, setBudgets] = useState({}) // nur bei Zeitprojekten: { [recordId]: ProjectBudget }
   const [showArchived, setShowArchived] = useState(false) // Archiv-Ansicht (nur mit Löschrecht)
 
-  const isProjektzeiten = slug === 'projektzeiten'
+  const isZeitprojekte = slug === ZEITPROJEKTE_SLUG
 
-  // Rest-Budgets für die sichtbaren Projektzeiten laden
+  // Rest-Budgets der sichtbaren Zeitprojekte laden
   const loadBudgets = useCallback(async (items) => {
-    if (!isProjektzeiten || !items?.length) return
+    if (!isZeitprojekte || !items?.length) return
     try {
       const res = await zeiterfassungApi.getBudgets(items.map(r => r.id))
       setBudgets(Object.fromEntries(res.data.map(b => [b.project_id, b])))
     } catch { /* Budgets sind Zusatzinfo – Fehler nicht blockierend */ }
-  }, [isProjektzeiten])
+  }, [isZeitprojekte])
 
   const loadType = useCallback(async () => {
     try {
@@ -165,7 +179,7 @@ export default function MasterDataDetail() {
       setEntityType(res.data)
     } catch {
       toast.error('Stammdaten-Typ nicht gefunden')
-      navigate('/masterdata')
+      navigate(zurueckZu)
     }
   }, [slug])
 
@@ -201,7 +215,7 @@ export default function MasterDataDetail() {
     }
     setModalRecord(undefined)
     // Budgets können sich durch Stundenkonto-Änderungen im Modal geändert haben
-    if (isProjektzeiten) loadBudgets(modalRecord ? records : [saved, ...records])
+    if (isZeitprojekte) loadBudgets(modalRecord ? records : [saved, ...records])
   }
 
   const handleDelete = async (record) => {
@@ -265,7 +279,7 @@ export default function MasterDataDetail() {
         subtitle={`${total} ${total === 1 ? 'Eintrag' : 'Einträge'}${showArchived ? ' · Archiv' : ''}`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          <button onClick={() => navigate('/masterdata')}
+          <button onClick={() => navigate(zurueckZu)}
             className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border bg-surface text-gray-600 border-gray-300 hover:bg-neutral-50 transition">
             <ArrowLeft size={16} /> Zurück
           </button>
@@ -387,7 +401,7 @@ export default function MasterDataDetail() {
                 key: f.key, label: f.name,
                 render: r => formatFieldValue(f, r.data[f.key]),
               })),
-              ...(isProjektzeiten ? [{
+              ...(isZeitprojekte ? [{
                 key: '_budget', label: 'Stundenkonto',
                 render: r => <BudgetCell budget={budgets[r.id]} />,
               }] : []),
@@ -435,7 +449,7 @@ export default function MasterDataDetail() {
           onClose={() => {
             setModalRecord(undefined)
             // Stundenkonten könnten im Modal geändert worden sein → Restwerte aktualisieren
-            if (isProjektzeiten) loadBudgets(records)
+            if (isZeitprojekte) loadBudgets(records)
           }}
           onSaved={handleSaved}
           nurLesen={!darfAendern}

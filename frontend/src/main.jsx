@@ -21,6 +21,9 @@ import UserManagementPage from './pages/UserManagementPage'
 import GruppenPage from './pages/GruppenPage'
 import ZeiterfassungPage from './pages/ZeiterfassungPage'
 import ZeiterfassungFelder from './pages/ZeiterfassungFelder'
+import ZeitprojektePage from './pages/ZeitprojektePage'
+import BerichtProjektzeitenPage from './pages/BerichtProjektzeitenPage'
+import BerichtAuswertungPage from './pages/BerichtAuswertungPage'
 import SettingsPage from './pages/SettingsPage'
 import DatacenterPage from './pages/DatacenterPage'
 import InvoicePage from './pages/InvoicePage'
@@ -111,12 +114,31 @@ function App() {
                           Platzhalter „artikelgruppen" ab und sucht einen
                           Stammdaten-Typ, den es nicht gibt. */}
                       <Route path="/masterdata/artikelgruppen" element={<ModuleRoute module="stammdaten"><ArtikelgruppenPage /></ModuleRoute>} />
+                      {/* Zeitprojekte hießen früher „projekte" (bis Migration
+                          0038) bzw. „projektzeiten" (bis 0059) und lagen in
+                          den Stammdaten. Beide Pfade stecken in Lesezeichen
+                          und in PWA-Verknüpfungen — sie führen jetzt an die
+                          neue Stelle statt in einen leeren Stammdaten-Typ.
+                          MUSS vor /masterdata/:slug stehen. */}
+                      <Route path="/masterdata/zeitprojekte"  element={<Navigate to="/zeiterfassung/zeitprojekte" replace />} />
+                      <Route path="/masterdata/projektzeiten" element={<Navigate to="/zeiterfassung/zeitprojekte" replace />} />
+                      <Route path="/masterdata/projekte"      element={<Navigate to="/zeiterfassung/zeitprojekte" replace />} />
                       <Route path="/masterdata/:slug"     element={<ModuleRoute module="stammdaten"><MasterDataDetail /></ModuleRoute>} />
                       <Route path="/profile"              element={<ProfilePage />} />
                       <Route path="/users"                element={<UserManagementPage />} />
                       {/* Rechtegruppen: nur Admin — wer Rechte verwaltet, kann sich selbst alles zuteilen */}
                       <Route path="/users/gruppen"        element={<AdminRoute><GruppenPage /></AdminRoute>} />
                       <Route path="/zeiterfassung"        element={<ModuleRoute module="zeiterfassung"><ZeiterfassungPage /></ModuleRoute>} />
+                      {/* Zeitprojekte: aus den Stammdaten ins Zeiterfassungs-
+                          Modul gezogen (01.09.2026). Die Seite zeigt weiterhin
+                          den Stammdaten-Baukasten, hängt aber am Modul
+                          Zeiterfassung — dort wird auch gebucht. */}
+                      <Route path="/zeiterfassung/zeitprojekte" element={<ModuleRoute module="zeiterfassung"><ZeitprojektePage /></ModuleRoute>} />
+                      {/* Berichte: früher ein Dialog auf der Erfassungsseite */}
+                      <Route path="/zeiterfassung/berichte"                element={<Navigate to="/zeiterfassung/berichte/projektzeiten" replace />} />
+                      <Route path="/zeiterfassung/berichte/projektzeiten"  element={<ModuleRoute module="zeiterfassung"><BerichtProjektzeitenPage /></ModuleRoute>} />
+                      <Route path="/zeiterfassung/berichte/benutzer"       element={<ModuleRoute module="zeiterfassung"><BerichtAuswertungPage gruppierung="benutzer" /></ModuleRoute>} />
+                      <Route path="/zeiterfassung/berichte/zeitprojekte"   element={<ModuleRoute module="zeiterfassung"><BerichtAuswertungPage gruppierung="zeitprojekt" /></ModuleRoute>} />
                       <Route path="/aufgaben"             element={<ModuleRoute module="aufgaben"><AufgabenPage /></ModuleRoute>} />
                       <Route path="/postecke"             element={<ModuleRoute module="postecke"><PosteckePage /></ModuleRoute>} />
                       <Route path="/projekte"             element={<ModuleRoute module="projekte"><ProjektplanPage /></ModuleRoute>} />

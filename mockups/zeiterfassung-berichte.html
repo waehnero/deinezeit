@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeineZeit – Zeiterfassung: Zeitprojekte & Berichte</title>
+<style>
+  :root {
+    --p-50:#fff7ed; --p-100:#ffedd5; --p-200:#fed7aa; --p-300:#fdba74; --p-400:#fb923c;
+    --p-500:#f97316; --p-600:#ea580c; --p-700:#c2410c;
+    --n-50:#f9fafb; --n-100:#f3f4f6; --n-200:#e5e7eb; --n-300:#d1d5db; --n-400:#9ca3af;
+    --n-500:#6b7280; --n-600:#4b5563; --n-700:#374151; --n-800:#1f2937; --n-900:#111827;
+    --green:#22c55e; --red:#ef4444; --amber:#f59e0b; --blue:#3b82f6;
+    --shadow:0 1px 3px 0 rgb(0 0 0 / .07), 0 1px 2px -1px rgb(0 0 0 / .07);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:Inter,system-ui,-apple-system,sans-serif; background:#eceef1; color:var(--n-900); padding:20px; }
+
+  /* ── Steuerleiste ── */
+  .toolbar { max-width:1500px; margin:0 auto 16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+  .toolbar h1 { font-size:17px; }
+  .toolbar .hint { font-size:12px; color:var(--n-500); width:100%; line-height:1.5; }
+  .seg { display:inline-flex; background:#fff; border-radius:10px; padding:3px; box-shadow:var(--shadow); gap:2px; flex-wrap:wrap; }
+  .seg button { border:0; background:transparent; padding:7px 13px; border-radius:8px; font:inherit; font-size:13px; font-weight:600; color:var(--n-500); cursor:pointer; }
+  .seg button.on { background:var(--p-500); color:#fff; }
+  .seg button:hover:not(.on) { background:var(--n-100); }
+  .seglabel { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--n-400); align-self:center; margin-right:2px; }
+
+  /* ── Geräte-Rahmen ── */
+  .stage { display:flex; justify-content:center; }
+  .frame { background:var(--n-50); border-radius:22px; box-shadow:0 8px 40px rgb(0 0 0 / .18); border:1px solid var(--n-200);
+           overflow:hidden; transition:width .25s; height:82vh; display:flex; }
+  .frame[data-device="iphone"]  { width:390px; }
+  .frame[data-device="ipad"]    { width:834px; }
+  .frame[data-device="macbook"] { width:1180px; }
+  .frame[data-device="desktop"] { width:1460px; max-width:98vw; }
+
+  /* ── Sidebar ── */
+  .side { width:224px; flex:none; background:#fff; border-right:1px solid var(--n-200); display:flex; flex-direction:column; overflow-y:auto; }
+  .frame[data-device="iphone"] .side { display:none; }
+  .frame[data-device="ipad"] .side { width:208px; }
+  .side .brand { display:flex; align-items:center; gap:10px; padding:16px 14px; border-bottom:1px solid var(--n-200); }
+  .side .brand .logo { width:30px; height:30px; border-radius:9px; background:var(--p-500); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex:none; }
+  .side .brand b { font-size:13px; }
+  .side .brand small { display:block; font-size:10px; color:var(--n-400); font-weight:500; }
+  .side nav { padding:12px 10px; flex:1; }
+  .side .cap { font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--n-400); padding:0 8px 8px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:9px; font-size:13px; font-weight:500; color:var(--n-600); cursor:pointer; }
+  .nav-item:hover { background:var(--n-100); color:var(--n-900); }
+  .nav-item.on { background:var(--p-50); color:var(--p-700); font-weight:600; }
+  .nav-item .ic { width:17px; text-align:center; flex:none; font-size:13px; }
+  .nav-item .chev { margin-left:auto; color:var(--n-400); font-size:10px; }
+  .subnav { margin:2px 0 4px 26px; display:flex; flex-direction:column; gap:1px; }
+  .sub-item { display:flex; align-items:center; gap:8px; padding:7px 11px; border-radius:9px; font-size:12.5px; color:var(--n-600); cursor:pointer; }
+  .sub-item:hover { background:var(--n-100); color:var(--n-900); }
+  .sub-item.on { background:var(--p-50); color:var(--p-700); font-weight:600; }
+  .sub-item .dot { width:5px; height:5px; border-radius:99px; background:currentColor; opacity:.55; flex:none; }
+  .subcap { font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--n-400); padding:9px 11px 4px; }
+  .side .foot { padding:10px; border-top:1px solid var(--n-200); }
+
+  /* Menüvarianten umschalten */
+  body[data-menu="A"] .menu-B, body[data-menu="B"] .menu-A { display:none; }
+
+  /* ── Inhaltsbereich ── */
+  .main { flex:1; overflow-y:auto; min-width:0; }
+  .mobilehead { display:none; align-items:center; justify-content:space-between; padding:11px 14px; background:#fff; border-bottom:1px solid var(--n-200); position:sticky; top:0; z-index:20; }
+  .frame[data-device="iphone"] .mobilehead { display:flex; }
+  .inner { padding:20px 22px 60px; }
+  .frame[data-device="iphone"] .inner { padding:14px 14px 70px; }
+
+  .card { background:#fff; border-radius:14px; box-shadow:var(--shadow); padding:16px; }
+  .apphead { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .apphead .ttl { display:flex; align-items:center; gap:10px; }
+  .apphead .ticon { width:36px; height:36px; border-radius:11px; background:var(--p-50); color:var(--p-600); display:flex; align-items:center; justify-content:center; font-size:17px; flex:none; }
+  .apphead h2 { font-size:19px; }
+  .apphead .sub { font-size:12px; color:var(--n-500); }
+  .btn { display:inline-flex; align-items:center; gap:6px; border:0; border-radius:9px; padding:7px 12px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .btn-ghost { background:var(--n-100); color:var(--n-600); }
+  .btn-line { background:#fff; color:var(--n-600); border:1px solid var(--n-300); }
+  .btn-prim { background:var(--p-500); color:#fff; }
+  .muted { color:var(--n-400); font-size:11.5px; }
+  .badge { font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:99px; display:inline-block; }
+  .b-green { background:#f0fdf4; color:#15803d; }
+  .b-red   { background:#fef2f2; color:var(--red); }
+  .b-amber { background:#fffbeb; color:#b45309; }
+  .b-gray  { background:var(--n-100); color:var(--n-500); }
+  .b-blue  { background:#eff6ff; color:#1d4ed8; }
+
+  /* Hinweisbanner „umgezogen" */
+  .moved { display:flex; gap:10px; align-items:flex-start; background:var(--p-50); border:1px solid var(--p-200); border-radius:12px; padding:11px 13px; margin-bottom:14px; font-size:12.5px; color:var(--p-700); line-height:1.5; }
+
+  /* ── Zeitraumleiste ── */
+  .zeitraum { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:14px; }
+  .zseg { display:inline-flex; background:#fff; border:1px solid var(--n-200); border-radius:10px; padding:3px; gap:2px; box-shadow:var(--shadow); }
+  .zseg button { border:0; background:transparent; padding:6px 12px; border-radius:8px; font:inherit; font-size:12.5px; font-weight:600; color:var(--n-500); cursor:pointer; }
+  .zseg button.on { background:var(--p-500); color:#fff; }
+  .zseg button:hover:not(.on) { background:var(--n-100); }
+  .znav { display:inline-flex; background:#fff; border:1px solid var(--n-200); border-radius:10px; overflow:hidden; box-shadow:var(--shadow); }
+  .znav button { border:0; background:#fff; padding:7px 12px; font:inherit; font-size:13px; color:var(--n-500); cursor:pointer; }
+  .znav button:hover { background:var(--n-100); }
+  .znav button + button { border-left:1px solid var(--n-200); }
+  .zdate { display:inline-flex; align-items:center; gap:7px; background:#fff; border:1px solid var(--n-200); border-radius:10px; padding:6px 11px; font-size:12.5px; box-shadow:var(--shadow); }
+  .zdate span { color:var(--n-400); font-size:11.5px; }
+  .zdate b { font-weight:600; font-variant-numeric:tabular-nums; }
+
+  /* ── Filterblock ── */
+  .filters { display:grid; grid-template-columns:repeat(3,1fr); gap:12px 16px; }
+  .frame[data-device="iphone"] .filters { grid-template-columns:1fr; }
+  .frame[data-device="ipad"] .filters { grid-template-columns:repeat(2,1fr); }
+  .fld label { display:block; font-size:11px; font-weight:600; color:var(--n-500); margin-bottom:4px; }
+  .fld .inp { display:flex; align-items:center; gap:6px; border:1px solid var(--n-300); border-radius:9px; padding:7px 10px; font-size:12.5px; color:var(--n-700); background:#fff; }
+  .fld .inp.ph { color:var(--n-400); }
+  .fld .inp .car { margin-left:auto; color:var(--n-400); font-size:10px; }
+
+  /* ── Summenzeile ── */
+  .sums { display:flex; flex-wrap:wrap; align-items:flex-end; gap:26px; margin:14px 0; }
+  .sum p { font-size:11px; font-weight:600; color:var(--n-500); text-transform:uppercase; letter-spacing:.05em; }
+  .sum b { font-size:24px; font-variant-numeric:tabular-nums; display:block; line-height:1.2; }
+  .sum.g b { color:#15803d; }
+  .sum.n b { color:var(--n-400); }
+  .rundung { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .frame[data-device="iphone"] .rundung { margin-left:0; }
+
+  /* ── Tabelle ── */
+  .tbl-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  thead th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--n-500); font-weight:700;
+             padding:9px 10px; border-bottom:1px solid var(--n-200); background:var(--n-50); white-space:nowrap; }
+  tbody td { padding:9px 10px; border-bottom:1px solid var(--n-100); vertical-align:middle; }
+  tbody tr:hover { background:var(--p-50); }
+  tfoot td { padding:10px; font-weight:700; border-top:2px solid var(--n-200); background:var(--n-50); }
+  .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .bar { height:6px; background:var(--n-100); border-radius:99px; overflow:hidden; min-width:70px; }
+  .bar i { display:block; height:100%; border-radius:99px; background:var(--p-500); }
+  .bar i.gr { background:var(--green); }
+
+  /* Handy: Tabellen als Karten (Regel aus ResponsiveTable) */
+  .cards { display:none; flex-direction:column; gap:9px; }
+  .frame[data-device="iphone"] .cards { display:flex; }
+  .frame[data-device="iphone"] .tbl-wrap { display:none; }
+  .mcard { border:1px solid var(--n-200); border-radius:12px; padding:11px 12px; background:#fff; }
+  .mcard .top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; margin-bottom:5px; }
+  .mcard b { font-size:13px; }
+  .mcard .kv { display:flex; justify-content:space-between; font-size:12px; color:var(--n-600); padding:2px 0; }
+
+  .sechead { display:flex; align-items:center; gap:9px; margin:18px 0 10px; }
+  .sechead h3 { font-size:13.5px; }
+  .sechead .line { flex:1; height:1px; background:var(--n-200); }
+
+  .page { display:none; }
+  .page.on { display:block; }
+
+  /* Bottom-Tab-Bar (nur iPhone) */
+  .tabbar { display:none; position:sticky; bottom:0; background:#fff; border-top:1px solid var(--n-200); }
+  .frame[data-device="iphone"] .tabbar { display:flex; }
+  .tabbar div { flex:1; text-align:center; padding:8px 2px; font-size:9.5px; font-weight:600; color:var(--n-400); }
+  .tabbar div.on { color:var(--p-600); }
+  .tabbar div span { display:block; font-size:16px; }
+
+  /* ── Konzept-Notizen ── */
+  .notes { max-width:1500px; margin:22px auto 0; display:grid; gap:13px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); }
+  .notes .card h4 { font-size:13.5px; margin-bottom:7px; }
+  .notes .card p, .notes .card li { font-size:12.5px; color:var(--n-600); line-height:1.6; }
+  .notes .card ul { padding-left:17px; }
+  .notes .card code { background:var(--n-100); border-radius:5px; padding:1px 5px; font-size:11.5px; }
+</style>
+</head>
+<body data-menu="B">
+
+<div class="toolbar">
+  <h1>🕒 DeineZeit – Zeiterfassung: Zeitprojekte &amp; Berichte</h1>
+  <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    <span class="seglabel">Menü</span>
+    <div class="seg" id="segMenu">
+      <button data-m="A">A · flach</button>
+      <button data-m="B" class="on">B · gruppiert</button>
+    </div>
+    <span class="seglabel">Gerät</span>
+    <div class="seg" id="segDevice">
+      <button data-d="iphone">iPhone</button>
+      <button data-d="ipad">iPad</button>
+      <button data-d="macbook" class="on">MacBook</button>
+      <button data-d="desktop">Desktop</button>
+    </div>
+  </div>
+  <div class="seg" id="segPage" style="margin-top:2px;">
+    <button data-p="zeitprojekte" class="on">Zeitprojekte</button>
+    <button data-p="projektzeiten">Bericht · Projektzeiten</button>
+    <button data-p="benutzer">Bericht · Benutzer</button>
+    <button data-p="auswertung">Bericht · Zeitprojekte</button>
+    <button data-p="erfassung">Erfassung (heute)</button>
+  </div>
+  <p class="hint">
+    Oben umschalten: <b>Menüvariante</b> (wie die Unterpunkte in der Seitenleiste gruppiert sind), <b>Gerät</b> und <b>Seite</b>.
+    Die Einträge in der Seitenleiste sind klickbar. Begriffe im Mockup bewusst getrennt:
+    <b>Zeitprojekt</b> = Stammsatz (Kunde/Projekt, worauf gebucht wird) · <b>Projektzeit</b> = einzelner Zeiteintrag.
+  </p>
+</div>
+
+<div class="stage">
+<div class="frame" data-device="macbook" id="frame">
+
+  <!-- ═══════════ SEITENLEISTE ═══════════ -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">DZ</div>
+      <div><b>DeineZeit</b><small>Wähner IT</small></div>
+    </div>
+
+    <nav>
+      <p class="cap">Menü</p>
+      <div class="nav-item"><span class="ic">▦</span>Dashboard</div>
+
+      <!-- ── Zeiterfassung + Untermenü ── -->
+      <div class="nav-item on" data-nav="erfassung"><span class="ic">🕒</span>Zeiterfassung<span class="chev">▾</span></div>
+
+      <!-- Variante A: flach -->
+      <div class="subnav menu-A">
+        <div class="sub-item" data-nav="erfassung"><span class="dot"></span>Erfassung</div>
+        <div class="sub-item" data-nav="zeitprojekte"><span class="dot"></span>Zeitprojekte</div>
+        <div class="sub-item" data-nav="projektzeiten"><span class="dot"></span>Projektzeiten</div>
+        <div class="sub-item" data-nav="benutzer"><span class="dot"></span>Benutzer-Auswertung</div>
+        <div class="sub-item" data-nav="auswertung"><span class="dot"></span>Zeitprojekt-Auswertung</div>
+      </div>
+
+      <!-- Variante B: gruppiert -->
+      <div class="subnav menu-B">
+        <div class="sub-item" data-nav="erfassung"><span class="dot"></span>Erfassung</div>
+        <div class="sub-item" data-nav="zeitprojekte"><span class="dot"></span>Zeitprojekte</div>
+        <p class="subcap">Berichte</p>
+        <div class="sub-item" data-nav="projektzeiten"><span class="dot"></span>Projektzeiten</div>
+        <div class="sub-item" data-nav="benutzer"><span class="dot"></span>Benutzer</div>
+        <div class="sub-item" data-nav="auswertung"><span class="dot"></span>Zeitprojekte</div>
+      </div>
+
+      <div class="nav-item"><span class="ic">☑</span>Aufgaben</div>
+      <div class="nav-item"><span class="ic">▤</span>Projekte</div>
+      <div class="nav-item"><span class="ic">🧾</span>Verkauf</div>
+      <div class="nav-item"><span class="ic">🧮</span>Buchhaltung</div>
+      <div class="nav-item"><span class="ic">📣</span>Postecke</div>
+
+      <!-- Stammdaten: nur noch Kontakte + Artikel -->
+      <div class="nav-item"><span class="ic">🗄</span>Stammdaten<span class="chev">▾</span></div>
+      <div class="subnav">
+        <div class="sub-item"><span class="dot"></span>Kontakte</div>
+        <div class="sub-item"><span class="dot"></span>Artikel</div>
+        <div class="sub-item" style="opacity:.45; text-decoration:line-through;"><span class="dot"></span>Zeitprojekte</div>
+      </div>
+
+      <div class="nav-item"><span class="ic">💾</span>Datacenter</div>
+    </nav>
+
+    <div class="foot">
+      <div class="nav-item"><span class="ic">⚙</span>Einstellungen</div>
+      <div class="nav-item"><span class="ic">👤</span>Mein Profil</div>
+    </div>
+  </aside>
+
+  <!-- ═══════════ INHALT ═══════════ -->
+  <div class="main">
+    <div class="mobilehead">
+      <div style="display:flex; align-items:center; gap:9px;">
+        <div style="width:26px;height:26px;border-radius:8px;background:var(--p-500);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;">DZ</div>
+        <b style="font-size:13px;">DeineZeit</b>
+      </div>
+      <span style="font-size:18px;color:var(--n-500);">☰</span>
+    </div>
+
+    <div class="inner">
+
+      <!-- ─────────── SEITE 1: ZEITPROJEKTE ─────────── -->
+      <section class="page on" data-page="zeitprojekte">
+        <div class="apphead">
+          <div class="ttl">
+            <div class="ticon">📁</div>
+            <div>
+              <h2>Zeitprojekte</h2>
+              <p class="sub">Worauf Projektzeiten gebucht werden · 148 aktiv</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-line">⚙ Felder</button>
+            <button class="btn btn-line">⇅ Import/Export</button>
+            <button class="btn btn-prim">＋ Zeitprojekt</button>
+          </div>
+        </div>
+
+        <div class="moved">
+          <span style="font-size:15px;">📦</span>
+          <div><b>Umgezogen.</b> Die Zeitprojekte lagen bisher unter Stammdaten. Sie gehören fachlich zur Zeiterfassung und stehen jetzt hier.
+          Alte Lesezeichen (<code style="background:#fff;padding:1px 4px;border-radius:4px;">/masterdata/projektzeiten</code>) werden automatisch hierher weitergeleitet.</div>
+        </div>
+
+        <div class="card">
+          <div class="filters" style="margin-bottom:14px;">
+            <div class="fld"><label>Suche</label><div class="inp ph">🔍 Name, Kontakt, Nummer …</div></div>
+            <div class="fld"><label>Kontakt</label><div class="inp ph">Alle<span class="car">▾</span></div></div>
+            <div class="fld"><label>Status</label><div class="inp">Nur aktive<span class="car">▾</span></div></div>
+          </div>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:26px;"><input type="checkbox"></th>
+                  <th>Zeitprojekt</th>
+                  <th>Kontakt</th>
+                  <th class="num">Gebucht</th>
+                  <th>Stundenkonto</th>
+                  <th>Status</th>
+                  <th style="width:70px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td><b>Website-Relaunch</b></td>
+                  <td>Aigner Bauer am Reitweg</td>
+                  <td class="num">42:15</td>
+                  <td><div style="display:flex;align-items:center;gap:8px;"><div class="bar" style="flex:1"><i class="gr" style="width:58%"></i></div><span class="badge b-green">Rest 21:00</span></div></td>
+                  <td><span class="badge b-green">aktiv</span></td>
+                  <td class="num muted">✎ &nbsp; ⋯</td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td><b>Wartung &amp; Support</b></td>
+                  <td>Ärztekammer Salzburg</td>
+                  <td class="num">118:30</td>
+                  <td><div style="display:flex;align-items:center;gap:8px;"><div class="bar" style="flex:1"><i style="width:94%;background:var(--red)"></i></div><span class="badge b-red">Rest 1:15</span></div></td>
+                  <td><span class="badge b-green">aktiv</span></td>
+                  <td class="num muted">✎ &nbsp; ⋯</td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td><b>Onlineshop Betreuung</b></td>
+                  <td>Biolifestyle Shop &amp; Co</td>
+                  <td class="num">67:45</td>
+                  <td><span class="muted">kein Stundenkonto</span></td>
+                  <td><span class="badge b-green">aktiv</span></td>
+                  <td class="num muted">✎ &nbsp; ⋯</td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td><b>Gemeindeblatt Layout</b></td>
+                  <td>Gemeinde Lengau</td>
+                  <td class="num">9:00</td>
+                  <td><div style="display:flex;align-items:center;gap:8px;"><div class="bar" style="flex:1"><i class="gr" style="width:18%"></i></div><span class="badge b-green">Rest 41:00</span></div></td>
+                  <td><span class="badge b-green">aktiv</span></td>
+                  <td class="num muted">✎ &nbsp; ⋯</td>
+                </tr>
+                <tr style="opacity:.6">
+                  <td><input type="checkbox"></td>
+                  <td><b>Messeauftritt 2025</b></td>
+                  <td>A+G Energie</td>
+                  <td class="num">31:30</td>
+                  <td><span class="muted">verbraucht</span></td>
+                  <td><span class="badge b-gray">archiviert</span></td>
+                  <td class="num muted">✎ &nbsp; ⋯</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="cards">
+            <div class="mcard">
+              <div class="top"><b>Website-Relaunch</b><span class="badge b-green">Rest 21:00</span></div>
+              <div class="kv"><span>Kontakt</span><span>Aigner Bauer am Reitweg</span></div>
+              <div class="kv"><span>Gebucht</span><b>42:15</b></div>
+            </div>
+            <div class="mcard">
+              <div class="top"><b>Wartung &amp; Support</b><span class="badge b-red">Rest 1:15</span></div>
+              <div class="kv"><span>Kontakt</span><span>Ärztekammer Salzburg</span></div>
+              <div class="kv"><span>Gebucht</span><b>118:30</b></div>
+            </div>
+            <div class="mcard">
+              <div class="top"><b>Onlineshop Betreuung</b><span class="badge b-gray">kein Konto</span></div>
+              <div class="kv"><span>Kontakt</span><span>Biolifestyle Shop &amp; Co</span></div>
+              <div class="kv"><span>Gebucht</span><b>67:45</b></div>
+            </div>
+          </div>
+        </div>
+
+        <p class="muted" style="margin-top:11px;">
+          Aufbau bleibt die bekannte Stammdaten-Tabelle (eigene Felder, Import/Export, Anhänge, Stundenkonten) —
+          nur an neuer Stelle und mit den Zusatzspalten „Gebucht" und „Stundenkonto".
+        </p>
+      </section>
+
+      <!-- ─────────── SEITE 2: BERICHT PROJEKTZEITEN ─────────── -->
+      <section class="page" data-page="projektzeiten">
+        <div class="apphead">
+          <div class="ttl">
+            <div class="ticon">📊</div>
+            <div>
+              <h2>Projektzeiten</h2>
+              <p class="sub">Alle Zeiteinträge filtern, runden, drucken und exportieren</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-line">👁 Vorschau</button>
+            <button class="btn btn-prim">⤓ Druck / Export</button>
+          </div>
+        </div>
+
+        <div class="zeitraum">
+          <div class="zseg">
+            <button>Tag</button><button class="on">Woche</button><button>Monat</button>
+            <button>Quartal</button><button>Jahr</button><button>Gesamt</button><button>Frei</button>
+          </div>
+          <div class="znav"><button>‹</button><button>›</button></div>
+          <div class="zdate"><span>📅 von</span><b>31.08.2026</b></div>
+          <div class="zdate"><span>📅 bis</span><b>06.09.2026</b></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <b style="font-size:14px;">Suche</b>
+            <label class="muted" style="display:flex;gap:7px;align-items:center;cursor:pointer;">
+              <input type="checkbox"> Archivierte Benutzer und Zeitprojekte anzeigen
+            </label>
+          </div>
+          <div class="filters">
+            <div class="fld"><label>Zeitprojekt</label><div class="inp ph">Alle<span class="car">▾</span></div></div>
+            <div class="fld"><label>Benutzer</label><div class="inp ph">Alle<span class="car">▾</span></div></div>
+            <div class="fld"><label>Notiz enthält</label><div class="inp ph">Freitext …</div></div>
+            <div class="fld"><label>Kontakt</label><div class="inp ph">Alle<span class="car">▾</span></div></div>
+            <div class="fld"><label>Verrechenbar</label><div class="inp">Alle<span class="car">▾</span></div></div>
+            <div class="fld"><label>Status</label><div class="inp">Alle<span class="car">▾</span></div></div>
+          </div>
+        </div>
+
+        <div class="sums">
+          <div class="sum"><p>Gesamt</p><b>34:45</b></div>
+          <div class="sum g"><p>Verrechenbar</p><b>28:30</b></div>
+          <div class="sum n"><p>Nicht verrechenbar</p><b>6:15</b></div>
+          <div class="rundung">
+            <div class="fld"><label>Runden</label><div class="inp">Aufrunden<span class="car">▾</span></div></div>
+            <div class="fld"><label>Minuten</label><div class="inp">15<span class="car">▾</span></div></div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0; overflow:hidden;">
+          <div style="display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--n-100);">
+            <button class="btn btn-prim">⤓ Druck / Export</button>
+            <button class="btn btn-ghost">🔒 Sperren</button>
+            <button class="btn btn-ghost">✓ Freigeben</button>
+            <span class="muted" style="margin-left:auto;">Gruppierung: <b style="color:var(--n-700)">Zeitprojekt</b> ▾</span>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:26px;"><input type="checkbox"></th>
+                  <th>Benutzer</th><th>Zeitprojekt</th><th>Zeit</th>
+                  <th class="num">Pause</th><th class="num">Dauer</th><th>Notiz</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td><input type="checkbox"></td><td>Oliver Wähner</td><td><b>Website-Relaunch</b><br><span class="muted">Aigner Bauer</span></td><td>Mo 31.08. &nbsp;08:15 – 11:30</td><td class="num">0:15</td><td class="num"><b>3:00</b></td><td class="muted">Konzept &amp; Wireframes</td><td><span class="badge b-green">verrechenbar</span></td></tr>
+                <tr><td><input type="checkbox"></td><td>Fabian Wähner</td><td><b>Wartung &amp; Support</b><br><span class="muted">Ärztekammer</span></td><td>Mo 31.08. &nbsp;09:00 – 10:45</td><td class="num">0:00</td><td class="num"><b>1:45</b></td><td class="muted">Serverupdate</td><td><span class="badge b-green">verrechenbar</span></td></tr>
+                <tr><td><input type="checkbox"></td><td>Oliver Wähner</td><td><b>Interne Arbeit</b></td><td>Mo 31.08. &nbsp;13:00 – 14:30</td><td class="num">0:00</td><td class="num"><b>1:30</b></td><td class="muted">Angebotslegung</td><td><span class="badge b-gray">nicht verrechenbar</span></td></tr>
+                <tr><td><input type="checkbox"></td><td>Tobias Köhler</td><td><b>Onlineshop Betreuung</b><br><span class="muted">Biolifestyle</span></td><td>Di 01.09. &nbsp;08:00 – 12:15</td><td class="num">0:30</td><td class="num"><b>3:45</b></td><td class="muted">Zahlungsanbindung</td><td><span class="badge b-amber">gesperrt</span></td></tr>
+                <tr><td><input type="checkbox"></td><td>Manfred Wörgötter</td><td><b>Gemeindeblatt Layout</b><br><span class="muted">Gemeinde Lengau</span></td><td>Di 01.09. &nbsp;13:30 – 17:00</td><td class="num">0:15</td><td class="num"><b>3:15</b></td><td class="muted">Satz Ausgabe 3/26</td><td><span class="badge b-blue">abgerechnet</span></td></tr>
+              </tbody>
+              <tfoot>
+                <tr><td colspan="5">Summe (gerundet auf 15 min, aufgerundet)</td><td class="num">13:15</td><td colspan="2"></td></tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="cards" style="padding:12px;">
+            <div class="mcard">
+              <div class="top"><b>Website-Relaunch</b><span class="badge b-green">3:00</span></div>
+              <div class="kv"><span>Oliver Wähner</span><span>Mo 31.08. 08:15–11:30</span></div>
+              <div class="kv"><span>Notiz</span><span>Konzept &amp; Wireframes</span></div>
+            </div>
+            <div class="mcard">
+              <div class="top"><b>Wartung &amp; Support</b><span class="badge b-green">1:45</span></div>
+              <div class="kv"><span>Fabian Wähner</span><span>Mo 31.08. 09:00–10:45</span></div>
+              <div class="kv"><span>Notiz</span><span>Serverupdate</span></div>
+            </div>
+            <div class="mcard">
+              <div class="top"><b>Interne Arbeit</b><span class="badge b-gray">1:30</span></div>
+              <div class="kv"><span>Oliver Wähner</span><span>Mo 31.08. 13:00–14:30</span></div>
+              <div class="kv"><span>Notiz</span><span>Angebotslegung</span></div>
+            </div>
+          </div>
+        </div>
+
+        <p class="muted" style="margin-top:11px;">
+          Ersetzt den bisherigen Dialog „Bericht erstellen": gleiche Filter, gleiche Rundung, gleicher PDF-Druck —
+          aber als eigene Seite mit sichtbarer Trefferliste, damit man vor dem Druck sieht, was im Bericht landet.
+        </p>
+      </section>
+
+      <!-- ─────────── SEITE 3: BENUTZER-AUSWERTUNG ─────────── -->
+      <section class="page" data-page="benutzer">
+        <div class="apphead">
+          <div class="ttl">
+            <div class="ticon">👥</div>
+            <div>
+              <h2>Benutzer-Auswertung</h2>
+              <p class="sub">Stunden je Benutzer im gewählten Zeitraum</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <div class="zseg"><button class="on">Absolut</button><button>Relativ</button></div>
+            <button class="btn btn-prim">⤓ Export</button>
+          </div>
+        </div>
+
+        <div class="zeitraum">
+          <div class="zseg">
+            <button>Tag</button><button class="on">Woche</button><button>Monat</button>
+            <button>Quartal</button><button>Jahr</button><button>Gesamt</button><button>Frei</button>
+          </div>
+          <div class="znav"><button>‹</button><button>›</button></div>
+          <div class="zdate"><span>📅 von</span><b>31.08.2026</b></div>
+          <div class="zdate"><span>📅 bis</span><b>06.09.2026</b></div>
+        </div>
+
+        <div class="card">
+          <b style="font-size:14px;">Zusammenfassung</b>
+          <div class="tbl-wrap" style="margin-top:10px;">
+            <table>
+              <thead>
+                <tr><th>Benutzer</th><th class="num">Projektzeit</th><th class="num">Verrechenbar</th><th class="num">Nicht verrechenbar</th><th style="width:180px;">Anteil verrechenbar</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><b>Fabian Wähner</b></td><td class="num">31:15</td><td class="num">26:30</td><td class="num">4:45</td><td><div class="bar"><i class="gr" style="width:85%"></i></div><span class="muted">85 %</span></td></tr>
+                <tr><td><b>Manfred Wörgötter</b></td><td class="num">28:00</td><td class="num">21:45</td><td class="num">6:15</td><td><div class="bar"><i class="gr" style="width:78%"></i></div><span class="muted">78 %</span></td></tr>
+                <tr><td><b>Oliver Wähner</b></td><td class="num">34:45</td><td class="num">19:00</td><td class="num">15:45</td><td><div class="bar"><i style="width:55%"></i></div><span class="muted">55 %</span></td></tr>
+                <tr><td><b>Tobias Köhler</b></td><td class="num">22:30</td><td class="num">20:15</td><td class="num">2:15</td><td><div class="bar"><i class="gr" style="width:90%"></i></div><span class="muted">90 %</span></td></tr>
+              </tbody>
+              <tfoot>
+                <tr><td>Gesamt</td><td class="num">116:30</td><td class="num">87:30</td><td class="num">29:00</td><td><div class="bar"><i class="gr" style="width:75%"></i></div><span class="muted">75 %</span></td></tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="cards">
+            <div class="mcard"><div class="top"><b>Fabian Wähner</b><span class="badge b-green">85 %</span></div>
+              <div class="kv"><span>Projektzeit</span><b>31:15</b></div><div class="kv"><span>Verrechenbar</span><span>26:30</span></div></div>
+            <div class="mcard"><div class="top"><b>Manfred Wörgötter</b><span class="badge b-green">78 %</span></div>
+              <div class="kv"><span>Projektzeit</span><b>28:00</b></div><div class="kv"><span>Verrechenbar</span><span>21:45</span></div></div>
+            <div class="mcard"><div class="top"><b>Oliver Wähner</b><span class="badge b-amber">55 %</span></div>
+              <div class="kv"><span>Projektzeit</span><b>34:45</b></div><div class="kv"><span>Verrechenbar</span><span>19:00</span></div></div>
+          </div>
+        </div>
+
+        <div class="sechead"><h3>Jetzt aktiv</h3><span class="line"></span><span class="muted">läuft gerade</span></div>
+        <div class="card" style="padding:0;">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Benutzer</th><th>Zeitprojekt</th><th>Notiz</th><th>Startzeit</th><th class="num">Dauer</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span style="display:inline-block;width:7px;height:7px;border-radius:99px;background:var(--green);margin-right:7px;"></span><b>Fabian Wähner</b></td>
+                  <td>Wartung &amp; Support</td><td class="muted">Ticket #4821</td><td>13:42</td><td class="num"><b>1:18</b></td>
+                </tr>
+                <tr>
+                  <td><span style="display:inline-block;width:7px;height:7px;border-radius:99px;background:var(--amber);margin-right:7px;"></span><b>Tobias Köhler</b></td>
+                  <td>Onlineshop Betreuung</td><td class="muted">pausiert seit 14:05</td><td>12:10</td><td class="num"><b>1:55</b></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="cards" style="padding:12px;">
+            <div class="mcard"><div class="top"><b>Fabian Wähner</b><span class="badge b-green">läuft · 1:18</span></div>
+              <div class="kv"><span>Wartung &amp; Support</span><span>seit 13:42</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────── SEITE 4: ZEITPROJEKT-AUSWERTUNG ─────────── -->
+      <section class="page" data-page="auswertung">
+        <div class="apphead">
+          <div class="ttl">
+            <div class="ticon">📁</div>
+            <div>
+              <h2>Zeitprojekt-Auswertung</h2>
+              <p class="sub">Stunden je Zeitprojekt im gewählten Zeitraum</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <div class="zseg"><button class="on">Absolut</button><button>Relativ</button></div>
+            <button class="btn btn-prim">⤓ Export</button>
+          </div>
+        </div>
+
+        <div class="zeitraum">
+          <div class="zseg">
+            <button>Tag</button><button>Woche</button><button class="on">Monat</button>
+            <button>Quartal</button><button>Jahr</button><button>Gesamt</button><button>Frei</button>
+          </div>
+          <div class="znav"><button>‹</button><button>›</button></div>
+          <div class="zdate"><span>📅 von</span><b>01.08.2026</b></div>
+          <div class="zdate"><span>📅 bis</span><b>31.08.2026</b></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <b style="font-size:14px;">Zusammenfassung</b>
+            <span class="muted">Gruppierung: <b style="color:var(--n-700)">Zeitprojekt</b> ▾ &nbsp;·&nbsp; auch nach <b style="color:var(--n-700)">Kontakt</b> möglich</span>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr><th>Zeitprojekt</th><th>Kontakt</th><th class="num">Projektzeit</th><th class="num">Verrechenbar</th><th style="width:150px;">Stundenkonto</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><b>Wartung &amp; Support</b></td><td>Ärztekammer Salzburg</td><td class="num">38:15</td><td class="num">38:15</td>
+                    <td><div class="bar"><i style="width:94%;background:var(--red)"></i></div><span class="badge b-red">Rest 1:15</span></td></tr>
+                <tr><td><b>Website-Relaunch</b></td><td>Aigner Bauer am Reitweg</td><td class="num">26:30</td><td class="num">24:00</td>
+                    <td><div class="bar"><i class="gr" style="width:58%"></i></div><span class="badge b-green">Rest 21:00</span></td></tr>
+                <tr><td><b>Onlineshop Betreuung</b></td><td>Biolifestyle Shop &amp; Co</td><td class="num">19:45</td><td class="num">19:45</td>
+                    <td><span class="muted">kein Konto</span></td></tr>
+                <tr><td><b>Gemeindeblatt Layout</b></td><td>Gemeinde Lengau</td><td class="num">12:00</td><td class="num">12:00</td>
+                    <td><div class="bar"><i class="gr" style="width:18%"></i></div><span class="badge b-green">Rest 41:00</span></td></tr>
+                <tr><td><b>Interne Arbeit</b></td><td class="muted">—</td><td class="num">20:00</td><td class="num">0:00</td>
+                    <td><span class="muted">—</span></td></tr>
+              </tbody>
+              <tfoot>
+                <tr><td colspan="2">Gesamt</td><td class="num">116:30</td><td class="num">94:00</td><td></td></tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="cards">
+            <div class="mcard"><div class="top"><b>Wartung &amp; Support</b><span class="badge b-red">Rest 1:15</span></div>
+              <div class="kv"><span>Ärztekammer Salzburg</span><b>38:15</b></div></div>
+            <div class="mcard"><div class="top"><b>Website-Relaunch</b><span class="badge b-green">Rest 21:00</span></div>
+              <div class="kv"><span>Aigner Bauer am Reitweg</span><b>26:30</b></div></div>
+            <div class="mcard"><div class="top"><b>Onlineshop Betreuung</b><span class="badge b-gray">kein Konto</span></div>
+              <div class="kv"><span>Biolifestyle Shop &amp; Co</span><b>19:45</b></div></div>
+          </div>
+        </div>
+
+        <p class="muted" style="margin-top:11px;">
+          Klick auf eine Zeile springt gefiltert in den Bericht „Projektzeiten" — von der Summe zum einzelnen Eintrag.
+        </p>
+      </section>
+
+      <!-- ─────────── SEITE 5: ERFASSUNG (unverändert, zur Einordnung) ─────────── -->
+      <section class="page" data-page="erfassung">
+        <div class="apphead">
+          <div class="ttl">
+            <div class="ticon">🕒</div>
+            <div>
+              <h2>Zeiterfassung</h2>
+              <p class="sub">Projektzeiten erfassen</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-line">🎤 Sprache</button>
+            <button class="btn btn-line">⚙ Felder</button>
+            <button class="btn btn-prim">＋ Projektzeit</button>
+          </div>
+        </div>
+
+        <div class="moved">
+          <span style="font-size:15px;">🧭</span>
+          <div><b>Was sich hier ändert:</b> Der Knopf „Bericht erstellen" verschwindet aus dem Seitenkopf —
+          Berichte stehen jetzt als eigene Menüpunkte links. Die Erfassung selbst bleibt unverändert.</div>
+        </div>
+
+        <div class="card" style="background:var(--n-900); color:#fff; margin-bottom:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span style="width:9px;height:9px;border-radius:99px;background:var(--green);flex:none;"></span>
+          <b style="font-variant-numeric:tabular-nums; font-size:17px;">02:47:31</b>
+          <span style="font-size:12.5px;color:var(--n-300);flex:1;min-width:120px;">Aigner Bauer / Website-Relaunch · Konzept</span>
+          <button class="btn" style="background:#fff;color:var(--n-900);">⏸ Pause</button>
+          <button class="btn" style="background:#fff;color:var(--n-900);">■ Stopp</button>
+        </div>
+
+        <div class="card" style="padding:0;">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th style="width:26px;"><input type="checkbox"></th><th>Zeitprojekt</th><th>Zeit</th><th class="num">Dauer</th><th>Notiz</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><input type="checkbox"></td><td><b>Website-Relaunch</b><br><span class="muted">Aigner Bauer</span></td><td>08:15 – 11:30</td><td class="num"><b>3:00</b></td><td class="muted">Konzept &amp; Wireframes</td><td><span class="badge b-green">veränderbar</span></td></tr>
+                <tr><td><input type="checkbox"></td><td><b>Interne Arbeit</b></td><td>13:00 – 14:30</td><td class="num"><b>1:30</b></td><td class="muted">Angebotslegung</td><td><span class="badge b-green">veränderbar</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="cards" style="padding:12px;">
+            <div class="mcard"><div class="top"><b>Website-Relaunch</b><span class="badge b-green">3:00</span></div>
+              <div class="kv"><span>08:15 – 11:30</span><span>Konzept</span></div></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Bottom-Tab-Bar (nur iPhone) -->
+    <div class="tabbar">
+      <div><span>▦</span>Dashboard</div>
+      <div class="on"><span>🕒</span>Zeiterfassung</div>
+      <div><span>☑</span>Aufgaben</div>
+      <div><span>▤</span>Projekte</div>
+      <div><span>☰</span>Mehr</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════ KONZEPT-NOTIZEN ═══════════ -->
+<div class="notes">
+  <div class="card">
+    <h4>🧭 Menüvariante A vs. B</h4>
+    <p><b>A · flach:</b> fünf gleichrangige Unterpunkte. Kürzester Weg, aber „Zeitprojekte" (Stammdaten) und „Projektzeiten" (Bericht) stehen direkt untereinander — zwei ähnliche Wörter, zwei völlig verschiedene Dinge.</p>
+    <p style="margin-top:7px;"><b>B · gruppiert:</b> Erfassung und Zeitprojekte oben, darunter eine kleine Überschrift „Berichte" mit drei Einträgen. Entspricht dem Aufbau von timr und trennt Stammdaten von Auswertungen sichtbar.</p>
+  </div>
+  <div class="card">
+    <h4>🔤 Begriffe (die geplante Säuberung)</h4>
+    <ul>
+      <li><b>Zeitprojekt</b> = Stammsatz, worauf gebucht wird (bei timr „Aufgabe")</li>
+      <li><b>Projektzeit</b> = einzelner Zeiteintrag</li>
+    </ul>
+    <p style="margin-top:7px;">In der Datenbank heißt der Typ heute noch <code>projektzeiten</code> — Altlast aus der Umbenennung von <code>projekte</code> (Migration 0038). Geplant: Migration auf <code>zeitprojekte</code> und dieselbe Sprache in Code, Oberfläche und Berichten.</p>
+  </div>
+  <div class="card">
+    <h4>🔐 Rechte</h4>
+    <p>Zeitprojekte anlegen und bearbeiten hängt künftig am Modul <b>Zeiterfassung</b> statt an <b>Stammdaten</b> — wer Zeiten bucht, pflegt auch die Projekte dazu. Lesen bleibt wie bisher für alle offen, damit die Auswahlfelder in Aufgaben und Verkauf weiter funktionieren.</p>
+  </div>
+  <div class="card">
+    <h4>🔗 Alte Wege bleiben gültig</h4>
+    <p><code>/masterdata/projektzeiten</code> und <code>/masterdata/zeitprojekte</code> leiten auf <code>/zeiterfassung/zeitprojekte</code> weiter — Lesezeichen und Verknüpfungen am Startbildschirm laufen nicht ins Leere. In den Stammdaten steht an der alten Stelle ein Hinweis statt eines toten Eintrags.</p>
+  </div>
+  <div class="card">
+    <h4>🆕 Was neu gebaut werden muss</h4>
+    <ul>
+      <li>Backend: ein Auswertungs-Endpunkt für die Summen je Benutzer bzw. je Zeitprojekt (gibt es heute nicht — der Bericht kann bisher nur PDF)</li>
+      <li>Frontend: gemeinsame Zeitraumleiste, drei Berichtsseiten, Untermenü in der Seitenleiste</li>
+      <li>Der bisherige Dialog „Bericht erstellen" wird zur Seite „Projektzeiten"</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>📱 Handy</h4>
+    <p>Tabellen werden wie überall in DeineZeit zu Karten (ResponsiveTable). Die Zeitraumleiste bleibt, bricht aber um; die Berichte sind über „Mehr → Zeiterfassung" erreichbar. Auf dem iPhone oben umschalten, um das zu sehen.</p>
+  </div>
+</div>
+
+<script>
+  const frame = document.getElementById('frame');
+
+  function wire(segId, attr, apply) {
+    const seg = document.getElementById(segId);
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      seg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      apply(b.dataset[attr]);
+    });
+  }
+
+  function showPage(p) {
+    document.querySelectorAll('.page').forEach(s => s.classList.toggle('on', s.dataset.page === p));
+    // Seitenleiste mitziehen
+    document.querySelectorAll('.sub-item[data-nav]').forEach(x => x.classList.toggle('on', x.dataset.nav === p));
+    document.querySelectorAll('#segPage button').forEach(x => x.classList.toggle('on', x.dataset.p === p));
+    frame.querySelector('.main').scrollTop = 0;
+  }
+
+  wire('segMenu', 'm', m => document.body.dataset.menu = m);
+  wire('segDevice', 'd', d => frame.dataset.device = d);
+  document.getElementById('segPage').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (b) showPage(b.dataset.p);
+  });
+
+  // Klick in der Seitenleiste wechselt ebenfalls die Seite
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.addEventListener('click', () => showPage(el.dataset.nav));
+  });
+
+  showPage('zeitprojekte');
+</script>
+
+</body>
+</html>

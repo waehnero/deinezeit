@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.12.75] – 2026-09-01 – Zeitprojekte und Berichte in der Zeiterfassung
+
+### Neu
+- Die Zeitprojekte sind von den Stammdaten in das Menü der Zeiterfassung gewandert — dort, wo die Zeiten darauf gebucht werden. Alte Lesezeichen werden automatisch weitergeleitet.
+- Neuer Menüpunkt „Berichte“ mit drei Auswertungen: Projektzeiten (Liste mit Filtern, Rundung und PDF-Druck), Benutzer-Auswertung und Zeitprojekt-Auswertung inklusive Stand der Stundenkonten.
+- In den Auswertungen führt ein Klick auf eine Zeile direkt zu den einzelnen Zeiteinträgen dahinter.
+- Zeiteinträge lassen sich direkt im Bericht „Projektzeiten“ bearbeiten, löschen und im Status ändern — ohne Umweg über die Erfassungsliste.
+- Der Projektzeitbericht hat ein neues Aussehen: Kennzahlen im Kopf, Balken je Zeile, saubere Seitenumbrüche — und die Vorschau zeigt endlich das Blatt statt einer fensterbreiten Tabelle.
+
+### Aktualisierungen
+- Der Bericht zeigt die Trefferliste jetzt vor dem Druck an — man sieht, was im PDF landet, bevor man es erzeugt.
+- Wer nur die eigenen Zeiten sehen darf, bekommt auch in Bericht und Auswertung nur die eigenen Einträge.
+- Einheitliche Begriffe im ganzen Modul: „Zeitprojekt“ ist der Stammsatz, „Projektzeit“ der einzelne Zeiteintrag.
+- Zeitraumfilter rechnen jetzt in Ortszeit: Ein Eintrag kurz nach Mitternacht erschien bisher im Vormonat.
+
+---
+
 ## [1.12.74] – 2026-08-31 – Steuerfall matrix
 
 ### Aktualisierungen

@@ -34,11 +34,33 @@ class MasterDataService:
         return q.order_by(EntityType.sort_order, EntityType.name).all()
 
     def get_entity_type(self, db: Session, slug_or_id: str) -> Optional[EntityType]:
+        """Stammdaten-Typ über Kennung oder Slug laden.
+
+        Für die Zeitprojekte gibt es einen Rückfall auf die früheren Slugs
+        (``projektzeiten`` bis Migration 0059, davor ``projekte``). Grund:
+        Frontend und Datenbank können für ein paar Minuten auseinanderlaufen —
+        beim Deploy startet das Backend neu, während im Browser noch die alte
+        Seite liegt, und lokal genügt ein vergessenes ``--build``. Ohne diesen
+        Rückfall meldet die Seite dann „Stammdaten-Typ nicht gefunden",
+        obwohl die Daten unverändert da sind.
+        """
         try:
             uid = UUID(slug_or_id)
             return db.query(EntityType).filter(EntityType.id == uid).first()
         except ValueError:
-            return db.query(EntityType).filter(EntityType.slug == slug_or_id).first()
+            pass
+
+        typ = db.query(EntityType).filter(EntityType.slug == slug_or_id).first()
+        if typ:
+            return typ
+
+        from app.core.zeitprojekte import ZEITPROJEKTE_SLUG, ALTE_SLUGS
+        if slug_or_id in (ZEITPROJEKTE_SLUG, *ALTE_SLUGS):
+            for kandidat in (ZEITPROJEKTE_SLUG, *ALTE_SLUGS):
+                typ = db.query(EntityType).filter(EntityType.slug == kandidat).first()
+                if typ:
+                    return typ
+        return None
 
     def create_entity_type(self, db: Session, name: str, icon: str = "Database",
                            color: str = "#6b7280", description: str = None,
