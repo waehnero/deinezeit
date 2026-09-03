@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.77] – 2026-09-03 – Audit buendel a
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.76] – 2026-09-02 – Zeiterfassung zeitprojekte
 
 ### Aktualisierungen

@@ -555,6 +555,9 @@ function FolderTree({ folders, selected, onSelect, viewMode, onViewModeChange })
 // Welche Dateien lassen sich in der Vorschau anzeigen?
 function kannVorschau(a) {
   const fn = (a.filename || '').toLowerCase()
+  // SVG bewusst ausgenommen: Das Backend liefert es aus Sicherheitsgründen nur
+  // als Download (es kann Skripte enthalten), eine Vorschau gäbe ein leeres Bild.
+  if (a.mimetype?.startsWith('image/svg') || fn.endsWith('.svg')) return false
   return a.type === 'file' && (
     a.mimetype?.startsWith('image/') ||
     a.mimetype === 'application/pdf' ||

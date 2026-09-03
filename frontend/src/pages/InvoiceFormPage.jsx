@@ -1238,6 +1238,36 @@ function ERechnungPanel({ invoiceId, nummer }) {
   if (laden || !stand) return null
 
   const vollstaendig = stand.moeglich
+
+  // Beide Downloads laufen über den axios-Client (Bearer-Token), nicht über
+  // ein <a href="/api/…">: So ein Link kommt ohne Token an und bekommt 403.
+  async function xmlHerunterladen() {
+    try {
+      const res = await invoiceApi.erechnungXml(invoiceId, !vollstaendig)
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${(nummer || 'beleg').replace(/\//g, '-')}-factur-x.xml`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) {
+      // Fehlertext steckt bei responseType 'blob' selbst in einem Blob.
+      let detail = ''
+      try { detail = JSON.parse(await e.response?.data?.text())?.detail || '' } catch {}
+      toast.error(detail || 'Die E-Rechnung konnte nicht erzeugt werden')
+    }
+  }
+
+  async function pdfOeffnen() {
+    try {
+      const res = await invoiceApi.downloadPdf(invoiceId)
+      const url = URL.createObjectURL(res.data)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch { toast.error('Das PDF konnte nicht erzeugt werden') }
+  }
   return (
     <div className="bg-surface border border-neutral-200 rounded-xl p-5">
       <div className="flex items-start gap-3">
@@ -1271,15 +1301,15 @@ function ERechnungPanel({ invoiceId, nummer }) {
           )}
 
           <div className="flex flex-wrap gap-2 mt-4">
-            <a href={invoiceApi.erechnungXmlUrl(invoiceId, !vollstaendig)}
+            <button type="button" onClick={xmlHerunterladen}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
               <Download size={14} /> XML {vollstaendig ? 'herunterladen' : 'trotzdem ansehen'}
-            </a>
+            </button>
             {nummer && (
-              <a href={`/api/invoices/${invoiceId}/pdf`}
+              <button type="button" onClick={pdfOeffnen}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
                 <Download size={14} /> PDF
-              </a>
+              </button>
             )}
           </div>
 

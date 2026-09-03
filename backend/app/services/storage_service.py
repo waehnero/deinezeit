@@ -44,10 +44,18 @@ def folder_name_for(db, entity_id, fallback: str = None) -> str:
 
 def build_storage_key(entity_type: str, entity_id: str, filename: str, db=None) -> str:
     """Einheitlicher Pfad: kontakte/<Kundenname>/dokument.pdf
-    Ohne db (oder ohne auflösbaren Namen) fällt der Ordner auf die ID zurück."""
+    Ohne db (oder ohne auflösbaren Namen) fällt der Ordner auf die ID zurück.
+
+    Alle drei Segmente werden bereinigt — bis 02.09.2026 nur der Dateiname.
+    Bei WebDAV/OneDrive wird der Schlüssel zum Pfad auf einem fremden Server;
+    ein ``../`` im Typ oder in der ID hätte dort aus dem Wurzelordner
+    hinausgeführt (Audit SEC-007). Die API prüft die Werte zusätzlich vorab
+    (``datacenter._entity_pruefen``); hier ist der zweite Riegel für alle
+    anderen Aufrufer."""
     safe_name = "".join(c for c in filename if c.isalnum() or c in "._- ")
-    folder = folder_name_for(db, entity_id)
-    return f"{entity_type}/{folder}/{safe_name}"
+    safe_type = _safe_segment(entity_type) or "sonstiges"
+    folder = _safe_segment(folder_name_for(db, entity_id)) or "ohne-zuordnung"
+    return f"{safe_type}/{folder}/{safe_name}"
 
 
 def generate_share_token() -> str:

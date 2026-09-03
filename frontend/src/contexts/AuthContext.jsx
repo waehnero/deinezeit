@@ -4,12 +4,17 @@ import {
   authApi, groupsApi, getAccessToken, setAbmeldeHandler,
   sitzungWiederherstellen, tokenVerwerfen, warAngemeldet,
 } from '../services/api'
+import { useSettings } from './SettingsContext'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [loadingAuth, setLoadingAuth] = useState(true)
+  // Nach dem Abmelden die Einstellungen neu laden: Was ein Administrator an
+  // Konfiguration sehen durfte, soll nicht im Speicher der Anmeldeseite
+  // weiterleben.
+  const { loadSettings } = useSettings()
   const navigate = useNavigate()
 
   /**
@@ -65,8 +70,9 @@ export function AuthProvider({ children }) {
       tokenVerwerfen()
       setCurrentUser(null)
       navigate('/login', { replace: true })
+      loadSettings()
     }
-  }, [navigate])
+  }, [navigate, loadSettings])
 
   /** Vom axios-Interceptor aufgerufen, wenn die Sitzung endgültig abgelaufen
    *  ist. Ersetzt das frühere window.location.href = '/login', das einen

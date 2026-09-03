@@ -467,8 +467,14 @@ export const invoiceApi = {
   angebotsquote:  (params) => api.get('/invoices/auswertung/angebotsquote', { params }),
 
   erechnungPruefen: (id) => api.get(`/invoices/${id}/erechnung/pruefen`),
-  erechnungXmlUrl:  (id, trotzLuecken = false) =>
-    `/api/invoices/${id}/erechnung/xml` + (trotzLuecken ? '?trotz_luecken=true' : ''),
+  // Als Blob, nicht als URL für ein <a href>: Ein einfacher Link schickt
+  // keinen Anmelde-Token mit (der lebt nur im Arbeitsspeicher) und bekäme
+  // vom Server 403. Bis 02.09.2026 war genau das der Fall (Audit BUG-001).
+  erechnungXml:     (id, trotzLuecken = false) =>
+    api.get(`/invoices/${id}/erechnung/xml`, {
+      params: trotzLuecken ? { trotz_luecken: true } : {},
+      responseType: 'blob',
+    }),
   uploadContract:   (id, file) => {
     const form = new FormData()
     form.append('file', file)
