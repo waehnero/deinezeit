@@ -230,3 +230,115 @@ def test_repath_verschiebt_in_namensordner(admin_client, db_session, monkeypatch
 def test_repath_erfordert_admin(auth_client):
     r = auth_client.post("/api/settings/storage/repath")
     assert r.status_code == 403
+
+
+# ── Backup-Archiv: Datenbank + Dateispeicher (Audit DATA-002) ────────────────
+
+def _archiv_mocks(monkeypatch, objekte=None, kaputt=()):
+    """pg_dump und MinIO ersetzen — hier geht es um das Archiv, nicht um Postgres."""
+    from app.services import backup_service, storage_service
+    objekte = objekte if objekte is not None else {
+        "kontakte/Muster GmbH/Rechnungen/RE-2026-001.pdf": b"%PDF-1.4 beleg",
+        "belege/positionsbilder/abc.jpg": b"\xff\xd8bild",
+    }
+
+    def fake_dump(pfad, timeout=None):
+        with open(pfad, "wb") as f:
+            f.write(b"-- PostgreSQL database dump\nCREATE TABLE users ();\n")
+    monkeypatch.setattr(backup_service, "pg_dump_in_datei", fake_dump)
+    monkeypatch.setattr(storage_service.MinioProvider, "list_keys",
+                        lambda self: [{"key": k, "size": len(v)} for k, v in objekte.items()])
+
+    def fake_download(self, key):
+        if key in kaputt:
+            raise RuntimeError("Objekt beschädigt")
+        return objekte[key], "application/octet-stream"
+    monkeypatch.setattr(storage_service.MinioProvider, "download", fake_download)
+    return objekte
+
+
+def test_backup_archiv_enthaelt_datenbank_dateien_und_manifest(admin_client, monkeypatch):
+    import io
+    import json
+    import zipfile
+    objekte = _archiv_mocks(monkeypatch)
+    c = admin_client
+
+    resp = c.get("/api/settings/backup/download")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("application/zip")
+    assert resp.headers["content-disposition"].endswith('.zip"') or ".zip" in resp.headers["content-disposition"]
+
+    with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        namen = set(zf.namelist())
+        assert "datenbank.sql" in namen
+        assert "manifest.json" in namen
+        for key, inhalt in objekte.items():
+            assert f"dateien/{key}" in namen
+            assert zf.read(f"dateien/{key}") == inhalt
+        assert b"CREATE TABLE users" in zf.read("datenbank.sql")
+        manifest = json.loads(zf.read("manifest.json"))
+    assert manifest["format"] == "deinezeit-backup/1"
+    assert manifest["dateien_anzahl"] == 2
+    assert manifest["fehler"] == []
+    assert manifest["app_version"]
+
+
+def test_backup_archiv_meldet_unlesbare_datei_statt_abzubrechen(admin_client, monkeypatch):
+    import io
+    import json
+    import zipfile
+    _archiv_mocks(monkeypatch, kaputt=("belege/positionsbilder/abc.jpg",))
+    c = admin_client
+    resp = c.get("/api/settings/backup/download")
+    assert resp.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        assert "dateien/belege/positionsbilder/abc.jpg" not in zf.namelist()
+        manifest = json.loads(zf.read("manifest.json"))
+    assert len(manifest["fehler"]) == 1
+    assert manifest["fehler"][0]["key"] == "belege/positionsbilder/abc.jpg"
+
+
+def test_backup_download_nur_admin(auth_client, monkeypatch):
+    _archiv_mocks(monkeypatch)
+    assert auth_client.get("/api/settings/backup/download").status_code == 403
+
+
+def test_onedrive_backup_laedt_das_archiv_hoch(db_session, monkeypatch):
+    """run_onedrive_backup schickt jetzt das ZIP (nicht mehr nur den Dump)."""
+    from app.services import backup_service
+    _archiv_mocks(monkeypatch)
+    hochgeladen = {}
+
+    class FakeProv:
+        def upload(self, name, data, mimetype):
+            hochgeladen["name"] = name; hochgeladen["data"] = data; hochgeladen["mimetype"] = mimetype
+        def item_meta(self, name):
+            return {"webUrl": "https://onedrive.example/" + name, "parentReference": {}}
+        def list_children(self):
+            return []
+    monkeypatch.setattr(backup_service, "build_backup_onedrive_provider", lambda s: FakeProv())
+
+    res = backup_service.run_onedrive_backup(db_session)
+    assert res["ok"] and res["dateien"] == 2
+    assert hochgeladen["name"].endswith(".zip") and hochgeladen["mimetype"] == "application/zip"
+    import io, zipfile
+    with zipfile.ZipFile(io.BytesIO(hochgeladen["data"])) as zf:
+        assert "datenbank.sql" in zf.namelist()
+
+
+def test_aufbewahrung_loescht_sql_und_zip(monkeypatch):
+    from app.services import backup_service
+    geloescht = []
+
+    class Prov:
+        def list_children(self):
+            return [
+                {"name": "deinezeit_backup_2020-01-01_02-00.sql", "lastModifiedDateTime": "2020-01-01T02:00:00Z"},
+                {"name": "deinezeit_backup_2020-01-02_02-00.zip", "lastModifiedDateTime": "2020-01-02T02:00:00Z"},
+                {"name": "notizen.txt", "lastModifiedDateTime": "2020-01-02T02:00:00Z"},
+            ]
+        def delete(self, name):
+            geloescht.append(name)
+    assert backup_service._apply_retention(Prov(), 30) == 2
+    assert "notizen.txt" not in geloescht

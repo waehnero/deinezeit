@@ -23,6 +23,7 @@ Zwei Dinge, die man beim Ändern wissen muss:
 from collections import defaultdict
 from datetime import datetime
 from typing import Callable
+from app.core import zeit
 
 
 # Fallback-Markenfarbe: dasselbe Orange wie in den Rechnungsvorlagen
@@ -183,7 +184,7 @@ def bericht_html(
         if empfaenger_html else ""
     )
 
-    erstellt = datetime.now().strftime("%d.%m.%Y %H:%M")
+    erstellt = zeit.jetzt().strftime("%d.%m.%Y %H:%M")
     rundung_hinweis = filters.get("rounding_label", "")
 
     return f"""<!DOCTYPE html>

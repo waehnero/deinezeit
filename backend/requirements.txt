@@ -1,5 +1,8 @@
 # Web Framework
-fastapi==0.111.0
+fastapi==0.141.1
+# starlette ist die Grundlage von FastAPI und wird hier ausdrücklich gepinnt,
+# damit pip-audit die Version sieht (Audit SEC-003: 0.37.2 hatte 8 Meldungen).
+starlette==1.3.1
 uvicorn[standard]==0.30.1
 
 # Datenbank
@@ -32,8 +35,8 @@ Pillow==12.3.0            # 22 Meldungen, u.a. PYSEC-2026-165, -2249…-3496
 webauthn==2.1.0
 
 # Validierung & Einstellungen
-pydantic==2.8.2
-pydantic-settings==2.3.4
+pydantic==2.12.5
+pydantic-settings==2.15.0
 email-validator==2.2.0
 
 # Hilfsbibliotheken
@@ -42,8 +45,8 @@ httpx==0.27.0
 requests==2.34.2          # PYSEC-2026-1872, PYSEC-2026-2275
 
 # PDF-Generierung
-weasyprint==62.3          # siehe Hinweis am Dateiende
-pydyf==0.10.0
+weasyprint==69.0
+pydyf==0.12.1
 Jinja2==3.1.6             # PYSEC-2026-1471, -1472, -1475
 slowapi==0.1.9
 limits==3.6.0
@@ -55,19 +58,8 @@ minio==7.2.7
 extract-msg==0.55.0
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Bewusst NICHT aktualisiert (Stand August 2026) — pip-audit meldet sie weiter
+# Bewusst NICHT aktualisiert (Stand September 2026) — pip-audit meldet sie weiter
 # ─────────────────────────────────────────────────────────────────────────────
-#
-# weasyprint 62.3 → 69.0  (PYSEC-2026-2034; PYSEC-2026-3412 ohne Fix)
-#   Sieben Hauptversionen Sprung an der PDF-Erzeugung. Rechnungen, Berichte,
-#   Aufgaben-Ausdrucke und die DSGVO-Auskunft hängen daran. Das Layout kann
-#   sich verschieben, und kein Test prüft das Aussehen eines PDF. Gehört in
-#   einen eigenen Branch mit Sichtprüfung aller fünf Belegvorlagen.
-#
-# starlette 0.37.2 → 1.3.x  (8 Meldungen)
-#   Erzwingt fastapi 0.111 → 0.141 und dadurch pydantic 2.8 → 2.12. Vier
-#   große Sprünge gleichzeitig; bricht etwas, ist die Ursache kaum
-#   einzugrenzen. Ebenfalls eigener Branch.
 #
 # ecdsa 0.19.2  (PYSEC-2026-1325, kein Fix verfügbar)
 #   Transitive Abhängigkeit von python-jose. Betrifft eine Seitenkanal-

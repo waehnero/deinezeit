@@ -7,6 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import logging
 import os
+from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.netz import echte_ip
 from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard, groups
@@ -50,11 +51,18 @@ if not limiter.enabled:
 # ── App — API-Docs in Produktion deaktivieren ─────────────────────────────────
 _is_dev = os.environ.get("APP_ENV", "production").lower() == "development"
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    await startup_event()          # definiert weiter unten
+    yield
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     docs_url="/api/docs"  if _is_dev else None,
     redoc_url="/api/redoc" if _is_dev else None,
+    lifespan=_lifespan,
 )
 
 app.state.limiter = limiter
@@ -143,8 +151,11 @@ app.include_router(postecke.router, prefix="/api",
 app.include_router(oeffentlich.router, prefix="/api")
 
 
-# ── MinIO Bucket beim Start sicherstellen ─────────────────────────────────────
-@app.on_event("startup")
+# ── Start der Anwendung (lifespan) ────────────────────────────────────────────
+# ``@app.on_event("startup")`` ist seit FastAPI 0.93 durch ``lifespan`` ersetzt
+# und in Starlette 1.x entfernt (Audit CODE-002, Update K-13). Die
+# Startarbeiten stehen weiter in einer eigenen Funktion, damit sie lesbar
+# bleiben; der lifespan-Kontext ruft sie einmal beim Start auf.
 async def startup_event():
     # In Tests übersprungen — wie die Worker weiter unten (Kennzeichen ist
     # TEST_DATABASE_URL, siehe tests/conftest.py). Der Testclient startet die

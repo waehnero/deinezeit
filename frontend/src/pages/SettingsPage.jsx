@@ -754,7 +754,7 @@ function TabBackup({ settings, onSaved }) {
       const cd    = res.headers['content-disposition'] || ''
       const match = cd.match(/filename="?([^"]+)"?/)
       a.href      = url
-      a.download  = match ? match[1] : `deinezeit_backup_${new Date().toISOString().slice(0,10)}.sql`
+      a.download  = match ? match[1] : `deinezeit_backup_${new Date().toISOString().slice(0,10)}.zip`
       a.click()
       window.URL.revokeObjectURL(url)
       toast.success('Backup heruntergeladen')
@@ -836,7 +836,7 @@ function TabBackup({ settings, onSaved }) {
         </div>
       </div>
       <div>
-        <Field label="Backup-Ordner" hint="Lokaler oder Cloud-Sync-Pfad für die .sql-Dateien">
+        <Field label="Backup-Ordner" hint="Lokaler oder Cloud-Sync-Pfad für die Backup-Dateien (.zip: Datenbank + Dateien)">
           <Input value={backupDir} onChange={setBackupDir} placeholder="C:\Backups\DeineZeit" />
         </Field>
       </div>
@@ -898,7 +898,7 @@ function TabBackup({ settings, onSaved }) {
                 <Input value={odSiteId} onChange={setOdSiteId} placeholder="contoso.sharepoint.com,…" />
               </Field>
             )}
-            <Field label="Zielverzeichnis in OneDrive" hint="Ordner, in den die .sql-Dateien geschrieben werden">
+            <Field label="Zielverzeichnis in OneDrive" hint="Ordner, in den die Backup-Archive (.zip: Datenbank + Dateien) geschrieben werden">
               <Input value={odFolder} onChange={setOdFolder} placeholder="DeineZeit-Backups" />
             </Field>
           </div>

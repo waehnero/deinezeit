@@ -12,6 +12,7 @@ import os
 import time
 import threading
 from datetime import date
+from app.core import zeit
 
 
 def markiere_ueberfaellige(db, stichtag: date = None) -> int:
@@ -26,7 +27,7 @@ def markiere_ueberfaellige(db, stichtag: date = None) -> int:
     from app.models.invoice import Invoice, InvoiceAuditLog
     from app.api.invoice import _zahlstand
 
-    heute = stichtag or date.today()
+    heute = stichtag or zeit.heute()
 
     kandidaten = (db.query(Invoice)
                   .filter(Invoice.doc_type == "rechnung",
@@ -70,7 +71,7 @@ def _worker_loop():
     time.sleep(60)
     while True:
         try:
-            heute = date.today()
+            heute = zeit.heute()
             # Bewusst kein "continue": Das würde das Warten am Schleifenende
             # überspringen und den Thread heißlaufen lassen.
             if letzter_lauf != heute:

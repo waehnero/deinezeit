@@ -33,6 +33,7 @@ from app.schemas.purchase import (
     PurchasePaymentState, PurchaseOpenItem, PurchaseOpenItemsBySupplier,
     PurchaseOpenItemsResponse, VorsteuerZeile, VorsteuerResponse,
 )
+from app.core import zeit
 
 router = APIRouter(prefix="/purchase-invoices", tags=["Eingangsrechnungen"])
 
@@ -171,7 +172,7 @@ def get_open_items(
     _: User = Depends(get_current_user),
 ):
     """Offene Posten der Kreditoren: Was schulde ich wem, und seit wann."""
-    heute = stichtag or date.today()
+    heute = stichtag or zeit.heute()
     q = db.query(PurchaseInvoice).filter(PurchaseInvoice.status != "storniert")
     if supplier_id:
         q = q.filter(PurchaseInvoice.supplier_id == supplier_id)

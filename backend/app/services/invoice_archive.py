@@ -11,6 +11,7 @@ parametrierbar (InvoiceSettings-Key ``archive_triggers`` = Liste von Auslösern)
 Mögliche Auslöser: email | gesendet | angenommen | abgelehnt | bezahlt | storniert
 """
 from datetime import datetime
+from app.core import zeit
 
 
 # Belegart → Unterordner-Name im Datacenter (unter dem Kontakt)
@@ -116,7 +117,7 @@ def archive_invoice_pdf(db, invoice, trigger: str) -> bool:
         return False
 
     folder = DOC_TYPE_FOLDER.get(invoice.doc_type, "Belege")
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    ts = zeit.jetzt().strftime("%Y-%m-%d_%H-%M-%S")
     safe_num = (invoice.number or "beleg").replace("/", "-")
     filename = f"{safe_num}_{ts}.pdf"
 

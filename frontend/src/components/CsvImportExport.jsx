@@ -3,7 +3,6 @@ import { masterdataApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import Papa from 'papaparse'
-import * as XLSX from 'xlsx'
 import {
   Download, Upload, X, Check, Loader2, AlertCircle, FileText, Plus, ArrowLeft,
 } from 'lucide-react'
@@ -46,6 +45,29 @@ export function CsvExportButton({ slug, entityName }) {
 }
 
 // ── Import ────────────────────────────────────────────────────────────────────
+
+// Zellwert aus ExcelJS in die Schreibweise bringen, die ein Mensch in Excel
+// sieht — so, wie sie auch der Server erwartet (services/masterdata_import.py):
+// ein Datum als „31.12.2026", keine Tageszahl seit 1900; Formeln über ihr
+// Ergebnis; Zahlen unverändert (die maschinelle Schreibweise mit Punkt versteht
+// der Import).
+function zellwertAlsText(wert) {
+  if (wert === null || wert === undefined) return ''
+  if (wert instanceof Date) {
+    const t = String(wert.getUTCDate()).padStart(2, '0')
+    const m = String(wert.getUTCMonth() + 1).padStart(2, '0')
+    return `${t}.${m}.${wert.getUTCFullYear()}`
+  }
+  if (typeof wert === 'object') {
+    if ('result' in wert) return zellwertAlsText(wert.result)          // Formel
+    if (Array.isArray(wert.richText)) return wert.richText.map(r => r.text).join('')
+    if ('text' in wert) return zellwertAlsText(wert.text)              // Hyperlink
+    if ('error' in wert) return ''                                     // #DIV/0! u. ä.
+    return String(wert)
+  }
+  if (typeof wert === 'boolean') return wert ? 'ja' : 'nein'
+  return String(wert)
+}
 
 const IGNORIEREN = '__ignore__'
 
@@ -150,27 +172,42 @@ function ImportAssistent({ slug, entityType, onClose, onImported }) {
     const datei = e.target.files?.[0]
     if (!datei) return
     setDateiname(datei.name)
-    const istExcel = /\.(xlsx|xlsm|xls)$/i.test(datei.name)
+    // Altes Binärformat (.xls, Excel 97–2003) wird nicht mehr gelesen: Die
+    // frühere Bibliothek „xlsx" hatte auf npm bekannte, nicht behobene
+    // Sicherheitslücken (Audit SEC-008) und wurde durch ExcelJS ersetzt, das
+    // nur das heutige .xlsx-Format kennt. Wer noch .xls hat, speichert die
+    // Datei in Excel einmal als .xlsx.
+    if (/\.xls$/i.test(datei.name)) {
+      toast.error('Das alte Excel-Format (.xls) wird nicht unterstützt — bitte in Excel als .xlsx speichern')
+      return
+    }
+    const istExcel = /\.(xlsx|xlsm)$/i.test(datei.name)
 
     if (istExcel) {
       const leser = new FileReader()
-      leser.onload = (ev) => {
+      leser.onload = async (ev) => {
         try {
-          const mappe = XLSX.read(ev.target.result, { type: 'array' })
-          const blatt = mappe.Sheets[mappe.SheetNames[0]]
-          // raw:false → Werte so, wie sie in Excel angezeigt werden. Ein
-          // österreichisches Datum kommt damit als „31.12.2026" an und nicht
-          // als Tageszahl seit 1900, die niemand mehr zuordnen kann.
-          const tabelle = XLSX.utils.sheet_to_json(blatt, {
-            header: 1, raw: false, defval: '', blankrows: false })
+          // Erst beim ersten Excel-Import nachgeladen: ExcelJS ist rund 1 MB
+          // groß und wird von den wenigsten Seitenaufrufen gebraucht.
+          const { default: ExcelJS } = await import('exceljs')
+          const mappe = new ExcelJS.Workbook()
+          await mappe.xlsx.load(ev.target.result)
+          const blatt = mappe.worksheets[0]
+          if (!blatt || blatt.rowCount === 0) { toast.error('Das erste Tabellenblatt ist leer'); return }
+          const tabelle = []
+          blatt.eachRow({ includeEmpty: false }, (zeile) => {
+            // zeile.values ist 1-basiert (Index 0 bleibt leer)
+            const werte = zeile.values.slice(1).map(zellwertAlsText)
+            tabelle.push(werte)
+          })
           if (!tabelle.length) { toast.error('Das erste Tabellenblatt ist leer'); return }
           const kopf = tabelle[0].map(z => String(z).trim())
           const daten = tabelle.slice(1)
             .filter(r => r.some(z => String(z).trim() !== ''))
             .map(r => Object.fromEntries(kopf.map((s, i) => [s, r[i] ?? ''])))
           uebernehmen(kopf, daten)
-          if (mappe.SheetNames.length > 1) {
-            toast(`Es wurde das erste Tabellenblatt „${mappe.SheetNames[0]}" gelesen`)
+          if (mappe.worksheets.length > 1) {
+            toast(`Es wurde das erste Tabellenblatt „${blatt.name}" gelesen`)
           }
         } catch {
           toast.error('Die Excel-Datei konnte nicht gelesen werden')
@@ -283,8 +320,8 @@ function ImportAssistent({ slug, entityType, onClose, onImported }) {
               >
                 <FileText size={40} className="mx-auto mb-3 text-gray-300" />
                 <p className="font-medium text-gray-600">CSV- oder Excel-Datei auswählen</p>
-                <p className="text-sm text-gray-400 mt-1">.csv, .xlsx oder .xls</p>
-                <input ref={fileRef} type="file" accept=".csv,.txt,.xlsx,.xlsm,.xls"
+                <p className="text-sm text-gray-400 mt-1">.csv oder .xlsx</p>
+                <input ref={fileRef} type="file" accept=".csv,.txt,.xlsx,.xlsm"
                   className="hidden" onChange={dateiGewaehlt} />
               </div>
             </div>

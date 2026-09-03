@@ -6,6 +6,7 @@ class SetupStatusResponse(BaseModel):
     """Zustand des Erstinstallations-Assistenten."""
     needs_setup: bool          # True = noch kein Benutzer vorhanden
     user_count: int
+    token_required: bool = False   # True = SETUP_TOKEN ist gesetzt und wird verlangt
 
 
 class CompanyData(BaseModel):
@@ -31,6 +32,9 @@ class SetupInitRequest(BaseModel):
     admin_password: str
     language: str = "de"
     company: Optional[CompanyData] = None
+    # Einrichtungs-Token aus der .env (SETUP_TOKEN). Pflicht, sobald der
+    # Betreiber einen gesetzt hat — siehe api/setup.py.
+    setup_token: Optional[str] = None
 
 
 class SetupInitResponse(BaseModel):

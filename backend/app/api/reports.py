@@ -24,6 +24,7 @@ from app.models.zeiterfassung import TimeEntry
 from app.models.settings import Setting
 from app.models.masterdata import EntityRecord, FieldDefinition
 from app.api.berichtsvorlage import bericht_html
+from app.core import zeit
 
 router = APIRouter(prefix="/reports", tags=["Berichte"])
 
@@ -360,7 +361,7 @@ def report_zeiterfassung(
         out_filename = f"{safe_name}.pdf"
     else:
         cf           = contact_name.replace(" ", "_") if contact_name else "Alle"
-        ts           = datetime.now().strftime("%Y-%m-%d")
+        ts           = zeit.jetzt().strftime("%Y-%m-%d")
         out_filename = f"Projektzeitbericht_{cf}_{ts}.pdf"
 
     return StreamingResponse(
