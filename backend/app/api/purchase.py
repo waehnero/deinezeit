@@ -144,7 +144,7 @@ def _pruefe_eingaben(body) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/vorsteuer", response_model=VorsteuerResponse)
-async def get_vorsteuer(
+def get_vorsteuer(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     db: Session = Depends(get_db),
@@ -164,7 +164,7 @@ async def get_vorsteuer(
 
 
 @router.get("/open-items", response_model=PurchaseOpenItemsResponse)
-async def get_open_items(
+def get_open_items(
     supplier_id: Optional[UUID] = Query(None),
     stichtag: Optional[date] = Query(None),
     db: Session = Depends(get_db),
@@ -221,7 +221,7 @@ async def get_open_items(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[PurchaseInvoiceListItem])
-async def list_invoices(
+def list_invoices(
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     supplier_id: Optional[UUID] = Query(None),
@@ -265,7 +265,7 @@ async def list_invoices(
 
 
 @router.post("", response_model=PurchaseInvoiceResponse)
-async def create_invoice(
+def create_invoice(
     body: PurchaseInvoiceCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -308,7 +308,7 @@ async def create_invoice(
 
 
 @router.get("/{invoice_id}", response_model=PurchaseInvoiceResponse)
-async def get_invoice(
+def get_invoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -320,7 +320,7 @@ async def get_invoice(
 
 
 @router.put("/{invoice_id}", response_model=PurchaseInvoiceResponse)
-async def update_invoice(
+def update_invoice(
     invoice_id: UUID,
     body: PurchaseInvoiceUpdate,
     db: Session = Depends(get_db),
@@ -365,7 +365,7 @@ async def update_invoice(
 
 @router.post("/{invoice_id}/cancel", response_model=PurchaseInvoiceResponse,
              dependencies=[Depends(require_loeschen("buchhaltung"))])
-async def cancel_invoice(
+def cancel_invoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -393,7 +393,7 @@ async def cancel_invoice(
 
 
 @router.delete("/{invoice_id}", status_code=204)
-async def delete_invoice(
+def delete_invoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -428,7 +428,7 @@ def _zahlstand_antwort(inv: PurchaseInvoice) -> PurchasePaymentState:
 
 
 @router.get("/{invoice_id}/payments", response_model=PurchasePaymentState)
-async def list_payments(
+def list_payments(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -440,7 +440,7 @@ async def list_payments(
 
 
 @router.post("/{invoice_id}/payments", response_model=PurchasePaymentState)
-async def add_payment(
+def add_payment(
     invoice_id: UUID,
     body: PurchasePaymentCreate,
     db: Session = Depends(get_db),
@@ -477,7 +477,7 @@ async def add_payment(
 
 
 @router.delete("/payments/{payment_id}", response_model=PurchasePaymentState)
-async def delete_payment(
+def delete_payment(
     payment_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -503,7 +503,7 @@ async def delete_payment(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/{invoice_id}/file", response_model=PurchaseInvoiceResponse)
-async def upload_file(
+def upload_file(
     invoice_id: UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -524,7 +524,7 @@ async def upload_file(
     if file.content_type and file.content_type not in ERLAUBTE_TYPEN:
         raise HTTPException(400, f"Dateityp {file.content_type} wird nicht unterstützt. "
                                  f"Erlaubt sind PDF, JPEG, PNG und WebP.")
-    daten = await file.read()
+    daten = file.file.read()
     if len(daten) > MAX_UPLOAD:
         raise HTTPException(400, "Datei zu groß (max. 20 MB)")
 
@@ -551,7 +551,7 @@ async def upload_file(
 
 
 @router.get("/{invoice_id}/file")
-async def get_file(
+def get_file(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),

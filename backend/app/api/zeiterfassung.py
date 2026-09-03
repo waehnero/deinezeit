@@ -29,7 +29,7 @@ router = APIRouter(prefix="/zeiterfassung", tags=["Zeiterfassung"])
 # ── Custom-Felder verwalten ───────────────────────────────────────────────────
 
 @router.get("/fields", response_model=List[TimeEntryFieldResponse])
-async def list_fields(
+def list_fields(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -38,7 +38,7 @@ async def list_fields(
 
 
 @router.post("/fields", response_model=TimeEntryFieldResponse)
-async def create_field(
+def create_field(
     body: TimeEntryFieldCreate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -62,7 +62,7 @@ async def create_field(
 
 
 @router.put("/fields/{field_id}", response_model=TimeEntryFieldResponse)
-async def update_field(
+def update_field(
     field_id: UUID,
     body: TimeEntryFieldUpdate,
     db: Session = Depends(get_db),
@@ -79,7 +79,7 @@ async def update_field(
 
 
 @router.delete("/fields/{field_id}")
-async def delete_field(
+def delete_field(
     field_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -93,7 +93,7 @@ async def delete_field(
 
 
 @router.post("/fields/sort-orders")
-async def update_sort_orders(
+def update_sort_orders(
     body: UpdateTimeEntryFieldSortOrders,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -115,7 +115,7 @@ async def update_sort_orders(
 # ── Timer starten / stoppen ───────────────────────────────────────────────────
 
 @router.get("/running", response_model=Optional[TimeEntryResponse])
-async def get_running_timer(
+def get_running_timer(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -128,7 +128,7 @@ async def get_running_timer(
 
 
 @router.post("/start", response_model=TimeEntryResponse)
-async def start_timer(
+def start_timer(
     body: TimeEntryCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -163,7 +163,7 @@ async def start_timer(
 
 
 @router.post("/{entry_id}/stop", response_model=TimeEntryResponse)
-async def stop_timer(
+def stop_timer(
     entry_id: UUID,
     body: TimeEntryStop,
     db: Session = Depends(get_db),
@@ -191,7 +191,7 @@ async def stop_timer(
 # ── Zeiteinträge CRUD ─────────────────────────────────────────────────────────
 
 @router.get("/entries", response_model=TimeEntryListResponse)
-async def list_entries(
+def list_entries(
     user_id: Optional[UUID] = Query(None),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
@@ -272,7 +272,7 @@ async def list_entries(
 
 
 @router.post("/entries", response_model=TimeEntryResponse)
-async def create_entry(
+def create_entry(
     body: TimeEntryCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -289,7 +289,7 @@ async def create_entry(
 
 
 @router.get("/entries/{entry_id}", response_model=TimeEntryResponse)
-async def get_entry(
+def get_entry(
     entry_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -409,7 +409,7 @@ def _apply_status_change(db: Session, entry: TimeEntry, new_status: str,
 
 
 @router.put("/entries/{entry_id}", response_model=TimeEntryResponse)
-async def update_entry(
+def update_entry(
     entry_id: UUID,
     body: TimeEntryUpdate,
     db: Session = Depends(get_db),
@@ -433,7 +433,7 @@ async def update_entry(
 
 
 @router.delete("/entries/{entry_id}")
-async def delete_entry(
+def delete_entry(
     entry_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -455,7 +455,7 @@ async def delete_entry(
 # ── Abrechnungs-Status ────────────────────────────────────────────────────────
 
 @router.put("/entries/{entry_id}/status", response_model=TimeEntryResponse)
-async def set_entry_status(
+def set_entry_status(
     entry_id: UUID,
     body: TimeEntryStatusUpdate,
     db: Session = Depends(get_db),
@@ -477,7 +477,7 @@ async def set_entry_status(
 
 
 @router.post("/entries/status-batch")
-async def set_entries_status_batch(
+def set_entries_status_batch(
     body: TimeEntryStatusBatch,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -550,7 +550,7 @@ def _compute_budget(db: Session, project_id: UUID) -> ProjectBudget:
 
 
 @router.get("/projekte/{project_id}/stundenkonten", response_model=List[StundenkontoResponse])
-async def list_stundenkonten(
+def list_stundenkonten(
     project_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -565,7 +565,7 @@ async def list_stundenkonten(
 
 
 @router.post("/projekte/{project_id}/stundenkonten", response_model=StundenkontoResponse)
-async def create_stundenkonto(
+def create_stundenkonto(
     project_id: UUID,
     body: StundenkontoCreate,
     db: Session = Depends(get_db),
@@ -588,7 +588,7 @@ async def create_stundenkonto(
 
 
 @router.put("/stundenkonten/{konto_id}", response_model=StundenkontoResponse)
-async def update_stundenkonto(
+def update_stundenkonto(
     konto_id: UUID,
     body: StundenkontoUpdate,
     db: Session = Depends(get_db),
@@ -606,7 +606,7 @@ async def update_stundenkonto(
 
 
 @router.delete("/stundenkonten/{konto_id}")
-async def delete_stundenkonto(
+def delete_stundenkonto(
     konto_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -621,7 +621,7 @@ async def delete_stundenkonto(
 
 
 @router.get("/budgets", response_model=List[ProjectBudget])
-async def get_budgets(
+def get_budgets(
     project_ids: str = Query(..., description="Komma-getrennte Projektzeit-IDs"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -712,7 +712,7 @@ def _parse_ki_json(text: str) -> dict:
 
 
 @router.post("/ki-nachtragen", response_model=KiNachtragenResponse)
-async def ki_nachtragen(
+def ki_nachtragen(
     body: KiNachtragenRequest,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -817,7 +817,7 @@ async def ki_nachtragen(
 # ── Statistik ─────────────────────────────────────────────────────────────────
 
 @router.get("/stats", response_model=TimeStats)
-async def get_stats(
+def get_stats(
     user_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

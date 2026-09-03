@@ -51,7 +51,7 @@ class AccountResponse(AccountCreate):
 # ── Kontenplan ────────────────────────────────────────────────────────────────
 
 @router.get("/accounts", response_model=List[AccountResponse])
-async def list_accounts(
+def list_accounts(
     typ: Optional[str] = Query(None),
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
@@ -66,7 +66,7 @@ async def list_accounts(
 
 
 @router.post("/accounts", response_model=AccountResponse)
-async def create_account(
+def create_account(
     body: AccountCreate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -82,7 +82,7 @@ async def create_account(
 
 
 @router.put("/accounts/{account_id}", response_model=AccountResponse)
-async def update_account(
+def update_account(
     account_id: UUID,
     body: AccountUpdate,
     db: Session = Depends(get_db),
@@ -99,7 +99,7 @@ async def update_account(
 
 
 @router.delete("/accounts/{account_id}", status_code=204)
-async def delete_account(
+def delete_account(
     account_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -112,7 +112,7 @@ async def delete_account(
 
 
 @router.post("/accounts/{account_id}/set-default-erloes", response_model=AccountResponse)
-async def set_default_erloes(
+def set_default_erloes(
     account_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -350,7 +350,7 @@ def _kreditor_konto(db: Session) -> str:
 
 
 @router.get("/export/bmd-eingang")
-async def export_bmd_eingang(
+def export_bmd_eingang(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     db: Session = Depends(get_db),
@@ -427,7 +427,7 @@ async def export_bmd_eingang(
 
 
 @router.get("/export/bmd")
-async def export_bmd(
+def export_bmd(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     # Leer = alle buchungsrelevanten Belegarten (Rechnung UND Gutschrift).

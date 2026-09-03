@@ -8,6 +8,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 import io
 import json
+import re
 
 from app.db.base import get_db
 from app.api.deps import (get_current_user, require_admin,
@@ -65,26 +66,62 @@ TYPE_PREFIX = {
     "lieferschein":         "LS",
 }
 
+# Erlaubte Platzhalter im Nummernformat. Der Formatstring kommt aus den
+# Einstellungen (nur Administrator), aber ``str.format`` erlaubt darüber auch
+# Attributzugriffe wie ``{seq.__class__}`` — ein Nummernformat soll genau zwei
+# Dinge einsetzen können und sonst nichts.
+_FORMAT_PLATZHALTER = re.compile(r"\{(year|seq)(:[^{}]*)?\}")
+
+
+def nummernformat_pruefen(fmt: str) -> str:
+    """Gibt das Format zurück oder wirft 400, wenn es mehr kann als Jahr und Zähler."""
+    rest = _FORMAT_PLATZHALTER.sub("", fmt or "")
+    if "{" in rest or "}" in rest:
+        raise HTTPException(
+            400, "Ungültiges Nummernformat: erlaubt sind nur die Platzhalter "
+                 "{year} und {seq} (z. B. RE-{year}-{seq:03d}).")
+    return fmt
+
+
+def _nummernformat(db: Session, doc_type: str) -> str:
+    setting = db.query(InvoiceSettings).filter_by(key=f"number_format_{doc_type}").first()
+    if setting and setting.value:
+        return setting.value.strip('"') if isinstance(setting.value, str) else str(setting.value)
+    return f"{TYPE_PREFIX.get(doc_type, 'DO')}-{{year}}-{{seq:03d}}"
+
+
 def _next_number(db: Session, doc_type: str, year: int) -> tuple[int, str]:
-    """Atomarer Zähler — gibt (sequence, formatted_number) zurück."""
-    seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=year).first()
+    """Atomarer Zähler — gibt (sequence, formatted_number) zurück.
+
+    Die Zählerzeile wird mit ``FOR UPDATE`` gesperrt (wie beim Artikelstamm,
+    services/artikelstamm.py). Ohne die Sperre lesen zwei gleichzeitige
+    Belegerstellungen denselben Stand und die zweite scheitert an
+    ``invoices.number UNIQUE`` mit einem nackten 500 — oder, ohne diese
+    Prüfung, entstünden doppelte Belegnummern (Audit DATA-005). Solange die
+    Zeile noch nicht existiert (erster Beleg eines Jahres), fängt ein Unique-
+    Verstoß beim Anlegen den Wettlauf ab und es wird erneut gelesen.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    seq = (db.query(InvoiceNumberSequence)
+             .filter_by(doc_type=doc_type, year=year)
+             .with_for_update()
+             .first())
     if not seq:
-        seq = InvoiceNumberSequence(doc_type=doc_type, year=year, last_sequence=0)
-        db.add(seq)
-        db.flush()
+        try:
+            with db.begin_nested():
+                db.add(InvoiceNumberSequence(doc_type=doc_type, year=year, last_sequence=0))
+        except IntegrityError:
+            pass    # ein anderer war schneller — dessen Zeile jetzt gesperrt lesen
+        seq = (db.query(InvoiceNumberSequence)
+                 .filter_by(doc_type=doc_type, year=year)
+                 .with_for_update()
+                 .one())
     seq.last_sequence += 1
     db.flush()
 
-    # Format aus Einstellungen lesen (Fallback)
-    fmt_key = f"number_format_{doc_type}"
-    setting = db.query(InvoiceSettings).filter_by(key=fmt_key).first()
-    if setting and setting.value:
-        fmt = setting.value.strip('"') if isinstance(setting.value, str) else str(setting.value)
-    else:
-        prefix = TYPE_PREFIX.get(doc_type, "DO")
-        fmt = f"{prefix}-{{year}}-{{seq:03d}}"
-
-    number = fmt.format(year=year, seq=seq.last_sequence)
+    number = nummernformat_pruefen(_nummernformat(db, doc_type)).format(
+        year=year, seq=seq.last_sequence)
     return seq.last_sequence, number
 
 
@@ -579,7 +616,7 @@ def _pruefe_belegsperre(inv: Invoice, body) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[InvoiceListItem])
-async def list_invoices(
+def list_invoices(
     doc_type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     contact_id: Optional[UUID] = Query(None),
@@ -658,7 +695,7 @@ async def list_invoices(
 
 
 @router.post("", response_model=InvoiceResponse)
-async def create_invoice(
+def create_invoice(
     body: InvoiceCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -706,7 +743,7 @@ async def create_invoice(
 
 
 @router.get("/templates", response_model=List[InvoiceListItem])
-async def list_recurring_templates(
+def list_recurring_templates(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -715,7 +752,7 @@ async def list_recurring_templates(
 
 
 @router.get("/next-number", response_model=NextNumberResponse)
-async def get_next_number(
+def get_next_number(
     doc_type: str = Query("rechnung"),
     year: Optional[int] = Query(None),
     db: Session = Depends(get_db),
@@ -724,14 +761,7 @@ async def get_next_number(
     y = year or datetime.now().year
     seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
     next_seq = (seq.last_sequence + 1) if seq else 1
-    fmt_key = f"number_format_{doc_type}"
-    setting = db.query(InvoiceSettings).filter_by(key=fmt_key).first()
-    if setting and setting.value:
-        fmt = setting.value.strip('"') if isinstance(setting.value, str) else str(setting.value)
-    else:
-        prefix = TYPE_PREFIX.get(doc_type, "DO")
-        fmt = f"{prefix}-{{year}}-{{seq:03d}}"
-    preview = fmt.format(year=y, seq=next_seq)
+    preview = nummernformat_pruefen(_nummernformat(db, doc_type)).format(year=y, seq=next_seq)
     return {"doc_type": doc_type, "year": y, "next_sequence": next_seq, "preview": preview}
 
 DOC_TYPES_LIST = ["rechnung", "angebot", "auftragsbestaetigung", "gutschrift", "lieferschein"]
@@ -745,7 +775,7 @@ DOC_TYPE_DEFAULTS = {
 
 
 @router.get("/number-sequences")
-async def get_number_sequences(
+def get_number_sequences(
     year: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -773,7 +803,7 @@ async def get_number_sequences(
 
 
 @router.put("/number-sequences/{doc_type}")
-async def update_number_sequence(
+def update_number_sequence(
     doc_type: str,
     body: dict,
     db: Session = Depends(get_db),
@@ -788,8 +818,10 @@ async def update_number_sequence(
 
     y = body.get("year", datetime.now().year)
 
-    # Format speichern
+    # Format speichern — vorher prüfen, damit kein Format gespeichert wird,
+    # an dem später jede Belegerstellung scheitert.
     if "format" in body:
+        nummernformat_pruefen(str(body["format"]))
         fmt_key = f"number_format_{doc_type}"
         setting = db.query(InvoiceSettings).filter_by(key=fmt_key).first()
         if setting:
@@ -843,7 +875,7 @@ async def update_number_sequence(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/settings/all")
-async def get_invoice_settings(
+def get_invoice_settings(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -876,7 +908,7 @@ async def get_invoice_settings(
 
 
 @router.put("/settings/{key}")
-async def update_invoice_setting(
+def update_invoice_setting(
     key: str,
     body: InvoiceSettingsUpdate,
     db: Session = Depends(get_db),
@@ -894,7 +926,7 @@ async def update_invoice_setting(
 
 
 @router.get("/template-preview/{template_id}")
-async def template_preview(
+def template_preview(
     template_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -972,7 +1004,7 @@ def _book_query(db: Session, date_from: Optional[date], date_to: Optional[date],
 
 
 @router.get("/book/list", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
-async def get_book_list(
+def get_book_list(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     doc_type: Optional[str] = Query(None),
@@ -1026,7 +1058,7 @@ async def get_book_list(
 
 
 @router.get("/book/csv", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
-async def get_book_csv(
+def get_book_csv(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     doc_type: Optional[str] = Query(None),
@@ -1063,7 +1095,7 @@ async def get_book_csv(
 
 
 @router.get("/book/pdf", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
-async def get_book_pdf(
+def get_book_pdf(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     doc_type: Optional[str] = Query(None),
@@ -1162,7 +1194,7 @@ async def get_book_pdf(
 
 
 @router.post("/positions/image")
-async def upload_position_image(
+def upload_position_image(
     size: str = Query("mittel", description="klein | mittel | gross"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -1182,7 +1214,7 @@ async def upload_position_image(
     if file.content_type and file.content_type not in position_image.ERLAUBTE_TYPEN:
         raise HTTPException(400, f"Dateityp {file.content_type} wird nicht unterstützt. "
                                  f"Erlaubt sind JPEG, PNG, WebP und GIF.")
-    rohdaten = await file.read()
+    rohdaten = file.file.read()
     if len(rohdaten) > position_image.MAX_UPLOAD:
         raise HTTPException(400, "Bild zu groß (max. 15 MB)")
 
@@ -1202,7 +1234,7 @@ async def upload_position_image(
 
 
 @router.get("/positions/image")
-async def get_position_image(
+def get_position_image(
     key: str = Query(..., description="Speicher-Schlüssel aus dem Upload"),
     provider: Optional[str] = Query(None, description="Speicher der Datei; leer = aktiver"),
     db: Session = Depends(get_db),
@@ -1222,7 +1254,7 @@ async def get_position_image(
 
 @router.get("/uva", response_model=UvaResponse,
             dependencies=[Depends(require_modul_rechte("buchhaltung"))])
-async def get_uva(
+def get_uva(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     db: Session = Depends(get_db),
@@ -1383,7 +1415,7 @@ async def get_uva(
 
 
 @router.get("/uva/pdf", dependencies=[Depends(require_modul_rechte("buchhaltung"))])
-async def get_uva_pdf(
+def get_uva_pdf(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     db: Session = Depends(get_db),
@@ -1399,7 +1431,7 @@ async def get_uva_pdf(
     """
     from app.services import tax_rates as tax_rates_service
 
-    daten = await get_uva(date_from=date_from, date_to=date_to, db=db, _=current_user)
+    daten = get_uva(date_from=date_from, date_to=date_to, db=db, _=current_user)
     settings = {r.key: r.value for r in db.query(Setting).all()}
     firma = settings.get("company_name", "") or "—"
     land = tax_rates_service.SUPPORTED_COUNTRIES.get(daten.country, daten.country)
@@ -1524,7 +1556,7 @@ def _bucket_fuer(tage: int) -> str:
 
 
 @router.get("/open-items", response_model=OpenItemsResponse, dependencies=[Depends(require_modul_rechte("buchhaltung"))])
-async def get_open_items(
+def get_open_items(
     contact_id: Optional[UUID] = Query(None),
     stichtag: Optional[date] = Query(None, description="Standard: heute"),
     db: Session = Depends(get_db),
@@ -1614,7 +1646,7 @@ def _zahlstand_antwort(invoice: Invoice) -> InvoicePaymentState:
 
 
 @router.get("/{invoice_id}/payments", response_model=InvoicePaymentState)
-async def list_payments(
+def list_payments(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -1627,7 +1659,7 @@ async def list_payments(
 
 
 @router.post("/{invoice_id}/payments", response_model=InvoicePaymentState)
-async def add_payment(
+def add_payment(
     invoice_id: UUID,
     body: InvoicePaymentCreate,
     db: Session = Depends(get_db),
@@ -1686,7 +1718,7 @@ async def add_payment(
 
 
 @router.delete("/payments/{payment_id}", response_model=InvoicePaymentState)
-async def delete_payment(
+def delete_payment(
     payment_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1742,7 +1774,7 @@ def _kontakt(db: Session, contact_id):
 
 
 @router.get("/dunning/run", response_model=DunningRunResponse, dependencies=MAHN_RECHT)
-async def dunning_run(
+def dunning_run(
     stichtag: Optional[date] = Query(None, description="Standard: heute"),
     contact_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
@@ -1822,7 +1854,7 @@ def _mahnung_erzeugen(db: Session, inv: Invoice, level: Optional[int],
 
 
 @router.post("/dunning/batch", response_model=List[DunningEntry], dependencies=MAHN_RECHT)
-async def dunning_batch(
+def dunning_batch(
     body: DunningBatchRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1859,7 +1891,7 @@ async def dunning_batch(
 
 
 @router.get("/dunning/{dunning_id}/pdf", dependencies=MAHN_RECHT)
-async def dunning_pdf(
+def dunning_pdf(
     dunning_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -1877,7 +1909,7 @@ async def dunning_pdf(
 
 
 @router.delete("/dunning/{dunning_id}", response_model=List[DunningEntry], dependencies=MAHN_RECHT)
-async def dunning_zuruecknehmen(
+def dunning_zuruecknehmen(
     dunning_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1911,7 +1943,7 @@ async def dunning_zuruecknehmen(
 
 
 @router.get("/{invoice_id}/dunning", response_model=List[DunningEntry], dependencies=MAHN_RECHT)
-async def dunning_historie(
+def dunning_historie(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -1924,7 +1956,7 @@ async def dunning_historie(
 
 
 @router.post("/{invoice_id}/dunning", response_model=DunningEntry, dependencies=MAHN_RECHT)
-async def dunning_anlegen(
+def dunning_anlegen(
     invoice_id: UUID,
     body: DunningCreateRequest,
     db: Session = Depends(get_db),
@@ -1943,7 +1975,7 @@ async def dunning_anlegen(
 
 
 @router.post("/{invoice_id}/dunning-block", response_model=InvoiceResponse, dependencies=MAHN_RECHT)
-async def dunning_sperre(
+def dunning_sperre(
     invoice_id: UUID,
     body: DunningBlockRequest,
     db: Session = Depends(get_db),
@@ -1974,7 +2006,7 @@ async def dunning_sperre(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/{invoice_id}/skonto", response_model=SkontoVorschau)
-async def skonto_vorschau(
+def skonto_vorschau(
     invoice_id: UUID,
     paid_at: Optional[date] = Query(None, description="Zahlungsdatum; Standard: heute"),
     db: Session = Depends(get_db),
@@ -2011,7 +2043,7 @@ async def skonto_vorschau(
 
 
 @router.post("/{invoice_id}/skonto", response_model=InvoicePaymentState)
-async def skonto_ausbuchen(
+def skonto_ausbuchen(
     invoice_id: UUID,
     body: SkontoRequest,
     db: Session = Depends(get_db),
@@ -2077,7 +2109,7 @@ async def skonto_ausbuchen(
 
 
 @router.get("/{invoice_id}", response_model=InvoiceResponse)
-async def get_invoice(
+def get_invoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -2089,7 +2121,7 @@ async def get_invoice(
 
 
 @router.get("/{invoice_id}/audit", response_model=List[InvoiceAuditEntry])
-async def get_invoice_audit(
+def get_invoice_audit(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -2119,7 +2151,7 @@ AUSWERTUNG_RECHT = [Depends(require_modul_rechte("buchhaltung"))]
 
 @router.get("/auswertung/umsatz-jahr", response_model=UmsatzJahrResponse,
             dependencies=AUSWERTUNG_RECHT)
-async def umsatz_je_monat(
+def umsatz_je_monat(
     jahr: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -2130,7 +2162,7 @@ async def umsatz_je_monat(
 
 @router.get("/auswertung/umsatz-kunden", response_model=UmsatzKundeResponse,
             dependencies=AUSWERTUNG_RECHT)
-async def umsatz_je_kunde(
+def umsatz_je_kunde(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     limit: int = Query(0, ge=0, le=500),
@@ -2143,7 +2175,7 @@ async def umsatz_je_kunde(
 
 @router.get("/auswertung/umsatz-artikel", response_model=UmsatzArtikelResponse,
             dependencies=AUSWERTUNG_RECHT)
-async def umsatz_je_artikel(
+def umsatz_je_artikel(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     limit: int = Query(0, ge=0, le=500),
@@ -2162,7 +2194,7 @@ async def umsatz_je_artikel(
 
 @router.get("/auswertung/angebotsquote", response_model=AngebotsquoteResponse,
             dependencies=AUSWERTUNG_RECHT)
-async def angebotsquote(
+def angebotsquote(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     db: Session = Depends(get_db),
@@ -2175,7 +2207,7 @@ async def angebotsquote(
 # ── E-Rechnung (C-5) ──────────────────────────────────────────────────────────
 
 @router.get("/{invoice_id}/erechnung/pruefen", response_model=ERechnungPruefung)
-async def check_einvoice(
+def check_einvoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -2202,7 +2234,7 @@ async def check_einvoice(
 
 
 @router.get("/{invoice_id}/erechnung/xml")
-async def download_einvoice_xml(
+def download_einvoice_xml(
     invoice_id: UUID,
     trotz_luecken: bool = Query(False),
     db: Session = Depends(get_db),
@@ -2240,7 +2272,7 @@ async def download_einvoice_xml(
 
 
 @router.get("/{invoice_id}/pdf")
-async def download_invoice_pdf(
+def download_invoice_pdf(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -2269,7 +2301,7 @@ async def download_invoice_pdf(
 
 
 @router.get("/{invoice_id}/preview")
-async def preview_invoice_html(
+def preview_invoice_html(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -2286,7 +2318,7 @@ async def preview_invoice_html(
 
 
 @router.put("/{invoice_id}", response_model=InvoiceResponse)
-async def update_invoice(
+def update_invoice(
     invoice_id: UUID,
     body: InvoiceUpdate,
     db: Session = Depends(get_db),
@@ -2372,7 +2404,7 @@ async def update_invoice(
 
 
 @router.delete("/{invoice_id}", status_code=204)
-async def delete_invoice(
+def delete_invoice(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -2403,7 +2435,7 @@ async def delete_invoice(
 
 @router.post("/{invoice_id}/cancel", response_model=InvoiceResponse,
              dependencies=[Depends(require_loeschen("verkauf"))])
-async def cancel_invoice(
+def cancel_invoice(
     invoice_id: UUID,
     body: InvoiceCancelRequest,
     db: Session = Depends(get_db),
@@ -2508,7 +2540,7 @@ async def cancel_invoice(
 
 
 @router.post("/{invoice_id}/mark-paid", response_model=InvoiceResponse)
-async def mark_paid(
+def mark_paid(
     invoice_id: UUID,
     body: InvoiceMarkPaidRequest,
     db: Session = Depends(get_db),
@@ -2561,7 +2593,7 @@ async def mark_paid(
 
 
 @router.post("/{invoice_id}/set-status", response_model=InvoiceResponse)
-async def set_status(
+def set_status(
     invoice_id: UUID,
     body: dict,
     db: Session = Depends(get_db),
@@ -2641,7 +2673,7 @@ def _pruefe_gueltigkeit(offer: Invoice, trotzdem: bool) -> None:
 
 
 @router.post("/{invoice_id}/convert-to-ab", response_model=InvoiceResponse)
-async def convert_to_ab(
+def convert_to_ab(
     invoice_id: UUID,
     trotz_ablauf: bool = Query(False, description="Abgelaufenes Angebot dennoch umwandeln"),
     db: Session = Depends(get_db),
@@ -2701,7 +2733,7 @@ async def convert_to_ab(
 
 
 @router.post("/{invoice_id}/convert-to-invoice", response_model=InvoiceResponse)
-async def convert_to_invoice(
+def convert_to_invoice(
     invoice_id: UUID,
     trotz_ablauf: bool = Query(False, description="Abgelaufenes Angebot dennoch umwandeln"),
     db: Session = Depends(get_db),
@@ -2803,7 +2835,7 @@ def _positionen_kopieren(db: Session, ziel: Invoice, quelle: Invoice) -> None:
 
 
 @router.get("/{invoice_id}/chain", response_model=StrangResponse)
-async def get_chain(
+def get_chain(
     invoice_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -2858,7 +2890,7 @@ async def get_chain(
 
 
 @router.post("/{invoice_id}/anzahlung", response_model=InvoiceResponse)
-async def create_advance(
+def create_advance(
     invoice_id: UUID,
     body: AnzahlungRequest,
     trotz_ablauf: bool = Query(False),
@@ -2967,7 +2999,7 @@ async def create_advance(
 
 
 @router.post("/{invoice_id}/schlussrechnung", response_model=InvoiceResponse)
-async def create_final_invoice(
+def create_final_invoice(
     invoice_id: UUID,
     body: SchlussrechnungRequest,
     db: Session = Depends(get_db),
@@ -3056,7 +3088,7 @@ async def create_final_invoice(
 
 
 @router.post("/{invoice_id}/duplicate", response_model=InvoiceResponse)
-async def duplicate_invoice(
+def duplicate_invoice(
     invoice_id: UUID,
     body: InvoiceDuplicateRequest,
     db: Session = Depends(get_db),
@@ -3129,7 +3161,7 @@ async def duplicate_invoice(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/{invoice_id}/contract", response_model=InvoiceAttachmentResponse)
-async def upload_contract(
+def upload_contract(
     invoice_id: UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -3161,7 +3193,7 @@ async def upload_contract(
     if vorhanden >= MAX_CONTRACTS:
         raise HTTPException(400, f"Maximal {MAX_CONTRACTS} Verträge je Beleg möglich.")
 
-    data = await file.read()
+    data = file.file.read()
     if len(data) > 25 * 1024 * 1024:
         raise HTTPException(400, "Datei zu groß (max. 25 MB)")
     orig = file.filename or "vertrag.pdf"
@@ -3211,7 +3243,7 @@ async def upload_contract(
 
 
 @router.get("/contract/{attachment_id}/download")
-async def download_contract(
+def download_contract(
     attachment_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -3235,7 +3267,7 @@ async def download_contract(
 
 
 @router.delete("/contract/{attachment_id}", status_code=204)
-async def delete_contract(
+def delete_contract(
     attachment_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -3461,7 +3493,7 @@ def _send_invoice_email(inv: Invoice, db, settings_d: dict, inv_settings_d: dict
 
 
 @router.post("/{invoice_id}/send-email")
-async def send_invoice_email(
+def send_invoice_email(
     invoice_id: UUID,
     body: dict,
     db: Session = Depends(get_db),
@@ -3514,7 +3546,7 @@ async def send_invoice_email(
 
 
 @router.post("/bulk-send-email")
-async def bulk_send_email(
+def bulk_send_email(
     body: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -3576,7 +3608,7 @@ async def bulk_send_email(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/email-templates/{doc_type}")
-async def get_email_template(
+def get_email_template(
     doc_type: str,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -3589,7 +3621,7 @@ async def get_email_template(
 
 
 @router.put("/email-templates/{doc_type}")
-async def update_email_template(
+def update_email_template(
     doc_type: str,
     body: dict,
     db: Session = Depends(get_db),
@@ -3607,7 +3639,7 @@ async def update_email_template(
 
 
 @router.get("/time-entries/unbilled")
-async def get_unbilled_time_entries(
+def get_unbilled_time_entries(
     contact_id: Optional[UUID] = Query(None),
     project_id: Optional[UUID] = Query(None),
     search: Optional[str] = Query(None),

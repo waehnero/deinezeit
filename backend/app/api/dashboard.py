@@ -20,7 +20,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/kennzahlen")
-async def get_kennzahlen(
+def get_kennzahlen(
     bausteine: str = Query(
         "",
         description="Kommaliste der gewünschten Bausteine, z. B. "
@@ -43,5 +43,5 @@ async def get_kennzahlen(
     if not gewuenscht:
         gewuenscht = sorted(dashboard_service.BAUSTEIN_MODUL)
 
-    daten = await dashboard_service.kennzahlen(db, current_user, gewuenscht)
+    daten = dashboard_service.kennzahlen(db, current_user, gewuenscht)
     return {"kennzahlen": daten}

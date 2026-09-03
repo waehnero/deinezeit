@@ -14,17 +14,14 @@ echo "[DeineZeit] Migrationen abgeschlossen. Server wird gestartet..."
 #
 # UVICORN_WORKERS steht bewusst auf 1.
 # ---------------------------------------------------------------------
-# Mehr Arbeitsprozesse würden mehrere Kerne nutzen, ABER: Zwei Dinge liegen
-# derzeit im Arbeitsspeicher EINES Prozesses (app/api/system.py):
-#
-#   * `_update_state` — der laufende Update-Vorgang samt Countdown. Bei
-#     mehreren Prozessen fragt der Browser mal den einen, mal den anderen;
-#     die Update-Meldung erschiene und verschwände scheinbar zufällig.
-#   * `_active_sessions` — die Zählung „aktive Benutzer".
-#
-# Beides gehört in die Datenbank, bevor der Wert erhöht wird. Bis dahin ist
-# 1 der einzig richtige Wert — ein höherer sähe schneller aus und würde das
-# Update-Fenster kaputtmachen.
+# Der Update-Zustand und die Zählung „aktive Benutzer" liegen seit dem Audit
+# (02.09.2026, OPS-003) in der Datenbank — die waren der ursprüngliche Grund.
+# Was noch EINEN Prozess verlangt: die Hintergrund-Worker (Mail-Scan,
+# wiederkehrende Rechnungen, Fälligkeit, Postecke, Backup, SSL) laufen als
+# Threads im App-Prozess. Mit zwei Prozessen liefen sie doppelt — doppelte
+# Rechnungsentwürfe, doppelte Backups, doppelte E-Mails. Erst wenn die Worker
+# einen Prozess-übergreifenden Riegel haben (oder in einen eigenen Container
+# wandern), darf der Wert steigen.
 WORKERS="${UVICORN_WORKERS:-1}"
 
 if [ "${APP_ENV:-production}" = "development" ]; then

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.79] – 2026-09-03 – Audit buendel c
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.78] – 2026-09-03 – Audit buendel b
 
 ### Aktualisierungen

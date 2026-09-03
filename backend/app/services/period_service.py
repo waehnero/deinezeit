@@ -19,6 +19,7 @@ verwischen.
 """
 import hashlib
 import io
+from starlette.concurrency import run_in_threadpool
 import zipfile
 from calendar import monthrange
 from datetime import date, datetime, timezone
@@ -269,31 +270,35 @@ async def paket_bauen(db: Session, jahr: int, monat: int, benutzer) -> tuple:
         return b"".join(teile)
 
     async def sammle(name: str, aufruf):
-        """Antwort eines Endpunkts als Datei aufnehmen; Fehler nicht verschlucken."""
+        """Antwort eines Endpunkts als Datei aufnehmen; Fehler nicht verschlucken.
+
+        ``aufruf`` ist ein Callable. Die Endpunkte sind seit dem Audit
+        (PERF-001) gewöhnliche Funktionen; sie laufen hier im Threadpool,
+        damit die PDF-Erzeugung den Event-Loop nicht anhält."""
         try:
-            dateien[name] = await _rohdaten(await aufruf)
+            dateien[name] = await _rohdaten(await run_in_threadpool(aufruf))
         except Exception as e:
             dateien[name.rsplit(".", 1)[0] + "_FEHLER.txt"] = (
                 f"Diese Datei konnte nicht erzeugt werden:\n{e}\n"
             ).encode("utf-8")
 
     await sammle("buchungsjournal.csv",
-                 export_bmd(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
+                 lambda: export_bmd(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
     # Eingangsseite als eigene Datei — im Verkaufsjournal hießen die Spalten
     # „Erlöskonto" und „Debitornummer", was für Aufwand und Kreditoren falsch
     # wäre.
     await sammle("buchungsjournal_eingang.csv",
-                 export_bmd_eingang(date_from=von, date_to=bis, db=db, _=benutzer))
+                 lambda: export_bmd_eingang(date_from=von, date_to=bis, db=db, _=benutzer))
     await sammle("belegjournal.pdf",
-                 get_book_pdf(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
+                 lambda: get_book_pdf(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
     await sammle("umsatzsteuer.pdf",
-                 get_uva_pdf(date_from=von, date_to=bis, db=db, current_user=benutzer))
+                 lambda: get_uva_pdf(date_from=von, date_to=bis, db=db, current_user=benutzer))
     await sammle("verkaufsbuch.csv",
-                 get_book_csv(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
+                 lambda: get_book_csv(date_from=von, date_to=bis, doc_type=None, db=db, _=benutzer))
 
     # Offene Posten zum Monatsletzten
     try:
-        op = await get_open_items(contact_id=None, stichtag=bis, db=db, _=benutzer)
+        op = await run_in_threadpool(get_open_items, contact_id=None, stichtag=bis, db=db, _=benutzer)
         puffer = io.StringIO()
         schreiber = csv_mod.writer(puffer, delimiter=";")
         schreiber.writerow(["Nummer", "Datum", "Fällig", "Kontakt", "Gesamt",

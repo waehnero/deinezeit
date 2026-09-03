@@ -403,3 +403,51 @@ def test_protokoll_haengt_am_beleg_und_verschwindet_mit_ihm(auth_client, db_sess
     db_session.delete(obj)
     db_session.commit()
     assert db_session.query(InvoiceAuditLog).count() == 0
+
+
+# ── Nummernkreis: Formatprüfung und Zeilensperre (Audit DATA-005) ────────────
+
+def test_nummernformat_nur_mit_year_und_seq(auth_client, admin_user):
+    """``str.format`` erlaubt Attributzugriffe — ein Nummernformat darf nur
+    {year} und {seq} enthalten. Geprüft beim Speichern UND in der Vorschau."""
+    _als_admin(auth_client)
+    resp = auth_client.put("/api/invoices/number-sequences/rechnung",
+                           json={"year": 2026, "format": "RE-{seq.__class__}"})
+    assert resp.status_code == 400
+    assert "{year}" in resp.json()["detail"]
+
+    resp = auth_client.put("/api/invoices/number-sequences/rechnung",
+                           json={"year": 2026, "format": "R{year}/{seq:04d}"})
+    assert resp.status_code == 200
+    vorschau = auth_client.get("/api/invoices/next-number",
+                               params={"doc_type": "rechnung", "year": 2026}).json()
+    assert vorschau["preview"] == "R2026/0001"
+
+
+def test_naechste_nummer_sperrt_zaehlerzeile(db_session, monkeypatch):
+    """``_next_number`` liest den Zähler mit FOR UPDATE — auch beim allerersten
+    Beleg eines Jahres, wenn die Zeile gerade erst entsteht."""
+    from app.api import invoice as invoice_api
+    from app.models.invoice import InvoiceNumberSequence
+
+    gesperrt = []
+    original = invoice_api.InvoiceNumberSequence  # noqa: F841 — nur Existenzprüfung
+    echte_with_for_update = None
+
+    from sqlalchemy.orm import Query
+    echte_with_for_update = Query.with_for_update
+
+    def merken(self, *a, **kw):
+        gesperrt.append(True)
+        return echte_with_for_update(self, *a, **kw)
+    monkeypatch.setattr(Query, "with_for_update", merken)
+
+    seq1, nummer1 = invoice_api._next_number(db_session, "rechnung", 2031)
+    seq2, nummer2 = invoice_api._next_number(db_session, "rechnung", 2031)
+    db_session.commit()
+
+    assert (seq1, seq2) == (1, 2)
+    assert nummer1 == "RE-2031-001" and nummer2 == "RE-2031-002"
+    assert len(gesperrt) >= 2, "Zähler wurde ohne Zeilensperre gelesen"
+    assert db_session.query(InvoiceNumberSequence).filter_by(
+        doc_type="rechnung", year=2031).one().last_sequence == 2

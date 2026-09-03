@@ -16,7 +16,7 @@ router = APIRouter(prefix="/users", tags=["Benutzerverwaltung"])
 
 
 @router.get("/", response_model=List[UserResponse])
-async def list_users(
+def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -25,7 +25,7 @@ async def list_users(
 
 
 @router.post("/", response_model=UserResponse)
-async def create_user(
+def create_user(
     body: UserCreate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -42,7 +42,7 @@ async def create_user(
 
 
 @router.put("/me", response_model=UserResponse)
-async def update_me(
+def update_me(
     body: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -76,7 +76,7 @@ async def update_me(
 
 
 @router.get("/me/dashboard", response_model=DashboardConfigPayload)
-async def get_my_dashboard(
+def get_my_dashboard(
     current_user: User = Depends(get_current_user),
 ):
     """Persönliche Dashboard-Konfiguration abrufen (None = Standard)."""
@@ -84,7 +84,7 @@ async def get_my_dashboard(
 
 
 @router.put("/me/dashboard", response_model=DashboardConfigPayload)
-async def save_my_dashboard(
+def save_my_dashboard(
     body: DashboardConfigPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -100,7 +100,7 @@ async def save_my_dashboard(
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-async def update_user_by_admin(
+def update_user_by_admin(
     user_id: UUID,
     body: AdminUserUpdate,
     request: Request,
@@ -209,7 +209,7 @@ async def update_user_by_admin(
 
 
 @router.post("/{user_id}/unlock", response_model=UserResponse)
-async def unlock_user(
+def unlock_user(
     user_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
@@ -270,7 +270,7 @@ def fachdaten_des_benutzers(db: Session, user_id: UUID) -> dict:
 
 
 @router.delete("/{user_id}")
-async def delete_user(
+def delete_user(
     user_id: UUID,
     request: Request,
     db: Session = Depends(get_db),

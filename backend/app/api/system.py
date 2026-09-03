@@ -5,7 +5,9 @@ import asyncio
 import subprocess
 import os
 import re
+import time
 import httpx
+from starlette.concurrency import run_in_threadpool
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from threading import Lock
@@ -18,7 +20,9 @@ from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
 from app.api.auth import absender_meta
 from app.core import auth_events as EV
+from app.models.settings import Setting
 from app.models.user import User, UserRole, UserSession
+from app.db.base import SessionLocal
 from app.schemas.user import AdminSessionResponse
 from app.services.auth_service import auth_service
 from app.core.config import settings
@@ -27,45 +31,59 @@ router = APIRouter(prefix="/system", tags=["system"])
 
 
 @router.get("/health")
-async def health():
+def health():
     """Einfacher Health-Check — wird von update.sh genutzt um zu prüfen ob das Backend läuft."""
     return {"status": "ok"}
 
-# ── Aktive Sessions (in-memory) ───────────────────────────────────────────────
-# { user_id: last_active_datetime }
-_active_sessions: dict = {}
-_sessions_lock = Lock()
+# ── Aktive Benutzer und Update-Zustand ───────────────────────────────────────
+#
+# Beides lag bis 02.09.2026 im Arbeitsspeicher EINES Prozesses (ein Dict für
+# die letzte Aktivität je Benutzer, ein Dict für den Update-Vorgang). Das
+# zwang UVICORN_WORKERS auf 1: Mit zwei Prozessen hätte der Browser mal den
+# einen, mal den anderen gefragt, und die Update-Meldung wäre scheinbar
+# zufällig erschienen und verschwunden (Audit OPS-003).
+#
+# Jetzt: Aktive Benutzer werden aus ``user_sessions.last_used_at`` gezählt
+# (wird bei jedem Zugriff höchstens einmal je Minute fortgeschrieben, siehe
+# auth_service.zugriff_vermerken). Der Update-Zustand liegt in der Tabelle
+# ``settings`` unter ``update_*``-Schlüsseln. Beides gilt damit für alle
+# Arbeitsprozesse gleichermaßen.
 
-def record_activity(user_id: str):
-    """Letzte Aktivität eines Benutzers aktualisieren."""
-    with _sessions_lock:
-        _active_sessions[user_id] = datetime.now(timezone.utc)
-
-def get_active_user_count(minutes: int = 5) -> int:
-    """Anzahl Benutzer die in den letzten N Minuten aktiv waren."""
+def get_active_user_count(db: Session, minutes: int = 5) -> int:
+    """Anzahl Benutzer mit einer lebenden Sitzung, die zuletzt vor höchstens
+    ``minutes`` Minuten benutzt wurde."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
-    with _sessions_lock:
-        return sum(1 for ts in _active_sessions.values() if ts > cutoff)
+    return (db.query(UserSession.user_id)
+              .filter(UserSession.revoked_at.is_(None),
+                      UserSession.last_used_at > cutoff)
+              .distinct().count())
 
-def get_active_user_ids(minutes: int = 5) -> list:
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
-    with _sessions_lock:
-        return [uid for uid, ts in _active_sessions.items() if ts > cutoff]
 
-# ── Update-Status (in-memory) ─────────────────────────────────────────────────
-_update_state = {
-    "status": "idle",          # idle | notifying | updating | done | failed
-    "pending": False,
-    "scheduled_at": None,      # ISO-String wann Update ausgeführt wird
-    "countdown_seconds": 0,
-    "initiated_by": None,
-    "message": "",
-}
-_update_lock = Lock()
+_UPDATE_FELDER = ("status", "scheduled_at", "initiated_by", "message")
+_UPDATE_VORGABE = {"status": "idle", "scheduled_at": "", "initiated_by": "", "message": ""}
 
-def _set_update_state(**kwargs):
-    with _update_lock:
-        _update_state.update(kwargs)
+
+def _update_state_lesen(db: Session) -> dict:
+    zeilen = {r.key: r.value for r in db.query(Setting).filter(
+        Setting.key.in_([f"update_{k}" for k in _UPDATE_FELDER])).all()}
+    state = {k: zeilen.get(f"update_{k}", v) or v for k, v in _UPDATE_VORGABE.items()}
+    state["pending"] = state["status"] == "notifying"
+    state["countdown_seconds"] = 0
+    return state
+
+
+def _update_state_schreiben(db: Session, **werte) -> None:
+    jetzt = datetime.now(timezone.utc)
+    for k, v in werte.items():
+        assert k in _UPDATE_FELDER, k
+        row = db.query(Setting).filter(Setting.key == f"update_{k}").first()
+        if row is None:
+            db.add(Setting(key=f"update_{k}", value=v or "", updated_at=jetzt))
+        else:
+            row.value = v or ""
+            row.updated_at = jetzt
+    db.commit()
+
 
 # ── Hilfsfunktion: Versionsvergleich ──────────────────────────────────────────
 def _version_newer(v1: str, v2: str) -> bool:
@@ -120,9 +138,29 @@ def _read_local_version() -> str:
     return settings.APP_VERSION  # Fallback auf config.py
 
 
-@router.get("/version")
-async def get_version_info():
-    """Aktuelle Version aus lokaler CHANGELOG.md, neueste von GitHub."""
+# ── Versionsprüfung ───────────────────────────────────────────────────────────
+#
+# Bis 02.09.2026 war /system/version ohne Anmeldung erreichbar und löste bei
+# jedem Aufruf eine Anfrage an GitHub und — wenn die scheiterte — ein
+# blockierendes ``git fetch`` (bis 15 s) aus. Damit konnte jeder Unbekannte den
+# Server für alle anderen anhalten (Audit OPS-004 / PERF-001). Jetzt: nur
+# angemeldet, Ergebnis zehn Minuten zwischengespeichert, git im Threadpool.
+_VERSION_CACHE_SEKUNDEN = 600
+_version_cache: dict = {"bis": 0.0, "wert": None}
+_version_lock = Lock()
+
+
+def _git_ahead_of_origin() -> bool:
+    """Blockierend (Subprozess) — nur über run_in_threadpool aufrufen."""
+    subprocess.run(["git", "-C", "/opt/deinezeit", "fetch", "origin", "main"],
+                   capture_output=True, timeout=10)
+    ahead = subprocess.run(
+        ["git", "-C", "/opt/deinezeit", "log", "HEAD..origin/main", "--oneline"],
+        capture_output=True, timeout=5, text=True)
+    return bool(ahead.stdout.strip())
+
+
+async def _version_ermitteln() -> dict:
     current = _read_local_version()
     latest = current
     update_available = False
@@ -148,15 +186,7 @@ async def get_version_info():
     # Fallback: git-basierte Prüfung wenn GitHub nicht per HTTP erreichbar
     if not github_check_ok:
         try:
-            subprocess.run(
-                ["git", "-C", "/opt/deinezeit", "fetch", "origin", "main"],
-                capture_output=True, timeout=10
-            )
-            ahead = subprocess.run(
-                ["git", "-C", "/opt/deinezeit", "log", "HEAD..origin/main", "--oneline"],
-                capture_output=True, timeout=5, text=True
-            )
-            if ahead.stdout.strip():
+            if await run_in_threadpool(_git_ahead_of_origin):
                 update_available = True
                 latest = f"{current}+"   # Neue Commits vorhanden, Versionsnummer unbekannt
         except Exception:
@@ -171,8 +201,22 @@ async def get_version_info():
     }
 
 
+@router.get("/version")
+async def get_version_info(_: User = Depends(get_current_user)):
+    """Aktuelle Version aus lokaler CHANGELOG.md, neueste von GitHub (10 min Cache)."""
+    jetzt = time.monotonic()
+    with _version_lock:
+        if _version_cache["wert"] is not None and jetzt < _version_cache["bis"]:
+            return _version_cache["wert"]
+    wert = await _version_ermitteln()
+    with _version_lock:
+        _version_cache["wert"] = wert
+        _version_cache["bis"] = time.monotonic() + _VERSION_CACHE_SEKUNDEN
+    return wert
+
+
 @router.get("/changelog")
-async def get_changelog():
+async def get_changelog(_: User = Depends(get_current_user)):
     """CHANGELOG.md von GitHub laden."""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -188,7 +232,7 @@ async def get_changelog():
 
 
 @router.get("/ssl-status")
-async def get_ssl_status(admin: User = Depends(require_admin)):
+def get_ssl_status(admin: User = Depends(require_admin)):
     """Zustand des HTTPS-Zertifikats: Restlaufzeit und ob die Automatik läuft.
 
     Nur für Administratoren — die Restlaufzeit eines Zertifikats ist zwar
@@ -210,18 +254,13 @@ async def get_ssl_status(admin: User = Depends(require_admin)):
 
 
 @router.get("/active-users")
-async def get_active_users(
+def get_active_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Anzahl aktiver Benutzer (letzte 5 Minuten).
-
-    Achtung: zählt aus ``_active_sessions`` im Arbeitsspeicher und ist damit
-    nur bei EINEM Arbeitsprozess richtig. Für die Übersicht in den
-    Einstellungen gibt es ``/system/sitzungen`` — die liest ``user_sessions``
-    und stimmt auch mit mehreren uvicorn-Workern.
-    """
-    count = get_active_user_count(minutes=5)
+    """Anzahl aktiver Benutzer (letzte 5 Minuten) — aus ``user_sessions``,
+    also unabhängig von der Zahl der Arbeitsprozesse."""
+    count = get_active_user_count(db, minutes=5)
     # Eigenen User abziehen
     active_count = max(0, count - 1)
     return {"active_users": active_count, "total_including_me": count}
@@ -257,7 +296,7 @@ def _sitzung_darstellen(sitzung: UserSession, jetzt: datetime,
 
 
 @router.get("/sitzungen", response_model=List[AdminSessionResponse])
-async def sitzungen_liste(request: Request, db: Session = Depends(get_db),
+def sitzungen_liste(request: Request, db: Session = Depends(get_db),
                           _: User = Depends(require_admin)):
     """Alle offenen Sitzungen, zuletzt aktive zuerst."""
     jetzt = datetime.now(timezone.utc)
@@ -272,7 +311,7 @@ async def sitzungen_liste(request: Request, db: Session = Depends(get_db),
 
 
 @router.delete("/sitzungen/{session_id}")
-async def sitzung_beenden(session_id: UUID, request: Request,
+def sitzung_beenden(session_id: UUID, request: Request,
                           db: Session = Depends(get_db),
                           admin: User = Depends(require_admin)):
     """Eine einzelne Sitzung beenden — das vergessene Gerät.
@@ -296,7 +335,7 @@ async def sitzung_beenden(session_id: UUID, request: Request,
 
 
 @router.delete("/sitzungen/benutzer/{user_id}")
-async def benutzer_abmelden(user_id: UUID, request: Request,
+def benutzer_abmelden(user_id: UUID, request: Request,
                             db: Session = Depends(get_db),
                             admin: User = Depends(require_admin)):
     """Alle Geräte eines Benutzers abmelden."""
@@ -314,10 +353,9 @@ async def benutzer_abmelden(user_id: UUID, request: Request,
 
 
 @router.get("/update-status")
-async def get_update_status():
+def get_update_status(db: Session = Depends(get_db)):
     """Update-Status abfragen — alle Benutzer pollen diesen Endpoint."""
-    with _update_lock:
-        state = dict(_update_state)
+    state = _update_state_lesen(db)
 
     # Countdown berechnen
     if state.get("scheduled_at") and state["status"] == "notifying":
@@ -344,19 +382,17 @@ async def start_update(
                    "Bitte 'git pull' im Projektverzeichnis ausführen und die Container neu starten.",
         )
 
-    with _update_lock:
-        if _update_state["status"] not in ("idle", "done", "failed"):
-            raise HTTPException(status_code=409, detail="Ein Update-Prozess läuft bereits")
+    if _update_state_lesen(db)["status"] not in ("idle", "done", "failed"):
+        raise HTTPException(status_code=409, detail="Ein Update-Prozess läuft bereits")
 
     scheduled_at = datetime.now(timezone.utc) + timedelta(minutes=2)
 
-    _set_update_state(
+    _update_state_schreiben(
+        db,
         status="notifying",
-        pending=True,
         scheduled_at=scheduled_at.isoformat(),
         initiated_by=admin.full_name,
         message=f"Update wird in 2 Minuten von {admin.full_name} gestartet. Bitte speichern Sie Ihre Arbeit.",
-        countdown_seconds=120,
     )
 
     # Hintergrund-Task: nach 2 Minuten Update ausführen
@@ -366,44 +402,58 @@ async def start_update(
 
 
 @router.post("/update/cancel")
-async def cancel_update(admin: User = Depends(require_admin)):
+def cancel_update(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     """Update abbrechen (nur während der Benachrichtigungs-Phase möglich)."""
-    with _update_lock:
-        if _update_state["status"] != "notifying":
-            raise HTTPException(status_code=409, detail="Update kann jetzt nicht mehr abgebrochen werden")
+    if _update_state_lesen(db)["status"] != "notifying":
+        raise HTTPException(status_code=409, detail="Update kann jetzt nicht mehr abgebrochen werden")
 
-    _set_update_state(
-        status="idle",
-        pending=False,
-        scheduled_at=None,
-        message="Update wurde abgebrochen.",
-    )
+    _update_state_schreiben(db, status="idle", scheduled_at="",
+                            message="Update wurde abgebrochen.")
     return {"ok": True}
 
 
 # ── Hintergrund-Update ────────────────────────────────────────────────────────
 
+def _mit_db(fn):
+    """Kurzlebige Sitzung für den Hintergrund-Task (er hat keine Request-Session)."""
+    db = SessionLocal()
+    try:
+        return fn(db)
+    finally:
+        db.close()
+
+
 async def _run_update_after_delay(delay_seconds: int):
     await asyncio.sleep(delay_seconds)
 
-    # Prüfen ob noch nicht abgebrochen
-    with _update_lock:
-        if _update_state["status"] != "notifying":
-            return
+    # Prüfen ob noch nicht abgebrochen (Zustand liegt in der Datenbank)
+    if await run_in_threadpool(_mit_db, lambda db: _update_state_lesen(db)["status"]) != "notifying":
+        return
 
-    _set_update_state(status="updating", pending=False, message="Update wird ausgeführt…")
+    await run_in_threadpool(_mit_db, lambda db: _update_state_schreiben(
+        db, status="updating", message="Update wird ausgeführt…"))
 
     # In separatem Thread ausführen damit der Event Loop nicht blockiert
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _execute_update)
+    await run_in_threadpool(_execute_update)
 
     # Watchdog: Wenn das Backend nach dem Update noch läuft (kein Neustart erfolgt),
     # wurde kein neuer Commit gefunden oder der Build schlug vor dem Container-Neustart fehl.
     # Nach 5 Minuten Status zurücksetzen damit Benutzer nicht dauerhaft ausgesperrt bleiben.
     await asyncio.sleep(300)
-    with _update_lock:
-        if _update_state["status"] == "updating":
-            _set_update_state(status="idle", pending=False, message="")
+    await run_in_threadpool(_mit_db, _update_watchdog)
+
+
+def update_zustand_nach_neustart_zuruecksetzen() -> None:
+    """Beim Start: einen liegengebliebenen Update-Zustand beenden."""
+    def _reset(db):
+        if _update_state_lesen(db)["status"] in ("notifying", "updating"):
+            _update_state_schreiben(db, status="idle", scheduled_at="", message="")
+    _mit_db(_reset)
+
+
+def _update_watchdog(db: Session) -> None:
+    if _update_state_lesen(db)["status"] == "updating":
+        _update_state_schreiben(db, status="idle", scheduled_at="", message="")
 
 
 def _execute_update():
@@ -444,8 +494,11 @@ def _execute_update():
             stderr=subprocess.DEVNULL,
         )
 
-        # Status bleibt "updating" — nach dem Neustart der Container resettet sich der
-        # In-Memory-State ohnehin. Das Frontend zeigt die Wartungsseite bis nginx wieder antwortet.
+        # Status bleibt "updating". Er liegt jetzt in der Datenbank und überlebt
+        # den Neustart — deshalb setzt ihn der Start (startup_event in main.py)
+        # zurück, sonst bliebe die Update-Meldung nach einem erfolgreichen
+        # Update stehen. Das Frontend zeigt die Wartungsseite bis nginx wieder antwortet.
 
     except Exception as e:
-        _set_update_state(status="failed", message=f"Update konnte nicht gestartet werden: {str(e)}")
+        fehler = f"Update konnte nicht gestartet werden: {e}"
+        _mit_db(lambda db: _update_state_schreiben(db, status="failed", message=fehler))

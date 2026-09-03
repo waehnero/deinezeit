@@ -366,7 +366,7 @@ def generiere_post(
 
 # ── Fotos ─────────────────────────────────────────────────────────────────────
 @router.post("/posts/{post_id}/fotos", response_model=PostResponse, status_code=201)
-async def upload_fotos(
+def upload_fotos(
     post_id: UUID,
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
@@ -384,7 +384,7 @@ async def upload_fotos(
         mimetype = (f.content_type or "").lower()
         if mimetype not in ERLAUBTE_FOTO_TYPEN:
             raise HTTPException(422, f"Dateityp nicht erlaubt: {f.filename}")
-        data = await f.read()
+        data = f.file.read()
         if len(data) > MAX_FOTO_BYTES:
             raise HTTPException(422, f"Foto zu groß (max. 25 MB): {f.filename}")
         # ID selbst vergeben, damit der Storage-Key VOR dem Insert feststeht
@@ -498,7 +498,7 @@ def delete_foto(
 
 # ── Video (max. eines je Post; kein Misch-Post mit Fotos) ─────────────────────
 @router.post("/posts/{post_id}/video", response_model=PostResponse, status_code=201)
-async def upload_video(
+def upload_video(
     post_id: UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -517,7 +517,7 @@ async def upload_video(
     mimetype = (file.content_type or "").lower()
     if mimetype not in ERLAUBTE_VIDEO_TYPEN:
         raise HTTPException(422, "Videotyp nicht erlaubt — bitte MP4 oder MOV.")
-    data = await file.read()
+    data = file.file.read()
     if len(data) > MAX_VIDEO_BYTES:
         raise HTTPException(422, "Video zu groß (max. 200 MB).")
 

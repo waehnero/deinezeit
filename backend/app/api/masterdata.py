@@ -108,7 +108,7 @@ def _schreibrecht_pruefen(user: User, slug: Optional[str] = None) -> None:
 # ─── Stammdaten-Typen ─────────────────────────────────────────────────────────
 
 @router.get("/types", response_model=List[EntityTypeResponse])
-async def list_entity_types(
+def list_entity_types(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -124,7 +124,7 @@ async def list_entity_types(
 
 
 @router.post("/types", response_model=EntityTypeResponse)
-async def create_entity_type(
+def create_entity_type(
     body: EntityTypeCreate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -136,7 +136,7 @@ async def create_entity_type(
 
 
 @router.get("/types/{slug}", response_model=EntityTypeResponse)
-async def get_entity_type(
+def get_entity_type(
     slug: str,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -152,7 +152,7 @@ async def get_entity_type(
 
 
 @router.put("/types/{slug}", response_model=EntityTypeResponse)
-async def update_entity_type(
+def update_entity_type(
     slug: str,
     body: EntityTypeUpdate,
     db: Session = Depends(get_db),
@@ -166,7 +166,7 @@ async def update_entity_type(
 
 
 @router.delete("/types/{slug}")
-async def delete_entity_type(
+def delete_entity_type(
     slug: str,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -182,7 +182,7 @@ async def delete_entity_type(
 # ─── Felddefinitionen ─────────────────────────────────────────────────────────
 
 @router.post("/types/{slug}/fields", response_model=FieldDefinitionResponse)
-async def add_field(
+def add_field(
     slug: str,
     body: FieldDefinitionCreate,
     db: Session = Depends(get_db),
@@ -229,7 +229,7 @@ async def add_field(
 
 
 @router.put("/types/{slug}/fields/{field_id}", response_model=FieldDefinitionResponse)
-async def update_field(
+def update_field(
     slug: str,
     field_id: UUID,
     body: FieldDefinitionUpdate,
@@ -264,7 +264,7 @@ async def update_field(
 
 
 @router.delete("/types/{slug}/fields/{field_id}")
-async def delete_field(
+def delete_field(
     slug: str,
     field_id: UUID,
     db: Session = Depends(get_db),
@@ -293,7 +293,7 @@ async def delete_field(
 
 
 @router.put("/types/{slug}/fields-order")
-async def update_field_order(
+def update_field_order(
     slug: str,
     body: UpdateFieldSortOrders,
     db: Session = Depends(get_db),
@@ -307,7 +307,7 @@ async def update_field_order(
 
 
 @router.put("/types/{slug}/fields-layout")
-async def update_fields_layout(
+def update_fields_layout(
     slug: str,
     layout: List[dict],
     db: Session = Depends(get_db),
@@ -329,7 +329,7 @@ async def update_fields_layout(
 
 
 @router.put("/types/{slug}/tabs")
-async def update_tabs(
+def update_tabs(
     slug: str,
     body: dict,
     db: Session = Depends(get_db),
@@ -364,7 +364,7 @@ async def update_tabs(
 # ─── Datensätze ───────────────────────────────────────────────────────────────
 
 @router.get("/types/{slug}/records", response_model=EntityRecordListResponse)
-async def list_records(
+def list_records(
     slug: str,
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -390,7 +390,7 @@ async def list_records(
 
 
 @router.post("/types/{slug}/records", response_model=EntityRecordResponse)
-async def create_record(
+def create_record(
     slug: str,
     body: EntityRecordCreate,
     db: Session = Depends(get_db),
@@ -433,7 +433,7 @@ async def create_record(
 
 
 @router.get("/types/{slug}/records/{record_id}", response_model=EntityRecordResponse)
-async def get_record(
+def get_record(
     slug: str,
     record_id: UUID,
     db: Session = Depends(get_db),
@@ -447,7 +447,7 @@ async def get_record(
 
 
 @router.put("/types/{slug}/records/{record_id}", response_model=EntityRecordResponse)
-async def update_record(
+def update_record(
     slug: str,
     record_id: UUID,
     body: EntityRecordUpdate,
@@ -466,7 +466,7 @@ async def update_record(
 
 
 @router.get("/types/{slug}/records/export/csv")
-async def export_records_csv(
+def export_records_csv(
     slug: str,
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -500,7 +500,7 @@ async def export_records_csv(
 
 
 @router.post("/types/{slug}/records/import", response_model=ImportReport)
-async def import_records(
+def import_records(
     slug: str,
     body: ImportRequest,
     db: Session = Depends(get_db),
@@ -547,7 +547,7 @@ async def import_records(
 
 
 @router.get("/types/{slug}/records/{record_id}/references")
-async def get_record_references(
+def get_record_references(
     slug: str,
     record_id: UUID,
     db: Session = Depends(get_db),
@@ -567,7 +567,7 @@ async def get_record_references(
 
 @router.post("/types/{slug}/records/{record_id}/archive",
              response_model=EntityRecordResponse)
-async def archive_record(
+def archive_record(
     slug: str,
     record_id: UUID,
     db: Session = Depends(get_db),
@@ -589,7 +589,7 @@ async def archive_record(
 
 @router.post("/types/{slug}/records/{record_id}/restore",
              response_model=EntityRecordResponse)
-async def restore_record(
+def restore_record(
     slug: str,
     record_id: UUID,
     db: Session = Depends(get_db),
@@ -610,7 +610,7 @@ async def restore_record(
 
 
 @router.delete("/types/{slug}/records/{record_id}")
-async def delete_record(
+def delete_record(
     slug: str,
     record_id: UUID,
     db: Session = Depends(get_db),
@@ -720,7 +720,7 @@ def _konto_pruefen(db: Session, nr: Optional[str], bezeichnung: str) -> Optional
 
 
 @router.get("/artikelgruppen", response_model=List[ArticleGroupResponse])
-async def list_article_groups(
+def list_article_groups(
     active_only: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -734,7 +734,7 @@ async def list_article_groups(
 
 
 @router.post("/artikelgruppen", response_model=ArticleGroupResponse)
-async def create_article_group(
+def create_article_group(
     body: ArticleGroupCreate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -769,7 +769,7 @@ async def create_article_group(
 
 
 @router.put("/artikelgruppen/{group_id}", response_model=ArticleGroupResponse)
-async def update_article_group(
+def update_article_group(
     group_id: UUID,
     body: ArticleGroupUpdate,
     db: Session = Depends(get_db),
@@ -817,7 +817,7 @@ async def update_article_group(
 
 
 @router.put("/artikelgruppen/{group_id}/konten", response_model=ArticleGroupResponse)
-async def set_article_group_accounts(
+def set_article_group_accounts(
     group_id: UUID,
     body: List[ArticleGroupAccountBase],
     db: Session = Depends(get_db),
@@ -881,14 +881,14 @@ async def set_article_group_accounts(
 
 
 @router.get("/steuerfaelle", response_model=List[SteuerfallInfo])
-async def list_steuerfaelle(_: User = Depends(get_current_user)):
+def list_steuerfaelle(_: User = Depends(get_current_user)):
     """Die möglichen Steuerfälle — feste Liste, siehe services/steuerfall.py."""
     return [SteuerfallInfo(kennung=k, bezeichnung=n)
             for k, n in steuerfall_service.STEUERFAELLE]
 
 
 @router.delete("/artikelgruppen/{group_id}")
-async def delete_article_group(
+def delete_article_group(
     group_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -919,7 +919,7 @@ async def delete_article_group(
 # ─── Artikel: Nummernvorschlag und Vorgabewerte ───────────────────────────────
 
 @router.get("/artikel/naechste-nummer")
-async def naechste_artikelnummer(
+def naechste_artikelnummer(
     gruppe: str = Query(..., description="Kurzschlüssel der Artikelgruppe"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -942,7 +942,7 @@ async def naechste_artikelnummer(
 
 
 @router.get("/artikel/{record_id}/vorgaben", response_model=ArtikelVorgaben)
-async def artikel_vorgaben(
+def artikel_vorgaben(
     record_id: UUID,
     contact_id: Optional[UUID] = Query(
         None, description="Kunde des Belegs — bestimmt den Steuerfall"),
@@ -968,7 +968,7 @@ async def artikel_vorgaben(
 # ─── Bilder an Stammdatensätzen ───────────────────────────────────────────────
 
 @router.post("/bild")
-async def upload_masterdata_image(
+def upload_masterdata_image(
     size: str = Query("mittel", description="klein | mittel | gross"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -991,7 +991,7 @@ async def upload_masterdata_image(
     if file.content_type and file.content_type not in position_image.ERLAUBTE_TYPEN:
         raise HTTPException(400, f"Dateityp {file.content_type} wird nicht unterstützt. "
                                  f"Erlaubt sind JPEG, PNG, WebP und GIF.")
-    rohdaten = await file.read()
+    rohdaten = file.file.read()
     if len(rohdaten) > position_image.MAX_UPLOAD:
         raise HTTPException(400, "Bild zu groß (max. 15 MB)")
 
@@ -1012,7 +1012,7 @@ async def upload_masterdata_image(
 
 
 @router.get("/bild")
-async def get_masterdata_image(
+def get_masterdata_image(
     key: str = Query(..., description="Speicher-Schlüssel aus dem Upload"),
     provider: Optional[str] = Query(None, description="Speicher der Datei; leer = aktiver"),
     db: Session = Depends(get_db),

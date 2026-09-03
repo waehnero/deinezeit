@@ -419,7 +419,7 @@ def darf_sehen(user: User, baustein: str) -> bool:
     return all(user_has_module(user, m) for m in module)
 
 
-async def kennzahlen(db: Session, user: User, bausteine: list[str]) -> dict:
+def kennzahlen(db: Session, user: User, bausteine: list[str]) -> dict:
     """Kennzahlen der angefragten Bausteine sammeln.
 
     Nicht erlaubte oder unbekannte Bausteine werden **still übergangen**, statt
@@ -457,10 +457,10 @@ async def kennzahlen(db: Session, user: User, bausteine: list[str]) -> dict:
 
             elif baustein == "zeiterfassung":
                 ergebnis["zeiterfassung"] = {
-                    "stats": await zeiterfassung_api.get_stats(
+                    "stats": zeiterfassung_api.get_stats(
                         user_id=None, db=db, current_user=user,
                     ),
-                    "laufend": await zeiterfassung_api.get_running_timer(
+                    "laufend": zeiterfassung_api.get_running_timer(
                         db=db, current_user=user,
                     ),
                 }
@@ -469,12 +469,12 @@ async def kennzahlen(db: Session, user: User, bausteine: list[str]) -> dict:
                 ergebnis["rechnungen"] = finanz_kennzahlen(db)
 
             elif baustein == "projekte":
-                ergebnis["projekte"] = await projektplan_api.recent_projects(
+                ergebnis["projekte"] = projektplan_api.recent_projects(
                     limit=5, db=db, _=user,
                 )
 
             elif baustein == "datacenter":
-                ergebnis["datacenter"] = await datacenter_api.get_datacenter_stats(
+                ergebnis["datacenter"] = datacenter_api.get_datacenter_stats(
                     limit=3, db=db, _=user,
                 )
 

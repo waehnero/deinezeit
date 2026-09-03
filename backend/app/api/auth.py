@@ -30,6 +30,7 @@ from uuid import UUID
 
 from fastapi import (APIRouter, Depends, HTTPException, Request, Response,
                      status)
+from starlette.concurrency import run_in_threadpool
 from slowapi import Limiter
 from sqlalchemy.orm import Session
 
@@ -234,7 +235,13 @@ async def login(request: Request, response: Response, body: LoginRequest,
 
     # Passwort prüfen (bei unbekanntem Konto gegen einen Wegwerf-Hash, damit
     # die Antwortzeit nicht verrät, ob es das Konto gibt).
-    geprueft = auth_service.authenticate_user(db, email, body.password)
+    #
+    # Im Threadpool: bcrypt braucht mit Absicht rund eine Drittelsekunde. Dieser
+    # Endpunkt muss ``async`` bleiben (wegen der Wartezeit in ``_bremsen``),
+    # und in einem ``async``-Endpunkt hielte die Prüfung sonst alle anderen
+    # Anfragen so lange an (Audit PERF-001).
+    geprueft = await run_in_threadpool(auth_service.authenticate_user,
+                                       db, email, body.password)
 
     if geprueft is None or not geprueft.is_active:
         await _bremsen(db, email, user)
@@ -286,7 +293,7 @@ async def login(request: Request, response: Response, body: LoginRequest,
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user)):
     """Aktuell eingeloggten Benutzer abrufen."""
     return current_user
 
@@ -297,7 +304,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 @router.post("/refresh", response_model=RefreshResponse)
 @limiter.limit("60/minute")
-async def refresh(request: Request, response: Response,
+def refresh(request: Request, response: Response,
                   db: Session = Depends(get_db)):
     """Sitzung verlängern — der neue Access-Token kommt zurück.
 
@@ -343,7 +350,7 @@ async def refresh(request: Request, response: Response,
 
 
 @router.post("/logout")
-async def logout(request: Request, response: Response,
+def logout(request: Request, response: Response,
                  db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user)):
     """Nur dieses Gerät abmelden."""
@@ -359,7 +366,7 @@ async def logout(request: Request, response: Response,
 
 
 @router.post("/logout-all")
-async def logout_all(request: Request, response: Response,
+def logout_all(request: Request, response: Response,
                      db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
     """Von allen Geräten abmelden — auch von diesem.
@@ -378,7 +385,7 @@ async def logout_all(request: Request, response: Response,
 
 
 @router.get("/sessions", response_model=list[SessionResponse])
-async def sessions_list(request: Request, db: Session = Depends(get_db),
+def sessions_list(request: Request, db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)):
     """„Hier bist du angemeldet" — offene Sitzungen des eigenen Kontos."""
     aktuelle = getattr(request.state, "session_id", None)
@@ -391,7 +398,7 @@ async def sessions_list(request: Request, db: Session = Depends(get_db),
 
 
 @router.delete("/sessions/{session_id}")
-async def session_revoke(session_id: UUID, request: Request,
+def session_revoke(session_id: UUID, request: Request,
                          response: Response, db: Session = Depends(get_db),
                          current_user: User = Depends(get_current_user)):
     """Eine einzelne Sitzung beenden (fremdes Gerät aus der Liste werfen)."""
@@ -413,7 +420,7 @@ async def session_revoke(session_id: UUID, request: Request,
 
 
 @router.get("/events", response_model=list[AuthEventResponse])
-async def events_list(limit: int = 30, db: Session = Depends(get_db),
+def events_list(limit: int = 30, db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
     """Die letzten Anmelde-Ereignisse des eigenen Kontos.
 
@@ -439,7 +446,7 @@ async def events_list(limit: int = 30, db: Session = Depends(get_db),
 
 @router.post("/password/forgot")
 @limiter.limit("5/hour")
-async def password_forgot(request: Request, body: PasswordForgotRequest,
+def password_forgot(request: Request, body: PasswordForgotRequest,
                           db: Session = Depends(get_db)):
     """Zurücksetzen anfordern.
 
@@ -513,7 +520,7 @@ async def password_forgot(request: Request, body: PasswordForgotRequest,
 
 @router.post("/password/reset")
 @limiter.limit("10/hour")
-async def password_reset(request: Request, body: PasswordResetRequest,
+def password_reset(request: Request, body: PasswordResetRequest,
                          db: Session = Depends(get_db)):
     """Neues Passwort mit dem Token aus der E-Mail setzen."""
     meta = absender_meta(request)
@@ -550,7 +557,7 @@ async def password_reset(request: Request, body: PasswordResetRequest,
 
 
 @router.post("/password/change")
-async def password_change(request: Request, response: Response,
+def password_change(request: Request, response: Response,
                           body: PasswordChangeRequest,
                           db: Session = Depends(get_db),
                           current_user: User = Depends(get_current_user)):
@@ -595,7 +602,7 @@ async def password_change(request: Request, response: Response,
 # ═════════════════════════════════════════════════════════════════════════════
 
 @router.post("/totp/setup", response_model=TOTPSetupResponse)
-async def setup_totp(db: Session = Depends(get_db),
+def setup_totp(db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
     """QR-Code für die Authenticator-App erzeugen.
 
@@ -614,7 +621,7 @@ async def setup_totp(db: Session = Depends(get_db),
 
 
 @router.post("/totp/enable")
-async def enable_totp(request: Request, body: TOTPVerifyRequest,
+def enable_totp(request: Request, body: TOTPVerifyRequest,
                       db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
     """2FA aktivieren (nach QR-Code-Scan und Code-Bestätigung)."""
@@ -638,7 +645,7 @@ async def enable_totp(request: Request, body: TOTPVerifyRequest,
 
 
 @router.post("/totp/disable")
-async def disable_totp(request: Request, body: TOTPVerifyRequest,
+def disable_totp(request: Request, body: TOTPVerifyRequest,
                        db: Session = Depends(get_db),
                        current_user: User = Depends(get_current_user)):
     """2FA deaktivieren — mit gültigem Code oder Einmal-Code."""
@@ -654,7 +661,7 @@ async def disable_totp(request: Request, body: TOTPVerifyRequest,
 
 
 @router.post("/recovery-codes", response_model=RecoveryCodesResponse)
-async def recovery_codes_neu(request: Request, body: TOTPVerifyRequest,
+def recovery_codes_neu(request: Request, body: TOTPVerifyRequest,
                              db: Session = Depends(get_db),
                              current_user: User = Depends(get_current_user)):
     """Neue Einmal-Codes erzeugen; die bisherigen verfallen dabei."""
@@ -671,7 +678,7 @@ async def recovery_codes_neu(request: Request, body: TOTPVerifyRequest,
 
 
 @router.get("/recovery-codes/status", response_model=RecoveryStatusResponse)
-async def recovery_codes_status(db: Session = Depends(get_db),
+def recovery_codes_status(db: Session = Depends(get_db),
                                 current_user: User = Depends(get_current_user)):
     return RecoveryStatusResponse(
         codes_left=auth_service.recovery_codes_offen(db, current_user),
@@ -689,7 +696,7 @@ async def recovery_codes_status(db: Session = Depends(get_db),
 # mit „Challenge abgelaufen", obwohl gerade nichts abgelaufen ist.
 
 @router.post("/webauthn/register/begin")
-async def webauthn_register_begin(db: Session = Depends(get_db),
+def webauthn_register_begin(db: Session = Depends(get_db),
                                   current_user: User = Depends(get_current_user)):
     """Registrierung eines neuen Passkeys starten (z.B. Face ID)."""
     import webauthn
@@ -708,7 +715,7 @@ async def webauthn_register_begin(db: Session = Depends(get_db),
 
 
 @router.post("/webauthn/register/complete")
-async def webauthn_register_complete(request: Request,
+def webauthn_register_complete(request: Request,
                                      body: WebAuthnRegisterComplete,
                                      db: Session = Depends(get_db),
                                      current_user: User = Depends(get_current_user)):
@@ -752,7 +759,7 @@ async def webauthn_register_complete(request: Request,
 
 @router.post("/webauthn/login/begin")
 @limiter.limit("20/minute")
-async def webauthn_login_begin(request: Request, body: WebAuthnLoginBegin,
+def webauthn_login_begin(request: Request, body: WebAuthnLoginBegin,
                                db: Session = Depends(get_db)):
     """Passkey-Login starten — Challenge erzeugen.
 
@@ -795,7 +802,7 @@ async def webauthn_login_begin(request: Request, body: WebAuthnLoginBegin,
 
 @router.post("/webauthn/login/complete", response_model=TokenResponse)
 @limiter.limit("20/minute")
-async def webauthn_login_complete(request: Request, response: Response,
+def webauthn_login_complete(request: Request, response: Response,
                                   body: WebAuthnLoginComplete,
                                   db: Session = Depends(get_db)):
     """Passkey-Login abschließen — Assertion prüfen und Sitzung anlegen."""
