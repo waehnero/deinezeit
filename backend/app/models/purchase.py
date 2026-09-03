@@ -10,7 +10,7 @@ muss nur gebucht und für die Vorsteuer ausgewertet werden.
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import (Column, String, Boolean, DateTime, Integer, Date,
+from sqlalchemy import (Index, Column, String, Boolean, DateTime, Integer, Date,
                         Text, ForeignKey, Numeric)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -32,6 +32,14 @@ TAX_KIND_LABELS = {
 class PurchaseInvoice(Base):
     """Eine Lieferantenrechnung."""
     __tablename__ = "purchase_invoices"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_purchase_invoices_date', 'date'),
+        Index('ix_purchase_invoices_status', 'status'),
+        Index('ix_purchase_invoices_supplier', 'supplier_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -104,11 +112,17 @@ class PurchaseInvoiceTax(Base):
     mit dem Beleg überein, und genau das prüft eine Betriebsprüfung.
     """
     __tablename__ = "purchase_invoice_taxes"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_purchase_invoice_taxes_beleg', 'purchase_invoice_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     purchase_invoice_id = Column(UUID(as_uuid=True),
                                  ForeignKey("purchase_invoices.id", ondelete="CASCADE"),
-                                 nullable=False, index=True)
+                                 nullable=False)
     tax_rate = Column(Numeric(5, 2), nullable=True)      # None = kein Satz (Reverse Charge)
     net_amount = Column(Numeric(12, 2), nullable=False, default=Decimal("0"))
     tax_amount = Column(Numeric(12, 2), nullable=False, default=Decimal("0"))
@@ -120,12 +134,19 @@ class PurchaseInvoiceTax(Base):
 class PurchasePayment(Base):
     """Ein Zahlungsausgang. Aufbau wie ``InvoicePayment`` auf der Verkaufsseite."""
     __tablename__ = "purchase_payments"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_purchase_payments_beleg', 'purchase_invoice_id'),
+        Index('ix_purchase_payments_datum', 'paid_at'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     purchase_invoice_id = Column(UUID(as_uuid=True),
                                  ForeignKey("purchase_invoices.id", ondelete="CASCADE"),
-                                 nullable=False, index=True)
-    paid_at = Column(Date, nullable=False, index=True)
+                                 nullable=False)
+    paid_at = Column(Date, nullable=False)
     amount = Column(Numeric(12, 2), nullable=False)
     # bank | bar | karte | lastschrift | verrechnung | sonstige
     method = Column(String(20), nullable=True)

@@ -20,7 +20,7 @@ Fotos liegen im Objektspeicher (storage_service), Schlüssel-Schema:
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Boolean, DateTime, Integer, ForeignKey, Text
+    Index, Column, String, Boolean, DateTime, Integer, ForeignKey, Text
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -46,6 +46,12 @@ class SocialProfil(Base):
     """Ein Social-Media-Konto inkl. Stil-Vorgaben für die KI."""
 
     __tablename__ = "social_profile"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_social_profile_owner', 'owner_user_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_user_id = Column(UUID(as_uuid=True),
@@ -78,6 +84,15 @@ class SocialPost(Base):
     """Ein vorbereiteter Social-Media-Post (ein Post = ein Zielprofil)."""
 
     __tablename__ = "social_posts"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_social_posts_geplant', 'geplant_am'),
+        Index('ix_social_posts_kontakt', 'kontakt_id'),
+        Index('ix_social_posts_owner', 'owner_user_id'),
+        Index('ix_social_posts_status', 'status'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_user_id = Column(UUID(as_uuid=True),
@@ -127,6 +142,12 @@ class SocialPostFoto(Base):
     """Ein Foto eines Posts (Datei im Objektspeicher)."""
 
     __tablename__ = "social_post_fotos"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_social_post_fotos_post', 'post_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True),
@@ -155,11 +176,17 @@ class SocialPostVideo(Base):
     """
 
     __tablename__ = "social_post_videos"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_social_post_videos_post', 'post_id', unique=True),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id = Column(UUID(as_uuid=True),
                      ForeignKey("social_posts.id", ondelete="CASCADE"),
-                     nullable=False, unique=True)
+                     nullable=False)
 
     storage_key = Column(String(500), nullable=False)
     # In welchem Speicher liegen Video UND Standbild (minio | nextcloud |

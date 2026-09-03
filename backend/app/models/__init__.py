@@ -5,6 +5,8 @@ from app.models.masterdata import (EntityType, FieldDefinition, EntityRecord,
                                    ArticleGroup, ArticleGroupAccount)
 from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
 from app.models.settings import Setting
+from app.models.attachment import Attachment
+from app.models.email_template import EmailTemplate
 from app.models.invoice import (Invoice, InvoicePosition, InvoiceAttachment,
                                 InvoiceNumberSequence, InvoiceSettings,
                                 InvoiceAuditLog, InvoicePayment, InvoiceDunning)

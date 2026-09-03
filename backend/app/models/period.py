@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, DateTime, UniqueConstraint
+from sqlalchemy import Index, Column, String, Integer, DateTime, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.db.base import Base
 
@@ -21,7 +21,13 @@ class AccountingPeriod(Base):
     bleibt sichtbar erhalten statt spurlos rückgängig gemacht zu werden.
     """
     __tablename__ = "accounting_periods"
-    __table_args__ = (UniqueConstraint("year", "month", name="uq_accounting_period"),)
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_accounting_periods_jahr_monat', 'year', 'month'),
+        UniqueConstraint("year", "month", name="uq_accounting_period"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     year = Column(Integer, nullable=False)
@@ -52,10 +58,16 @@ class PeriodHandover(Base):
     belegbar, was die Steuerberatung tatsächlich bekommen hat.
     """
     __tablename__ = "period_handovers"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_period_handovers_jahr_monat', 'year', 'month'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    year = Column(Integer, nullable=False, index=True)
-    month = Column(Integer, nullable=False, index=True)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False,
                         default=lambda: datetime.now(timezone.utc))
     created_by = Column(String(200), nullable=True)

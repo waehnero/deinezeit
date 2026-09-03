@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import (Column, String, Boolean, DateTime, Enum, ForeignKey,
+from sqlalchemy import (UniqueConstraint, Column, String, Boolean, DateTime, Enum, ForeignKey,
                         Text, LargeBinary, Integer, Index, Table)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -27,6 +27,7 @@ user_groups = Table(
            primary_key=True),
     Column("created_at", DateTime(timezone=True),
            default=lambda: datetime.now(timezone.utc)),
+    Index("ix_user_groups_group_id", "group_id"),
 )
 
 
@@ -73,9 +74,15 @@ class PermissionGroup(Base):
 
 class User(Base):
     __tablename__ = "users"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_users_email', 'email'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=False)
     full_name = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.employee)
@@ -94,7 +101,7 @@ class User(Base):
     # Angaben, z. B. {"verkauf": {"loeschen": false}}. Ein Entzug hier gewinnt
     # gegen jede Gruppe.
     permission_overrides = Column(JSONB, nullable=True)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, nullable=False, default=True)
 
     groups = relationship("PermissionGroup", secondary=user_groups,
                           back_populates="users", lazy="selectin")
@@ -128,7 +135,7 @@ class User(Base):
     # beim nächsten Schreiben verschlüsselt. Nie direkt zugreifen, sondern über
     # AuthService.totp_secret_lesen()/totp_secret_setzen().
     totp_secret = Column(Text, nullable=True)
-    totp_enabled = Column(Boolean, default=False)
+    totp_enabled = Column(Boolean, nullable=False, default=False)
     # Secret aus einem laufenden 2FA-Einrichtungsvorgang. Liegt bewusst hier und
     # nicht mehr beim Client: vorher schickte das Frontend das Secret als
     # Query-Parameter an /auth/totp/enable zurück und es landete in Zugriffslogs
@@ -172,10 +179,11 @@ class WebAuthnCredential(Base):
     __tablename__ = "webauthn_credentials"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+                     nullable=False)
     credential_id = Column(Text, unique=True, nullable=False)
     public_key = Column(Text, nullable=False)
-    sign_count = Column(String(20), default="0")
+    sign_count = Column(String(20), nullable=False, default="0")
     device_name = Column(String(100), nullable=True)  # z.B. "iPhone von Oliver"
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_used_at = Column(DateTime(timezone=True), nullable=True)
@@ -195,8 +203,8 @@ class UserSession(Base):
     __tablename__ = "user_sessions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False,
-                     index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+                     nullable=False, index=True)
     # SHA-256 des Refresh-Tokens — der Token selbst wird nie gespeichert.
     refresh_token_hash = Column(String(255), nullable=False, index=True)
     user_agent = Column(String(500), nullable=True)
@@ -280,6 +288,12 @@ class WebAuthnChallenge(Base):
     „Challenge abgelaufen", obwohl nichts abgelaufen ist.
     """
     __tablename__ = "webauthn_challenges"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        UniqueConstraint('scope', name='webauthn_challenges_scope_key'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # z. B. "reg:<user-id>" oder "auth:<e-mail>"
@@ -319,6 +333,12 @@ class PasswordResetToken(Base):
     verwendbar und wird von einer Passwortänderung entwertet.
     """
     __tablename__ = "password_reset_tokens"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        UniqueConstraint('token_hash', name='password_reset_tokens_token_hash_key'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),

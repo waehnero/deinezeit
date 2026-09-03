@@ -339,7 +339,7 @@ export default function UserManagementPage() {
   }, [])
 
   const handleDelete = async (user) => {
-    if (!confirm(`„${user.full_name}" wirklich endgültig löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`)) return
+    if (!confirm(`„${user.full_name}" wirklich endgültig löschen?\n\nDas geht nur, wenn noch keine Daten (Zeiteinträge, Stammdaten, Aufgaben …) auf das Konto verweisen — sonst bitte „Deaktivieren" verwenden.\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`)) return
     try {
       await usersApi.delete(user.id)
       setUsers(prev => prev.filter(u => u.id !== user.id))

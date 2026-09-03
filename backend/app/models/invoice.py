@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from sqlalchemy import (Column, String, Boolean, DateTime, Integer, Date,
+from sqlalchemy import (Index, Column, String, Boolean, DateTime, Integer, Date,
                         Text, ForeignKey, Numeric, UniqueConstraint)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -14,6 +14,17 @@ class Invoice(Base):
     doc_type: rechnung | angebot | gutschrift | lieferschein
     """
     __tablename__ = "invoices"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_invoices_chain_id', 'chain_id'),
+        Index('ix_invoices_contact_id', 'contact_id'),
+        Index('ix_invoices_date', 'date'),
+        Index('ix_invoices_doc_type', 'doc_type'),
+        Index('ix_invoices_status', 'status'),
+        Index('ix_invoices_year_type', 'year', 'doc_type'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -148,6 +159,12 @@ class InvoicePosition(Base):
                 Zeile mit negativem Betrag)
     """
     __tablename__ = "invoice_positions"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_invoice_positions_invoice_id', 'invoice_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
@@ -193,6 +210,12 @@ class InvoiceAttachment(Base):
     attach_type: upload | datacenter | external
     """
     __tablename__ = "invoice_attachments"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_invoice_attachments_invoice_id', 'invoice_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
@@ -247,7 +270,7 @@ class InvoicePayment(Base):
     reference = Column(String(200), nullable=True)   # Verwendungszweck, Beleg-Nr. der Bank
     note = Column(String(500), nullable=True)
     created_by = Column(String(200), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     invoice = relationship("Invoice", back_populates="payments")
 

@@ -27,6 +27,19 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # Eine von außen übergebene Verbindung verwenden (Alembic-Standardmuster,
+    # siehe „Sharing a Connection" in der Alembic-Doku). Gebraucht von
+    # tests/test_migrationen.py, das die Migrationen in einem eigenen
+    # Datenbank-Schema durchlaufen lässt und das Ergebnis mit den Modellen
+    # vergleicht. Beim normalen Aufruf (`alembic upgrade head`) ist das
+    # Attribut nicht gesetzt, und es ändert sich nichts.
+    verbindung = config.attributes.get("connection")
+    if verbindung is not None:
+        context.configure(connection=verbindung, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

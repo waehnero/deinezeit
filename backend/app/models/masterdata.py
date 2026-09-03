@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import (Column, String, Boolean, DateTime, Integer, Numeric,
+from sqlalchemy import (UniqueConstraint, Index, Column, String, Boolean, DateTime, Integer, Numeric,
                         ForeignKey, Text)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -20,8 +20,8 @@ class EntityType(Base):
     icon = Column(String(50), nullable=True)             # z.B. "Users"
     color = Column(String(20), nullable=True)            # z.B. "#3b82f6"
     description = Column(String(500), nullable=True)
-    is_active = Column(Boolean, default=True)
-    sort_order = Column(Integer, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
     # Geordnete Tab-Liste: ["Allgemein", "Bankdaten", "Kontakt"]
     # Leere Liste = keine Tabs (klassisches Formular ohne Reiter)
     tabs = Column(JSONB, nullable=True, default=list)
@@ -41,6 +41,12 @@ class FieldDefinition(Base):
     z.B. 'Firmenname' (Text), 'Umsatz' (Zahl), 'Gründungsdatum' (Datum)
     """
     __tablename__ = "field_definitions"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_field_definitions_entity_type_id', 'entity_type_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     entity_type_id = Column(UUID(as_uuid=True), ForeignKey("entity_types.id"), nullable=False)
@@ -50,11 +56,11 @@ class FieldDefinition(Base):
     key = Column(String(100), nullable=False)          # Technischer Key: "firmenname"
     field_type = Column(String(30), nullable=False)    # text, number, date, email, phone,
                                                        # dropdown, checkbox, textarea, url
-    is_required = Column(Boolean, default=False)
-    is_unique = Column(Boolean, default=False)
-    show_in_list = Column(Boolean, default=True)       # In der Tabellen-Übersicht anzeigen
-    sort_order = Column(Integer, default=0)
-    col_span = Column(Integer, default=12)             # Rasterbreite: 3=25%, 4=33%, 6=50%, 9=75%, 12=100%
+    is_required = Column(Boolean, nullable=False, default=False)
+    is_unique = Column(Boolean, nullable=False, default=False)
+    show_in_list = Column(Boolean, nullable=False, default=True)       # In der Tabellen-Übersicht anzeigen
+    sort_order = Column(Integer, nullable=False, default=0)
+    col_span = Column(Integer, nullable=False, default=12)             # Rasterbreite: 3=25%, 4=33%, 6=50%, 9=75%, 12=100%
 
     # Tab-Zugehörigkeit: Name des Tabs (muss in EntityType.tabs enthalten sein)
     # None = kein Tab / erster Tab
@@ -98,6 +104,14 @@ class EntityRecord(Base):
     Die eigentlichen Daten werden in 'data' als JSONB gespeichert.
     """
     __tablename__ = "entity_records"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_entity_records_archived', 'archived_at'),
+        Index('ix_entity_records_data', 'data', postgresql_using='gin'),
+        Index('ix_entity_records_entity_type_id', 'entity_type_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     entity_type_id = Column(UUID(as_uuid=True), ForeignKey("entity_types.id"), nullable=False)
@@ -203,6 +217,12 @@ class ArticleGroupAccount(Base):
     Gruppentabelle unlesbar wird.
     """
     __tablename__ = "article_group_accounts"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        UniqueConstraint('article_group_id', 'steuerfall', name='uq_article_group_steuerfall'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     article_group_id = Column(UUID(as_uuid=True),

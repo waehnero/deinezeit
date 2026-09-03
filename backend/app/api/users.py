@@ -228,18 +228,91 @@ async def unlock_user(
     return user
 
 
+def fachdaten_des_benutzers(db: Session, user_id: UUID) -> dict:
+    """Was im System auf diesen Benutzer verweist — mit Anzahl je Art.
+
+    Grundlage für die Entscheidung „löschen oder deaktivieren". Aufgeführt
+    wird nur, was fachlich zählt: Zeiteinträge, angelegte Stammdaten und
+    Projekte, zugewiesene Aufgaben, Postecke-Inhalte, Mail-Konten. Sitzungen,
+    Passkeys, Einmal-Codes und der Prüfpfad hängen am Konto und gehen mit
+    (bzw. bleiben anonymisiert erhalten) — sie sind kein Grund, ein Konto zu
+    behalten."""
+    from app.models.zeiterfassung import TimeEntry, Stundenkonto
+    from app.models.masterdata import EntityRecord
+    from app.models.projektplan import (PlanningProject, Task, ChecklistItem)
+    from app.models.aufgaben import Todo
+    from app.models.postecke import SocialProfil, SocialPost
+    from app.models.mailimport import MailAccount, MailTaskSuggestion
+
+    def n(query) -> int:
+        return query.count()
+
+    pruefungen = {
+        "Zeiteinträge":            n(db.query(TimeEntry).filter(TimeEntry.user_id == user_id)),
+        "angelegte Stammdaten":    n(db.query(EntityRecord).filter(
+            (EntityRecord.created_by == user_id) | (EntityRecord.updated_by == user_id)
+            | (EntityRecord.archived_by == user_id))),
+        "Stundenkonten":           n(db.query(Stundenkonto).filter(Stundenkonto.created_by == user_id)),
+        "Projekte":                n(db.query(PlanningProject).filter(PlanningProject.created_by == user_id)),
+        "Projektaufgaben":         n(db.query(Task).filter(
+            (Task.assignee_id == user_id) | (Task.created_by == user_id))),
+        "Checklistenpunkte":       n(db.query(ChecklistItem).filter(
+            (ChecklistItem.assignee_user_id == user_id) | (ChecklistItem.created_by == user_id))),
+        "Aufgaben":                n(db.query(Todo).filter(
+            (Todo.assignee_id == user_id) | (Todo.created_by == user_id))),
+        "Postecke-Profile":        n(db.query(SocialProfil).filter(SocialProfil.owner_user_id == user_id)),
+        "Postecke-Beiträge":       n(db.query(SocialPost).filter(SocialPost.owner_user_id == user_id)),
+        "Mail-Konten":             n(db.query(MailAccount).filter(MailAccount.owner_user_id == user_id)),
+        "Mail-Vorschläge":         n(db.query(MailTaskSuggestion).filter(
+            MailTaskSuggestion.decided_by == user_id)),
+    }
+    return {k: v for k, v in pruefungen.items() if v}
+
+
 @router.delete("/{user_id}")
 async def delete_user(
     user_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Benutzer endgültig löschen (nur Admin)."""
+    """Benutzer endgültig löschen (nur Admin) — nur, wenn nichts an ihm hängt.
+
+    Bis 02.09.2026 löschte dieser Endpunkt bedingungslos. Über die
+    Löschkaskade an ``time_entries.user_id`` verschwanden dabei sämtliche
+    Zeiteinträge des Benutzers — auch abgerechnete —, ohne Rückfrage. Hatte
+    der Benutzer dagegen Stammdaten oder Projekte angelegt, scheiterte das
+    Löschen an einem Fremdschlüssel mit einem nackten HTTP 500 (Audit
+    DATA-003).
+
+    Jetzt gilt: Verweist noch irgendetwas Fachliches auf das Konto, wird der
+    Aufruf mit 409 und einer Aufstellung abgelehnt — der richtige Weg ist dann
+    „Deaktivieren" (PUT /users/{id} mit ``is_active=false``): Das Konto kann
+    sich nicht mehr anmelden, alle Sitzungen enden, die Daten bleiben
+    zuordenbar. Nur ein Konto ohne Spuren (z. B. eine Fehlanlage) wird wirklich
+    gelöscht.
+    """
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Den eigenen Account kann man nicht löschen")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+
+    spuren = fachdaten_des_benutzers(db, user_id)
+    if spuren:
+        aufstellung = ", ".join(f"{anzahl} {art}" for art, anzahl in spuren.items())
+        raise HTTPException(
+            status_code=409,
+            detail=(f"„{user.full_name}“ kann nicht gelöscht werden, weil noch "
+                    f"Daten auf das Konto verweisen: {aufstellung}. Bitte "
+                    "deaktivieren Sie den Benutzer stattdessen — er kann sich "
+                    "dann nicht mehr anmelden, seine Einträge bleiben erhalten."))
+
+    from app.api.auth import absender_meta
+    auth_service.alle_sitzungen_widerrufen(db, user, "admin")
+    auth_service.ereignis(db, EV.LOGOUT_ALL, user=None, email=user.email,
+                          meta=absender_meta(request),
+                          detail=f"Konto gelöscht durch Administrator {current_user.email}")
     db.delete(user)
     db.commit()
     return {"message": "Benutzer gelöscht"}

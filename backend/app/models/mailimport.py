@@ -19,7 +19,7 @@ Fernet-Schlüssel verschlüsselt (services/mail_ingest.py).
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Date
+    Index, Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Date
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.db.base import Base
@@ -32,6 +32,12 @@ class MailAccount(Base):
     """Eine angebundene Mailbox (ein Ordner wird gescannt)."""
 
     __tablename__ = "mail_accounts"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_mail_accounts_owner', 'owner_user_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -93,6 +99,14 @@ class MailTaskSuggestion(Base):
     """
 
     __tablename__ = "mail_task_suggestions"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_mail_suggestions_account', 'account_id'),
+        Index('ix_mail_suggestions_message', 'account_id', 'message_id'),
+        Index('ix_mail_suggestions_status', 'status'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
