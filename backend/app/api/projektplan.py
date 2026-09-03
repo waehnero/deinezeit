@@ -240,7 +240,7 @@ def _get_task_or_404(db: Session, task_id: UUID) -> Task:
 
 # ── Projekte ──────────────────────────────────────────────────────────────────
 @router.get("/projects", response_model=List[PlanningProjectListItem])
-async def list_projects(
+def list_projects(
     include_archived: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -274,7 +274,7 @@ async def list_projects(
 
 
 @router.get("/projects/recent", response_model=List[PlanningProjectListItem])
-async def recent_projects(
+def recent_projects(
     limit: int = Query(5, ge=1, le=20),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -299,7 +299,7 @@ async def recent_projects(
 
 
 @router.post("/projects", response_model=PlanningProjectDetail)
-async def create_project(
+def create_project(
     body: PlanningProjectCreate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -312,7 +312,7 @@ async def create_project(
 
 
 @router.get("/projects/{project_id}", response_model=PlanningProjectDetail)
-async def get_project(
+def get_project(
     project_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -379,7 +379,7 @@ def _project_detail(db: Session, proj: PlanningProject) -> PlanningProjectDetail
 
 
 @router.put("/projects/{project_id}", response_model=PlanningProjectDetail)
-async def update_project(
+def update_project(
     project_id: UUID,
     body: PlanningProjectUpdate,
     db: Session = Depends(get_db),
@@ -394,7 +394,7 @@ async def update_project(
 
 
 @router.delete("/projects/{project_id}")
-async def delete_project(
+def delete_project(
     project_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -426,7 +426,7 @@ async def delete_project(
 
 
 @router.post("/projects/{project_id}/duplicate", response_model=PlanningProjectDetail)
-async def duplicate_project(
+def duplicate_project(
     project_id: UUID,
     body: DuplicateProject,
     db: Session = Depends(get_db),
@@ -516,7 +516,7 @@ async def duplicate_project(
 
 # ── Aufgaben ──────────────────────────────────────────────────────────────────
 @router.post("/projects/{project_id}/tasks", response_model=TaskResponse)
-async def create_task(
+def create_task(
     project_id: UUID,
     body: TaskCreate,
     db: Session = Depends(get_db),
@@ -553,7 +553,7 @@ async def create_task(
 # WICHTIG: /tasks/dates muss VOR /tasks/{task_id} stehen, sonst matcht
 # FastAPI "dates" als task_id (UUID-Fehler – wie zuvor bei der Checkliste).
 @router.put("/tasks/dates", response_model=dict)
-async def update_task_dates(
+def update_task_dates(
     body: TaskDatesBatch,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -686,7 +686,7 @@ def _send_automation_email(db: Session, task: Task, rule: AutomationRule, actor:
 
 
 @router.put("/tasks/{task_id}", response_model=TaskResponse)
-async def update_task(
+def update_task(
     task_id: UUID,
     body: TaskUpdate,
     db: Session = Depends(get_db),
@@ -727,7 +727,7 @@ async def update_task(
 
 
 @router.delete("/tasks/{task_id}")
-async def delete_task(
+def delete_task(
     task_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -759,7 +759,7 @@ async def delete_task(
 
 # ── Abhängigkeiten ────────────────────────────────────────────────────────────
 @router.post("/dependencies", response_model=DependencyResponse)
-async def create_dependency(
+def create_dependency(
     body: DependencyCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -797,7 +797,7 @@ async def create_dependency(
 
 
 @router.delete("/dependencies/{dep_id}")
-async def delete_dependency(
+def delete_dependency(
     dep_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -812,7 +812,7 @@ async def delete_dependency(
 
 # ── Meilensteine ──────────────────────────────────────────────────────────────
 @router.post("/projects/{project_id}/milestones", response_model=MilestoneResponse)
-async def create_milestone(
+def create_milestone(
     project_id: UUID,
     body: MilestoneCreate,
     db: Session = Depends(get_db),
@@ -827,7 +827,7 @@ async def create_milestone(
 
 
 @router.put("/milestones/{milestone_id}", response_model=MilestoneResponse)
-async def update_milestone(
+def update_milestone(
     milestone_id: UUID,
     body: MilestoneUpdate,
     db: Session = Depends(get_db),
@@ -844,7 +844,7 @@ async def update_milestone(
 
 
 @router.delete("/milestones/{milestone_id}")
-async def delete_milestone(
+def delete_milestone(
     milestone_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -859,7 +859,7 @@ async def delete_milestone(
 
 # ── Aktion: Aufgabe -> Detailprojekt ──────────────────────────────────────────
 @router.post("/tasks/{task_id}/promote", response_model=PlanningProjectDetail)
-async def promote_task_to_project(
+def promote_task_to_project(
     task_id: UUID,
     body: PromoteTaskToProject,
     db: Session = Depends(get_db),
@@ -920,7 +920,7 @@ def _get_checklist_item_or_404(db: Session, item_id: UUID) -> ChecklistItem:
 
 
 @router.get("/checklist/{parent_type}/{parent_id}", response_model=List[ChecklistItemResponse])
-async def list_checklist(
+def list_checklist(
     parent_type: str,
     parent_id: UUID,
     db: Session = Depends(get_db),
@@ -936,7 +936,7 @@ async def list_checklist(
 
 
 @router.post("/checklist/{parent_type}/{parent_id}", response_model=ChecklistItemResponse)
-async def create_checklist_item(
+def create_checklist_item(
     parent_type: str,
     parent_id: UUID,
     body: ChecklistItemCreate,
@@ -957,7 +957,7 @@ async def create_checklist_item(
 
 
 @router.put("/checklist/item/{item_id}", response_model=ChecklistItemResponse)
-async def update_checklist_item(
+def update_checklist_item(
     item_id: UUID,
     body: ChecklistItemUpdate,
     db: Session = Depends(get_db),
@@ -972,7 +972,7 @@ async def update_checklist_item(
 
 
 @router.delete("/checklist/item/{item_id}")
-async def delete_checklist_item(
+def delete_checklist_item(
     item_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -984,7 +984,7 @@ async def delete_checklist_item(
 
 
 @router.post("/checklist/item/{item_id}/promote", response_model=TaskResponse)
-async def checklist_item_to_task(
+def checklist_item_to_task(
     item_id: UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1024,7 +1024,7 @@ async def checklist_item_to_task(
 
 
 @router.post("/checklist/item/{item_id}/assign", response_model=ChecklistItemResponse)
-async def assign_checklist_item(
+def assign_checklist_item(
     item_id: UUID,
     body: ChecklistAssign,
     db: Session = Depends(get_db),
@@ -1120,7 +1120,7 @@ VALID_FIELD_TYPES = ("text", "number", "date", "email", "phone", "url",
 
 
 @router.get("/fields", response_model=List[TaskFieldResponse])
-async def list_task_fields(
+def list_task_fields(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -1128,7 +1128,7 @@ async def list_task_fields(
 
 
 @router.post("/fields", response_model=TaskFieldResponse)
-async def create_task_field(
+def create_task_field(
     body: TaskFieldCreate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -1149,7 +1149,7 @@ async def create_task_field(
 
 
 @router.put("/fields/{field_id}", response_model=TaskFieldResponse)
-async def update_task_field(
+def update_task_field(
     field_id: UUID,
     body: TaskFieldUpdate,
     db: Session = Depends(get_db),
@@ -1169,7 +1169,7 @@ async def update_task_field(
 
 
 @router.delete("/fields/{field_id}")
-async def delete_task_field(
+def delete_task_field(
     field_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -1184,7 +1184,7 @@ async def delete_task_field(
 
 # ── Projekt-Einstellungen (Tags, Status, Prioritäten) ─────────────────────────
 @router.get("/settings", response_model=ProjektplanSettings)
-async def get_projektplan_settings(
+def get_projektplan_settings(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -1207,7 +1207,7 @@ async def get_projektplan_settings(
 
 
 @router.put("/settings", response_model=ProjektplanSettings)
-async def update_projektplan_settings(
+def update_projektplan_settings(
     body: ProjektplanSettings,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),

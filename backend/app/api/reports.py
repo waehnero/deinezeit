@@ -275,7 +275,7 @@ def _build_html(
 # ── Report-Endpoint ───────────────────────────────────────────────────────────
 
 @router.get("/zeiterfassung")
-async def report_zeiterfassung(
+def report_zeiterfassung(
     date_from:    str           = Query(...,       description="Von-Datum ISO (YYYY-MM-DD)"),
     date_to:      str           = Query(...,       description="Bis-Datum ISO (YYYY-MM-DD)"),
     group_by:     str           = Query("aufgabe", description="aufgabe (= Zeitprojekt) | benutzer | kontakt"),
@@ -373,7 +373,7 @@ async def report_zeiterfassung(
 # ── Kontaktliste für Filter-Dropdown ─────────────────────────────────────────
 
 @router.get("/zeiterfassung/contacts")
-async def report_contact_list(
+def report_contact_list(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -390,7 +390,7 @@ async def report_contact_list(
 # ── Zeitprojekt-Liste für Filter-Dropdown ────────────────────────────────────
 
 @router.get("/zeiterfassung/tasks")
-async def report_task_list(
+def report_task_list(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -449,7 +449,7 @@ def _entry_query(db: Session, current_user: User, dt_from: datetime, dt_to: date
 
 
 @router.get("/zeiterfassung/uebersicht")
-async def report_uebersicht(
+def report_uebersicht(
     date_from:    str           = Query(...,         description="Von-Datum ISO (YYYY-MM-DD)"),
     date_to:      str           = Query(...,         description="Bis-Datum ISO (YYYY-MM-DD)"),
     group_by:     str           = Query("benutzer",  description="benutzer | zeitprojekt | kontakt"),

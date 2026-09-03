@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -12,7 +12,6 @@ from app.core.netz import echte_ip
 from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard, groups
 from app.api import settings as settings_api
 from app.services import storage_service
-from app.api.system import record_activity
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 # Uvicorn konfiguriert nur seine eigenen Logger; der Root-Logger bleibt leer.
@@ -144,22 +143,6 @@ app.include_router(postecke.router, prefix="/api",
 app.include_router(oeffentlich.router, prefix="/api")
 
 
-# ── Aktivitäts-Middleware: letzte Aktivität pro Benutzer tracken ──────────────
-@app.middleware("http")
-async def track_activity(request: Request, call_next):
-    response = await call_next(request)
-    try:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header.split(" ", 1)[1]
-            from app.core.security import decode_token
-            payload = decode_token(token)
-            if payload and payload.get("sub") and payload.get("type") == "access":
-                record_activity(payload["sub"])
-    except Exception:
-        pass
-    return response
-
 # ── MinIO Bucket beim Start sicherstellen ─────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
@@ -174,6 +157,14 @@ async def startup_event():
             storage_service.ensure_bucket()
         except Exception as e:
             print(f"[WARN] MinIO Bucket konnte nicht erstellt werden: {e}")
+        # Update-Zustand liegt in der Datenbank (api/system.py) und überlebt
+        # damit den Neustart. Nach einem Update (oder einem Abbruch mittendrin)
+        # muss er zurück auf „idle", sonst bliebe das Update-Banner stehen.
+        try:
+            from app.api.system import update_zustand_nach_neustart_zuruecksetzen
+            update_zustand_nach_neustart_zuruecksetzen()
+        except Exception as e:
+            print(f"[WARN] Update-Zustand konnte nicht zurückgesetzt werden: {e}")
     # Auto-Scan für den Mail-Import (Aufgabenmodul); in Tests deaktiviert
     try:
         from app.services.mail_ingest import start_background_scanner

@@ -493,7 +493,7 @@ def _render_msg_preview(raw: bytes) -> str:
 # ── 1a. Alle Anhänge abrufen ─────────────────────────────────────────────────
 
 @router.get("/all")
-async def list_all_attachments(
+def list_all_attachments(
     entity_type: Optional[str] = Query(None),
     entity_id:   Optional[str] = Query(None),
     contact_id:  Optional[str] = Query(None),
@@ -521,7 +521,7 @@ async def list_all_attachments(
 # ── 1a2. Dashboard-Statistik ─────────────────────────────────────────────────
 
 @router.get("/stats")
-async def get_datacenter_stats(
+def get_datacenter_stats(
     limit: int = Query(3, ge=1, le=10, description="Anzahl der neuesten Dateien"),
     db:    Session = Depends(get_db),
     _:     User = Depends(require_module("datacenter")),
@@ -555,14 +555,14 @@ async def get_datacenter_stats(
 # ── 1b. Link-Anbieter ────────────────────────────────────────────────────────
 
 @router.get("/providers")
-async def get_providers(_: User = Depends(get_current_user)):
+def get_providers(_: User = Depends(get_current_user)):
     return {"providers": [{"key": k, "label": v} for k, v in LINK_PROVIDERS.items()]}
 
 
 # ── 1c. Öffentlicher Download via Share-Token (kein Login) ───────────────────
 
 @router.get("/share/{token}")
-async def download_via_share_link(
+def download_via_share_link(
     token: str,
     db:    Session = Depends(get_db),
 ):
@@ -585,7 +585,7 @@ async def download_via_share_link(
 # ── 1d. Link hinzufügen ──────────────────────────────────────────────────────
 
 @router.post("/link")
-async def add_link(
+def add_link(
     body:    LinkCreate,
     db:      Session = Depends(get_db),
     current: User = Depends(get_current_user),
@@ -610,7 +610,7 @@ async def add_link(
 # ── 2a. Download (eingeloggt) ─────────────────────────────────────────────────
 
 @router.get("/{attachment_id}/download")
-async def download_file(
+def download_file(
     attachment_id: str,
     db:            Session = Depends(get_db),
     _:             User = Depends(get_current_user),
@@ -631,7 +631,7 @@ async def download_file(
 # ── 2b. Vorschau ──────────────────────────────────────────────────────────────
 
 @router.get("/{attachment_id}/preview")
-async def preview_file(
+def preview_file(
     attachment_id: str,
     db:            Session = Depends(get_db),
     _:             User = Depends(get_current_user),
@@ -681,7 +681,7 @@ async def preview_file(
 # ── 2c. Share-Link erstellen ──────────────────────────────────────────────────
 
 @router.post("/{attachment_id}/share-link")
-async def create_share_link(
+def create_share_link(
     attachment_id: str,
     body:          ShareLinkRequest,
     db:            Session = Depends(get_db),
@@ -709,7 +709,7 @@ async def create_share_link(
 # ── 2d. Share-Link verlängern ─────────────────────────────────────────────────
 
 @router.patch("/{attachment_id}/share-link")
-async def extend_share_link(
+def extend_share_link(
     attachment_id: str,
     body:          ShareLinkExtendRequest,
     db:            Session = Depends(get_db),
@@ -735,7 +735,7 @@ async def extend_share_link(
 # ── 2e. Share-Link löschen ────────────────────────────────────────────────────
 
 @router.delete("/{attachment_id}/share-link")
-async def delete_share_link(
+def delete_share_link(
     attachment_id: str,
     db:            Session = Depends(get_db),
     _:             User = Depends(get_current_user),
@@ -752,7 +752,7 @@ async def delete_share_link(
 # ── 3. Anhänge eines Datensatzes abrufen ──────────────────────────────────────
 
 @router.get("/{entity_type}/{entity_id}")
-async def list_attachments(
+def list_attachments(
     entity_type: str,
     entity_id:   str,
     db:          Session = Depends(get_db),
@@ -769,7 +769,7 @@ async def list_attachments(
 # ── 4. Datei hochladen ────────────────────────────────────────────────────────
 
 @router.post("/{entity_type}/{entity_id}/upload")
-async def upload_file(
+def upload_file(
     entity_type: str,
     entity_id:   str,
     file:        UploadFile = File(...),
@@ -777,7 +777,7 @@ async def upload_file(
     current:     User = Depends(get_current_user),
 ):
     _entity_pruefen(entity_type, entity_id)
-    data = await file.read()
+    data = file.file.read()
     if len(data) > MAX_FILE_SIZE:
         raise HTTPException(400, f"Datei zu groß (max. {MAX_FILE_SIZE // 1024 // 1024} MB)")
 
@@ -814,7 +814,7 @@ async def upload_file(
 # ── 4b. Kontakt einer Datei nachträglich setzen/ändern ───────────────────────
 
 @router.patch("/{attachment_id}/contact")
-async def update_attachment_contact(
+def update_attachment_contact(
     attachment_id: str,
     body:          ContactUpdate,
     db:            Session = Depends(get_db),
@@ -872,7 +872,7 @@ def _check_attachment_deletable(db: Session, att: Attachment,
 
 
 @router.delete("/{attachment_id}")
-async def delete_attachment(
+def delete_attachment(
     attachment_id: str,
     db:            Session = Depends(get_db),
     current_user:  User = Depends(get_current_user),

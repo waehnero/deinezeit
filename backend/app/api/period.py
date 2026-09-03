@@ -22,7 +22,7 @@ router = APIRouter(prefix="/periods", tags=["Monatsabschluss"])
 
 
 @router.get("", response_model=List[PeriodResponse])
-async def list_periods(
+def list_periods(
     jahr: Optional[int] = Query(None, description="Standard: laufendes Jahr"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -53,7 +53,7 @@ async def list_periods(
 
 
 @router.get("/{jahr}/{monat}/check", response_model=PeriodCheckResponse)
-async def check_period(
+def check_period(
     jahr: int, monat: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -63,7 +63,7 @@ async def check_period(
 
 
 @router.post("/{jahr}/{monat}/close", response_model=PeriodResponse)
-async def close_period(
+def close_period(
     jahr: int, monat: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
@@ -83,7 +83,7 @@ async def close_period(
 
 
 @router.post("/{jahr}/{monat}/reopen", response_model=PeriodResponse)
-async def reopen_period(
+def reopen_period(
     jahr: int, monat: int,
     body: PeriodReopenRequest,
     db: Session = Depends(get_db),
@@ -129,7 +129,7 @@ async def download_package(
 
 
 @router.get("/{jahr}/{monat}/handovers", response_model=List[HandoverResponse])
-async def list_handovers(
+def list_handovers(
     jahr: int, monat: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),

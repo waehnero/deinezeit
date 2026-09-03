@@ -62,7 +62,7 @@ def _mitglieder_setzen(db: Session, gruppe: PermissionGroup,
 # ═════════════════════════════════════════════════════════════════════════════
 
 @router.get("/katalog")
-async def katalog(_: User = Depends(get_current_user)):
+def katalog(_: User = Depends(get_current_user)):
     """Module, vergebbare Rechte und Umfangsangaben für die Oberfläche.
 
     Bewusst für alle angemeldeten Benutzer lesbar: Die Liste ist keine
@@ -81,7 +81,7 @@ async def katalog(_: User = Depends(get_current_user)):
 # ═════════════════════════════════════════════════════════════════════════════
 
 @router.get("/", response_model=list[GroupResponse])
-async def gruppen_liste(db: Session = Depends(get_db),
+def gruppen_liste(db: Session = Depends(get_db),
                         _: User = Depends(require_admin)):
     gruppen = db.query(PermissionGroup).order_by(
         PermissionGroup.sort_order, PermissionGroup.name).all()
@@ -89,7 +89,7 @@ async def gruppen_liste(db: Session = Depends(get_db),
 
 
 @router.post("/", response_model=GroupResponse)
-async def gruppe_anlegen(body: GroupCreate, request: Request,
+def gruppe_anlegen(body: GroupCreate, request: Request,
                          db: Session = Depends(get_db),
                          current_user: User = Depends(require_admin)):
     if db.query(PermissionGroup).filter(PermissionGroup.name == body.name).first():
@@ -116,7 +116,7 @@ async def gruppe_anlegen(body: GroupCreate, request: Request,
 
 
 @router.put("/{group_id}", response_model=GroupResponse)
-async def gruppe_aendern(group_id: UUID, body: GroupUpdate, request: Request,
+def gruppe_aendern(group_id: UUID, body: GroupUpdate, request: Request,
                          db: Session = Depends(get_db),
                          current_user: User = Depends(require_admin)):
     gruppe = db.query(PermissionGroup).filter(
@@ -165,7 +165,7 @@ async def gruppe_aendern(group_id: UUID, body: GroupUpdate, request: Request,
 
 
 @router.delete("/{group_id}")
-async def gruppe_loeschen(group_id: UUID, request: Request,
+def gruppe_loeschen(group_id: UUID, request: Request,
                           db: Session = Depends(get_db),
                           current_user: User = Depends(require_admin)):
     gruppe = db.query(PermissionGroup).filter(
@@ -204,7 +204,7 @@ async def gruppe_loeschen(group_id: UUID, request: Request,
 # ═════════════════════════════════════════════════════════════════════════════
 
 @router.put("/users/{user_id}/groups", response_model=EffektiveRechteResponse)
-async def benutzer_gruppen_setzen(user_id: UUID, body: UserGroupsUpdate,
+def benutzer_gruppen_setzen(user_id: UUID, body: UserGroupsUpdate,
                                   request: Request,
                                   db: Session = Depends(get_db),
                                   current_user: User = Depends(require_admin)):
@@ -231,7 +231,7 @@ async def benutzer_gruppen_setzen(user_id: UUID, body: UserGroupsUpdate,
 
 
 @router.put("/users/{user_id}/overrides", response_model=EffektiveRechteResponse)
-async def benutzer_ausnahmen_setzen(user_id: UUID,
+def benutzer_ausnahmen_setzen(user_id: UUID,
                                     body: PermissionOverridesUpdate,
                                     request: Request,
                                     db: Session = Depends(get_db),
@@ -287,7 +287,7 @@ def _rechte_antwort(user: User) -> EffektiveRechteResponse:
 
 
 @router.get("/users/{user_id}/rechte", response_model=EffektiveRechteResponse)
-async def benutzer_rechte(user_id: UUID, db: Session = Depends(get_db),
+def benutzer_rechte(user_id: UUID, db: Session = Depends(get_db),
                           current_user: User = Depends(get_current_user)):
     """Die maßgeblichen Rechte eines Benutzers samt Herkunft.
 
@@ -309,6 +309,6 @@ async def benutzer_rechte(user_id: UUID, db: Session = Depends(get_db),
 
 
 @router.get("/me/rechte", response_model=EffektiveRechteResponse)
-async def eigene_rechte(current_user: User = Depends(get_current_user)):
+def eigene_rechte(current_user: User = Depends(get_current_user)):
     """Kurzform für die eigenen Rechte — was die Oberfläche beim Start braucht."""
     return _rechte_antwort(current_user)

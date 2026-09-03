@@ -31,14 +31,14 @@ def _save_setting(db: Session, key: str, value: str) -> None:
 
 
 @router.get("/status", response_model=SetupStatusResponse)
-async def setup_status(db: Session = Depends(get_db)):
+def setup_status(db: Session = Depends(get_db)):
     """Prueft, ob der Einrichtungsassistent noetig ist (noch kein Benutzer)."""
     count = _user_count(db)
     return SetupStatusResponse(needs_setup=(count == 0), user_count=count)
 
 
 @router.post("/init", response_model=SetupInitResponse)
-async def setup_init(
+def setup_init(
     request: Request,
     response: Response,
     body: SetupInitRequest,

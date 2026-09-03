@@ -139,7 +139,7 @@ def _ist_admin(request: Request, db: Session,
 
 
 @router.get("", response_model=SettingsResponse)
-async def get_settings(
+def get_settings(
     request: Request,
     db: Session = Depends(get_db),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
@@ -156,7 +156,7 @@ async def get_settings(
 
 # ── Admin: Settings aktualisieren ────────────────────────────────────────────
 @router.put("")
-async def update_settings(
+def update_settings(
     body: SettingsUpdate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -187,7 +187,7 @@ async def update_settings(
 
 # ── Admin: Logo hochladen (generiert 3 Varianten automatisch) ────────────────
 @router.post("/logo")
-async def upload_logo(
+def upload_logo(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -198,7 +198,7 @@ async def upload_logo(
     if ext not in (".png", ".jpg", ".jpeg", ".svg", ".webp"):
         raise HTTPException(400, "Nur PNG, JPG, SVG und WebP erlaubt")
 
-    raw_bytes = await file.read()
+    raw_bytes = file.file.read()
 
     # SVGs können nicht mit Pillow verarbeitet werden → nur Original speichern
     if ext == ".svg":
@@ -269,7 +269,7 @@ async def upload_logo(
 
 # ── Admin: Logo löschen ───────────────────────────────────────────────────────
 @router.delete("/logo")
-async def delete_logo(
+def delete_logo(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
@@ -283,7 +283,7 @@ async def delete_logo(
 
 # ── Admin: Favicon separat hochladen ─────────────────────────────────────────
 @router.post("/favicon")
-async def upload_favicon(
+def upload_favicon(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -295,7 +295,7 @@ async def upload_favicon(
     if ext not in (".png", ".jpg", ".jpeg", ".ico", ".svg"):
         raise HTTPException(400, "Nur PNG, JPG, ICO und SVG erlaubt")
 
-    raw_bytes = await file.read()
+    raw_bytes = file.file.read()
 
     if ext == ".svg":
         _svg_pruefen(raw_bytes)
@@ -335,7 +335,7 @@ async def upload_favicon(
 
 # ── Admin: Verknüpften Firmen-Kontakt abrufen ─────────────────────────────────
 @router.get("/company-contact")
-async def get_company_contact(
+def get_company_contact(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -378,7 +378,7 @@ async def get_company_contact(
 
 # ── Öffentlich: Liste aller Kontakte für den Selektor ────────────────────────
 @router.get("/contact-options")
-async def get_contact_options(
+def get_contact_options(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -408,7 +408,7 @@ async def get_contact_options(
 
 # ── Admin: Test-E-Mail senden ─────────────────────────────────────────────────
 @router.post("/test-email")
-async def test_email(
+def test_email(
     body: TestEmailRequest,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -438,7 +438,7 @@ async def test_email(
 
 # ── Backup-Ping: durch Token gesichert ───────────────────────────────────────
 @router.post("/backup-ping")
-async def backup_ping(
+def backup_ping(
     request: Request,
     db: Session = Depends(get_db),
 ):
@@ -467,7 +467,7 @@ async def backup_ping(
 
 # ── Admin: Datenbank-Backup herunterladen ─────────────────────────────────────
 @router.get("/backup/download")
-async def download_backup(
+def download_backup(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
@@ -502,7 +502,7 @@ class BackupOneDriveTestRequest(BaseModel):
 
 
 @router.post("/backup/onedrive/test")
-async def test_backup_onedrive(
+def test_backup_onedrive(
     body: BackupOneDriveTestRequest,
     db:   Session = Depends(get_db),
     _:    User    = Depends(require_admin),
@@ -545,7 +545,7 @@ async def test_backup_onedrive(
 
 
 @router.post("/backup/run")
-async def run_backup_now(
+def run_backup_now(
     db: Session = Depends(get_db),
     _:  User    = Depends(require_admin),
 ):
@@ -580,7 +580,7 @@ class StorageTestRequest(BaseModel):
 
 
 @router.post("/storage/test")
-async def test_storage_connection(
+def test_storage_connection(
     body: StorageTestRequest,
     db:   Session = Depends(get_db),
     _:    User    = Depends(require_admin),
@@ -629,7 +629,7 @@ async def test_storage_connection(
 
 
 @router.post("/storage/apply")
-async def apply_storage_settings(
+def apply_storage_settings(
     db: Session = Depends(get_db),
     _:  User    = Depends(require_admin),
 ):
@@ -646,7 +646,7 @@ class StorageMigrateRequest(BaseModel):
 
 
 @router.get("/storage/migration-status")
-async def storage_migration_status(
+def storage_migration_status(
     db: Session = Depends(get_db),
     _:  User    = Depends(require_admin),
 ):
@@ -656,7 +656,7 @@ async def storage_migration_status(
 
 
 @router.post("/storage/migrate")
-async def storage_migrate(
+def storage_migrate(
     body: StorageMigrateRequest,
     db:   Session = Depends(get_db),
     _:    User    = Depends(require_admin),
@@ -667,7 +667,7 @@ async def storage_migrate(
 
 
 @router.get("/storage/repath-status")
-async def storage_repath_status(
+def storage_repath_status(
     db: Session = Depends(get_db),
     _:  User    = Depends(require_admin),
 ):
@@ -677,7 +677,7 @@ async def storage_repath_status(
 
 
 @router.post("/storage/repath")
-async def storage_repath(
+def storage_repath(
     db: Session = Depends(get_db),
     _:  User    = Depends(require_admin),
 ):

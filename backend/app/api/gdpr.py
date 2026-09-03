@@ -75,7 +75,7 @@ def _company_context(db: Session) -> tuple[str, list[str], Optional[UUID]]:
 
 
 @router.get("/records/{record_id}/report")
-async def get_report(
+def get_report(
     record_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
@@ -86,7 +86,7 @@ async def get_report(
 
 
 @router.post("/records/{record_id}/erase")
-async def erase_record(
+def erase_record(
     record_id: UUID,
     body: EraseRequest,
     db: Session = Depends(get_db),
@@ -199,7 +199,7 @@ async def erase_record(
 
 
 @router.get("/log")
-async def get_deletion_log(
+def get_deletion_log(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
