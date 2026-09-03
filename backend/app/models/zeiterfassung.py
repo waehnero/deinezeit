@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Numeric, Text, ForeignKey
+from sqlalchemy import Index, Column, String, Boolean, DateTime, Date, Integer, Numeric, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -18,14 +18,14 @@ class TimeEntryField(Base):
     name = Column(String(100), nullable=False)
     key = Column(String(100), nullable=False, unique=True)
     field_type = Column(String(30), nullable=False)     # text, number, date, dropdown, checkbox, textarea, url
-    is_required = Column(Boolean, default=False)
-    show_in_list = Column(Boolean, default=True)
-    sort_order = Column(Integer, default=0)
-    col_span = Column(Integer, default=12)              # 3=25%, 4=33%, 6=50%, 9=75%, 12=100%
+    is_required = Column(Boolean, nullable=False, default=False)
+    show_in_list = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    col_span = Column(Integer, nullable=False, default=12)              # 3=25%, 4=33%, 6=50%, 9=75%, 12=100%
     options = Column(JSONB, nullable=True)              # für Dropdown
     placeholder = Column(String(200), nullable=True)
     default_value = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
 class TimeEntry(Base):
@@ -36,11 +36,24 @@ class TimeEntry(Base):
     ended_at = NULL bedeutet der Timer läuft gerade.
     """
     __tablename__ = "time_entries"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_time_entries_project_id', 'project_id'),
+        Index('ix_time_entries_started_at', 'started_at'),
+        Index('ix_time_entries_task', 'task_id'),
+        Index('ix_time_entries_user_id', 'user_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # Benutzer
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Benutzer. Bewusst OHNE Löschkaskade (bis Migration 0061 stand hier
+    # ondelete="CASCADE"): Ein gelöschter Benutzer darf nicht seine
+    # Zeiteinträge mitnehmen — das sind Arbeitszeitnachweise, teils bereits
+    # abgerechnet. Benutzer mit Zeiteinträgen werden deaktiviert, nicht
+    # gelöscht (api/users.py; Audit DATA-003).
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     # Projekt (EntityRecord aus Stammdaten, denormalisiert)
     project_id = Column(UUID(as_uuid=True), nullable=True)
@@ -73,8 +86,8 @@ class TimeEntry(Base):
     # Custom-Felder (erweiterbar)
     data = Column(JSONB, nullable=False, default=dict)
 
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", foreign_keys=[user_id], lazy="joined")
@@ -103,6 +116,12 @@ class Stundenkonto(Base):
     soll dem Kunden ein neues Stundenkonto angeboten werden.
     """
     __tablename__ = "stundenkonten"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_stundenkonten_project', 'project_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -111,7 +130,7 @@ class Stundenkonto(Base):
     # sonst gingen vom Kunden erworbene Stundenpakete kommentarlos verloren.
     project_id = Column(UUID(as_uuid=True),
                         ForeignKey("entity_records.id", ondelete="RESTRICT"),
-                        nullable=False, index=True)
+                        nullable=False)
 
     bezeichnung = Column(String(300), nullable=True)    # z.B. "Stundenpaket 10h"
     stunden = Column(Numeric(8, 2), nullable=False)     # erworbene Stunden

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Text
+from sqlalchemy import Index, Column, String, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 
@@ -8,6 +8,13 @@ from app.db.base import Base
 class AccountingAccount(Base):
     """Kontenplan-Eintrag (EKR oder benutzerdefiniert)."""
     __tablename__ = "accounting_accounts"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_accounting_accounts_nr', 'nr'),
+        Index('ix_accounting_accounts_typ', 'typ'),
+    )
 
     id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nr          = Column(String(20), nullable=False, unique=True)   # z.B. "4000"

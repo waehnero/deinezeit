@@ -26,7 +26,7 @@ die API validiert daher nicht hart gegen diese Tupel.
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Boolean, DateTime, Integer, Date, Time, ForeignKey, Text
+    Index, Column, String, Boolean, DateTime, Integer, Date, Time, ForeignKey, Text
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.db.base import Base
@@ -44,6 +44,16 @@ class Todo(Base):
     """Eine Aufgabe der zentralen To-do-Liste."""
 
     __tablename__ = "todos"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_todos_assignee', 'assignee_id'),
+        Index('ix_todos_due_date', 'due_date'),
+        Index('ix_todos_planning_task', 'planning_task_id'),
+        Index('ix_todos_record', 'record_id'),
+        Index('ix_todos_status', 'status'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 

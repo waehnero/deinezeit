@@ -22,7 +22,7 @@ Hierarchie:
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Boolean, DateTime, Integer, Date, ForeignKey, Text, Numeric
+    Index, Column, String, Boolean, DateTime, Integer, Date, ForeignKey, Text, Numeric
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -52,10 +52,10 @@ class ProjectTaskField(Base):
     name = Column(String(100), nullable=False)
     key = Column(String(100), nullable=False, unique=True)
     field_type = Column(String(30), nullable=False)   # text, number, date, dropdown, checkbox, textarea, url
-    is_required = Column(Boolean, default=False)
-    show_in_list = Column(Boolean, default=True)
-    sort_order = Column(Integer, default=0)
-    col_span = Column(Integer, default=12)
+    is_required = Column(Boolean, nullable=False, default=False)
+    show_in_list = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    col_span = Column(Integer, nullable=False, default=12)
     options = Column(JSONB, nullable=True)            # für Dropdown
     placeholder = Column(String(200), nullable=True)
     default_value = Column(String(500), nullable=True)
@@ -69,6 +69,12 @@ class PlanningProject(Base):
     die Zeiterfassung weiterhin bebuchbar bleibt – aber ohne Zwang.
     """
     __tablename__ = "planning_projects"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_planning_projects_masterdata', 'masterdata_project_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -121,6 +127,14 @@ class Task(Base):
     (Sammelvorgänge). Eine Aufgabe ohne parent ist ein Top-Level-Vorgang.
     """
     __tablename__ = "planning_tasks"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_planning_tasks_contact', 'contact_id'),
+        Index('ix_planning_tasks_parent', 'parent_task_id'),
+        Index('ix_planning_tasks_project', 'project_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -208,6 +222,13 @@ class TaskDependency(Base):
     lag_days: positiver oder negativer Versatz in Tagen.
     """
     __tablename__ = "planning_task_dependencies"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_planning_deps_pred', 'predecessor_id'),
+        Index('ix_planning_deps_succ', 'successor_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -245,6 +266,12 @@ class ChecklistItem(Base):
     Stammdaten-Kontakt zugewiesen werden (für E-Mail-Benachrichtigung).
     """
     __tablename__ = "planning_checklist_items"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_checklist_parent', 'parent_type', 'parent_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -275,6 +302,12 @@ class Milestone(Base):
     Eigene Tabelle (getrennt von Tasks) für die Roadmap-Ansicht.
     """
     __tablename__ = "planning_milestones"
+    # Indizes/Constraints mit den Namen aus den Migrationen (Audit DATA-004):
+    # Modelle und Produktionsschema müssen deckungsgleich sein, damit die
+    # Tests dasselbe Schema prüfen wie der Betrieb (tests/test_migrationen.py).
+    __table_args__ = (
+        Index('ix_planning_milestones_project', 'project_id'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
