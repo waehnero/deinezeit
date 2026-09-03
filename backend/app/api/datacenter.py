@@ -9,6 +9,7 @@ WICHTIGE ROUTE-REIHENFOLGE:
 """
 import io
 import os
+import re
 import uuid
 import email
 import secrets
@@ -89,6 +90,28 @@ def resolve_contact(db: Session, entity_type: str, entity_id: str):
 
 router = APIRouter(prefix="/datacenter", tags=["Datacenter"])
 
+
+# ── Prüfung der Zuordnung (entity_type / entity_id) ───────────────────────────
+#
+# `entity_type` ist ein Slug (Stammdaten-Typ wie „kontakte" oder ein fester
+# Modulname wie „zeiterfassung", „planning_task", „todo", „dsgvo"), `entity_id`
+# eine UUID. Beides kam bis 02.09.2026 ungeprüft aus der URL in den
+# Speicherschlüssel und in die Datenbank: Ein „../" im Typ wurde bei
+# WebDAV/OneDrive zum Pfad außerhalb des Wurzelordners, eine Nicht-UUID als ID
+# endete in einem Datenbankfehler (HTTP 500). Eine feste Positivliste gibt es
+# bewusst nicht — Stammdaten-Typen legt der Administrator selbst an.
+_SLUG_MUSTER = re.compile(r"^[a-z0-9][a-z0-9_-]{0,49}$")
+
+
+def _entity_pruefen(entity_type: str, entity_id: str) -> uuid.UUID:
+    """Wirft 400 bei ungültiger Zuordnung; gibt die ID als UUID zurück."""
+    if not _SLUG_MUSTER.match(entity_type or ""):
+        raise HTTPException(400, "Ungültiger Datensatztyp")
+    try:
+        return uuid.UUID(str(entity_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(400, "Ungültige Datensatz-ID")
+
 # Max. Dateigröße: 100 MB
 MAX_FILE_SIZE = 100 * 1024 * 1024
 
@@ -104,9 +127,21 @@ LINK_PROVIDERS = {
     "custom":      "Externer Link",
 }
 
-# Mimetypes die eine Vorschau unterstützen
+# Mimetypes, die INLINE im Browser angezeigt werden dürfen.
+#
+# Positivliste statt Präfix „image/": Bis 02.09.2026 stand hier „image/", und
+# damit auch image/svg+xml. Ein SVG ist aber kein Bild im Sinne des Browsers,
+# sondern ein Dokument, das Skripte ausführen darf. Weil die Vorschau unter der
+# Adresse der Anwendung läuft, lief so ein Skript mit den Rechten des
+# angemeldeten Betrachters — bis hin zum Holen eines frischen Access-Tokens
+# über den Refresh-Cookie (Audit SEC-001). Der Mimetype kommt zudem ungeprüft
+# vom Browser des Hochladenden; er ist keine verlässliche Angabe.
 PREVIEW_MIMETYPES = [
-    "image/",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/bmp",
     "application/pdf",
     "text/plain",
     "text/markdown",             # z.B. Postecke-Postsarchiv
@@ -114,6 +149,33 @@ PREVIEW_MIMETYPES = [
     "text/rfc822",               # .eml (alternativ)
     "application/vnd.ms-outlook", # .msg
 ]
+
+# Dateiendungen, die der Browser als aktives Dokument ausführen würde — ganz
+# gleich, welchen Mimetype der Upload behauptet hat. Für sie gibt es keine
+# Inline-Vorschau, nur den Download.
+AKTIVE_ENDUNGEN = (".svg", ".svgz", ".html", ".htm", ".xhtml", ".xml",
+                   ".js", ".mjs", ".xsl", ".xslt")
+
+# Kopfzeilen für Vorschau-Antworten. `nosniff` verhindert, dass der Browser
+# den Inhalt trotz angegebenem Typ „errät" und z.B. eine als text/plain
+# gespeicherte HTML-Datei doch als HTML rendert. nginx setzt den Header zwar
+# auch — die Vorschau soll aber nicht davon abhängen, was davor steht.
+_VORSCHAU_KOPF = {"X-Content-Type-Options": "nosniff"}
+# Für die von uns erzeugten HTML-Vorschauen (.eml/.msg): Skripte sind dort
+# grundsätzlich nicht vorgesehen; der Header macht das für den Browser
+# verbindlich, auch wenn beim Escapen etwas durchrutschen sollte.
+_HTML_VORSCHAU_KOPF = {"X-Content-Type-Options": "nosniff",
+                       "Content-Security-Policy": "script-src 'none'"}
+
+
+def _ist_aktiv(filename: str, mimetype: str) -> bool:
+    """True, wenn die Datei im Browser Code ausführen könnte."""
+    name = (filename or "").lower()
+    mt = (mimetype or "").lower()
+    return (name.endswith(AKTIVE_ENDUNGEN)
+            or mt.startswith("image/svg")
+            or mt in ("text/html", "application/xhtml+xml", "application/xml",
+                      "text/xml", "application/javascript", "text/javascript"))
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -530,6 +592,7 @@ async def add_link(
 ):
     if body.link_provider not in LINK_PROVIDERS:
         body.link_provider = "custom"
+    _entity_pruefen(body.entity_type, body.entity_id)
     contact_id, contact_name = resolve_contact(db, body.entity_type, body.entity_id)
     attachment = Attachment(
         entity_type=body.entity_type, entity_id=body.entity_id,
@@ -577,28 +640,41 @@ async def preview_file(
     if not att or att.type != "file":
         raise HTTPException(404, "Anhang nicht gefunden")
 
-    mimetype = att.mimetype or "application/octet-stream"
+    mimetype = (att.mimetype or "application/octet-stream").split(";")[0].strip().lower()
     filename_lower = (att.filename or "").lower()
     is_eml = mimetype in ("message/rfc822", "text/rfc822") or filename_lower.endswith(".eml")
     is_msg = mimetype == "application/vnd.ms-outlook" or filename_lower.endswith(".msg")
 
+    # Aktive Inhalte (SVG, HTML, XML, JS) werden nie inline ausgeliefert —
+    # der Browser bekommt sie nur als Download, egal was der Upload behauptet.
+    if _ist_aktiv(att.filename, mimetype):
+        data, _ = storage_service.download_file(att.storage_key, db=db, backend=att.storage_provider)
+        return Response(
+            content=data, media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{att.filename}"',
+                     **_VORSCHAU_KOPF},
+        )
+
     # EML/MSG immer erlauben, auch wenn Browser "application/octet-stream" gesendet hat
-    if not is_eml and not is_msg and not any(mimetype.startswith(t) for t in PREVIEW_MIMETYPES):
+    if not is_eml and not is_msg and mimetype not in PREVIEW_MIMETYPES:
         raise HTTPException(415, "Keine Vorschau für diesen Dateityp")
 
-    data, content_type = storage_service.download_file(att.storage_key, db=db, backend=att.storage_provider)
+    data, _ = storage_service.download_file(att.storage_key, db=db, backend=att.storage_provider)
 
     if is_msg:
-        return HTMLResponse(content=_render_msg_preview(data))
+        return HTMLResponse(content=_render_msg_preview(data), headers=_HTML_VORSCHAU_KOPF)
 
     # EML-Vorschau als HTML rendern
     if is_eml:
         html_content = _render_eml_preview(data)
-        return HTMLResponse(content=html_content)
+        return HTMLResponse(content=html_content, headers=_HTML_VORSCHAU_KOPF)
 
+    # Ausgeliefert wird der geprüfte Typ aus der Positivliste — nicht der Typ,
+    # den der Speicher zurückmeldet (der stammt ebenfalls vom Upload).
     return Response(
-        content=data, media_type=content_type,
-        headers={"Content-Disposition": f'inline; filename="{att.filename}"'}
+        content=data, media_type=mimetype,
+        headers={"Content-Disposition": f'inline; filename="{att.filename}"',
+                 **_VORSCHAU_KOPF},
     )
 
 
@@ -682,6 +758,7 @@ async def list_attachments(
     db:          Session = Depends(get_db),
     _:           User = Depends(get_current_user),
 ):
+    _entity_pruefen(entity_type, entity_id)
     rows = db.query(Attachment).filter(
         Attachment.entity_type == entity_type,
         Attachment.entity_id   == entity_id,
@@ -699,6 +776,7 @@ async def upload_file(
     db:          Session = Depends(get_db),
     current:     User = Depends(get_current_user),
 ):
+    _entity_pruefen(entity_type, entity_id)
     data = await file.read()
     if len(data) > MAX_FILE_SIZE:
         raise HTTPException(400, f"Datei zu groß (max. {MAX_FILE_SIZE // 1024 // 1024} MB)")

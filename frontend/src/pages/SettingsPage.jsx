@@ -3010,6 +3010,12 @@ export default function SettingsPage() {
   const [reloading, setReloading] = useState(false)
   const { settings, loading, loadSettings } = useSettings()
 
+  // Beim Öffnen einmal frisch laden: Der Server gibt die vollständige
+  // Konfiguration nur an einen angemeldeten Administrator heraus. Der erste
+  // Ladevorgang beim App-Start lief noch ohne Anmeldung und hat deshalb nur
+  // die Darstellungsfelder (Firmenname, Farben, Logo) geliefert.
+  useEffect(() => { loadSettings() }, [])
+
   const handleReload = async () => {
     setReloading(true)
     await loadSettings()

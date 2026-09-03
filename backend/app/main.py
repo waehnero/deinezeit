@@ -163,10 +163,17 @@ async def track_activity(request: Request, call_next):
 # ── MinIO Bucket beim Start sicherstellen ─────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
-    try:
-        storage_service.ensure_bucket()
-    except Exception as e:
-        print(f"[WARN] MinIO Bucket konnte nicht erstellt werden: {e}")
+    # In Tests übersprungen — wie die Worker weiter unten (Kennzeichen ist
+    # TEST_DATABASE_URL, siehe tests/conftest.py). Der Testclient startet die
+    # App für JEDEN Test neu; ohne erreichbares MinIO versucht der Client hier
+    # fünfmal mit wachsender Wartezeit, rund sechs Sekunden je Test. Bei 873
+    # Tests waren das in der CI (die kein MinIO hat) bis zu 87 Minuten reiner
+    # Leerlauf (Audit TEST-002).
+    if not os.environ.get("TEST_DATABASE_URL"):
+        try:
+            storage_service.ensure_bucket()
+        except Exception as e:
+            print(f"[WARN] MinIO Bucket konnte nicht erstellt werden: {e}")
     # Auto-Scan für den Mail-Import (Aufgabenmodul); in Tests deaktiviert
     try:
         from app.services.mail_ingest import start_background_scanner

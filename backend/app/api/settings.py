@@ -1,9 +1,12 @@
 import os
 import io
+import re as _re
 import shutil
 import subprocess
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -11,7 +14,7 @@ from PIL import Image
 
 from app.db.base import get_db
 from app.models.settings import Setting
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.masterdata import EntityType, EntityRecord, FieldDefinition
 from app.schemas.settings import SettingsResponse, SettingsUpdate, TestEmailRequest
 from app.api.deps import get_current_user, require_admin
@@ -35,6 +38,26 @@ def _save(db: Session, key: str, value: str):
     else:
         db.add(Setting(key=key, value=value, updated_at=datetime.now(timezone.utc)))
     db.commit()
+
+
+# Muster, die in einem SVG auf ausführbaren Inhalt hindeuten. Logo und Favicon
+# werden unter /api/static unter der Adresse der Anwendung ausgeliefert; ein
+# SVG mit Skript liefe dort mit den Rechten des Betrachters. Hochladen darf
+# zwar nur ein Administrator, aber ein unbedacht aus dem Netz übernommenes
+# Logo soll trotzdem nicht zur Hintertür werden (Audit SEC-013).
+_SVG_AKTIV = _re.compile(
+    rb"<\s*script|<\s*foreignObject|<\s*iframe|<\s*embed|<\s*object"
+    rb"|\bon[a-z]+\s*=|javascript\s*:|<\s*use[^>]+href\s*=\s*[\"']?\s*(?:https?:|//)",
+    _re.IGNORECASE,
+)
+
+
+def _svg_pruefen(raw: bytes) -> None:
+    """Bricht mit 400 ab, wenn das SVG Skripte oder Fremdinhalte einbettet."""
+    if _SVG_AKTIV.search(raw):
+        raise HTTPException(
+            400, "Das SVG enthält Skripte oder eingebettete Fremdinhalte und "
+                 "wird nicht angenommen. Bitte ein bereinigtes SVG oder PNG verwenden.")
 
 
 def _pil_to_png_bytes(img: Image.Image) -> bytes:
@@ -73,13 +96,62 @@ def _generate_logo_variants(original_bytes: bytes, ext: str) -> tuple[bytes, byt
     return original_bytes, _pil_to_png_bytes(header), _pil_to_png_bytes(favicon)
 
 
-# ── Öffentlich: alle Settings lesen ──────────────────────────────────────────
+# ── Settings lesen ────────────────────────────────────────────────────────────
+#
+# Der Endpunkt ist bewusst ohne Anmeldung erreichbar: Die Anmeldeseite braucht
+# Firmenname, Farben und Logo, bevor jemand angemeldet ist. Bis 02.09.2026
+# bekam ein Unbekannter darüber aber die komplette Konfiguration (SMTP-Server
+# und -Benutzer, Microsoft-Tenant, WebDAV-Adresse, Backup-Pfad …) — alles bis
+# auf die Passwörter (Audit SEC-004). Jetzt gilt: ohne Anmeldung oder ohne
+# Administratorrecht nur die Darstellungsfelder; die vollständige
+# Konfiguration sieht nur ein Administrator (die Einstellungsseite).
+
+#: Felder, die jeder sehen darf — auch vor der Anmeldung.
+OEFFENTLICHE_FELDER = frozenset({
+    "company_name", "app_subtitle", "color_theme", "design_template",
+    "brand_color", "custom_text_color", "custom_bg_color", "custom_surface_color",
+    "logo_url", "logo_header_url", "logo_favicon_url", "sidebar_logo_source",
+})
+
+#: Felder, die nie nach außen gehen — auch nicht an Administratoren. Sie werden
+#: nur gesetzt, nie gelesen (die Einstellungsseite zeigt ein leeres Feld).
+GEHEIME_FELDER = frozenset({
+    "smtp_password", "ms_client_secret", "webdav_password",
+    "onedrive_client_secret", "backup_onedrive_client_secret",
+})
+
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+def _ist_admin(request: Request, db: Session,
+               credentials: Optional[HTTPAuthorizationCredentials]) -> bool:
+    """Prüft still, ob ein gültiger Administrator-Token mitkommt.
+
+    Kein 401 bei fehlendem oder ungültigem Token — der Endpunkt muss für die
+    Anmeldeseite weiterhin ohne Anmeldung antworten."""
+    if credentials is None:
+        return False
+    try:
+        user = get_current_user(request, credentials, db)
+    except HTTPException:
+        return False
+    return user.role == UserRole.admin
+
+
 @router.get("", response_model=SettingsResponse)
-async def get_settings(db: Session = Depends(get_db)):
+async def get_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+):
     data = _load(db)
-    # Secrets niemals zurückgeben
-    safe = {k: v for k, v in data.items() if k not in ('smtp_password', 'ms_client_secret', 'webdav_password', 'onedrive_client_secret', 'backup_onedrive_client_secret')}
-    return SettingsResponse(**{k: safe.get(k, '') for k in SettingsResponse.model_fields})
+    if _ist_admin(request, db, credentials):
+        erlaubt = set(SettingsResponse.model_fields) - GEHEIME_FELDER
+    else:
+        erlaubt = OEFFENTLICHE_FELDER
+    werte = {k: (data.get(k, '') if k in erlaubt else '')
+             for k in SettingsResponse.model_fields}
+    return SettingsResponse(**werte)
 
 
 # ── Admin: Settings aktualisieren ────────────────────────────────────────────
@@ -130,6 +202,7 @@ async def upload_logo(
 
     # SVGs können nicht mit Pillow verarbeitet werden → nur Original speichern
     if ext == ".svg":
+        _svg_pruefen(raw_bytes)
         orig_path = os.path.join(LOGO_PATH, f"logo_original{ext}")
         # Alte Logos entfernen
         for old in os.listdir(LOGO_PATH):
@@ -223,6 +296,9 @@ async def upload_favicon(
         raise HTTPException(400, "Nur PNG, JPG, ICO und SVG erlaubt")
 
     raw_bytes = await file.read()
+
+    if ext == ".svg":
+        _svg_pruefen(raw_bytes)
 
     if ext not in (".ico", ".svg"):
         try:

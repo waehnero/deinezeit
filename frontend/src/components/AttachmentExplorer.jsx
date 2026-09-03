@@ -325,7 +325,10 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
     setAttachments(prev => prev.filter(a => a.id !== att.id))
   }
 
+  // SVG bewusst ausgenommen: Das Backend liefert es aus Sicherheitsgründen nur
+  // als Download (es kann Skripte enthalten), eine Vorschau gäbe ein leeres Bild.
   const canPreview = (att) => att.type === 'file' && att.mimetype &&
+    !att.mimetype.startsWith('image/svg') && !(att.filename || '').toLowerCase().endsWith('.svg') &&
     (att.mimetype.startsWith('image/') || att.mimetype === 'application/pdf' || att.mimetype.startsWith('text/'))
 
   const content = (
