@@ -119,6 +119,19 @@ class MinioProvider(StorageProvider):
         except S3Error:
             pass
 
+    def list_keys(self) -> list:
+        """Alle Objektschlüssel im Bucket mit Größe — für das Backup.
+
+        Bewusst der ganze Bucket und nicht nur die ``attachments``-Tabelle:
+        Positionsbilder, Stammdatenbilder und Postecke-Medien liegen ebenfalls
+        hier, ohne eine Zeile in ``attachments`` zu haben."""
+        c = self._client()
+        if not c.bucket_exists(self.bucket):
+            return []
+        return [{"key": o.object_name, "size": o.size or 0}
+                for o in c.list_objects(self.bucket, recursive=True)
+                if not o.is_dir]
+
     def test_connection(self) -> dict:
         try:
             self._client().list_buckets()

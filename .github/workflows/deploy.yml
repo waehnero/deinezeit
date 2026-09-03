@@ -1,6 +1,6 @@
 # ============================================================
 # DeineZeit – Automatisches Deployment (CD)
-# Läuft bei jedem Push auf den main-Branch
+# Läuft nach jeder erfolgreichen CI auf dem main-Branch (oder von Hand)
 #
 # Voraussetzungen (einmalig in GitHub einstellen):
 #   Settings → Secrets and variables → Actions → New repository secret
@@ -13,8 +13,15 @@
 
 name: Deploy → Produktion
 
+# Läuft erst, wenn die CI („CI – Qualitätsprüfung") für main durch ist —
+# und nur bei Erfolg. Bis 03.09.2026 startete der Deploy parallel zur CI beim
+# Push auf main: main war zwar über den Branch-Schutz abgesichert, aber nach
+# dem Merge zweier PRs konnte main rot sein und wurde trotzdem ausgerollt
+# (Audit OPS-001).
 on:
-  push:
+  workflow_run:
+    workflows: ["CI – Qualitätsprüfung"]
+    types: [completed]
     branches: [main]
   # Von Hand auslösbar (Actions → Deploy → Produktion → Run workflow).
   #
@@ -37,8 +44,12 @@ jobs:
     name: "Auf Server deployen"
     runs-on: ubuntu-latest
 
-    # Nur deployen wenn alle CI-Checks bestanden haben
-    needs: []   # Parallel zu CI – oder: needs: [sicherheit-backend, docker-build]
+    # Nur bei grüner CI — oder von Hand (workflow_dispatch), z. B. nach einer
+    # Actions-Störung. Der Sicherheits-Job der CI ist nicht blockierend
+    # (continue-on-error) und hält den Deploy daher nicht auf.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
 
     environment:
       name: production
@@ -47,6 +58,9 @@ jobs:
     steps:
       - name: Code auschecken
         uses: actions/checkout@v4
+        with:
+          # Bei workflow_run genau den Stand nehmen, den die CI geprüft hat
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: "SSH-Schlüssel einrichten"
         uses: webfactory/ssh-agent@v0.9.0
@@ -94,28 +108,35 @@ jobs:
         run: |
           set -eo pipefail
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "GIT_SHA='${{ github.sha }}' DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' DOMAIN='${{ vars.DOMAIN }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy.sh'"
+            "GIT_SHA='${{ github.event.workflow_run.head_sha || github.sha }}' DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' DOMAIN='${{ vars.DOMAIN }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy.sh'"
 
       - name: "Healthcheck"
+        # Schlägt jetzt FEHL, wenn die Seite nach dem Deploy nicht antwortet —
+        # bis 03.09.2026 war das nur eine Warnung, und der Lauf blieb grün,
+        # während die Seite unerreichbar war (Audit OPS-001). Zwölf Versuche im
+        # Abstand von zehn Sekunden decken den Container-Neustart ab.
         run: |
-          echo "Warte 15 Sekunden auf Start..."
-          sleep 15
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://${{ vars.DOMAIN || secrets.SSH_HOST }}/api/health || echo "000")
-          if [ "$STATUS" = "200" ]; then
-            echo "✓ App läuft (HTTP $STATUS)"
-          else
-            echo "⚠ Healthcheck: HTTP $STATUS – bitte Logs prüfen"
-            echo "  ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
-            echo "  cd ${{ secrets.DEPLOY_PATH }} && docker compose logs --tail=50"
-          fi
+          ZIEL="https://${{ vars.DOMAIN || secrets.SSH_HOST }}/api/health"
+          for versuch in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$ZIEL" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ App läuft (HTTP $STATUS, Versuch $versuch)"
+              exit 0
+            fi
+            echo "  Versuch $versuch/12: HTTP $STATUS – warte 10 s"
+            sleep 10
+          done
+          echo "✗ Healthcheck fehlgeschlagen: $ZIEL antwortet nicht mit 200."
+          echo "  ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          echo "  cd ${{ secrets.DEPLOY_PATH }} && docker compose logs --tail=50"
+          exit 1
 
       - name: "Deployment-Zusammenfassung"
         if: always()
         run: |
           echo "## Deployment-Ergebnis" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.event.workflow_run.head_sha || github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auslöser:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Zeitpunkt:** $(date '+%d.%m.%Y %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
           echo "- **Gestartet von:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

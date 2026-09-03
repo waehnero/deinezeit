@@ -293,6 +293,9 @@ write_config() {
     print_step "Konfiguration wird erstellt..."
 
     SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n/+=')
+    # Einrichtungs-Token: sichert /setup/init, bis der erste Administrator
+    # existiert (Audit SEC-006). Wird unten für den Notfall ausgegeben.
+    SETUP_TOKEN=$(openssl rand -hex 16)
     DB_PASSWORD=$(openssl rand -hex 16)
     MINIO_PASSWORD=$(openssl rand -hex 16)
 
@@ -309,6 +312,8 @@ DB_NAME=deinezeit
 # Backend-Sicherheit
 SECRET_KEY=${SECRET_KEY}
 FRONTEND_URL=https://${DOMAIN}
+# Schützt den Einrichtungs-Assistenten, solange noch kein Benutzer existiert.
+SETUP_TOKEN=${SETUP_TOKEN}
 
 # WebAuthn (Face ID / Passkeys)
 WEBAUTHN_RP_ID=${DOMAIN}
@@ -470,6 +475,9 @@ else:
 db.close()
 "
     print_ok "Administrator-Konto bereit"
+    echo "     Falls das Konto nicht angelegt werden konnte: Der Assistent unter"
+    echo "     https://${DOMAIN} fragt nach dem Einrichtungs-Token aus ${INSTALL_DIR}/.env"
+    echo "     (Zeile SETUP_TOKEN)."
 }
 
 # ── SSL nachträglich aktivieren ───────────────────────────────────────────────

@@ -5,7 +5,7 @@ from typing import List
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "DeineZeit"
-    APP_VERSION: str = "1.12.79"
+    APP_VERSION: str = "1.12.80"
     DEBUG: bool = False
 
     # Datenbank
@@ -45,9 +45,22 @@ class Settings(BaseSettings):
     # Deploy-Modus
     DEPLOY_MODE: str = "production"
 
+    # Zeitzone der Installation (Kalenderdaten, Berichte, Worker-Zeiten).
+    # Kommt aus docker-compose.yml (TZ=…); siehe core/zeit.py.
+    TZ: str = "Europe/Vienna"
+
     class Config:
         env_file = ".env"
         case_sensitive = True
 
 
 settings = Settings()
+
+# Prozess-Zeitzone setzen, damit auch date.today()/datetime.now() in
+# Bibliotheken und an übersehenen Stellen die Ortszeit liefern (Audit BUG-002).
+# tzset gibt es nur auf Unix — im Container immer, unter Windows nie nötig.
+import os as _os
+import time as _time
+_os.environ["TZ"] = settings.TZ
+if hasattr(_time, "tzset"):
+    _time.tzset()

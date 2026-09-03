@@ -35,6 +35,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       SECRET_KEY: ${SECRET_KEY}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
       FRONTEND_URL: ${FRONTEND_URL}
       MINIO_ENDPOINT: minio:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -44,7 +45,9 @@ services:
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
       INSTALL_DIR: /opt/deinezeit
-      APP_VERSION: ${APP_VERSION:-1.12.79}
+      APP_VERSION: ${APP_VERSION:-1.12.80}
+      # Ortszeit für Kalenderdaten, Berichte und Worker-Zeiten (Audit BUG-002)
+      TZ: ${TZ:-Europe/Vienna}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/deinezeit:/opt/deinezeit

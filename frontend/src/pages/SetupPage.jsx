@@ -65,6 +65,9 @@ export default function SetupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
+  // Einrichtungs-Token: Pflicht, wenn der Server einen SETUP_TOKEN kennt
+  const [tokenRequired, setTokenRequired] = useState(false)
+  const [setupToken, setSetupToken] = useState('')
 
   // Schritt 2 – Firma (optional)
   const [company, setCompany] = useState({
@@ -87,7 +90,7 @@ export default function SetupPage() {
     setupApi.status()
       .then((r) => {
         if (!r.data.needs_setup) { navigate('/login', { replace: true }) }
-        else setChecking(false)
+        else { setTokenRequired(!!r.data.token_required); setChecking(false) }
       })
       .catch(() => setChecking(false))
   }, [navigate])
@@ -101,6 +104,7 @@ export default function SetupPage() {
     if (!email.trim() || !email.includes('@')) return toast.error('Bitte eine gültige E-Mail-Adresse angeben.')
     if (password.length < 8) return toast.error('Das Passwort muss mindestens 8 Zeichen lang sein.')
     if (password !== password2) return toast.error('Die Passwörter stimmen nicht überein.')
+    if (tokenRequired && !setupToken.trim()) return toast.error('Bitte den Einrichtungs-Token aus der .env eintragen.')
     setStep(2)
   }
 
@@ -113,6 +117,7 @@ export default function SetupPage() {
         admin_password: password,
         language: 'de',
         company: withCompany && company.firmenname.trim() ? company : null,
+        setup_token: tokenRequired ? setupToken.trim() : null,
       }
       const res = await setupApi.init(payload)
       // Wie beim normalen Anmelden: nur der kurzlebige Access-Token landet im
@@ -195,6 +200,17 @@ export default function SetupPage() {
                     value={password2} onChange={(e) => setPassword2(e.target.value)}
                     required placeholder="••••••••" autoComplete="new-password" />
                 </div>
+                {tokenRequired && (
+                  <div>
+                    <label className="label">Einrichtungs-Token</label>
+                    <input className="input font-mono" value={setupToken}
+                      onChange={(e) => setSetupToken(e.target.value)}
+                      required placeholder="aus der Datei .env (SETUP_TOKEN)" autoComplete="off" />
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Schützt die Ersteinrichtung: Nur wer den Server verwaltet, kennt den Token.
+                    </p>
+                  </div>
+                )}
 
                 <button type="submit" className="btn-primary w-full justify-center py-2.5 mt-2">
                   Weiter <ArrowRight size={16} />

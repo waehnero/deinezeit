@@ -13,6 +13,7 @@ wertlos. Der Ablauf wird darum aus dem Datum abgeleitet und angezeigt; wer nach
 Fristende umwandelt, wird gefragt, nicht gehindert.
 """
 from datetime import date, timedelta
+from app.core import zeit
 
 # Schlüssel in den Verkaufseinstellungen; Wert = Tage ab Belegdatum
 VORGABE_KEY = "default_offer_valid_days"
@@ -58,11 +59,11 @@ def ist_abgelaufen(invoice, stichtag: date = None) -> bool:
         return False
     if invoice.status in ("angenommen", "abgelehnt", "storniert", "entwurf"):
         return False
-    return invoice.valid_until < (stichtag or date.today())
+    return invoice.valid_until < (stichtag or zeit.heute())
 
 
 def resttage(invoice, stichtag: date = None):
     """Tage bis zum Fristende; negativ, wenn vorbei. ``None`` ohne Frist."""
     if invoice.doc_type != "angebot" or not invoice.valid_until:
         return None
-    return (invoice.valid_until - (stichtag or date.today())).days
+    return (invoice.valid_until - (stichtag or zeit.heute())).days

@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.core.modules import user_has_module
 from app.models.user import User, UserRole
+from app.core import zeit
 
 # Belegzustände, in denen noch Geld aussteht (Beschluss 15.08.2026).
 # Deckungsgleich mit services/overdue_service.py und services/dunning.py —
@@ -51,7 +52,7 @@ def finanz_kennzahlen(db: Session) -> dict:
     """
     from app.models.invoice import Invoice, InvoicePayment
 
-    heute = date.today()
+    heute = zeit.heute()
 
     # Bereits gezahlte Beträge je Beleg
     zahlungen = (
@@ -133,7 +134,7 @@ def offene_posten_kennzahlen(db: Session) -> dict:
     """
     from app.models.invoice import Invoice, InvoiceDunning, InvoicePayment
 
-    heute = date.today()
+    heute = zeit.heute()
 
     zahlungen = (
         db.query(
@@ -263,7 +264,7 @@ def umsatz_kennzahlen(db: Session) -> dict:
     """
     from app.services import auswertungen
 
-    jahr = date.today().year
+    jahr = zeit.heute().year
     roh = auswertungen.je_monat(db, jahr)
 
     return {
@@ -294,7 +295,7 @@ def eingangsrechnungen_kennzahlen(db: Session, user: User) -> dict:
     from app.models.period import AccountingPeriod
     from app.models.purchase import PurchaseInvoice
 
-    heute = date.today()
+    heute = zeit.heute()
     monatsbeginn = heute.replace(day=1)
 
     offen = (

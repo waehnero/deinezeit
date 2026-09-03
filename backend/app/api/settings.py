@@ -18,6 +18,7 @@ from app.models.user import User, UserRole
 from app.models.masterdata import EntityType, EntityRecord, FieldDefinition
 from app.schemas.settings import SettingsResponse, SettingsUpdate, TestEmailRequest
 from app.api.deps import get_current_user, require_admin
+from app.core import zeit
 
 router = APIRouter(prefix="/settings", tags=["Einstellungen"])
 
@@ -215,7 +216,7 @@ def upload_logo(
 
         # Cache-Buster: Dateiname bleibt gleich, daher würde der Browser sonst
         # das alte gecachte Bild weiter anzeigen
-        v = int(datetime.now().timestamp())
+        v = int(zeit.jetzt().timestamp())
         logo_url = f"/api/static/logo/logo_original{ext}?v={v}"
         _save(db, "logo_url",        logo_url)
         _save(db, "logo_header_url", logo_url)
@@ -251,7 +252,7 @@ def upload_logo(
 
     # Cache-Buster: Dateinamen bleiben gleich, daher würde der Browser sonst
     # die alten gecachten Bilder weiter anzeigen
-    v = int(datetime.now().timestamp())
+    v = int(zeit.jetzt().timestamp())
     logo_url        = f"/api/static/logo/logo_original{ext}?v={v}"
     logo_header_url = f"/api/static/logo/logo_header.png?v={v}"
     logo_favicon_url = f"/api/static/logo/logo_favicon.png?v={v}"
@@ -328,7 +329,7 @@ def upload_favicon(
     with open(favicon_path, "wb") as f:
         f.write(raw_bytes)
 
-    favicon_url = f"/api/static/logo/logo_favicon{ext}?v={int(datetime.now().timestamp())}"
+    favicon_url = f"/api/static/logo/logo_favicon{ext}?v={int(zeit.jetzt().timestamp())}"
     _save(db, "logo_favicon_url", favicon_url)
     return {"logo_favicon_url": favicon_url}
 
@@ -471,20 +472,27 @@ def download_backup(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    from app.services.backup_service import create_pg_dump
+    """Backup als ZIP: Datenbank + alle Dateien des Objektspeichers + Manifest
+    (Audit DATA-002 — vorher nur der SQL-Dump)."""
+    from fastapi.responses import FileResponse
+    from starlette.background import BackgroundTask
+    from app.services.backup_service import create_backup_archive, backup_dateiname
     try:
-        dump_bytes = create_pg_dump(timeout=60)
+        zip_pfad, _manifest = create_backup_archive(db)
     except RuntimeError as e:
         raise HTTPException(500, str(e))
 
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    filename  = f"deinezeit_backup_{timestamp}.sql"
     _save(db, "backup_last_at", datetime.now(timezone.utc).isoformat())
 
-    return StreamingResponse(
-        io.BytesIO(dump_bytes),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    def _aufraeumen(pfad=zip_pfad):
+        try:
+            os.remove(pfad)
+        except OSError:
+            pass
+
+    return FileResponse(
+        zip_pfad, media_type="application/zip", filename=backup_dateiname("zip"),
+        background=BackgroundTask(_aufraeumen),
     )
 
 

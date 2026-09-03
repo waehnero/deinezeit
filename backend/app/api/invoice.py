@@ -50,6 +50,7 @@ from app.schemas.invoice import (
     AnzahlungRequest, SchlussrechnungRequest,
     AbzugZeile, StrangBeleg, StrangResponse,
 )
+from app.core import zeit
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
 
@@ -265,7 +266,7 @@ def _ensure_number(db: Session, invoice: Invoice) -> bool:
     """
     if invoice.number:
         return False
-    jahr = (invoice.date or datetime.now().date()).year
+    jahr = (invoice.date or zeit.jetzt().date()).year
     sequence, number = _next_number(db, invoice.doc_type, jahr)
     invoice.year = jahr
     invoice.sequence = sequence
@@ -347,7 +348,7 @@ def _ist_ueberfaellig(invoice: Invoice, stichtag: date = None) -> bool:
     """Zahlungsziel überschritten und noch etwas offen?"""
     if not invoice.due_date:
         return False
-    return invoice.due_date < (stichtag or date.today())
+    return invoice.due_date < (stichtag or zeit.heute())
 
 
 def _pruefe_periode(db: Session, invoice: Invoice, vorgang: str = "geändert") -> None:
@@ -758,7 +759,7 @@ def get_next_number(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    y = year or datetime.now().year
+    y = year or zeit.jetzt().year
     seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
     next_seq = (seq.last_sequence + 1) if seq else 1
     preview = nummernformat_pruefen(_nummernformat(db, doc_type)).format(year=y, seq=next_seq)
@@ -781,7 +782,7 @@ def get_number_sequences(
     _: User = Depends(get_current_user),
 ):
     """Gibt Nummernkreise (Format + aktueller Zähler) für alle Dokumenttypen zurück."""
-    y = year or datetime.now().year
+    y = year or zeit.jetzt().year
     result = []
     for doc_type in DOC_TYPES_LIST:
         seq = db.query(InvoiceNumberSequence).filter_by(doc_type=doc_type, year=y).first()
@@ -816,7 +817,7 @@ def update_number_sequence(
     if doc_type not in DOC_TYPES_LIST:
         raise HTTPException(400, f"Ungültiger Dokumenttyp: {doc_type}")
 
-    y = body.get("year", datetime.now().year)
+    y = body.get("year", zeit.jetzt().year)
 
     # Format speichern — vorher prüfen, damit kein Format gespeichert wird,
     # an dem später jede Belegerstellung scheitert.
@@ -971,7 +972,7 @@ def template_preview(
     ]
     subtotal  = sum((p.line_total for p in positions), Decimal("0"))
     tax_total = (subtotal * Decimal("0.20")).quantize(Decimal("0.01"))
-    today = date.today()
+    today = zeit.heute()
     demo_invoice = SimpleNamespace(
         doc_type="rechnung", status="offen", tax_mode="normal",
         number="RE-2026-042", date=today, due_date=today + timedelta(days=30),
@@ -1481,7 +1482,7 @@ def get_uva_pdf(
       <p class="sub">{firma} &nbsp;|&nbsp; Zeitraum: {zeitraum}
          &nbsp;|&nbsp; Steuerland: {land}
          &nbsp;|&nbsp; {daten.beleg_anzahl} Belege
-         &nbsp;|&nbsp; erstellt am {date.today():%d.%m.%Y}</p>
+         &nbsp;|&nbsp; erstellt am {zeit.heute():%d.%m.%Y}</p>
 
       <div class="warn">
         <b>Diese Aufstellung ist keine vollständige Umsatzsteuervoranmeldung.</b>
@@ -1575,7 +1576,7 @@ def get_open_items(
     """
     from decimal import Decimal
 
-    heute = stichtag or date.today()
+    heute = stichtag or zeit.heute()
 
     q = db.query(Invoice).filter(
         Invoice.is_recurring_template == False,
@@ -1867,7 +1868,7 @@ def dunning_batch(
     den Lauf NICHT scheitern: Er wird übersprungen, der Rest läuft durch.
     Andernfalls müsste man den Lauf nach jedem Sonderfall neu zusammenstellen.
     """
-    stichtag = body.dunned_at or date.today()
+    stichtag = body.dunned_at or zeit.heute()
     if not body.invoice_ids:
         raise HTTPException(400, "Keine Belege ausgewählt")
 
@@ -1967,7 +1968,7 @@ def dunning_anlegen(
     if not inv:
         raise HTTPException(404, "Beleg nicht gefunden")
 
-    eintrag = _mahnung_erzeugen(db, inv, body.level, body.dunned_at or date.today(),
+    eintrag = _mahnung_erzeugen(db, inv, body.level, body.dunned_at or zeit.heute(),
                                 body.force, current_user.email)
     db.commit()
     db.refresh(eintrag)
@@ -2020,7 +2021,7 @@ def skonto_vorschau(
     if not inv:
         raise HTTPException(404, "Beleg nicht gefunden")
 
-    datum = paid_at or date.today()
+    datum = paid_at or zeit.heute()
     _, offen, _ = _zahlstand(inv)
     betrag = skonto_service.betrag(inv)
     frist = skonto_service.frist_ende(inv)
@@ -2157,7 +2158,7 @@ def umsatz_je_monat(
     _: User = Depends(get_current_user),
 ):
     """Monatsumsatz eines Jahres mit Vorjahresvergleich."""
-    return auswertungen_service.je_monat(db, jahr or datetime.now().year)
+    return auswertungen_service.je_monat(db, jahr or zeit.jetzt().year)
 
 
 @router.get("/auswertung/umsatz-kunden", response_model=UmsatzKundeResponse,
@@ -2476,7 +2477,7 @@ def cancel_invoice(
 
     credit_note = None
     if body.cancel_mode == "with_credit":
-        year = datetime.now().year
+        year = zeit.jetzt().year
         sequence, number = _next_number(db, "gutschrift", year)
         credit_note = Invoice(
             doc_type="gutschrift",
@@ -2487,7 +2488,7 @@ def cancel_invoice(
             project_id=inv.project_id,
             related_invoice_id=inv.id,
             title=f"Gutschrift zu {inv.number}",
-            date=datetime.now().date(),
+            date=zeit.jetzt().date(),
             # Die Gutschrift betrifft dieselbe Leistung — Zeitraum mitnehmen,
             # sonst fehlt der Pflichtangabe nach § 11 Abs. 1 Z 4 UStG die
             # Grundlage. Altbelege haben noch kein Leistungsdatum (das Feld war
@@ -2698,7 +2699,7 @@ def convert_to_ab(
         doc_type="auftragsbestaetigung",
         contact_id=offer.contact_id, project_id=offer.project_id,
         related_invoice_id=offer.id,
-        title=offer.title, date=datetime.now().date(),
+        title=offer.title, date=zeit.jetzt().date(),
         delivery_date=offer.delivery_date, delivery_date_to=offer.delivery_date_to,
         tax_mode=offer.tax_mode, currency=offer.currency,
         template_id=offer.template_id,
@@ -2754,7 +2755,7 @@ def convert_to_invoice(
         project_id=offer.project_id,
         related_invoice_id=offer.id,
         title=offer.title,
-        date=datetime.now().date(),
+        date=zeit.jetzt().date(),
         delivery_date=offer.delivery_date, delivery_date_to=offer.delivery_date_to,
         tax_mode=offer.tax_mode,
         currency=offer.currency,
@@ -2945,7 +2946,7 @@ def create_advance(
         raise HTTPException(400, f"Die Anzahlung ({betrag:.2f}) übersteigt die "
                                  f"Auftragssumme ({grundlage:.2f})")
 
-    belegdatum = body.date or datetime.now().date()
+    belegdatum = body.date or zeit.jetzt().date()
     if period_service.ist_gesperrt(db, belegdatum):
         period_service.pruefe_periode_offen(db, belegdatum, "angelegt")
 
@@ -3046,7 +3047,7 @@ def create_final_invoice(
         if anzahlung_service.strang_kopf(quelle) != chain_id:
             raise HTTPException(400, "Der Vorlagebeleg gehört zu einem anderen Vorgang")
 
-    belegdatum = body.date or datetime.now().date()
+    belegdatum = body.date or zeit.jetzt().date()
     if period_service.ist_gesperrt(db, belegdatum):
         period_service.pruefe_periode_offen(db, belegdatum, "angelegt")
 
@@ -3106,10 +3107,10 @@ def duplicate_invoice(
     # Das Duplikat ist ein Entwurf und bekommt seine Nummer erst beim Finalisieren
     dup = Invoice(
         doc_type=src.doc_type,
-        date=datetime.now().date(),
+        date=zeit.jetzt().date(),
         # Leistungsdatum NICHT übernehmen: Das Duplikat betrifft eine neue
         # Leistung; ein mitkopiertes altes Datum wäre schlicht falsch.
-        delivery_date=datetime.now().date(),
+        delivery_date=zeit.jetzt().date(),
         tax_mode=src.tax_mode,
         currency=src.currency,
         template_id=src.template_id,

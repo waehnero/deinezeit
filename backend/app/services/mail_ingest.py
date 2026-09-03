@@ -41,6 +41,7 @@ from app.services.ki import (  # noqa: F401
     encrypt_secret, decrypt_secret,
     load_ki_settings, save_ki_settings, call_ki,
 )
+from app.core import zeit
 
 # Wie viele Nachrichten pro Scan maximal betrachtet werden (neueste zuerst)
 MAX_MESSAGES_PER_SCAN = 25
@@ -382,7 +383,7 @@ def _parse_ki_json(text: str) -> List[dict]:
 def extract_tasks(ki: dict, mail: dict) -> List[dict]:
     """Ruft den konfigurierten KI-Provider auf und liefert Aufgabenvorschläge."""
     prompt = _EXTRACT_PROMPT.format(
-        today=date.today().isoformat(),
+        today=zeit.heute().isoformat(),
         sender=mail.get("sender") or "-",
         subject=mail.get("subject") or "-",
         received=(mail.get("received_at").isoformat() if mail.get("received_at") else "-"),

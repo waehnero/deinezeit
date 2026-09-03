@@ -22,6 +22,7 @@ Drei Regeln, die den Rest bestimmen:
 """
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from app.core import zeit
 
 
 # ── Vorgaben ─────────────────────────────────────────────────────────────────
@@ -231,7 +232,7 @@ def kandidaten(db, stichtag: date = None, contact_id=None) -> dict:
     from app.models.masterdata import EntityRecord
     from app.api.invoice import _zahlstand
 
-    heute = stichtag or date.today()
+    heute = stichtag or zeit.heute()
     stufen = get_levels(db)
     zins_conf = get_zins_einstellungen(db)
 
@@ -319,7 +320,7 @@ def mahnung_anlegen(db, invoice, stufe: dict, stichtag: date = None,
     from app.models.invoice import InvoiceDunning
     from app.api.invoice import _zahlstand
 
-    heute = stichtag or date.today()
+    heute = stichtag or zeit.heute()
     _, offen, _ = _zahlstand(invoice)
     zins_conf = get_zins_einstellungen(db)
     satz = jahreszinssatz(zins_conf, ist_unternehmen(kontakt))

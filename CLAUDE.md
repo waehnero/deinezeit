@@ -229,7 +229,8 @@ git config core.hooksPath .githooks
 - **`auto-version.yml`** — **deaktiviert** (scheiterte am Branch-Schutz). Der
   Versions-Bump passiert jetzt lokal beim Committen per pre-commit-Hook (s. o.);
   den Changelog-Text schreibt Claude/Oliver beim Entwickeln.
-- **`deploy.yml`** — bei Push auf `main`: per SSH/rsync auf den Server,
+- **`deploy.yml`** — nach **erfolgreicher CI** auf `main` (`workflow_run`, seit 03.09.2026;
+  vorher parallel zur CI beim Push) oder von Hand: per SSH/rsync auf den Server,
   `docker compose build` + `alembic upgrade head` + Neustart + Healthcheck.
   Nötige Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`.
 

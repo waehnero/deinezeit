@@ -123,3 +123,40 @@ def test_init_mit_firma_verknuepft_briefkopf(client, db_session):
                     headers={"Authorization": f"Bearer {token}"})
     assert cc.status_code == 200
     assert cc.json()["contact"]["display_name"] == "Muster GmbH"
+
+
+# ── Einrichtungs-Token (Audit SEC-006) ───────────────────────────────────────
+
+def test_ohne_token_in_der_umgebung_bleibt_der_assistent_offen(client, monkeypatch):
+    """Rückwärtskompatibel: Ohne SETUP_TOKEN in der .env läuft es wie bisher."""
+    monkeypatch.delenv("SETUP_TOKEN", raising=False)
+    assert client.get("/api/setup/status").json()["token_required"] is False
+    assert client.post("/api/setup/init", json=ADMIN).status_code == 200
+
+
+def test_mit_token_verlangt_der_assistent_den_token(client, monkeypatch):
+    monkeypatch.setenv("SETUP_TOKEN", "geheim-1234")
+    assert client.get("/api/setup/status").json()["token_required"] is True
+
+    # ohne Token → 403, es entsteht kein Benutzer
+    resp = client.post("/api/setup/init", json=ADMIN)
+    assert resp.status_code == 403, resp.text
+    assert "Token" in resp.json()["detail"]
+    assert client.get("/api/setup/status").json()["needs_setup"] is True
+
+    # falscher Token → 403
+    resp = client.post("/api/setup/init", json={**ADMIN, "setup_token": "falsch"})
+    assert resp.status_code == 403
+
+    # richtiger Token → Administrator wird angelegt
+    resp = client.post("/api/setup/init", json={**ADMIN, "setup_token": " geheim-1234 "})
+    assert resp.status_code == 200, resp.text
+    assert client.get("/api/setup/status").json()["needs_setup"] is False
+
+
+def test_zweiter_aufruf_nach_dem_ersten_admin_bleibt_gesperrt(client, monkeypatch):
+    """Auch mit richtigem Token gibt es nur einen Erst-Administrator."""
+    monkeypatch.setenv("SETUP_TOKEN", "geheim-1234")
+    assert client.post("/api/setup/init", json={**ADMIN, "setup_token": "geheim-1234"}).status_code == 200
+    zweiter = {**ADMIN, "admin_email": "zweiter@deinezeit.local", "setup_token": "geheim-1234"}
+    assert client.post("/api/setup/init", json=zweiter).status_code == 409

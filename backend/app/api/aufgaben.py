@@ -37,6 +37,7 @@ from app.schemas.aufgaben import (
     AufgabenStats, AufgabenStatItem,
 )
 from app.schemas.projektplan import StatusOption
+from app.core import zeit
 
 router = APIRouter(prefix="/aufgaben", tags=["Aufgaben"])
 
@@ -305,7 +306,7 @@ def get_stats(
     Projekt aktiv) — konsistent zur Listenansicht.
     """
     done_status = _load_settings(db).done_status
-    heute = date.today()
+    heute = zeit.heute()
 
     # ── Todos ────────────────────────────────────────────────────────────────
     query = db.query(Todo).filter(

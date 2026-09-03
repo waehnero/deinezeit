@@ -18,6 +18,7 @@ from app.services import period_service
 from app.schemas.period import (PeriodResponse, PeriodCheckResponse,
                                 PeriodReopenRequest, HandoverResponse)
 
+from app.core import zeit
 router = APIRouter(prefix="/periods", tags=["Monatsabschluss"])
 
 
@@ -32,7 +33,7 @@ def list_periods(
 
     Monate ohne Eintrag sind offen — es wird nichts im Voraus angelegt.
     """
-    y = jahr or datetime.now().year
+    y = jahr or zeit.jetzt().year
     vorhanden = {p.month: p for p in db.query(AccountingPeriod).filter_by(year=y).all()}
 
     ergebnis = []

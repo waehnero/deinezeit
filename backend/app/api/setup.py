@@ -1,7 +1,10 @@
+import os
+import secrets
 from datetime import datetime, timezone
 
 from fastapi import (APIRouter, Depends, HTTPException, Request, Response,
                      status)
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.base import get_db
@@ -21,6 +24,18 @@ def _user_count(db: Session) -> int:
     return db.query(User).count()
 
 
+def _setup_token() -> str:
+    """Einrichtungs-Token aus der Umgebung (SETUP_TOKEN in der .env).
+
+    Bis 03.09.2026 war /setup/init für jeden erreichbar, solange noch kein
+    Benutzer existierte: Wer eine frische Installation zwischen Zertifikat und
+    Assistent erreichte, wurde Administrator (Audit SEC-006). install.sh legt
+    den Token jetzt automatisch an; bei einer Installation von Hand steht er
+    in .env.example beschrieben. Ist keiner gesetzt, verhält sich der Endpunkt
+    wie bisher — mit einer Warnung im Log."""
+    return (os.environ.get("SETUP_TOKEN") or "").strip()
+
+
 def _save_setting(db: Session, key: str, value: str) -> None:
     row = db.query(Setting).filter(Setting.key == key).first()
     if row:
@@ -34,7 +49,8 @@ def _save_setting(db: Session, key: str, value: str) -> None:
 def setup_status(db: Session = Depends(get_db)):
     """Prueft, ob der Einrichtungsassistent noetig ist (noch kein Benutzer)."""
     count = _user_count(db)
-    return SetupStatusResponse(needs_setup=(count == 0), user_count=count)
+    return SetupStatusResponse(needs_setup=(count == 0), user_count=count,
+                               token_required=bool(_setup_token()))
 
 
 @router.post("/init", response_model=SetupInitResponse)
@@ -50,8 +66,28 @@ def setup_init(
     Endpunkt gesperrt (HTTP 409). So kann er nach der Ersteinrichtung nicht
     missbraucht werden, um einen weiteren Admin anzulegen.
     """
-    # ── Riegel: nur bei komplett leerer Benutzertabelle ──────────────────────
+    # ── Riegel 1: Einrichtungs-Token (falls gesetzt) ─────────────────────────
+    erwartet = _setup_token()
+    if erwartet:
+        if not secrets.compare_digest((body.setup_token or "").strip(), erwartet):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=("Einrichtungs-Token fehlt oder ist falsch. Er steht in der "
+                        "Datei .env auf dem Server (SETUP_TOKEN)."))
+    else:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Erstinstallation ohne SETUP_TOKEN — der Assistent ist bis zum ersten "
+            "Benutzer für jeden erreichbar. Empfehlung: SETUP_TOKEN in der .env setzen.")
+
+    # ── Riegel 2: nur bei komplett leerer Benutzertabelle ────────────────────
+    # Die Tabelle wird für die Dauer der Transaktion gesperrt, damit zwei
+    # gleichzeitige Aufrufe nicht beide „0 Benutzer" sehen und zwei
+    # Administratoren anlegen. create_user() bestätigt die Transaktion und gibt
+    # die Sperre damit frei.
+    db.execute(text("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE"))
     if _user_count(db) > 0:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Einrichtung bereits abgeschlossen — Anmeldung erforderlich.",

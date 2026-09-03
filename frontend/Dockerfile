@@ -2,7 +2,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+# `npm ci` statt `npm install`: installiert exakt den Stand aus package-lock.json
+# und bricht ab, wenn Lockfile und package.json auseinanderlaufen. Mit
+# `npm install` löste jeder Image-Build die Abhängigkeiten neu auf — zwei
+# Deploys ohne Codeänderung konnten verschiedene Pakete enthalten, und das
+# Lockfile fehlte zeitweise ganze Pakete (Audit BUG-003).
+RUN npm ci --no-audit --no-fund
 
 # Cache-Buster: Der Deploy übergibt bei jedem Commit den aktuellen Git-SHA als
 # Build-Arg. Da sich der Wert dann ändert, invalidiert Docker ab hier den Cache

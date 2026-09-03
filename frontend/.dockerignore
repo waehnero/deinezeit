@@ -1,5 +1,5 @@
 # Nicht in den Docker-Build-Kontext übertragen (Build wird sonst extrem langsam):
-# node_modules wird im Container ohnehin frisch per `npm install` aufgebaut.
+# node_modules wird im Container ohnehin frisch per `npm ci` aufgebaut.
 node_modules
 dist
 .vite

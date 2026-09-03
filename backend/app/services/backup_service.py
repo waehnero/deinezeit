@@ -1,57 +1,189 @@
 """
-Backup-Service – serverseitige Datenbank-Sicherung.
+Backup-Service – serverseitige Sicherung von Datenbank UND Dateispeicher.
 
-Erzeugt per ``pg_dump`` einen vollständigen SQL-Dump der Datenbank und kann ihn
-optional über die Microsoft-Graph-API nach OneDrive / SharePoint hochladen
-(Backup-Ziel ``onedrive``). Die Credentials-Logik ist identisch zum
-Speicher-Provider (``storage_service``): entweder werden die Graph-Zugangsdaten
-aus dem E-Mail-Modul (``ms_*``) wiederverwendet oder eigene ``backup_onedrive_*``
-Zugangsdaten genutzt. Das Zielverzeichnis in OneDrive ist frei wählbar.
+Ein Backup ist seit 03.09.2026 ein ZIP-Archiv (Audit DATA-002):
 
-Die tägliche Automatik läuft – wie der Wiederkehr-/Mail-Worker – in einem
-eigenen Daemon-Thread (in Tests deaktiviert).
+    datenbank.sql        vollständiger pg_dump
+    manifest.json        Version, Zeitpunkt, Migrationsstand, Dateiliste
+    dateien/<schlüssel>  jedes Objekt aus dem MinIO-Bucket
+
+Bis dahin wurde nur die Datenbank gesichert. Der Objektspeicher — Anhänge,
+Positions- und Stammdatenbilder, Postecke-Medien und vor allem das
+automatische **PDF-Archiv der Verkaufsbelege** — hing an einem Docker-Volume
+ohne jede Sicherung. Ein Verlust des Volumes hätte die ``attachments``-Zeilen
+ohne ihre Dateien zurückgelassen.
+
+Dateien, die in WebDAV oder OneDrive liegen (Mischbetrieb), stehen nur im
+Manifest — sie sind bereits extern. Wiederherstellung: docs/WIEDERHERSTELLUNG.md.
+
+Das Archiv kann optional über die Microsoft-Graph-API nach OneDrive /
+SharePoint hochgeladen werden (Backup-Ziel ``onedrive``). Die tägliche
+Automatik läuft — wie der Wiederkehr-/Mail-Worker — in einem eigenen
+Daemon-Thread (in Tests deaktiviert).
 """
 import os
 import json
 import subprocess
+import tempfile
 import threading
 import time
-from datetime import datetime, timezone, date, timedelta
+import zipfile
+from datetime import datetime, timezone, timedelta
+from app.core import zeit
 
 
 # ── pg_dump ───────────────────────────────────────────────────────────────────
 
-def create_pg_dump(timeout: int = 60) -> bytes:
-    """Erzeugt einen vollständigen SQL-Dump der Datenbank als Bytes.
-
-    Wirft RuntimeError bei Parsing-/Ausführungsfehlern (aufrufer-freundlich, damit
-    API-Endpunkt sauber HTTP 500 mit Klartext liefern kann)."""
+def _db_zugang() -> dict:
     db_url = os.environ.get("DATABASE_URL", "")
     try:
         parts   = db_url.replace("postgresql://", "").split("@")
         user_pw = parts[0].split(":")
         host_db = parts[1].split("/")
-        db_user = user_pw[0]
-        db_pass = user_pw[1] if len(user_pw) > 1 else ""
-        db_host = host_db[0].split(":")[0]
-        db_name = host_db[1]
+        return {
+            "user": user_pw[0],
+            "password": user_pw[1] if len(user_pw) > 1 else "",
+            "host": host_db[0].split(":")[0],
+            "name": host_db[1].split("?")[0],
+        }
     except Exception:
         raise RuntimeError("Datenbank-URL konnte nicht geparst werden")
 
-    env = os.environ.copy()
-    env["PGPASSWORD"] = db_pass
+
+def _timeout_vorgabe(timeout) -> int:
+    """Zeitlimit für pg_dump. Vorgabe 600 s statt bisher 60 — eine Datenbank,
+    die in 60 s nicht durch ist, scheiterte sonst still bei jedem Backup.
+    Überschreibbar über BACKUP_TIMEOUT_SEKUNDEN."""
+    if timeout:
+        return int(timeout)
     try:
-        result = subprocess.run(
-            ["pg_dump", "-h", db_host, "-U", db_user, "-d", db_name, "--no-owner"],
-            capture_output=True, text=True, env=env, timeout=timeout,
-        )
+        return int(os.environ.get("BACKUP_TIMEOUT_SEKUNDEN", "600"))
+    except ValueError:
+        return 600
+
+
+def pg_dump_in_datei(pfad: str, timeout: int = None) -> None:
+    """Schreibt den Dump direkt in eine Datei (nicht in den Arbeitsspeicher)."""
+    z = _db_zugang()
+    env = os.environ.copy()
+    env["PGPASSWORD"] = z["password"]
+    try:
+        with open(pfad, "wb") as ziel:
+            result = subprocess.run(
+                ["pg_dump", "-h", z["host"], "-U", z["user"], "-d", z["name"], "--no-owner"],
+                stdout=ziel, stderr=subprocess.PIPE, env=env,
+                timeout=_timeout_vorgabe(timeout),
+            )
     except subprocess.TimeoutExpired:
-        raise RuntimeError(f"Backup-Timeout nach {timeout} Sekunden")
+        raise RuntimeError(f"Backup-Timeout nach {_timeout_vorgabe(timeout)} Sekunden")
     except FileNotFoundError:
         raise RuntimeError("pg_dump nicht gefunden — bitte Container neu bauen")
     if result.returncode != 0:
-        raise RuntimeError(f"pg_dump Fehler: {result.stderr[:200]}")
-    return result.stdout.encode("utf-8")
+        raise RuntimeError(f"pg_dump Fehler: {result.stderr.decode('utf-8', 'replace')[:200]}")
+
+
+def create_pg_dump(timeout: int = None) -> bytes:
+    """Vollständiger SQL-Dump als Bytes (für Aufrufer, die ihn im Speicher
+    brauchen). Wirft RuntimeError bei Parsing-/Ausführungsfehlern."""
+    with tempfile.NamedTemporaryFile(suffix=".sql", delete=False) as tmp:
+        pfad = tmp.name
+    try:
+        pg_dump_in_datei(pfad, timeout)
+        with open(pfad, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.remove(pfad)
+        except OSError:
+            pass
+
+
+# ── Archiv: Datenbank + Dateispeicher ────────────────────────────────────────
+
+def _migrationsstand(db) -> str:
+    """Alembic-Stand fürs Manifest. Im Savepoint: Fehlt die Tabelle (Testschema
+    aus create_all), bleibt die Sitzung benutzbar."""
+    try:
+        from sqlalchemy import text
+        with db.begin_nested():
+            return db.execute(text("SELECT version_num FROM alembic_version")).scalar() or ""
+    except Exception:
+        return ""
+
+
+def create_backup_archive(db, timeout: int = None) -> tuple:
+    """Erzeugt das ZIP-Archiv in einer temporären Datei.
+
+    Rückgabe ``(pfad, manifest)``. Der Aufrufer löscht die Datei, wenn er sie
+    ausgeliefert oder hochgeladen hat. Die Objekte werden einzeln geholt und
+    gleich ins Archiv geschrieben — im Speicher liegt immer nur eine Datei.
+    """
+    from app.services import storage_service
+    from app.models.attachment import Attachment
+    from app.core.config import settings as app_settings
+
+    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+        zip_pfad = tmp.name
+    with tempfile.NamedTemporaryFile(suffix=".sql", delete=False) as tmp:
+        sql_pfad = tmp.name
+
+    try:
+        pg_dump_in_datei(sql_pfad, timeout)
+
+        minio = storage_service.MinioProvider()
+        try:
+            objekte = minio.list_keys()
+        except Exception as e:                                       # noqa: BLE001
+            raise RuntimeError(f"Dateispeicher (MinIO) nicht erreichbar: {e}")
+
+        # Anhänge in fremden Speichern nur verzeichnen — sie liegen schon extern
+        extern = [{"id": str(a.id), "storage_key": a.storage_key,
+                   "provider": a.storage_provider, "filename": a.filename}
+                  for a in db.query(Attachment).filter(
+                      Attachment.type == "file",
+                      Attachment.storage_provider.isnot(None),
+                      Attachment.storage_provider != "minio").all()]
+
+        manifest = {
+            "format": "deinezeit-backup/1",
+            "erstellt": datetime.now(timezone.utc).isoformat(),
+            "app_version": app_settings.APP_VERSION,
+            "migration": _migrationsstand(db),
+            "dateien_anzahl": len(objekte),
+            "dateien_bytes": sum(o["size"] for o in objekte),
+            "dateien": [o["key"] for o in objekte],
+            "externe_anhaenge": extern,
+            "fehler": [],
+        }
+
+        with zipfile.ZipFile(zip_pfad, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(sql_pfad, "datenbank.sql")
+            for o in objekte:
+                try:
+                    daten, _ = minio.download(o["key"])
+                    zf.writestr(f"dateien/{o['key']}", daten)
+                except Exception as e:                               # noqa: BLE001
+                    # Eine unlesbare Datei darf das Backup nicht verhindern —
+                    # sie steht im Manifest, damit es nicht unbemerkt bleibt.
+                    manifest["fehler"].append({"key": o["key"], "fehler": str(e)[:200]})
+            zf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+    except Exception:
+        try:
+            os.remove(zip_pfad)
+        except OSError:
+            pass
+        raise
+    finally:
+        try:
+            os.remove(sql_pfad)
+        except OSError:
+            pass
+
+    return zip_pfad, manifest
+
+
+def backup_dateiname(endung: str = "zip") -> str:
+    return f"deinezeit_backup_{zeit.jetzt().strftime('%Y-%m-%d_%H-%M')}.{endung}"
 
 
 # ── OneDrive-Provider fürs Backup ─────────────────────────────────────────────
@@ -92,7 +224,7 @@ def build_backup_onedrive_provider(settings: dict):
 
 
 def _apply_retention(provider, keep_days: int) -> int:
-    """Löscht .sql-Backups im Zielordner, die älter als keep_days sind.
+    """Löscht Backups (.sql/.zip) im Zielordner, die älter als keep_days sind.
     Best-effort; Fehler werden geschluckt. Gibt Anzahl gelöschter Dateien zurück."""
     if keep_days <= 0:
         return 0
@@ -101,7 +233,8 @@ def _apply_retention(provider, keep_days: int) -> int:
         cutoff = datetime.now(timezone.utc) - timedelta(days=keep_days)
         for item in provider.list_children():
             name = item.get("name", "")
-            if not name.startswith("deinezeit_backup_") or not name.endswith(".sql"):
+            if not name.startswith("deinezeit_backup_") or \
+               not (name.endswith(".sql") or name.endswith(".zip")):
                 continue
             mod_raw = item.get("lastModifiedDateTime", "")
             try:
@@ -124,11 +257,18 @@ def run_onedrive_backup(db) -> dict:
     settings = _load_backup_settings(db)
     provider = build_backup_onedrive_provider(settings)
 
-    dump = create_pg_dump()
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    filename  = f"deinezeit_backup_{timestamp}.sql"
+    zip_pfad, manifest = create_backup_archive(db)
+    try:
+        with open(zip_pfad, "rb") as f:
+            dump = f.read()
+    finally:
+        try:
+            os.remove(zip_pfad)
+        except OSError:
+            pass
+    filename = backup_dateiname("zip")
 
-    provider.upload(filename, dump, "application/sql")
+    provider.upload(filename, dump, "application/zip")
 
     # Verifizieren, dass die Datei wirklich am Ziel liegt (Metadaten holen)
     meta = None
@@ -163,7 +303,9 @@ def run_onedrive_backup(db) -> dict:
 
     size_kb = round(len(dump) / 1024, 1)
     return {"ok": True, "filename": filename, "web_url": web_url,
-            "message": f"Backup '{filename}' ({size_kb} KB) hochgeladen"
+            "dateien": manifest["dateien_anzahl"],
+            "message": f"Backup '{filename}' ({size_kb} KB, Datenbank + "
+                       f"{manifest['dateien_anzahl']} Dateien) hochgeladen"
                        + (f" – {web_url}" if web_url else "")}
 
 
@@ -190,7 +332,7 @@ def _worker_loop():
                 settings = _load_backup_settings(db)
                 if settings.get("backup_target") != "onedrive":
                     continue
-                now = datetime.now()
+                now = zeit.jetzt()
                 heute = now.date()
                 if last_run_day == heute:
                     continue

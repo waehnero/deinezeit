@@ -19,6 +19,7 @@ import os
 import time
 import threading
 from datetime import date, datetime, timezone, timedelta
+from app.core import zeit
 
 
 def _add_months(d: date, months: int) -> date:
@@ -214,7 +215,7 @@ def materialize_due_recurring(db, today: date = None) -> int:
     from app.models.invoice import Invoice
 
     if today is None:
-        today = date.today()
+        today = zeit.heute()
 
     templates = (db.query(Invoice)
                  .filter(Invoice.is_recurring_template.is_(True),
@@ -257,7 +258,7 @@ def _worker_loop():
     time.sleep(60)
     while True:
         try:
-            heute = date.today()
+            heute = zeit.heute()
             # Bewusst kein "continue": Das würde das Warten am Schleifenende
             # überspringen und den Thread heißlaufen lassen.
             if last_run_day != heute:

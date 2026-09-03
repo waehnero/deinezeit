@@ -18,6 +18,7 @@ from datetime import datetime
 
 import qrcode
 from weasyprint import HTML as WeasyprintHTML
+from app.core import zeit
 
 
 def _qr_data_uri(payload: str) -> str:
@@ -170,7 +171,7 @@ def generate_todo_pdf(todo: dict, qr_payload: str, statuses: list, priorities: l
     {f'<div class="beschreibung"><span class="k">Beschreibung</span>{beschreibung}</div>' if beschreibung else ''}
 
     <div class="fuss">
-      Gedruckt am {datetime.now().strftime('%d.%m.%Y, %H:%M')} Uhr ·
+      Gedruckt am {zeit.jetzt().strftime('%d.%m.%Y, %H:%M')} Uhr ·
       Aufgaben-ID: {_esc(todo.get('id'))}
     </div>
   </div>
