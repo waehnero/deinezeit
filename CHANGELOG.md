@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.76] – 2026-09-02 – Zeiterfassung zeitprojekte
+
+### Aktualisierungen
+- (Release-Notes ergänzen)
+
+---
+
 ## [1.12.75] – 2026-09-01 – Zeitprojekte und Berichte in der Zeiterfassung
 
 ### Neu

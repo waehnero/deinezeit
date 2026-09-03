@@ -58,12 +58,31 @@ jobs:
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: "Code auf Server übertragen"
+        # `--delete` entfernt am Server alles, was es im Runner-Checkout nicht
+        # gibt. Deshalb muss hier JEDER Pfad stehen, der nur am Server entsteht
+        # — sonst ist er nach dem nächsten Deploy weg. Ausgeschlossene Pfade
+        # werden von rsync weder überschrieben noch gelöscht.
+        #
+        #   backups/     Vor-Update-Sicherungen (scripts/deploy.sh, install.sh)
+        #   logs/        update.log des In-App-Updates (update.sh)
+        #   backup.cfg   wird vom Backend am Server beschrieben (Einstellungen)
+        #   mockups/, design-vorschlaege/, lasttest/
+        #                Entwurfs- und Messdateien, gehören nicht auf den Server
+        #
+        # Bis 02.09.2026 fehlten backups/ und logs/ in dieser Liste: jeder
+        # Merge auf main hat die Sicherungen am Server gelöscht (Audit DATA-001).
         run: |
           rsync -az --delete \
             --exclude='.git' \
             --exclude='.env' \
             --exclude='backend/static' \
             --exclude='postgres_data' \
+            --exclude='backups/' \
+            --exclude='logs/' \
+            --exclude='backup.cfg' \
+            --exclude='mockups/' \
+            --exclude='design-vorschlaege/' \
+            --exclude='lasttest/' \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
       - name: "Docker-Images bauen & Dienste neu starten"

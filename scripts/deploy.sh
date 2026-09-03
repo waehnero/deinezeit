@@ -196,10 +196,17 @@ if [ -d ".git" ] && command -v git &>/dev/null; then
 fi
 
 # Datenbank-Backup vor Update
+#
+# Ablage standardmäßig in $INSTALL_DIR/backups. Dieser Ordner ist im
+# CI-Deploy (deploy.yml) vom rsync ausgenommen — bis 02.09.2026 war er das
+# nicht, und jeder Merge auf main hat die Sicherungen gelöscht (Audit
+# DATA-001). Über BACKUP_DIR lässt sich ein Ort außerhalb des Deploy-Pfads
+# wählen, z. B. BACKUP_DIR=/var/backups/deinezeit.
 print_step "Datenbank-Backup vor dem Update..."
-mkdir -p backups
+BACKUP_DIR="${BACKUP_DIR:-$INSTALL_DIR/backups}"
+mkdir -p "$BACKUP_DIR"
 source .env 2>/dev/null || true
-BACKUP_FILE="backups/pre-update_$(date +%Y%m%d_%H%M%S).sql"
+BACKUP_FILE="$BACKUP_DIR/pre-update_$(date +%Y%m%d_%H%M%S).sql"
 if docker compose exec -T db pg_dump -U "${DB_USER:-deinezeit}" "${DB_NAME:-deinezeit}" > "$BACKUP_FILE" 2>/dev/null; then
     print_ok "Backup gespeichert: $BACKUP_FILE"
 else
