@@ -4,6 +4,30 @@
  */
 export const changelog = [
   {
+    version: '1.12.84',
+    day: '04',
+    month: 'September',
+    year: '2026',
+    features: [
+      'Zeiteinträge können einer Projektplan-Aufgabe zugeordnet werden (Auswahl beim Nachtragen)',
+    ],
+    updates: [
+      'Projektplan: gebuchte Zeiten je Aufgabe werden angezeigt; Aufgaben mit Zeiten sind vor dem Löschen geschützt',
+    ],
+  },
+  {
+    version: '1.12.83',
+    day: '04',
+    month: 'September',
+    year: '2026',
+    features: [
+      'Zeiteinträge können einer Projektplan-Aufgabe zugeordnet werden (Auswahl beim Nachtragen)',
+    ],
+    updates: [
+      'Projektplan: gebuchte Zeiten je Aufgabe werden angezeigt; Aufgaben mit Zeiten sind vor dem Löschen geschützt',
+    ],
+  },
+  {
     version: '1.12.82',
     day: '04',
     month: 'September',

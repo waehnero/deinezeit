@@ -8,7 +8,7 @@
  *
  * `initial`: optionale Vorbefüllung (z.B. KI-Vorschlag aus dem Sprach-Nachtragen)
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Check, Loader2, Sparkles, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { zeiterfassungApi, datacenterApi } from '../services/api'
@@ -34,6 +34,16 @@ export default function ProjektzeitModal({ entry, initial = null, onClose, onSav
   const [pause, setPause] = useState(entry?.pause_minutes ?? init.pause ?? 0)
   const [note, setNote] = useState(entry?.note ?? init.note ?? '')
   const [billable, setBillable] = useState(entry?.billable ?? init.billable ?? true)
+  // Aufgabenbezug (Projektplanung): freiwillig, unabhängig vom Zeitprojekt.
+  // Daran hängen im Projektplan die gebuchten Minuten je Aufgabe und die
+  // Löschsperre für Aufgaben/Projekte mit Zeiten.
+  const [taskId, setTaskId] = useState(entry?.task_id || init.taskId || '')
+  const [aufgaben, setAufgaben] = useState(null)   // null = noch nicht geladen
+  useEffect(() => {
+    zeiterfassungApi.aufgabenAuswahl()
+      .then((r) => setAufgaben(r.data))
+      .catch(() => setAufgaben([]))
+  }, [])
   const [loading, setLoading] = useState(false)
   const [createAnother, setCreateAnother] = useState(false)
   const [createdEntry, setCreatedEntry] = useState(null)
@@ -47,6 +57,7 @@ export default function ProjektzeitModal({ entry, initial = null, onClose, onSav
     project_id: project.projectId || null,
     project_name: project.projectName || null,
     contact_id: null, contact_name: project.contactName || null,
+    task_id: taskId || null,
     started_at: startedAt, ended_at: endedAt || null,
     pause_minutes: Number(pause) || 0,
     note: note || null, billable, data: {},
@@ -149,6 +160,27 @@ export default function ProjektzeitModal({ entry, initial = null, onClose, onSav
             <ZeitprojektSuche value={project} onChange={setProject}
               initialSearch={!project.projectId ? (init.project?.projectName || '') : ''} />
           </div>
+          {/* Aufgabenauswahl nur zeigen, wenn es überhaupt Planungsaufgaben gibt —
+              oder der Eintrag schon auf eine (inzwischen erledigte) zeigt. */}
+          {((aufgaben && aufgaben.length > 0) || entry?.task_id) && (
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Aufgabe (Projektplan)</label>
+              <select value={taskId} onChange={(e) => setTaskId(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">— keine —</option>
+                {entry?.task_id && !(aufgaben || []).some((a) => a.id === entry.task_id) && (
+                  <option value={entry.task_id}>{entry.task_title || 'Bisherige Aufgabe'}</option>
+                )}
+                {Object.entries((aufgaben || []).reduce((acc, a) => {
+                  (acc[a.project_name] ||= []).push(a); return acc
+                }, {})).map(([projekt, liste]) => (
+                  <optgroup key={projekt} label={projekt}>
+                    {liste.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Notiz</label>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}

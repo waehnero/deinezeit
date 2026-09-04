@@ -25,7 +25,8 @@ Benutzerverwaltung mit Rechtegruppen, 2FA/Passkeys · Dashboard.
 
 ### Audit September 2026
 
-Vollständiges Software-Audit am 02.09.2026 — Bericht: [docs/AUDIT-2026-09-02.md](docs/AUDIT-2026-09-02.md).
+Vollständiges Software-Audit am 02.09.2026 — Bericht: [docs/AUDIT-2026-09-02.md](docs/AUDIT-2026-09-02.md),
+Abschlussprüfung 04.09.2026: [docs/AUDIT-2026-09-02-ABSCHLUSS.md](docs/AUDIT-2026-09-02-ABSCHLUSS.md).
 Umgesetzt in Bündeln (K-01 … K-25): Backups bleiben beim Deploy erhalten und enthalten den
 Dateispeicher (+ Restore-Anleitung [docs/WIEDERHERSTELLUNG.md](docs/WIEDERHERSTELLUNG.md)),
 XSS-Lücke in der Datacenter-Vorschau geschlossen, Konfigurations-Geheimnisse verschlüsselt,

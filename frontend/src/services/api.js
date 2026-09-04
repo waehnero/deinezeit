@@ -295,6 +295,9 @@ export const masterdataApi = {
 }
 
 export const zeiterfassungApi = {
+  // Aufgabenbezug: offene Aufgaben der Projektplanung zur Auswahl im Zeiteintrag
+  aufgabenAuswahl: (q) => api.get('/zeiterfassung/aufgaben', { params: q ? { q } : {} }),
+
   // Abrechnungs-Status
   setEntryStatus: (id, status) => api.put(`/zeiterfassung/entries/${id}/status`, { status }),
   setEntriesStatusBatch: (entryIds, status) =>

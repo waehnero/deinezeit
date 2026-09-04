@@ -63,7 +63,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: deinezeit-files
       MINIO_PUBLIC_URL: http://localhost
-      APP_VERSION: ${APP_VERSION:-1.12.82}
+      APP_VERSION: ${APP_VERSION:-1.12.84}
       # Ortszeit für Kalenderdaten, Berichte und Worker-Zeiten (Audit BUG-002)
       TZ: ${TZ:-Europe/Vienna}
       DEPLOY_MODE: local

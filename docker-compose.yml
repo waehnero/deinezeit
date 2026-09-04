@@ -50,7 +50,7 @@ services:
       MINIO_PUBLIC_URL: ${FRONTEND_URL}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
-      APP_VERSION: ${APP_VERSION:-1.12.82}
+      APP_VERSION: ${APP_VERSION:-1.12.84}
       # Ortszeit für Kalenderdaten, Berichte und Worker-Zeiten (Audit BUG-002)
       TZ: ${TZ:-Europe/Vienna}
     volumes:
