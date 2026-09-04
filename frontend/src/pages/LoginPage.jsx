@@ -124,10 +124,6 @@ export default function LoginPage() {
       .catch(() => {})
   }, [navigate])
 
-  // Update-Nachricht anzeigen wenn Benutzer durch Update abgemeldet wurde
-  const updateMessage = sessionStorage.getItem('update_message')
-  if (updateMessage) sessionStorage.removeItem('update_message')
-
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -216,13 +212,6 @@ export default function LoginPage() {
             </div>
             <span className="text-neutral-900 font-semibold text-lg">DeineZeit</span>
           </div>
-
-          {updateMessage && (
-            <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-start gap-2">
-              <span className="text-green-500 mt-0.5">✓</span>
-              <span>{updateMessage}</span>
-            </div>
-          )}
 
           <h1 className="text-2xl font-bold text-neutral-900 mb-1">Willkommen zurück</h1>
           <p className="text-neutral-500 text-sm mb-8">Melde dich mit deinem Konto an</p>

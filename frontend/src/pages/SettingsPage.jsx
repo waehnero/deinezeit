@@ -1494,17 +1494,12 @@ function TabSystem() {
   const [versionInfo, setVersionInfo]     = useState(null)
   const [changelog, setChangelog]         = useState('')
   const [showChangelog, setShowChangelog] = useState(false)
-  const [activeUsers, setActiveUsers]     = useState(0)
   const [loading, setLoading]             = useState(true)
   const [checking, setChecking]           = useState(false)
-  const [starting, setStarting]           = useState(false)
-  const [cancelling, setCancelling]       = useState(false)
-  const [updateStatus, setUpdateStatus]   = useState(null)
   const [sslStatus, setSslStatus]         = useState(null)
 
   useEffect(() => {
     loadVersionInfo()
-    loadActiveUsers()
     loadSslStatus()
   }, [])
 
@@ -1527,13 +1522,6 @@ function TabSystem() {
     }
   }
 
-  const loadActiveUsers = async () => {
-    try {
-      const res = await systemApi.getActiveUsers()
-      setActiveUsers(res.data.active_users || 0)
-    } catch { /* ignorieren */ }
-  }
-
   const handleCheckUpdate = async () => {
     setChecking(true)
     try {
@@ -1541,6 +1529,8 @@ function TabSystem() {
       setVersionInfo(res.data)
       if (!res.data.update_available) {
         toast.success('Sie verwenden bereits die neueste Version.')
+      } else {
+        toast('Eine neuere Version liegt auf GitHub — sie wird automatisch ausgerollt.')
       }
     } catch {
       toast.error('Versionsprüfung fehlgeschlagen.')
@@ -1560,38 +1550,6 @@ function TabSystem() {
     }
   }
 
-  const handleStartUpdate = async () => {
-    if (!window.confirm(
-      `Update starten?\n\nAlle angemeldeten Benutzer werden in 2 Minuten automatisch abgemeldet.\nDas System ist danach kurzzeitig nicht erreichbar.`
-    )) return
-
-    setStarting(true)
-    try {
-      await systemApi.startUpdate()
-      toast.success('Update eingeleitet — Benutzer werden benachrichtigt.')
-      const res = await systemApi.getUpdateStatus()
-      setUpdateStatus(res.data)
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Update konnte nicht gestartet werden.')
-    } finally {
-      setStarting(false)
-    }
-  }
-
-  const handleCancelUpdate = async () => {
-    setCancelling(true)
-    try {
-      await systemApi.cancelUpdate()
-      toast.success('Update wurde abgebrochen.')
-      setUpdateStatus(null)
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Abbrechen nicht möglich.')
-    } finally {
-      setCancelling(false)
-    }
-  }
-
-  const updatePending = updateStatus?.status === 'notifying'
   const isLocalMode = versionInfo?.local_mode === true
 
   return (
@@ -1631,7 +1589,7 @@ function TabSystem() {
               ) : versionInfo?.update_available ? (
                 <span className="flex items-center gap-1 text-amber-600 font-medium">
                   <AlertTriangle size={13} />
-                  Update verfügbar
+                  Neuere Version auf GitHub — Deploy steht aus
                 </span>
               ) : versionInfo?.github_check_ok === false ? (
                 <span className="flex items-center gap-1 text-amber-600 font-medium">
@@ -1647,7 +1605,7 @@ function TabSystem() {
             </div>
             {versionInfo?.github_check_ok === false && !isLocalMode && (
               <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-1">
-                GitHub konnte nicht erreicht werden. Verwenden Sie „Update erzwingen" um trotzdem zu aktualisieren.
+                GitHub konnte nicht erreicht werden — die Anzeige „Neueste Version" ist deshalb unvollständig.
               </p>
             )}
           </div>
@@ -1695,13 +1653,15 @@ function TabSystem() {
         <hr className="border-gray-100" />
       )}
 
-      {/* Update starten */}
+      {/* Aktualisierung — bewusst OHNE Knopf. Das In-App-Update (Backend baut
+          den Server per Docker-Socket neu) wurde am 04.09.2026 gestrichen
+          (Audit SEC-002, K-21): Der Docker-Socket im Backend war gleichbedeutend
+          mit root auf dem Server. */}
       <div>
         <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <ArrowUpCircle size={16} className="text-primary-500" />
-          System-Update
+          Aktualisierung
         </h3>
-
         {isLocalMode ? (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
             <p className="text-sm font-medium text-blue-800 flex items-center gap-2">
@@ -1709,7 +1669,6 @@ function TabSystem() {
               Lokale Entwicklungsinstanz
             </p>
             <p className="text-sm text-blue-700">
-              Automatische Updates sind in der lokalen Instanz nicht verfügbar.
               Um auf eine neue Version zu aktualisieren, bitte im Projektverzeichnis ausführen:
             </p>
             <code className="block mt-2 bg-blue-100 text-blue-900 text-xs px-3 py-2 rounded-lg font-mono">
@@ -1717,53 +1676,17 @@ function TabSystem() {
             </code>
           </div>
         ) : (
-          <>
-            {/* Aktive Benutzer */}
-            <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-              <Users size={14} className="text-gray-400" />
-              {activeUsers === 0
-                ? 'Keine weiteren Benutzer angemeldet.'
-                : `${activeUsers} weitere Benutzer${activeUsers === 1 ? '' : ''} angemeldet — werden 2 Minuten vor dem Update benachrichtigt.`
-              }
-            </div>
-
-            {updatePending ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                <p className="text-sm font-medium text-amber-800 flex items-center gap-2">
-                  <AlertTriangle size={15} />
-                  Update läuft in Kürze — Countdown aktiv
-                </p>
-                <p className="text-xs text-amber-700">{updateStatus.message}</p>
-                <button onClick={handleCancelUpdate} disabled={cancelling}
-                  className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-100">
-                  {cancelling ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
-                  Update abbrechen
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {versionInfo?.update_available ? (
-                  <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-sm text-primary-800">
-                    Version <strong>v{versionInfo.latest}</strong> ist verfügbar.
-                    Alle Benutzer werden 2 Minuten vor dem Neustart benachrichtigt.
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600">
-                    Sie können auch ein erneutes Update der aktuellen Version erzwingen
-                    (z.B. um Konfigurationsänderungen einzuspielen).
-                  </div>
-                )}
-                <button
-                  onClick={handleStartUpdate}
-                  disabled={starting}
-                  className="btn-primary text-sm py-2 px-4 flex items-center gap-2"
-                >
-                  {starting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpCircle size={14} />}
-                  {versionInfo?.update_available ? `Update auf v${versionInfo.latest} starten` : 'System neu starten / Update erzwingen'}
-                </button>
-              </div>
-            )}
-          </>
+          <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 space-y-1">
+            <p>
+              Neue Versionen werden <strong>automatisch</strong> eingespielt: Nach jeder
+              Änderung auf GitHub prüft die CI den Code, und erst bei grüner Prüfung
+              wird der Server aktualisiert (GitHub Actions → „Deploy").
+            </p>
+            <p className="text-xs text-gray-500">
+              Ein Update von Hand ist nicht vorgesehen. Bei Bedarf am Server:
+              <code className="ml-1 font-mono">cd /opt/deinezeit &amp;&amp; sudo bash scripts/deploy.sh</code>
+            </p>
+          </div>
         )}
       </div>
 

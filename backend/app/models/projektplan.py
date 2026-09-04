@@ -191,13 +191,26 @@ class Task(Base):
 
     project = relationship("PlanningProject", back_populates="tasks")
 
-    # Eltern/Kind-Beziehung (rekursiv)
+    # Eltern/Kind-Beziehung (rekursiv).
+    #
+    # Bis 04.09.2026 stand ``remote_side=[id]`` auf ``children`` — damit war
+    # die Beziehung VERKEHRT herum: ``task.children`` lieferte das Elternteil
+    # (ein einzelnes Objekt, keine Liste) und ``task.parent`` die Kinder. Folgen:
+    # ``TaskResponse.model_validate(task)`` scheiterte bei jeder Unteraufgabe
+    # (500 beim Anlegen/Ändern einer Teilaufgabe), ``is_leaf`` war falsch, und
+    # ``cascade="all"`` zeigte vom Kind aufs Elternteil. Aufgedeckt vom ersten
+    # Test des Moduls (Audit TEST-001, K-22). ``remote_side`` gehört auf die
+    # Seite, die den Fremdschlüssel hält — das Elternteil.
+    parent = relationship(
+        "Task",
+        remote_side=[id],
+        back_populates="children",
+    )
     children = relationship(
         "Task",
-        backref="parent",
-        remote_side=[id],
-        cascade="all",
-        single_parent=False,
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        passive_deletes=True,          # die Datenbank kaskadiert (ondelete=CASCADE)
     )
 
     # Abhängigkeiten, bei denen DIESE Aufgabe der Nachfolger ist

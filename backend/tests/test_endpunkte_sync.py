@@ -22,9 +22,8 @@ API = pathlib.Path(__file__).resolve().parents[1] / "app" / "api"
 # umgesetzt haben.
 BEWUSST_ASYNC = {
     ("auth.py", "login"),                 # asyncio.sleep in _bremsen; bcrypt im Threadpool
-    ("system.py", "get_version_info"),    # httpx; git im Threadpool
+    ("system.py", "get_version_info"),    # httpx
     ("system.py", "get_changelog"),       # httpx
-    ("system.py", "start_update"),        # asyncio.create_task braucht den Loop
     ("period.py", "download_package"),    # Endpunkte laufen im Threadpool (period_service)
 }
 

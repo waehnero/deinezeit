@@ -14,13 +14,16 @@ Dieses Modul schließt genau diese Lücke. Es prüft zwei Dinge:
    ``/etc/letsencrypt/live/<domain>/fullchain.pem`` (nur lesend eingebunden).
 2. **Läuft die Erneuerungsautomatik überhaupt noch?**  Ein stehengebliebener
    certbot-Container ist das Frühwarnsignal — er fällt Wochen auf, bevor die
-   Restlaufzeit knapp wird.
+   Restlaufzeit knapp wird. Der certbot-Container schreibt bei jedem Durchlauf
+   ein Lebenszeichen (``.certbot-lebenszeichen`` im Zertifikatsverzeichnis);
+   ist es älter als drei Durchläufe, steht die Automatik. Bis 04.09.2026
+   wurde das per ``docker inspect`` über den Docker-Socket geprüft — der ist
+   aus dem Backend verschwunden (Audit SEC-002, K-21).
 
 Ergebnis landet in den Einstellungen unter „System" und geht bei Bedarf als
 E-Mail an alle Administratoren.
 """
 import os
-import subprocess
 import threading
 import time
 from datetime import datetime, timezone, timedelta
@@ -33,7 +36,10 @@ WARNUNG_TAGE  = 21
 KRITISCH_TAGE = 7
 
 LETSENCRYPT_DIR = os.environ.get("LETSENCRYPT_DIR", "/etc/letsencrypt")
-CERTBOT_CONTAINER = os.environ.get("CERTBOT_CONTAINER", "deinezeit_certbot")
+# Lebenszeichen des certbot-Containers (siehe docker-compose.yml, Dienst
+# certbot): Die Schleife berührt die Datei bei jedem Durchlauf (alle 12 h).
+LEBENSZEICHEN_DATEI = os.path.join(LETSENCRYPT_DIR, ".certbot-lebenszeichen")
+LEBENSZEICHEN_MAX_ALTER = timedelta(hours=36)     # drei verpasste Durchläufe
 
 
 # ── Zertifikat lesen ──────────────────────────────────────────────────────────
@@ -88,23 +94,20 @@ def _ablaufdatum(pfad: str):
 # ── Automatik prüfen ──────────────────────────────────────────────────────────
 
 def _automatik_laeuft():
-    """Prüft, ob der certbot-Container läuft. True / False / None (unbekannt).
+    """Prüft anhand des Lebenszeichens, ob der certbot-Container läuft.
+    True / False / None (unbekannt).
 
-    None bedeutet: es ließ sich nicht feststellen (kein Docker-Socket, lokale
-    Entwicklungsinstanz). Das ist ausdrücklich KEINE Warnung — sonst würde die
-    lokale Instanz dauernd Alarm schlagen."""
-    if not os.path.exists("/var/run/docker.sock"):
-        return None
+    None bedeutet: kein Lebenszeichen vorhanden (lokale Entwicklungsinstanz
+    ohne certbot, oder ein Stand vor dem 04.09.2026). Das ist ausdrücklich
+    KEINE Warnung — sonst würde die lokale Instanz dauernd Alarm schlagen.
+    False bedeutet: Das Lebenszeichen ist da, aber alt — die Schleife ist
+    stehengeblieben, oder der Container läuft nicht mehr."""
     try:
-        res = subprocess.run(
-            ["docker", "inspect", "-f", "{{.State.Running}}", CERTBOT_CONTAINER],
-            capture_output=True, text=True, timeout=10,
-        )
-        if res.returncode != 0:
-            return False          # Container existiert nicht (mehr)
-        return res.stdout.strip() == "true"
-    except Exception:                                            # noqa: BLE001
+        alter = datetime.now(timezone.utc) - datetime.fromtimestamp(
+            os.path.getmtime(LEBENSZEICHEN_DATEI), tz=timezone.utc)
+    except OSError:
         return None
+    return alter <= LEBENSZEICHEN_MAX_ALTER
 
 
 # ── Gesamtstatus ──────────────────────────────────────────────────────────────

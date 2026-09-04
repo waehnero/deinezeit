@@ -416,9 +416,8 @@ export const systemApi = {
   getChangelog:    () => api.get('/system/changelog'),
   getActiveUsers:  () => api.get('/system/active-users'),
   getSslStatus:    () => api.get('/system/ssl-status'),
-  getUpdateStatus: () => api.get('/system/update-status'),
-  startUpdate:     () => api.post('/system/update/start'),
-  cancelUpdate:    () => api.post('/system/update/cancel'),
+  // Kein In-App-Update mehr (Audit K-21, 04.09.2026): Updates kommen
+  // ausschließlich über den CI-Deploy nach einem Merge in main.
 
   // Angemeldete Sitzungen (nur Administrator). Grundlage ist user_sessions,
   // nicht die Zählung im Arbeitsspeicher — die stimmt mit mehreren

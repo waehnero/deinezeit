@@ -13,7 +13,10 @@ services:
       - internal
 
   minio:
-    image: minio/minio:latest
+    # Fest auf die Version gepinnt, die seit 04.09.2026 produktiv läuft (Audit
+    # OPS-005). ``latest`` hätte bei jedem Deploy unbemerkt eine andere Version
+    # ziehen können — MinIO hat 2025 mehrfach Funktionen aus dem Image entfernt.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: deinezeit_minio
     restart: always
     command: server /data --console-address ":9001"
@@ -47,13 +50,19 @@ services:
       MINIO_PUBLIC_URL: ${FRONTEND_URL}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
-      INSTALL_DIR: /opt/deinezeit
-      APP_VERSION: ${APP_VERSION:-1.12.81}
+      APP_VERSION: ${APP_VERSION:-1.12.82}
       # Ortszeit für Kalenderdaten, Berichte und Worker-Zeiten (Audit BUG-002)
       TZ: ${TZ:-Europe/Vienna}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/deinezeit:/opt/deinezeit
+      # KEIN Docker-Socket und KEIN Mount des Installationsordners mehr. Beides
+      # brauchte nur das In-App-Update, das am 04.09.2026 gestrichen wurde
+      # (Audit SEC-002, K-21): Wer den Docker-Socket hat, ist root auf dem
+      # Server — ein einziger Fehler im Backend hätte den ganzen Server
+      # preisgegeben. Updates kommen jetzt ausschließlich über den CI-Deploy.
+      #
+      # Das Änderungsprotokoll wird nur lesend eingebunden; das Backend liest
+      # daraus die installierte Version (Einstellungen → System).
+      - ./CHANGELOG.md:/opt/deinezeit/CHANGELOG.md:ro
       # Nur-Lese-Zugriff auf die Let's-Encrypt-Zertifikate. Damit kann das
       # Backend die Restlaufzeit auslesen und rechtzeitig warnen, BEVOR das
       # Zertifikat abläuft (Einstellungen → System, plus E-Mail an die
@@ -140,6 +149,10 @@ services:
         while :; do
           echo "[certbot] $$(date '+%Y-%m-%d %H:%M:%S') Erneuerung wird geprueft"
           certbot renew --webroot --webroot-path /var/www/certbot
+          # Lebenszeichen für die SSL-Überwachung im Backend (ssl_service.py):
+          # Bleibt die Datei länger als 36 h unberührt, meldet das Backend
+          # „Automatik steht". Ersetzt die frühere Prüfung per Docker-Socket.
+          touch /etc/letsencrypt/.certbot-lebenszeichen
           sleep 12h & wait $${!}
         done
 

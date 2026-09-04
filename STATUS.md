@@ -30,14 +30,13 @@ Umgesetzt in Bündeln (K-01 … K-25): Backups bleiben beim Deploy erhalten und 
 Dateispeicher (+ Restore-Anleitung [docs/WIEDERHERSTELLUNG.md](docs/WIEDERHERSTELLUNG.md)),
 XSS-Lücke in der Datacenter-Vorschau geschlossen, Konfigurations-Geheimnisse verschlüsselt,
 Endpunkte laufen im Threadpool, FastAPI/Starlette/WeasyPrint aktuell, Ortszeit statt UTC,
-Setup-Token, CSP (Report-Only). Offen: In-App-Update/Docker-Socket entfernen (K-21),
-Testlücken (K-22), Release 2.0.0 (R-01).
+Setup-Token, CSP scharf, In-App-Update samt Docker-Socket gestrichen (Updates nur noch per
+CI-Deploy), Worker-Sperre per Advisory-Lock. Offen: Release 2.0.0 (R-01).
 
 ### Bekannte Einschränkungen
 
-- **`UVICORN_WORKERS` muss 1 bleiben:** Die Hintergrund-Worker (Mail-Scan, Wiederkehr,
-  Fälligkeit, Postecke, Backup, SSL) laufen als Threads im App-Prozess und liefen mit
-  mehreren Prozessen doppelt.
+- **Kein Update-Knopf mehr:** Neue Versionen kommen ausschließlich über den CI-Deploy
+  (GitHub Actions nach grüner Prüfung); von Hand am Server `sudo bash scripts/deploy.sh`.
 - **Doku ist Windows-zentriert** (`.bat`/`.ps1`); Mac-Workflow steht in [CLAUDE.md](CLAUDE.md).
 - **Kein Offline-Modus:** Service Worker bewusst abgeschaltet (alter Code im Cache).
 - **Nur Deutsch:** Sprachwahl ausgeblendet, i18n nicht durchgezogen.
@@ -45,7 +44,6 @@ Testlücken (K-22), Release 2.0.0 (R-01).
 
 ### Nächste Schritte / To-dos
 
-- Bündel G: K-21 (In-App-Update streichen, Docker-Socket raus), K-22 (Tests: Projektplan, Vitest)
 - Abschlussprüfung und Release **2.0.0** (Versionsschreibweise mit führenden Nullen ist in npm nicht zulässig)
 
 ---

@@ -59,7 +59,7 @@ deinezeit/
 │   │   ├── api/               # Endpunkte: auth, users, masterdata, zeiterfassung,
 │   │   │                      #   reports, settings, datacenter, system, invoice,
 │   │   │                      #   accounting, projektplan, deps
-│   │   ├── core/              # config.py (Settings/Env), security.py
+│   │   ├── core/              # config.py (Settings/Env), security.py, zeit.py, worker_sperre.py
 │   │   ├── db/                # DB-Session / Base
 │   │   ├── models/            # SQLAlchemy-Modelle (ein Modul je Domäne)
 │   │   ├── schemas/           # Pydantic-Schemas
@@ -237,6 +237,13 @@ git config core.hooksPath .githooks
   vorher parallel zur CI beim Push) oder von Hand: per SSH/rsync auf den Server,
   `docker compose build` + `alembic upgrade head` + Neustart + Healthcheck.
   Nötige Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`.
+- **Kein In-App-Update mehr** (seit 04.09.2026, Audit SEC-002/K-21): Der
+  Backend-Container hat weder Docker-Socket noch `git`/`docker`-CLI. Updates
+  kommen nur über `deploy.yml` oder von Hand `sudo bash scripts/deploy.sh`.
+  Nicht wieder einbauen — `tests/test_system.py` wacht darüber.
+- **Mehrere Arbeitsprozesse** (`UVICORN_WORKERS`) sind erlaubt: Die
+  Hintergrund-Worker startet nur der Prozess, der den Advisory-Lock hält
+  (`app/core/worker_sperre.py`).
 
 ### SSL-Zertifikat (nicht anfassen ohne Grund)
 
@@ -287,7 +294,16 @@ Fixtures in `backend/tests/conftest.py` (Test-DB, Client, `auth_client`);
 > eine eigene `tests/test_<modul>.py` mit (gleiches Schema wie `test_auth.py`),
 > damit die Weiterentwicklung mitgetestet bleibt.
 
-> Frontend-Tests (Vitest) sind noch nicht eingerichtet (geplante Etappe).
+### Automatisierte Tests (Frontend)
+
+Vitest (jsdom) seit 04.09.2026 — Testdateien liegen neben dem Code als
+`*.test.js(x)` (`src/services/api.test.js`, `src/components/ErrorBoundary.test.jsx`).
+
+```bash
+cd frontend && npm test          # einmal (auch in der CI: „Frontend: Tests (Vitest)")
+cd frontend && npm run test:watch
+```
+
 > Über die Backend-Tests hinaus heißt „testen" weiterhin auch: lokal mit Docker
 > hochfahren und manuell prüfen.
 

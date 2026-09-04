@@ -41,8 +41,8 @@ Beim Start führt der Backend-Container automatisch die Datenbank-Migrationen
 aus (`alembic upgrade head`) – das legt die neuen Tabellen für das
 Projektmodul an (Migrationen **0016–0019**).
 
-> Falls ihr ein `update.sh` nutzt: stattdessen einfach `sh update.sh`
-> ausführen – es macht git pull + build in einem.
+> Hinweis (04.09.2026): Das frühere `update.sh` gibt es nicht mehr — Updates
+> laufen über den CI-Deploy (GitHub Actions) oder `sudo bash scripts/deploy.sh`.
 
 ---
 
