@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, cast, String, func, and_
+from sqlalchemy import or_, func
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
@@ -9,7 +9,7 @@ from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
 from app.models.zeiterfassung import TimeEntry, TimeEntryField, Stundenkonto
-from app.models.masterdata import EntityRecord, EntityType
+from app.models.masterdata import EntityRecord
 from app.services.ki import load_ki_settings, call_ki
 from app.core import zeitprojekte
 from app.models.invoice import Invoice, InvoicePosition

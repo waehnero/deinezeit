@@ -10,7 +10,6 @@ Welche Ereignisse archiviert werden, ist in den Verkaufseinstellungen
 parametrierbar (InvoiceSettings-Key ``archive_triggers`` = Liste von Auslösern).
 Mögliche Auslöser: email | gesendet | angenommen | abgelehnt | bezahlt | storniert
 """
-from datetime import datetime
 from app.core import zeit
 
 

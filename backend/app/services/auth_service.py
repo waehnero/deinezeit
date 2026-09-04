@@ -42,8 +42,7 @@ from app.core.crypto import entschluesseln, verschluesseln
 from app.core.security import (create_access_token, create_refresh_token,
                                get_password_hash, verify_password)
 from app.models.user import (AuthEvent, PasswordResetToken, TotpRecoveryCode,
-                             User, UserSession, WebAuthnChallenge,
-                             WebAuthnCredential)
+                             User, UserSession, WebAuthnChallenge)
 
 logger = logging.getLogger(__name__)
 

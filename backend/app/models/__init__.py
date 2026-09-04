@@ -1,3 +1,5 @@
+# ruff: noqa: F401 — dieses Modul re-exportiert alle Modelle, damit Base.metadata
+# sämtliche Tabellen kennt (Alembic, Tests, create_all).
 from app.models.user import (User, WebAuthnCredential, UserSession,
                              AuthEvent, WebAuthnChallenge, TotpRecoveryCode,
                              PasswordResetToken, PermissionGroup, user_groups)

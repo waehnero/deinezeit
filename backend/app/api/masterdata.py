@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
 from fastapi.responses import StreamingResponse, Response
+import logging
 import csv
 import io
 from sqlalchemy.orm import Session
@@ -7,11 +8,11 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.db.base import get_db
-from app.api.deps import get_current_user, require_admin, require_module
+from app.api.deps import get_current_user, require_admin
 from app.core.berechtigungen import SCHREIBEN, hat_recht
 from app.models.user import User
 from app.models.accounting import AccountingAccount
-from app.models.masterdata import (EntityType, FieldDefinition, EntityRecord,
+from app.models.masterdata import (EntityRecord,
                                    ArticleGroup, ArticleGroupAccount)
 from app.schemas.masterdata import (
     EntityTypeCreate, EntityTypeUpdate, EntityTypeResponse,
@@ -29,6 +30,9 @@ from app.services import integrity
 from app.services import artikelstamm
 from app.services import steuerfall as steuerfall_service
 from app.core.zeitprojekte import ZEITPROJEKTE_SLUG
+from app.core.http import content_disposition
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/masterdata", tags=["Stammdaten"])
 
@@ -495,7 +499,7 @@ def export_records_csv(
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": content_disposition("attachment", filename)}
     )
 
 
@@ -1005,7 +1009,8 @@ def upload_masterdata_image(
     try:
         storage_service.upload_file(schluessel, daten, mime, db=db, backend=backend)
     except Exception as exc:
-        raise HTTPException(500, f"Speicher-Fehler: {exc}")
+        logger.exception("Fehler bei masterdata: %s", exc)
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
 
     return {"key": schluessel, "provider": backend, "size": size,
             "bytes": len(daten), "name": file.filename}

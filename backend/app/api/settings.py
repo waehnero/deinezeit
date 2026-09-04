@@ -1,14 +1,13 @@
 import os
 import io
 import re as _re
+import secrets
 import shutil
-import subprocess
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from PIL import Image
 
@@ -444,10 +443,14 @@ def backup_ping(
     db: Session = Depends(get_db),
 ):
     """Wird von backup.ps1 nach erfolgreichem Backup aufgerufen (Token-gesichert)."""
-    from fastapi import Header
     token = request.headers.get("X-Backup-Token", "")
     expected = os.environ.get("BACKUP_PING_TOKEN", "")
-    if expected and token != expected:
+    if not expected:
+        # Ohne hinterlegten Token wäre der Endpunkt für jeden offen und
+        # könnte „Backup erfolgreich" vortäuschen (Audit SEC-010).
+        raise HTTPException(status_code=503, detail="Backup-Ping ist nicht eingerichtet "
+                                                    "(BACKUP_PING_TOKEN fehlt in der .env)")
+    if not secrets.compare_digest(token, expected):
         raise HTTPException(status_code=401, detail="Ungültiger Backup-Token")
     import json
     now_iso = datetime.now(timezone.utc).isoformat()

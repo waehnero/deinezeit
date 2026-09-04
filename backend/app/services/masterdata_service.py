@@ -3,7 +3,6 @@ from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, cast, String, func
-from sqlalchemy.dialects.postgresql import JSONB
 from app.models.masterdata import EntityType, FieldDefinition, EntityRecord
 
 

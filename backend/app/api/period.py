@@ -5,10 +5,9 @@ Liegt bewusst in einem eigenen Router (nicht unter ``/invoices``), weil der
 Abschluss zur Buchhaltung gehört und nicht zur Belegerfassung. Deshalb hängt
 er auch am Modul ``buchhaltung``.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
@@ -19,6 +18,7 @@ from app.schemas.period import (PeriodResponse, PeriodCheckResponse,
                                 PeriodReopenRequest, HandoverResponse)
 
 from app.core import zeit
+from app.core.http import content_disposition
 router = APIRouter(prefix="/periods", tags=["Monatsabschluss"])
 
 
@@ -124,7 +124,7 @@ async def download_package(
     name = f"uebergabe_{jahr}-{monat:02d}.zip"
     return Response(
         content=inhalt, media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{name}"',
+        headers={"Content-Disposition": content_disposition("attachment", name),
                  "X-Handover-Checksum": handover.checksum or ""},
     )
 

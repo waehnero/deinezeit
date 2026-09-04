@@ -24,12 +24,11 @@ import threading
 import time
 import os
 from datetime import datetime, timezone, timedelta, date
-from typing import List, Optional
+from typing import List
 
 import httpx
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.models.mailimport import MailAccount, MailTaskSuggestion
 from app.models.settings import Setting
 

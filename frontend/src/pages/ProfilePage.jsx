@@ -10,6 +10,9 @@ import {
 import AnzeigeEinstellungen from '../components/AnzeigeEinstellungen'
 import SitzungsUebersicht from '../components/SitzungsUebersicht'
 
+// Siehe Kommentar an der Sprachwahl weiter unten.
+const SPRACHWAHL_SICHTBAR = false
+
 export default function ProfilePage() {
   const { t, i18n } = useTranslation()
   const [user, setUser] = useState(null)
@@ -179,6 +182,12 @@ export default function ProfilePage() {
               <input type="email" value={user?.email} disabled
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-500" />
             </div>
+            {/* Sprachwahl ausgeblendet (Audit UX-002): Nur 48 Texte sind
+                übersetzt, 30 von 34 Seiten sind fest deutsch — der Schalter
+                wirkte praktisch nicht und hat nur Erwartungen geweckt. Der
+                Wert bleibt im Profil gespeichert; kommt eine vollständige
+                Übersetzung, wird der Block hier wieder eingeblendet. */}
+            {SPRACHWAHL_SICHTBAR && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                 <Globe size={14} /> {t('profile.language')}
@@ -197,6 +206,7 @@ export default function ProfilePage() {
                 ))}
               </div>
             </div>
+            )}
             <button type="submit" disabled={savingProfile}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white text-sm font-medium rounded-xl transition">
               {savingProfile ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}

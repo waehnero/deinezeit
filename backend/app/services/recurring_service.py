@@ -18,7 +18,7 @@ Ablauf je Vorlage:
 import os
 import time
 import threading
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, timedelta
 from app.core import zeit
 
 

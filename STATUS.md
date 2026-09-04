@@ -9,59 +9,54 @@
 
 ## Aktueller Stand (Snapshot)
 
-- **Version:** 1.12.14 (Stand 26.06.2026, siehe CHANGELOG)
-- **Branch:** `main`, synchron mit `origin/main` (sauberer Working Tree)
-- **Letzter Commit:** `fe65af4 – chore: Version 1.12.14 – Zeiterfassung Datei-Upload repariert`
-- **DB-Migrationsstand:** bis `0020_attachment_kontakt`
-- **Lokale Umgebung:** Docker Compose (`docker-compose.local.yml`) → http://localhost
+- **Version:** siehe `frontend/package.json` / [CHANGELOG.md](CHANGELOG.md) (der pre-commit-Hook hebt sie je Branch an)
+- **Branch-Modell:** Feature-Branch → PR → CI (pytest ist Pflicht) → Merge auf `main` → Deploy **nach grüner CI** (`deploy.yml`, `workflow_run`)
+- **DB-Migrationsstand:** bis `0061_schema_angleichen`; Modelle und Migrationen sind deckungsgleich (`tests/test_migrationen.py` wacht darüber)
+- **Tests:** ~930 pytest-Tests, Laufzeit in CI wenige Minuten
+- **Lokale Umgebung:** Docker Compose (`docker-compose.local.yml`) → http://localhost; lokale Werte in `.env.local` (nicht im Repo)
 
 ### Module / Funktionsumfang
 
-Zeiterfassung · Stammdaten · Projektplanung (Kanban/Gantt, Migration 0016+) ·
-Rechnungen (PDF via WeasyPrint) · Buchhaltung · Datacenter (Dateien via MinIO,
-nach Modul/Kontakt organisiert) · Benutzerverwaltung mit 2FA/Passkeys ·
-PWA-Installation.
+Zeiterfassung (mit Zeitprojekten, Berichten) · Stammdaten (inkl. Artikelstamm, Import) ·
+Projektplanung (Kanban/Gantt) · Aufgaben (mit Mail-Import/KI) · Verkauf (Belege, PDF,
+E-Rechnung, Zahlungen, Mahnwesen, Monatsabschluss) · Buchhaltung (Eingangsrechnungen,
+UVA, BMD-Export) · Datacenter (Dateien via MinIO/WebDAV/OneDrive) · Postecke ·
+Benutzerverwaltung mit Rechtegruppen, 2FA/Passkeys · Dashboard.
 
-### Laufende Baustellen / offene Punkte
+### Audit September 2026
 
-- **CI/CD-Pipeline steht und funktioniert (✓):** Kompletter Ablauf scharf:
-  lokal `./test.sh` → Feature-Branch + PR → CI-Tests „Backend: Tests (pytest)"
-  müssen grün sein (Branch-Schutz-Regel „Schutz main - Tests erforderlich",
-  aktiv, Pflicht-Check) → Merge nach `main` → **automatisches Deployment** auf
-  den Hetzner-Server (dz.wwinterface.online) via `deploy.yml`. Deploy-Secrets
-  (`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_PATH`) sind hinterlegt;
-  erstes erfolgreiches Auto-Deployment am 28.06.2026 (Run #130, Commit 28685a8).
-- **Kleinere offene Punkte CI/CD:**
-  - `deploy.yml`-Healthcheck zeigt noch auf Platzhalter `https://deine-domain.at`
-    statt `dz.wwinterface.online` → Healthcheck prüft falsche Adresse (Deploy
-    selbst läuft, nur die Abschlussprüfung greift ins Leere). Korrigieren.
-  - Warnung „Node.js 20 deprecated" in den Actions (`webfactory/ssh-agent`,
-    `actions/checkout`) – unkritisch, bei Gelegenheit Action-Versionen anheben.
-- **Abhängigkeits-Updates (offen, Folgeschritt):** pip-audit meldet bekannte
-  Schwachstellen in `pillow`, `python-dotenv`, `requests`, `weasyprint`,
-  `jinja2`, `starlette`. Bereits erledigt: `python-jose` 3.3.0→3.5.0,
-  `python-multipart` 0.0.9→0.0.32. Der pip-audit-CI-Schritt ist vorerst
-  **nicht blockierend** (warnt, blockiert Merge nicht). Restliche Updates
-  kontrolliert einzeln nachziehen (Achtung: `starlette`/FastAPI-Kopplung,
-  `weasyprint` betrifft Rechnungs-PDFs) – jeweils mit den Tests absichern.
-- **Schritt 3/4 (offen):** Tests je bestehendem Modul; danach Frontend (Vitest).
+Vollständiges Software-Audit am 02.09.2026 — Bericht: [docs/AUDIT-2026-09-02.md](docs/AUDIT-2026-09-02.md).
+Umgesetzt in Bündeln (K-01 … K-25): Backups bleiben beim Deploy erhalten und enthalten den
+Dateispeicher (+ Restore-Anleitung [docs/WIEDERHERSTELLUNG.md](docs/WIEDERHERSTELLUNG.md)),
+XSS-Lücke in der Datacenter-Vorschau geschlossen, Konfigurations-Geheimnisse verschlüsselt,
+Endpunkte laufen im Threadpool, FastAPI/Starlette/WeasyPrint aktuell, Ortszeit statt UTC,
+Setup-Token, CSP (Report-Only). Offen: In-App-Update/Docker-Socket entfernen (K-21),
+Testlücken (K-22), Release 2.0.0 (R-01).
 
-### Bekannte Probleme / Risiken
+### Bekannte Einschränkungen
 
-- **Doku ist Windows-zentriert** (`.bat`/`.ps1`, „Doppelklick", Pfad
-  `C:\Projekte\deinezeit`); Mac-Workflow ist in [CLAUDE.md](CLAUDE.md) ergänzt,
-  aber die Endnutzer-Anleitungen (`LOKAL-TESTEN.md`, `MIGRATION-…`, Handoffs)
-  beschreiben weiterhin Windows.
-- **Push auf `main` löst automatisches Deployment aus** (`deploy.yml`) — also
-  nur nach Freigabe und bestandenem lokalem Test pushen.
+- **`UVICORN_WORKERS` muss 1 bleiben:** Die Hintergrund-Worker (Mail-Scan, Wiederkehr,
+  Fälligkeit, Postecke, Backup, SSL) laufen als Threads im App-Prozess und liefen mit
+  mehreren Prozessen doppelt.
+- **Doku ist Windows-zentriert** (`.bat`/`.ps1`); Mac-Workflow steht in [CLAUDE.md](CLAUDE.md).
+- **Kein Offline-Modus:** Service Worker bewusst abgeschaltet (alter Code im Cache).
+- **Nur Deutsch:** Sprachwahl ausgeblendet, i18n nicht durchgezogen.
+- **Excel-Import:** nur `.xlsx` (kein `.xls`).
 
 ### Nächste Schritte / To-dos
 
-- _(offen — von Oliver festzulegen)_
+- Bündel G: K-21 (In-App-Update streichen, Docker-Socket raus), K-22 (Tests: Projektplan, Vitest)
+- Abschlussprüfung und Release **2.0.0** (Versionsschreibweise mit führenden Nullen ist in npm nicht zulässig)
 
 ---
 
 ## Logbuch
+
+### 2026-09-02 … 09-03 – Software-Audit und Korrekturbündel A–F
+- Prüfbericht `docs/AUDIT-2026-09-02.md` (45 Befunde, Korrekturplan K-01…K-26).
+- Umgesetzt: K-01, A (K-22a, K-02…K-06, Migration 0060), B (K-07…K-09, Migration 0061),
+  C (K-10…K-12), D (K-13, K-15, K-17, K-18), E (K-14, K-16, K-19, K-20), F (K-23, K-24, K-25).
+- CI-Laufzeit des pytest-Jobs von 84 Minuten auf wenige Minuten (MinIO-Retry in Tests).
 
 ### 2026-06-27 – CI-Gate für Tests (Schritt 2)
 - `ci.yml`: neuer Job „Backend: Tests (pytest)" mit Postgres-Service-Container;

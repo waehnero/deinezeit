@@ -19,7 +19,7 @@ Neu gerechnet wird nur, was es vorher nirgends gab: die Finanz-Kennzahlen.
 Modulrechte werden je Baustein geprüft (siehe `kennzahlen`); wer ein Modul
 nicht hat, bekommt den Baustein schlicht nicht geliefert.
 """
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func

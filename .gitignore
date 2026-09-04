@@ -1,4 +1,6 @@
-﻿.env
+.env
+# Lokale Testkonfiguration bleibt lokal (Audit SEC-012) — Vorlage: .env.example
+.env.local
 logs/
 backups/
 *.log

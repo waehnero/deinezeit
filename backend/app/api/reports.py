@@ -25,6 +25,7 @@ from app.models.settings import Setting
 from app.models.masterdata import EntityRecord, FieldDefinition
 from app.api.berichtsvorlage import bericht_html
 from app.core import zeit
+from app.core.http import content_disposition
 
 router = APIRouter(prefix="/reports", tags=["Berichte"])
 
@@ -353,7 +354,8 @@ def report_zeiterfassung(
         pdf_bytes = WeasyprintHTML(string=html_content).write_pdf()
     except Exception as exc:
         logger.exception("WeasyPrint Fehler beim PDF-Generieren")
-        raise HTTPException(500, f"PDF-Generierung fehlgeschlagen: {exc}") from exc
+        logger.exception("Fehler bei reports: %s", exc)
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
 
     # ── Dateiname ─────────────────────────────────────────────────────────────
     if filename:
@@ -367,7 +369,7 @@ def report_zeiterfassung(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{out_filename}"'},
+        headers={"Content-Disposition": content_disposition("attachment", out_filename)},
     )
 
 

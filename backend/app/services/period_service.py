@@ -333,7 +333,7 @@ async def paket_bauen(db: Session, jahr: int, monat: int, benutzer) -> tuple:
 
     # Inhaltsverzeichnis mit Prüfsummen — damit später nachweisbar ist, was drin war
     zeilen = [
-        f"Übergabe an die Buchhaltung",
+        "Übergabe an die Buchhaltung",
         f"Zeitraum:   {MONATSNAMEN[monat]} {jahr} ({von:%d.%m.%Y} – {bis:%d.%m.%Y})",
         f"Erstellt:   {datetime.now(timezone.utc):%d.%m.%Y %H:%M} UTC",
         f"Benutzer:   {getattr(benutzer, 'email', '—')}",

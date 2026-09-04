@@ -17,10 +17,10 @@ import csv
 from app.db.base import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User
+from app.core.http import content_disposition
 from app.models.accounting import AccountingAccount
-from app.models.invoice import Invoice, InvoicePosition, InvoiceSettings
+from app.models.invoice import Invoice
 from app.models.masterdata import EntityRecord
-from app.models.settings import Setting
 from app.services import tax_rates as tax_rates_service
 from app.services import positionen as positionen_service
 from pydantic import BaseModel
@@ -504,7 +504,6 @@ def export_bmd(
         # Buchungsgruppen je Erlöskonto und USt-Code (Erlöskonto: Position >
         # Artikel > Vorgabe). Die Regel steckt in _ust_gruppen, weil der
         # Skonto-Durchlauf weiter unten dieselbe Aufteilung braucht.
-        from decimal import Decimal
         ust_groups = _ust_gruppen(inv, default_erloes, steuersaetze, konto_codes)
 
         for (erloes_konto, ust_code), amounts in ust_groups.items():
@@ -550,5 +549,5 @@ def export_bmd(
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode("utf-8-sig")),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition("attachment", filename)},
     )
