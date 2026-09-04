@@ -151,25 +151,17 @@ def test_abhaengigkeiten_regeln(auth_client):
 # ── Löschsperren: gebuchte Zeiten schützen ───────────────────────────────────
 
 def _zeit_buchen(auth_client, db_session, task_id):
-    """Zeiteintrag mit Aufgabenbezug.
-
-    ``time_entries.task_id`` existiert seit Migration 0016, doch kein
-    Zeiterfassungs-Endpunkt setzt die Spalte (Schema ohne ``task_id``) — die
-    Kopplung Zeit → Aufgabe ist im Backend nie verdrahtet worden. Deshalb
-    wird der Bezug hier direkt in der Datenbank gesetzt; die Löschsperren
-    darunter gelten, sobald die Kopplung einmal befüllt wird."""
-    from sqlalchemy import text
+    """Zeiteintrag mit Aufgabenbezug — seit Bündel H über den Endpunkt
+    (``task_id`` im Zeiteintrag), nicht mehr per Datenbank-Umweg."""
     start = datetime(2026, 9, 7, 8, 0, tzinfo=timezone.utc)
     resp = auth_client.post("/api/zeiterfassung/entries", json={
-        "project_name": "Umbau",
+        "project_name": "Umbau", "task_id": task_id,
         "started_at": start.isoformat(),
         "ended_at": (start + timedelta(hours=1)).isoformat(),
         "pause_minutes": 0, "billable": True, "data": {},
     })
     assert resp.status_code == 200, resp.text
-    db_session.execute(text("UPDATE time_entries SET task_id = :t WHERE id = :e"),
-                       {"t": task_id, "e": resp.json()["id"]})
-    db_session.commit()
+    assert resp.json()["task_id"] == task_id
     return resp.json()
 
 

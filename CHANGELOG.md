@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.12.84] – 2026-09-04 – Audit Bündel H
+
+### Neu
+- Zeiteinträge können einer Projektplan-Aufgabe zugeordnet werden (Auswahl beim Nachtragen)
+
+### Aktualisierungen
+- Projektplan: gebuchte Zeiten je Aufgabe werden angezeigt; Aufgaben mit Zeiten sind vor dem Löschen geschützt
+
+---
+
+## [1.12.83] – 2026-09-04 – Audit Bündel H
+
+### Neu
+- Zeiteinträge können einer Projektplan-Aufgabe zugeordnet werden (Auswahl beim Nachtragen)
+
+### Aktualisierungen
+- Projektplan: gebuchte Zeiten je Aufgabe werden angezeigt; Aufgaben mit Zeiten sind vor dem Löschen geschützt
+
+---
+
 ## [1.12.82] – 2026-09-04 – Audit buendel g
 
 ### Aktualisierungen

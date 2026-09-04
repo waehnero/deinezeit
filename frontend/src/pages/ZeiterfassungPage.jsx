@@ -365,6 +365,7 @@ function EntryRow({ entry, onEdit, onDelete, onRepeat, onSetStatus,
       <td className="px-4 py-3">
         <div className="text-sm font-medium text-gray-800">{entry.project_name || '—'}</div>
         {entry.contact_name && <div className="text-xs text-gray-400">{entry.contact_name}</div>}
+        {entry.task_title && <div className="text-xs text-primary-600">↳ {entry.task_title}</div>}
       </td>
       <td className="px-4 py-3 whitespace-nowrap">
         <div className="text-sm text-gray-700">
@@ -681,6 +682,7 @@ export default function ZeiterfassungPage() {
       const res = await zeiterfassungApi.startTimer({
         project_id: entry.project_id, project_name: entry.project_name,
         contact_id: entry.contact_id, contact_name: entry.contact_name,
+        task_id: entry.task_id || null,
         started_at: nowIso(), note: entry.note, billable: entry.billable, data: {},
       })
       setRunning(res.data)

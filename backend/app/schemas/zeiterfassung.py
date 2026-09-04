@@ -53,6 +53,11 @@ class TimeEntryCreate(BaseModel):
     project_name: Optional[str] = None
     contact_id: Optional[UUID] = None
     contact_name: Optional[str] = None
+    # Optionaler Bezug zu einer Aufgabe der Projektplanung. Die Spalte gab es
+    # seit Migration 0016, doch bis 04.09.2026 setzte sie kein Endpunkt
+    # (Audit-Nachbefund aus K-22, Bündel H). Der Titel wird serverseitig aus
+    # der Aufgabe übernommen.
+    task_id: Optional[UUID] = None
     started_at: datetime
     ended_at: Optional[datetime] = None
     pause_minutes: int = 0
@@ -66,6 +71,9 @@ class TimeEntryUpdate(BaseModel):
     project_name: Optional[str] = None
     contact_id: Optional[UUID] = None
     contact_name: Optional[str] = None
+    # ``null`` löst den Aufgabenbezug (ausdrücklich mitgeschickt), weggelassen
+    # lässt ihn stehen — siehe update_entry.
+    task_id: Optional[UUID] = None
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     pause_minutes: Optional[int] = None
@@ -96,6 +104,8 @@ class TimeEntryResponse(BaseModel):
     project_name: Optional[str] = None
     contact_id: Optional[UUID] = None
     contact_name: Optional[str] = None
+    task_id: Optional[UUID] = None
+    task_title: Optional[str] = None
     started_at: datetime
     ended_at: Optional[datetime] = None
     pause_minutes: int
@@ -201,3 +211,11 @@ class ProjectBudget(BaseModel):
     remaining_minutes: int           # Rest (kann negativ werden)
     exhausted: bool                  # True = Budget aufgebraucht → neues Stundenkonto anbieten
     konten_count: int
+
+
+class AufgabeAuswahl(BaseModel):
+    """Eintrag der Aufgabenauswahl im Zeiteintrag (offene Planungsaufgaben)."""
+    id: UUID
+    title: str
+    project_id: UUID
+    project_name: str

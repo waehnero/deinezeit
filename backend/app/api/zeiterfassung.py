@@ -20,10 +20,51 @@ from app.schemas.zeiterfassung import (
     TimeEntryResponse, TimeEntryListResponse, TimeStats,
     TimeEntryStatusUpdate, TimeEntryStatusBatch,
     StundenkontoCreate, StundenkontoUpdate, StundenkontoResponse, ProjectBudget,
-    KiNachtragenRequest, KiNachtragenResponse,
+    KiNachtragenRequest, KiNachtragenResponse, AufgabeAuswahl,
 )
+from app.models.projektplan import PlanningProject, Task
 
 router = APIRouter(prefix="/zeiterfassung", tags=["Zeiterfassung"])
+
+
+# ── Aufgabenbezug (Projektplanung) ───────────────────────────────────────────
+#
+# Ein Zeiteintrag kann auf eine Aufgabe der Projektplanung zeigen. Daran
+# hängen die Löschsperren im Projektplan (Aufgabe/Projekt mit gebuchten Zeiten
+# bleiben stehen) und die Anzeige „gebuchte Minuten" je Aufgabe. Der Bezug ist
+# freiwillig und unabhängig vom Zeitprojekt (Stammdaten).
+
+def _aufgabe_aufloesen(db: Session, task_id) -> tuple:
+    """(task_id, task_title) — 404, wenn die Aufgabe nicht existiert."""
+    if task_id is None:
+        return None, None
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Aufgabe nicht gefunden")
+    return task.id, task.title
+
+
+@router.get("/aufgaben", response_model=List[AufgabeAuswahl])
+def aufgaben_auswahl(
+    q: Optional[str] = Query(None, description="Suchtext in Aufgabe oder Projekt"),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Offene Aufgaben nicht archivierter Planungsprojekte — für die Auswahl
+    im Zeiteintrag. Bewusst hier und nicht unter /projektplan: Wer Zeiten
+    erfasst, hat nicht zwingend das Modul „Projekte"."""
+    query = (db.query(Task, PlanningProject.name)
+               .join(PlanningProject, PlanningProject.id == Task.project_id)
+               .filter(PlanningProject.is_archived == False,          # noqa: E712
+                       Task.status != "erledigt", Task.is_milestone == False))  # noqa: E712
+    if q:
+        muster = f"%{q.strip()}%"
+        query = query.filter(or_(Task.title.ilike(muster), PlanningProject.name.ilike(muster)))
+    zeilen = (query.order_by(PlanningProject.name, Task.sort_order, Task.title)
+                   .limit(limit).all())
+    return [AufgabeAuswahl(id=t.id, title=t.title, project_id=t.project_id, project_name=pn)
+            for t, pn in zeilen]
 
 
 # ── Custom-Felder verwalten ───────────────────────────────────────────────────
@@ -143,12 +184,15 @@ def start_timer(
         running.ended_at = body.started_at
         running.updated_at = datetime.now(timezone.utc)
 
+    task_id, task_title = _aufgabe_aufloesen(db, body.task_id)
     entry = TimeEntry(
         user_id=current_user.id,
         project_id=body.project_id,
         project_name=body.project_name,
         contact_id=body.contact_id,
         contact_name=body.contact_name,
+        task_id=task_id,
+        task_title=task_title,
         started_at=body.started_at,
         ended_at=None,  # läuft
         pause_minutes=0,
@@ -278,9 +322,11 @@ def create_entry(
     current_user: User = Depends(get_current_user),
 ):
     """Zeiteintrag manuell nachtragen."""
+    werte = body.model_dump()
+    werte["task_id"], werte["task_title"] = _aufgabe_aufloesen(db, werte.get("task_id"))
     entry = TimeEntry(
         user_id=current_user.id,
-        **body.model_dump(),
+        **werte,
     )
     db.add(entry)
     db.commit()
@@ -426,6 +472,9 @@ def update_entry(
 
     for k, v in body.model_dump(exclude_none=True).items():
         setattr(entry, k, v)
+    # Aufgabenbezug: nur wenn das Feld mitgeschickt wurde — ``null`` löst ihn.
+    if "task_id" in body.model_fields_set:
+        entry.task_id, entry.task_title = _aufgabe_aufloesen(db, body.task_id)
     entry.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(entry)
