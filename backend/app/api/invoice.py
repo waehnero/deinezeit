@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func, extract
+from sqlalchemy import and_, or_
 from typing import List, Optional
 from uuid import UUID, uuid4
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
+import logging
 import io
-import json
 import re
 
 from app.db.base import get_db
@@ -35,8 +34,8 @@ from app.services import auswertungen as auswertungen_service
 from app.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceListItem,
     InvoiceCancelRequest, InvoiceMarkPaidRequest,
-    InvoiceBookFilter, InvoiceSettingsUpdate, NextNumberResponse,
-    InvoicePositionResponse, InvoiceAttachmentResponse,
+    InvoiceSettingsUpdate, NextNumberResponse,
+    InvoiceAttachmentResponse,
     InvoiceDuplicateRequest, InvoiceAuditEntry,
     InvoicePaymentCreate, InvoicePaymentResponse, InvoicePaymentState,
     OpenItem, OpenItemsByContact, OpenItemsResponse,
@@ -51,6 +50,9 @@ from app.schemas.invoice import (
     AbzugZeile, StrangBeleg, StrangResponse,
 )
 from app.core import zeit
+from app.core.http import content_disposition
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/invoices", tags=["Rechnungen"])
 
@@ -128,7 +130,7 @@ def _next_number(db: Session, doc_type: str, year: int) -> tuple[int, str]:
 
 from app.services.positionen import (WERTZEILEN, gruppen_netto as _gruppen_netto,
                                       rabatt_verteilen as _rabatt_verteilen,
-                                      rabattbetrag as _rabattbetrag, typ as _postyp)
+                                      rabattbetrag as _rabattbetrag)
 
 
 def _calc_totals(invoice: Invoice) -> None:
@@ -1185,7 +1187,8 @@ def get_book_pdf(
         # „belegbuch.pdf" herunter und bekam HTML — der Fehler fiel erst beim
         # Öffnen auf, und dann sah es nach einer kaputten Datei aus statt nach
         # einem Serverproblem.
-        raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {e}")
+        logger.exception("Fehler bei invoice: %s", e)
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
 
     return Response(
         content=pdf_bytes,
@@ -1228,7 +1231,8 @@ def upload_position_image(
     try:
         storage_service.upload_file(schluessel, daten, mime, db=db, backend=backend)
     except Exception as exc:
-        raise HTTPException(500, f"Speicher-Fehler: {exc}")
+        logger.exception("Fehler bei invoice: %s", exc)
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
 
     return {"image_key": schluessel, "image_size": size, "image_provider": backend,
             "breite_mm": position_image.breite_mm(size), "bytes": len(daten)}
@@ -1521,11 +1525,12 @@ def get_uva_pdf(
         import weasyprint
         pdf = weasyprint.HTML(string=html).write_pdf()
     except Exception as e:
-        raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {e}")
+        logger.exception("Fehler bei invoice: %s", e)
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
 
     name = f"umsatzsteuer_{date_from or 'alle'}_{date_to or ''}".rstrip("_")
     return Response(content=pdf, media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'})
+                    headers={"Content-Disposition": content_disposition("attachment", name + ".pdf")})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1906,7 +1911,7 @@ def dunning_pdf(
 
     pdf_bytes, dateiname = generate_dunning_pdf(db, eintrag)
     return Response(content=pdf_bytes, media_type="application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{dateiname}"'})
+                    headers={"Content-Disposition": content_disposition("inline", dateiname)})
 
 
 @router.delete("/dunning/{dunning_id}", response_model=List[DunningEntry], dependencies=MAHN_RECHT)
@@ -2268,7 +2273,7 @@ def download_einvoice_xml(
     return Response(
         content=xml,
         media_type="application/xml",
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers={"Content-Disposition": content_disposition("attachment", name)},
     )
 
 
@@ -2291,13 +2296,14 @@ def download_invoice_pdf(
                                  sender_contact, recipient_contact, db=db,
                                  erechnung_xml=xml)
     except Exception as e:
-        raise HTTPException(500, f"PDF konnte nicht erzeugt werden: {str(e)}")
+        logger.exception("Fehler bei invoice: %s", e)
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
 
     filename = f"{(inv.number or 'beleg').replace('/', '-')}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition("attachment", filename)},
     )
 
 
@@ -3214,7 +3220,8 @@ def upload_contract(
     try:
         storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
     except Exception as exc:
-        raise HTTPException(500, f"Speicher-Fehler: {exc}")
+        logger.exception("Fehler bei invoice: %s", exc)
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
 
     rec = db.query(EntityRecord).filter(EntityRecord.id == inv.contact_id).first()
     contact_name = rec.display_name if rec else None
@@ -3264,7 +3271,7 @@ def download_contract(
         backend = dc.storage_provider if dc else None
     data, mime = storage_service.download_file(att.file_path, db=db, backend=backend)
     return Response(content=data, media_type=mime or att.mime_type or "application/octet-stream",
-                    headers={"Content-Disposition": f'inline; filename="{att.filename or "vertrag"}"'})
+                    headers={"Content-Disposition": content_disposition("inline", att.filename or "vertrag")})
 
 
 @router.delete("/contract/{attachment_id}", status_code=204)
@@ -3541,7 +3548,8 @@ def send_invoice_email(
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
-        raise HTTPException(500, f"E-Mail konnte nicht gesendet werden: {str(e)}")
+        logger.exception("Fehler bei invoice: %s", e)
+        raise HTTPException(500, "Die E-Mail konnte nicht gesendet werden (Ursache im Serverlog).")
 
     return {"ok": True, "to": to_email, "number": inv.number}
 

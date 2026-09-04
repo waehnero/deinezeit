@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Index, Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Date
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 
 MAIL_PROTOCOLS = ("imap", "graph")

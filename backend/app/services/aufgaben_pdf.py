@@ -14,7 +14,6 @@ Erzeugt mit WeasyPrint (wie die Rechnungs-PDFs) und qrcode (bereits für
 """
 import base64
 import io
-from datetime import datetime
 
 import qrcode
 from weasyprint import HTML as WeasyprintHTML

@@ -451,29 +451,42 @@ create_admin() {
     print_step "Administrator-Konto wird angelegt..."
 
     cd "$INSTALL_DIR"
-    docker compose exec -T backend python3 -c "
-import sys
-sys.path.insert(0, '/app')
+    # Zugangsdaten gehen als Umgebungsvariablen in den Container, nicht als
+    # Text im Python-Programm: Ein Apostroph im Passwort oder Namen hätte den
+    # Code zerrissen — die Anlage scheiterte still, und der Assistent im
+    # Browser blieb offen (Audit, Nachtrag 03.09.2026).
+    docker compose exec -T \
+        -e DZ_ADMIN_EMAIL="$ADMIN_LOGIN_EMAIL" \
+        -e DZ_ADMIN_NAME="$ADMIN_NAME" \
+        -e DZ_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+        backend python3 -c '
+import os, sys
+sys.path.insert(0, "/app")
 from app.db.base import SessionLocal
 from app.services.auth_service import auth_service
-from app.models.user import UserRole
 
 db = SessionLocal()
-existing = auth_service.get_user_by_email(db, '${ADMIN_LOGIN_EMAIL}')
+email = os.environ["DZ_ADMIN_EMAIL"]
+existing = auth_service.get_user_by_email(db, email)
 if existing:
-    print('BEREITS_VORHANDEN')
+    print("BEREITS_VORHANDEN")
 else:
     user = auth_service.create_user(
         db,
-        email='${ADMIN_LOGIN_EMAIL}',
-        full_name='${ADMIN_NAME}',
-        password='${ADMIN_PASSWORD}',
-        role='admin',
-        language='de'
+        email=email,
+        full_name=os.environ["DZ_ADMIN_NAME"],
+        password=os.environ["DZ_ADMIN_PASSWORD"],
+        role="admin",
+        language="de",
     )
-    print('ERSTELLT:' + str(user.id))
+    print("ERSTELLT:" + str(user.id))
 db.close()
-"
+' || {
+        print_warn "Administrator-Konto konnte nicht angelegt werden (z. B. Passwort entspricht"
+        print_warn "nicht der Richtlinie). Bitte im Browser den Assistenten verwenden — er fragt"
+        print_warn "nach dem Einrichtungs-Token aus ${INSTALL_DIR}/.env (Zeile SETUP_TOKEN)."
+        return 0
+    }
     print_ok "Administrator-Konto bereit"
     echo "     Falls das Konto nicht angelegt werden konnte: Der Assistent unter"
     echo "     https://${DOMAIN} fragt nach dem Einrichtungs-Token aus ${INSTALL_DIR}/.env"

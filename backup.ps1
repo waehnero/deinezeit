@@ -85,9 +85,21 @@ $total = (Get-ChildItem -Path $backupDir -Filter "deinezeit_backup_*.sql").Count
 Write-Host ""
 Write-Host "  Backup erfolgreich! Gesamt im Ordner: $total Datei(en)" -ForegroundColor Green
 
-# Backup-Zeitstempel an WebApp melden (damit die Einstellungsseite aktuell bleibt)
+# Backup-Zeitstempel an WebApp melden (damit die Einstellungsseite aktuell bleibt).
+# Der Endpunkt verlangt den Token BACKUP_PING_TOKEN aus der .env (seit 03.09.2026,
+# Audit SEC-010) — ohne ihn koennte jeder ein "Backup erfolgreich" vortaeuschen.
 try {
-    Invoke-WebRequest -Uri "http://localhost/api/settings/backup-ping" -Method POST -UseBasicParsing -TimeoutSec 5 | Out-Null
+    $pingToken = ""
+    $envFile = Join-Path $PSScriptRoot ".env"
+    if (Test-Path $envFile) {
+        Get-Content $envFile | ForEach-Object {
+            if ($_ -match "^BACKUP_PING_TOKEN=(.*)$") { $pingToken = $matches[1].Trim() }
+        }
+    }
+    if ($pingToken) {
+        Invoke-WebRequest -Uri "http://localhost/api/settings/backup-ping" -Method POST -UseBasicParsing -TimeoutSec 5 `
+            -Headers @{ "X-Backup-Token" = $pingToken } | Out-Null
+    }
 } catch {
     # Kein Fehler ausgeben wenn WebApp nicht läuft
 }

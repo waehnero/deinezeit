@@ -86,8 +86,8 @@ def pruefen(invoice: Invoice, inv_settings: dict,
             verkaeufer_kontakt, empfaenger_kontakt) -> list:
     """Nur die Liste der fehlenden Angaben."""
     if invoice.doc_type not in BELEGARTEN:
-        return [f"Für diese Belegart gibt es keine E-Rechnung — nur "
-                f"Rechnungen und Gutschriften werden elektronisch übermittelt."]
+        return ["Für diese Belegart gibt es keine E-Rechnung — nur "
+                "Rechnungen und Gutschriften werden elektronisch übermittelt."]
     _, fehlt = aufbereiten(invoice, inv_settings, verkaeufer_kontakt, empfaenger_kontakt)
     return fehlt
 

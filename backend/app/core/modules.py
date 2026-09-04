@@ -23,7 +23,7 @@ Wichtige Querbezüge (bewusst NICHT gesperrt):
     erfordern 'verkauf' UND 'buchhaltung'. Wer Belege schreiben darf, muss
     nicht zwangsläufig die Auswertungen und den Export sehen.
 """
-from app.models.user import User, UserRole
+from app.models.user import User
 
 # Reihenfolge = Anzeige-Reihenfolge im Menü / in der Benutzerverwaltung
 MODULES = (

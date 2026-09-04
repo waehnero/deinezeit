@@ -11,11 +11,12 @@ Was übernommen wird, weil es sich auf der Verkaufsseite bewährt hat: die
 Periodensperre (in einen abgeschlossenen Monat wird nichts mehr gebucht), die
 Fälligkeitsstaffel der offenen Posten und der Umgang mit Zahlungen.
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from app.db.base import get_db
@@ -34,6 +35,9 @@ from app.schemas.purchase import (
     PurchaseOpenItemsResponse, VorsteuerZeile, VorsteuerResponse,
 )
 from app.core import zeit
+from app.core.http import content_disposition
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/purchase-invoices", tags=["Eingangsrechnungen"])
 
@@ -539,7 +543,8 @@ def upload_file(
                                     file.content_type or "application/pdf",
                                     db=db, backend=backend)
     except Exception as exc:
-        raise HTTPException(500, f"Speicher-Fehler: {exc}")
+        logger.exception("Fehler bei purchase: %s", exc)
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
 
     inv.file_key = schluessel
     inv.file_name = file.filename
@@ -573,4 +578,4 @@ def get_file(
         raise HTTPException(404, "Das Original ist im Speicher nicht auffindbar")
     name = inv.file_name or f"{inv.internal_number or 'beleg'}.pdf"
     return Response(content=daten, media_type=mime or inv.file_mimetype or "application/pdf",
-                    headers={"Content-Disposition": f'inline; filename="{name}"'})
+                    headers={"Content-Disposition": content_disposition("inline", name)})

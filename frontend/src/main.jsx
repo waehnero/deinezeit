@@ -43,6 +43,7 @@ import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
 import AufgabenPage from './pages/AufgabenPage'
 import PosteckePage from './pages/PosteckePage'
 import Layout, { homeRoute } from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 
 const AuthSpinner = () => (
   <div className="flex items-center justify-center h-64">
@@ -95,6 +96,9 @@ function App() {
           {/* Safe-Area-Abstand: am iPhone erscheinen Toasts sonst unter Notch/Kamera */}
           <Toaster position="top-right" toastOptions={{ duration: 4000 }}
             containerStyle={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }} />
+          {/* Render-Fehler einer Seite zeigen eine Meldung statt einer weißen
+              Seite (Audit UX-001); Anbieter darüber bleiben unberührt. */}
+          <ErrorBoundary>
           <Routes>
             <Route path="/setup" element={<SetupPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -181,6 +185,7 @@ function App() {
             {/* Hinweis: /dashboard leitet über ModuleRoute ggf. weiter zur
                 Startseite des Benutzers (erstes freigeschaltetes Modul) */}
           </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </SettingsProvider>
     </BrowserRouter>

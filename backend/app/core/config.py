@@ -1,11 +1,10 @@
 from pydantic_settings import BaseSettings
-from typing import List
 
 
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "DeineZeit"
-    APP_VERSION: str = "1.12.80"
+    APP_VERSION: str = "1.12.81"
     DEBUG: bool = False
 
     # Datenbank

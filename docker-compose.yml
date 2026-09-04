@@ -36,6 +36,9 @@ services:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       SECRET_KEY: ${SECRET_KEY}
       SETUP_TOKEN: ${SETUP_TOKEN:-}
+      # Für den Backup-Ping der Windows-Skripte (backup.ps1). Bis 03.09.2026
+      # kam der Wert nie im Container an — der Endpunkt war damit offen.
+      BACKUP_PING_TOKEN: ${BACKUP_PING_TOKEN:-}
       FRONTEND_URL: ${FRONTEND_URL}
       MINIO_ENDPOINT: minio:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -45,7 +48,7 @@ services:
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME}
       INSTALL_DIR: /opt/deinezeit
-      APP_VERSION: ${APP_VERSION:-1.12.80}
+      APP_VERSION: ${APP_VERSION:-1.12.81}
       # Ortszeit für Kalenderdaten, Berichte und Worker-Zeiten (Audit BUG-002)
       TZ: ${TZ:-Europe/Vienna}
     volumes:

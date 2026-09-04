@@ -31,6 +31,10 @@ Set-Location $PSScriptRoot
 # .env.local verwenden
 if (-not (Test-Path ".env.local")) {
     Write-Host "  FEHLER: .env.local nicht gefunden!" -ForegroundColor Red
+    Write-Host "  Die Datei ist seit September 2026 nicht mehr im Repository (Audit SEC-012)." -ForegroundColor Yellow
+    Write-Host "  Einmalig anlegen: .env.example nach .env.local kopieren und die lokalen" -ForegroundColor Yellow
+    Write-Host "  Werte eintragen (FRONTEND_URL=http://localhost, WEBAUTHN_RP_ID=localhost," -ForegroundColor Yellow
+    Write-Host "  DOMAIN=localhost, beliebige Testpasswoerter). Siehe LOKAL-TESTEN.md." -ForegroundColor Yellow
     Read-Host "  Druecken Sie Enter zum Beenden"
     exit 1
 }

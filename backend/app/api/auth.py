@@ -23,12 +23,13 @@ Was diese Etappe (17.08.2026) an dieser Datei geändert hat:
 import asyncio
 import base64
 import json
+from html import escape as html_escape
 import logging
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
-from fastapi import (APIRouter, Depends, HTTPException, Request, Response,
+from fastapi import (APIRouter, Depends, HTTPException, Query, Request, Response,
                      status)
 from starlette.concurrency import run_in_threadpool
 from slowapi import Limiter
@@ -420,7 +421,7 @@ def session_revoke(session_id: UUID, request: Request,
 
 
 @router.get("/events", response_model=list[AuthEventResponse])
-def events_list(limit: int = 30, db: Session = Depends(get_db),
+def events_list(limit: int = Query(30, ge=1, le=200), db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
     """Die letzten Anmelde-Ereignisse des eigenen Kontos.
 
@@ -491,7 +492,7 @@ def password_forgot(request: Request, body: PasswordForgotRequest,
             f"{settings.APP_NAME}"
         )
         html = (
-            f"<p>Hallo {user.full_name},</p>"
+            f"<p>Hallo {html_escape(user.full_name or '')},</p>"
             "<p>für Ihr Konto wurde das Zurücksetzen des Passworts "
             "angefordert.</p>"
             f'<p><a href="{link}">Passwort jetzt neu setzen</a></p>'

@@ -35,14 +35,29 @@ Sobald Docker Desktop läuft:
 1. Öffnen Sie den Ordner mit dem Programm
    (dort wo diese Anleitung liegt)
 
-2. Doppelklicken Sie auf **`start-lokal.bat`**
+2. **Einmalig:** Kopieren Sie die Datei `.env.example` und nennen Sie die
+   Kopie `.env.local`. Öffnen Sie die Kopie im Editor und tragen Sie die
+   Werte für den eigenen Computer ein:
 
-3. Ein schwarzes Fenster öffnet sich — das ist normal.
+   ```
+   FRONTEND_URL=http://localhost
+   DOMAIN=localhost
+   WEBAUTHN_RP_ID=localhost
+   APP_ENV=development
+   ```
+
+   Für Passwörter und Schlüssel (`DB_PASSWORD`, `SECRET_KEY`, `MINIO_…`)
+   genügen auf dem eigenen Rechner beliebige Testwerte. Diese Datei bleibt
+   auf Ihrem Computer und wird nicht weitergegeben.
+
+3. Doppelklicken Sie auf **`start-lokal.bat`**
+
+4. Ein schwarzes Fenster öffnet sich — das ist normal.
    Beim **ersten Start** werden alle notwendigen Dateien
    heruntergeladen und das Programm gebaut.
    **Das dauert 3–5 Minuten** — bitte warten.
 
-4. Wenn alles fertig ist, öffnet sich der Browser automatisch
+5. Wenn alles fertig ist, öffnet sich der Browser automatisch
    und zeigt die Anmeldeseite von DeineZeit.
 
 ---

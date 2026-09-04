@@ -11,8 +11,10 @@
 Selbst-gehostete WebApp für **Zeiterfassung, Stammdaten, Projektplanung,
 Rechnungen, Buchhaltung und einen Datei-„Datacenter"-Bereich**. Läuft komplett
 in Docker (Backend, Frontend, PostgreSQL, MinIO, nginx, certbot) und wird per
-GitHub Actions auf einen eigenen Linux-Server deployed. PWA-fähig (installierbar
-über „Zum Home-Bildschirm").
+GitHub Actions auf einen eigenen Linux-Server deployed. Web-App mit Manifest;
+der Service Worker ist bewusst abgeschaltet (`selfDestroying` in
+`vite.config.js`), weil der Offline-Cache wiederholt alten Code festgehalten hat
+— kein Offline-Modus, Updates greifen sofort.
 
 - **Repo:** https://github.com/waehnero/deinezeit (Branch: `main`)
 - **Aktuelle Version:** siehe [STATUS.md](STATUS.md) / [CHANGELOG.md](CHANGELOG.md)
@@ -35,9 +37,11 @@ GitHub Actions auf einen eigenen Linux-Server deployed. PWA-fähig (installierba
 - **React 18** + **Vite 5**, React Router 6
 - State: **Zustand**; Formulare: react-hook-form
 - UI: **Tailwind CSS 3**, lucide-react Icons, react-hot-toast
-- i18n: i18next (mehrsprachig)
+- i18n: i18next — **faktisch einsprachig (Deutsch)**: nur ~48 Schlüssel sind
+  übersetzt, die Seiten sind fest deutsch; die Sprachwahl im Profil ist
+  ausgeblendet (Audit UX-002)
 - Editor: TipTap; Drag&Drop: @dnd-kit (Kanban/Gantt); CSV: papaparse
-- **PWA:** vite-plugin-pwa (Service Worker, Manifest)
+- **PWA:** vite-plugin-pwa nur noch für das Manifest (Service Worker abgeschaltet, s. o.)
 
 **Infrastruktur**
 - Docker Compose; nginx als Reverse-Proxy; certbot für SSL (Let's Encrypt)
@@ -60,7 +64,7 @@ deinezeit/
 │   │   ├── models/            # SQLAlchemy-Modelle (ein Modul je Domäne)
 │   │   ├── schemas/           # Pydantic-Schemas
 │   │   └── services/          # auth, email, invoice_pdf, masterdata, storage (MinIO)
-│   ├── alembic/versions/      # Migrationen 0001..0020 (durchnummeriert)
+│   ├── alembic/versions/      # Migrationen 0001..0061 (durchnummeriert; Drift-Test tests/test_migrationen.py)
 │   ├── Dockerfile
 │   └── entrypoint.sh          # führt `alembic upgrade head` aus, startet uvicorn
 ├── frontend/
@@ -292,7 +296,8 @@ Fixtures in `backend/tests/conftest.py` (Test-DB, Client, `auth_client`);
 ## Konventionen
 
 - **Sprache:** Code-Kommentare, Commit-Messages, UI-Texte und Changelog auf
-  **Deutsch**. Benutzersichtbare Texte im Frontend über i18next.
+  **Deutsch**. Benutzersichtbare Texte im Frontend derzeit direkt auf Deutsch
+  (i18next ist eingerichtet, aber nicht durchgezogen — siehe Tech-Stack).
 - **Domänen-Schnitt:** pro Fachbereich je ein Modul in `api/`, `models/`,
   `schemas/`, `services/` (gleicher Name, z. B. `invoice.py`). Neue Features
   diesem Muster folgend ergänzen.

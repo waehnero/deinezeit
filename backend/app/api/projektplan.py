@@ -21,7 +21,6 @@ from app.api.deps import get_current_user, require_admin
 from app.models.user import User
 from app.models.projektplan import (
     PlanningProject, Task, TaskDependency, Milestone, ProjectTaskField, ChecklistItem,
-    TASK_STATUS, TASK_PRIORITY, DEPENDENCY_TYPES,
 )
 from app.models.zeiterfassung import TimeEntry
 from app.models.settings import Setting
@@ -123,7 +122,6 @@ def _critical_task_ids(tasks: List[Task], deps: List[TaskDependency]) -> set:
     Slack 0 liegen auf dem kritischen Pfad. Aufgaben ohne Datumsangaben
     werden über die reine Abhängigkeitskette (längster Pfad) berücksichtigt.
     """
-    from datetime import date as _date
 
     dur: Dict[UUID, int] = {}
     for t in tasks:

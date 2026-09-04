@@ -22,7 +22,7 @@ Hierarchie:
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Index, Column, String, Boolean, DateTime, Integer, Date, ForeignKey, Text, Numeric
+    Index, Column, String, Boolean, DateTime, Integer, Date, ForeignKey, Text
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship

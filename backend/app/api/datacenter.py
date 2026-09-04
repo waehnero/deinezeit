@@ -7,6 +7,7 @@ WICHTIGE ROUTE-REIHENFOLGE:
   da FastAPI/Starlette in Definitionsreihenfolge matched und /{a}/{b} auch
   /{id}/preview abfangen würde.
 """
+import logging
 import io
 import os
 import re
@@ -18,7 +19,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from fastapi.responses import StreamingResponse, Response, HTMLResponse
+from fastapi.responses import Response, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,7 @@ from app.models.masterdata import EntityRecord, EntityType
 from app.models.user import User
 from app.api.deps import get_current_user, require_module
 from app.services import storage_service
+from app.core.http import content_disposition
 
 
 # ── Kontakt-Vererbung ─────────────────────────────────────────────────────────
@@ -87,6 +89,8 @@ def resolve_contact(db: Session, entity_type: str, entity_id: str):
         # Vererbung ist best-effort: schlägt sie fehl, bleibt die Datei "ohne Kontakt".
         return None, None
     return None, None
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/datacenter", tags=["Datacenter"])
 
@@ -576,7 +580,7 @@ def download_via_share_link(
     return Response(
         content=data, media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{att.filename}"',
+            "Content-Disposition": content_disposition("attachment", att.filename),
             "Content-Length": str(len(data)),
         }
     )
@@ -622,7 +626,7 @@ def download_file(
     return Response(
         content=data, media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{att.filename}"',
+            "Content-Disposition": content_disposition("attachment", att.filename),
             "Content-Length": str(len(data)),
         }
     )
@@ -651,7 +655,7 @@ def preview_file(
         data, _ = storage_service.download_file(att.storage_key, db=db, backend=att.storage_provider)
         return Response(
             content=data, media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{att.filename}"',
+            headers={"Content-Disposition": content_disposition("attachment", att.filename),
                      **_VORSCHAU_KOPF},
         )
 
@@ -673,7 +677,7 @@ def preview_file(
     # den der Speicher zurückmeldet (der stammt ebenfalls vom Upload).
     return Response(
         content=data, media_type=mimetype,
-        headers={"Content-Disposition": f'inline; filename="{att.filename}"',
+        headers={"Content-Disposition": content_disposition("inline", att.filename),
                  **_VORSCHAU_KOPF},
     )
 
@@ -794,7 +798,8 @@ def upload_file(
     try:
         storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
     except Exception as exc:
-        raise HTTPException(500, f"Speicher-Fehler: {exc}")
+        logger.exception("Fehler bei datacenter: %s", exc)
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
 
     contact_id, contact_name = resolve_contact(db, entity_type, entity_id)
 

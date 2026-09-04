@@ -27,7 +27,7 @@ from typing import Optional
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.models.invoice import Invoice, InvoicePosition
+from app.models.invoice import Invoice
 from app.models.masterdata import EntityRecord
 from app.services import positionen as positionen_service
 

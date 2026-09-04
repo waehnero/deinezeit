@@ -109,7 +109,15 @@ jobs:
             libgdk-pixbuf-2.0-0 shared-mime-info
 
       - name: Abhängigkeiten installieren
-        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt ruff
+
+      # Blockierend (Audit CODE-001): Namensfehler, kaputte Importe und
+      # Syntaxfehler dürfen nicht bis in die Produktion kommen. Nur die
+      # Fehlerklassen F/E9 — Stilfragen bleiben außen vor. Migrationen werden
+      # nicht geprüft: bestehende Migrationen bleiben unangetastet.
+      - name: "Statische Prüfung (ruff)"
+        working-directory: backend
+        run: ruff check --select F,E9 --ignore F841 app/ alembic/env.py
 
       - name: "Tests ausführen"
         working-directory: backend

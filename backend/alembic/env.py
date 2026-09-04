@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.db.base import Base
-from app.models import *  # noqa: alle Modelle importieren
+from app.models import *  # noqa: F401,F403  (alle Modelle importieren)
 from app.core.config import settings
 
 config = context.config

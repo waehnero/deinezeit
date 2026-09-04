@@ -9,7 +9,7 @@ import time
 import httpx
 from starlette.concurrency import run_in_threadpool
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import List
 from threading import Lock
 from uuid import UUID
 
@@ -21,7 +21,7 @@ from app.api.deps import get_current_user, require_admin
 from app.api.auth import absender_meta
 from app.core import auth_events as EV
 from app.models.settings import Setting
-from app.models.user import User, UserRole, UserSession
+from app.models.user import User, UserSession
 from app.db.base import SessionLocal
 from app.schemas.user import AdminSessionResponse
 from app.services.auth_service import auth_service
