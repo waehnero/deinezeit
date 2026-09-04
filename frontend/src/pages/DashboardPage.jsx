@@ -673,7 +673,7 @@ function SystemWidget({ userStats, versionInfo, titel, editMode, navigate }) {
           <span className="text-sm text-neutral-800">Version</span>
           <span className="text-xs text-neutral-400">
             {versionInfo?.current || '—'}
-            {versionInfo?.update_available ? ' · Update verfügbar' : ''}
+            {versionInfo?.update_available ? ' · neuere Version auf GitHub' : ''}
           </span>
         </div>
       </div>

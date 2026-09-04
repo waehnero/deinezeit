@@ -10,7 +10,6 @@ import { toggleDark } from '../utils/anzeige'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
 import { masterdataApi } from '../services/api'
-import UpdateBanner from './UpdateBanner'
 import CommandPalette from './CommandPalette'
 import { ZEITPROJEKTE_SLUG, ZEITPROJEKTE_ALTE_SLUGS, ZEITPROJEKTE_PFAD } from '../utils/zeitprojekte'
 
@@ -292,7 +291,6 @@ export default function Layout({ children }) {
 
   return (
     <div className="flex h-screen bg-neutral-50 overflow-hidden">
-      <UpdateBanner />
       {/* Desktop Sidebar */}
       <aside style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)' }}
         className={`hidden lg:flex flex-col bg-sidebar border-r border-sidebar-border flex-shrink-0 relative transition-all duration-200 ${

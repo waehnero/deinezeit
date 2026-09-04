@@ -248,3 +248,41 @@ def test_endpunkt_bleibt_stehen_wenn_das_lesen_scheitert(client, admin_user,
     resp = client.get("/api/system/ssl-status", headers=kopf)
     assert resp.status_code == 200
     assert resp.json()["status"] == "nicht_konfiguriert"
+
+
+# ── Lebenszeichen statt Docker-Socket (K-21) ─────────────────────────────────
+#
+# Ob der certbot-Container läuft, wurde bis 04.09.2026 per ``docker inspect``
+# über den Docker-Socket geprüft. Der Socket ist aus dem Backend verschwunden;
+# jetzt berührt die certbot-Schleife bei jedem Durchlauf eine Datei im
+# Zertifikatsverzeichnis, und das Backend schaut nur auf deren Alter.
+
+def test_lebenszeichen_frisch_bedeutet_automatik_laeuft(tmp_path, monkeypatch):
+    datei = tmp_path / ".certbot-lebenszeichen"
+    datei.write_text("")
+    monkeypatch.setattr(ssl_service, "LEBENSZEICHEN_DATEI", str(datei))
+    assert ssl_service._automatik_laeuft() is True
+
+
+def test_lebenszeichen_alt_bedeutet_automatik_steht(tmp_path, monkeypatch):
+    import os, time
+    datei = tmp_path / ".certbot-lebenszeichen"
+    datei.write_text("")
+    vor_zwei_tagen = time.time() - 48 * 3600
+    os.utime(datei, (vor_zwei_tagen, vor_zwei_tagen))
+    monkeypatch.setattr(ssl_service, "LEBENSZEICHEN_DATEI", str(datei))
+    assert ssl_service._automatik_laeuft() is False
+
+
+def test_ohne_lebenszeichen_unbekannt_kein_alarm(tmp_path, monkeypatch):
+    """Lokale Instanz ohne certbot: None, und None ist keine Warnung."""
+    monkeypatch.setattr(ssl_service, "LEBENSZEICHEN_DATEI", str(tmp_path / "fehlt"))
+    assert ssl_service._automatik_laeuft() is None
+
+
+def test_backend_braucht_keinen_docker_socket_mehr():
+    """Der Riegel gegen Rückfall: kein subprocess, kein docker im Modul."""
+    import inspect
+    quelle = inspect.getsource(ssl_service)
+    assert "subprocess" not in quelle
+    assert "subprocess.run" not in quelle

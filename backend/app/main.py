@@ -167,14 +167,16 @@ async def startup_event():
             storage_service.ensure_bucket()
         except Exception as e:
             print(f"[WARN] MinIO Bucket konnte nicht erstellt werden: {e}")
-        # Update-Zustand liegt in der Datenbank (api/system.py) und überlebt
-        # damit den Neustart. Nach einem Update (oder einem Abbruch mittendrin)
-        # muss er zurück auf „idle", sonst bliebe das Update-Banner stehen.
-        try:
-            from app.api.system import update_zustand_nach_neustart_zuruecksetzen
-            update_zustand_nach_neustart_zuruecksetzen()
-        except Exception as e:
-            print(f"[WARN] Update-Zustand konnte nicht zurückgesetzt werden: {e}")
+    # Die Hintergrund-Worker laufen in genau EINEM Arbeitsprozess — wer den
+    # Riegel in der Datenbank bekommt, startet sie (core/worker_sperre.py).
+    # Damit darf UVICORN_WORKERS größer als 1 sein (Audit OPS-003, K-21).
+    from app.core.worker_sperre import worker_exklusiv_starten
+    worker_exklusiv_starten(hintergrund_worker_starten)
+
+
+def hintergrund_worker_starten() -> None:
+    """Startet alle Worker-Threads. Wird über die Worker-Sperre genau einmal
+    je Installation aufgerufen — nie direkt."""
     # Auto-Scan für den Mail-Import (Aufgabenmodul); in Tests deaktiviert
     try:
         from app.services.mail_ingest import start_background_scanner

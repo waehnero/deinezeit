@@ -24,7 +24,8 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # Gleiche Version wie in Produktion (docker-compose.yml, Audit OPS-005).
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: deinezeit_minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -62,7 +63,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: deinezeit-files
       MINIO_PUBLIC_URL: http://localhost
-      APP_VERSION: ${APP_VERSION:-1.12.81}
+      APP_VERSION: ${APP_VERSION:-1.12.82}
       # Ortszeit für Kalenderdaten, Berichte und Worker-Zeiten (Audit BUG-002)
       TZ: ${TZ:-Europe/Vienna}
       DEPLOY_MODE: local

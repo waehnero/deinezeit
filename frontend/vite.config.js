@@ -1,8 +1,18 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Frontend-Tests (Vitest, seit 04.09.2026 — Audit TEST-003, K-22):
+  //   npm test            einmal durchlaufen
+  //   npm run test:watch  bei Änderungen erneut
+  // Läuft in jsdom (kein Browser nötig). Testdateien liegen neben dem Code
+  // als *.test.js / *.test.jsx.
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.{js,jsx}'],
+    setupFiles: ['src/test-setup.js'],
+  },
   plugins: [
     react(),
     VitePWA({

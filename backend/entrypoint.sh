@@ -12,16 +12,15 @@ echo "[DeineZeit] Migrationen abgeschlossen. Server wird gestartet..."
 # Arbeitsspeicher und Zeit, ohne irgendeinen Nutzen — bis 20.08.2026 lief der
 # Server so, weil der Schalter fest in der Startzeile stand.
 #
-# UVICORN_WORKERS steht bewusst auf 1.
+# UVICORN_WORKERS darf seit 04.09.2026 größer als 1 sein.
 # ---------------------------------------------------------------------
-# Der Update-Zustand und die Zählung „aktive Benutzer" liegen seit dem Audit
-# (02.09.2026, OPS-003) in der Datenbank — die waren der ursprüngliche Grund.
-# Was noch EINEN Prozess verlangt: die Hintergrund-Worker (Mail-Scan,
-# wiederkehrende Rechnungen, Fälligkeit, Postecke, Backup, SSL) laufen als
-# Threads im App-Prozess. Mit zwei Prozessen liefen sie doppelt — doppelte
-# Rechnungsentwürfe, doppelte Backups, doppelte E-Mails. Erst wenn die Worker
-# einen Prozess-übergreifenden Riegel haben (oder in einen eigenen Container
-# wandern), darf der Wert steigen.
+# Was früher EINEN Prozess verlangte, ist erledigt: Update-Zustand und Zählung
+# „aktive Benutzer" liegen in der Datenbank (OPS-003), und die Hintergrund-
+# Worker (Mail-Scan, wiederkehrende Rechnungen, Fälligkeit, Postecke, Backup,
+# SSL) startet nur noch der Prozess, der den Riegel in der Datenbank hält
+# (app/core/worker_sperre.py, K-21). Vorgabe bleibt 1 — auf einem kleinen
+# Server reicht das; 2 lohnt sich erst, wenn PDF-Erzeugung und Berichte
+# spürbar aufeinander warten. Richtwert: höchstens Anzahl CPU-Kerne.
 WORKERS="${UVICORN_WORKERS:-1}"
 
 if [ "${APP_ENV:-production}" = "development" ]; then

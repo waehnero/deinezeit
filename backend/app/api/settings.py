@@ -165,7 +165,11 @@ def update_settings(
     for key, value in updates.items():
         _save(db, key, str(value))
 
-    # backup.cfg aktualisieren wenn Backup-Einstellungen geändert wurden
+    # backup.cfg aktualisieren wenn Backup-Einstellungen geändert wurden.
+    # Die Datei lesen die Windows-Skripte (backup-watcher.ps1 & Co.) einer
+    # LOKALEN Installation; docker-compose.local.yml bindet sie dafür ein. In
+    # Produktion gibt es den Mount seit K-21 nicht mehr — der Schreibversuch
+    # landet dann im Container und ist wirkungslos (kein Fehler).
     backup_keys = {"backup_dir", "backup_keep_days", "backup_schedule_time"}
     if updates.keys() & backup_keys:
         cfg_path = "/opt/deinezeit/backup.cfg"

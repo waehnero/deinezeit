@@ -78,8 +78,8 @@ jobs:
         # werden von rsync weder überschrieben noch gelöscht.
         #
         #   backups/     Vor-Update-Sicherungen (scripts/deploy.sh, install.sh)
-        #   logs/        update.log des In-App-Updates (update.sh)
-        #   backup.cfg   wird vom Backend am Server beschrieben (Einstellungen)
+        #   logs/        ältere update.log-Dateien (In-App-Update, gestrichen 04.09.2026)
+        #   backup.cfg   Altlast lokaler Installationen; am Server seit K-21 ohne Leser
         #   mockups/, design-vorschlaege/, lasttest/
         #                Entwurfs- und Messdateien, gehören nicht auf den Server
         #

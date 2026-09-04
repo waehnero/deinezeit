@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "DeineZeit"
-    APP_VERSION: str = "1.12.81"
+    APP_VERSION: str = "1.12.82"
     DEBUG: bool = False
 
     # Datenbank
