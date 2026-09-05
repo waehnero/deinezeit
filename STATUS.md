@@ -9,10 +9,10 @@
 
 ## Aktueller Stand (Snapshot)
 
-- **Version:** siehe `frontend/package.json` / [CHANGELOG.md](CHANGELOG.md) (der pre-commit-Hook hebt sie je Branch an)
+- **Version:** **2.0.0** (Release 04.09.2026, Abschluss des Audits) — Details in `frontend/package.json` / [CHANGELOG.md](CHANGELOG.md); der pre-commit-Hook hebt die Patch-Version je Branch an
 - **Branch-Modell:** Feature-Branch → PR → CI (pytest ist Pflicht) → Merge auf `main` → Deploy **nach grüner CI** (`deploy.yml`, `workflow_run`)
-- **DB-Migrationsstand:** bis `0061_schema_angleichen`; Modelle und Migrationen sind deckungsgleich (`tests/test_migrationen.py` wacht darüber)
-- **Tests:** ~930 pytest-Tests, Laufzeit in CI wenige Minuten
+- **DB-Migrationsstand:** bis `0062_update_zustand_entfernen`; Modelle und Migrationen sind deckungsgleich (`tests/test_migrationen.py` wacht darüber)
+- **Tests:** 961 pytest-Tests + 9 Vitest-Tests, Laufzeit in CI wenige Minuten
 - **Lokale Umgebung:** Docker Compose (`docker-compose.local.yml`) → http://localhost; lokale Werte in `.env.local` (nicht im Repo)
 
 ### Module / Funktionsumfang
@@ -32,7 +32,9 @@ Dateispeicher (+ Restore-Anleitung [docs/WIEDERHERSTELLUNG.md](docs/WIEDERHERSTE
 XSS-Lücke in der Datacenter-Vorschau geschlossen, Konfigurations-Geheimnisse verschlüsselt,
 Endpunkte laufen im Threadpool, FastAPI/Starlette/WeasyPrint aktuell, Ortszeit statt UTC,
 Setup-Token, CSP scharf, In-App-Update samt Docker-Socket gestrichen (Updates nur noch per
-CI-Deploy), Worker-Sperre per Advisory-Lock. Offen: Release 2.0.0 (R-01).
+CI-Deploy), Worker-Sperre per Advisory-Lock, Zeit → Aufgabe verdrahtet (Bündel H).
+Abschlussprüfung: [docs/AUDIT-2026-09-02-ABSCHLUSS.md](docs/AUDIT-2026-09-02-ABSCHLUSS.md);
+Release-Checkliste: [docs/RELEASE-2.0.0.md](docs/RELEASE-2.0.0.md).
 
 ### Bekannte Einschränkungen
 
@@ -45,7 +47,9 @@ CI-Deploy), Worker-Sperre per Advisory-Lock. Offen: Release 2.0.0 (R-01).
 
 ### Nächste Schritte / To-dos
 
-- Abschlussprüfung und Release **2.0.0** (Versionsschreibweise mit führenden Nullen ist in npm nicht zulässig)
+- Nach 2.0.0 (ohne Release-Druck): npm-Hauptversionen (react-router 7, TipTap 3, vite 8), K-26
+  (invoice.py aufteilen, Skripte ordnen, React.lazy, aria-label/Formularfeld-IDs), OPS-006 Logging
+- Branch-Schutz: „Frontend: Tests (Vitest)" als Pflicht-Check aufnehmen
 
 ---
 

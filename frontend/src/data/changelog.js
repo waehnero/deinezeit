@@ -4,27 +4,32 @@
  */
 export const changelog = [
   {
+    version: '2.0.0',
+    day: '04',
+    month: 'September',
+    year: '2026',
+    features: [
+      "DeineZeit 2.0: Ergebnis eines vollständigen Sicherheits- und Qualitäts-Audits (02.–04.09.2026). Alle 45 Befunde wurden bewertet, 37 behoben, die übrigen sind bewusst dokumentiert — kein offener Punkt betrifft Sicherheit oder Datenintegrität.",
+    ],
+    updates: [
+      "Sicherheit: Sitzungsübernahme über hochgeladene SVG-Dateien geschlossen, Konfigurations-Geheimnisse liegen verschlüsselt in der Datenbank, Content-Security-Policy aktiv, Erstinstallation nur mit Einrichtungs-Token, Web-Framework auf aktuellem Stand.",
+      "Datensicherheit: Backups überleben den Deploy und enthalten jetzt auch den Dateispeicher (Beleg-PDFs, Anhänge); Wiederherstellungsanleitung liegt bei. Benutzer mit gebuchten Zeiten können nicht mehr gelöscht werden.",
+      "Betrieb: Der Server hat keinen Zugriff mehr auf Docker — Aktualisierungen kommen ausschließlich über den geprüften Deploy nach grünen Tests. Mehrere Arbeitsprozesse sind möglich, ohne dass Hintergrundjobs doppelt laufen.",
+      "Stabilität: PDF-Erzeugung, Mailversand und Berichte halten den Server nicht mehr für alle anderen an. Belegnummern sind auch bei gleichzeitigem Ausstellen eindeutig. Kalenderdaten rechnen in Ortszeit.",
+      "Qualität: 961 automatische Backend-Tests (vorher 873) und erstmals Frontend-Tests; Datenbankschema und Migrationen werden laufend auf Übereinstimmung geprüft.",
+      "Behoben: Teilaufgaben im Projektplan ließen sich nicht anlegen (Fehler 500); Zeiteinträge können jetzt einer Projektplan-Aufgabe zugeordnet werden.",
+    ],
+  },
+  {
     version: '1.12.84',
     day: '04',
     month: 'September',
     year: '2026',
     features: [
-      'Zeiteinträge können einer Projektplan-Aufgabe zugeordnet werden (Auswahl beim Nachtragen)',
+      "Zeiteinträge können einer Projektplan-Aufgabe zugeordnet werden (Auswahl beim Nachtragen)",
     ],
     updates: [
-      'Projektplan: gebuchte Zeiten je Aufgabe werden angezeigt; Aufgaben mit Zeiten sind vor dem Löschen geschützt',
-    ],
-  },
-  {
-    version: '1.12.83',
-    day: '04',
-    month: 'September',
-    year: '2026',
-    features: [
-      'Zeiteinträge können einer Projektplan-Aufgabe zugeordnet werden (Auswahl beim Nachtragen)',
-    ],
-    updates: [
-      'Projektplan: gebuchte Zeiten je Aufgabe werden angezeigt; Aufgaben mit Zeiten sind vor dem Löschen geschützt',
+      "Projektplan: gebuchte Zeiten je Aufgabe werden angezeigt; Aufgaben mit Zeiten sind vor dem Löschen geschützt",
     ],
   },
   {
@@ -34,7 +39,10 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      '(Release-Notes ergänzen)',
+      "In-App-Update entfernt: Aktualisierungen kommen jetzt ausschließlich über den geprüften Deploy nach grünen Tests",
+      "Sicherheit: Das Backend hat keinen Zugriff mehr auf Docker; die Content-Security-Policy ist aktiv",
+      "Projektplan: Teilaufgaben ließen sich nicht anlegen (Fehler 500) — behoben",
+      "Betrieb: Hintergrundjobs laufen auch mit mehreren Arbeitsprozessen nur einmal; MinIO-Version fest gepinnt",
     ],
   },
   {
@@ -44,7 +52,11 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      '(Release-Notes ergänzen)',
+      "Ein Anzeigefehler in der Oberfläche führt nicht mehr zur weißen Seite, sondern zu einer Meldung mit Neuladen-Knopf",
+      "Downloads mit Umlauten im Dateinamen kommen in allen Browsern richtig an",
+      "Technische Fehlerdetails werden nicht mehr an den Browser durchgereicht, sondern im Serverlog festgehalten",
+      "Backup-Ping der Windows-Skripte ist abgesichert; Installationsskript übergibt das Admin-Passwort sicher",
+      "Dokumentation berichtigt (Status, Anleitung lokal); Sprachwahl ausgeblendet, da nur Deutsch gepflegt ist",
     ],
   },
   {
@@ -54,7 +66,13 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      '(Release-Notes ergänzen)',
+      "Backup enthält jetzt auch den Dateispeicher (Beleg-PDFs, Anhänge, Fotos) samt Inhaltsverzeichnis; neue Wiederherstellungsanleitung",
+      "Deploy läuft erst nach erfolgreicher Prüfung und bricht ab, wenn der Server danach nicht antwortet",
+      "Web-Framework (FastAPI/Starlette) und PDF-Erzeugung (WeasyPrint) auf aktuellen Stand gebracht",
+      "Erstinstallation nur noch mit Einrichtungs-Token aus der Installation",
+      "Kalenderdaten, Berichte und Fälligkeiten rechnen in Ortszeit (Europe/Vienna) statt UTC",
+      "Excel-Import auf eine gepflegte Bibliothek umgestellt (nur noch .xlsx)",
+      "Content-Security-Policy im Beobachtungsmodus eingeführt",
     ],
   },
   {
@@ -64,7 +82,9 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      '(Release-Notes ergänzen)',
+      "Belegnummern sind auch dann eindeutig, wenn zwei Personen gleichzeitig ausstellen",
+      "PDF-Erzeugung, Mailversand und lange Berichte halten den Server nicht mehr für alle anderen Benutzer an",
+      "Versions- und Änderungsabfrage nur noch angemeldet und zwischengespeichert",
     ],
   },
   {
@@ -74,7 +94,8 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      '(Release-Notes ergänzen)',
+      "Benutzer mit Zeiteinträgen oder Stammdaten können nicht mehr gelöscht werden — stattdessen deaktivieren (vorher gingen die Zeiten verloren)",
+      "Datenbankschema und Migrationen abgeglichen; ein Test wacht ab jetzt über die Übereinstimmung",
     ],
   },
   {
@@ -84,7 +105,11 @@ export const changelog = [
     year: '2026',
     features: [],
     updates: [
-      '(Release-Notes ergänzen)',
+      "Sicherheitslücke geschlossen: Hochgeladene SVG-Dateien werden nicht mehr im Browser ausgeführt",
+      "Konfigurations-Geheimnisse (SMTP, Cloud, KI) liegen verschlüsselt in der Datenbank",
+      "Ohne Anmeldung sind nur noch Logo und Farben sichtbar, keine Konfiguration",
+      "XML- und PDF-Download im Belegformular funktionieren wieder",
+      "Testreihe in der Pipeline von über einer Stunde auf wenige Minuten beschleunigt",
     ],
   },
   {
