@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import PageHeader from '../components/PageHeader'
 import { LayoutDashboard } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import {
   masterdataApi, authApi, zeiterfassungApi, usersApi, systemApi, dashboardApi,
 } from '../services/api'

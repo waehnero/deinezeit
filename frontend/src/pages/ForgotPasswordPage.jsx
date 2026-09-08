@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { ArrowLeft, ShieldAlert, Loader2, MailCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { version } from '../../package.json'

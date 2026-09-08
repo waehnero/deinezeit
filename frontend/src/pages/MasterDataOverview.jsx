@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import PageHeader from '../components/PageHeader'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { masterdataApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'

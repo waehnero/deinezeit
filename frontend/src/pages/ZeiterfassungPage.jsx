@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import PageHeader from '../components/PageHeader'
 import Fab from '../components/Fab'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router'
 import { zeiterfassungApi, usersApi, datacenterApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {

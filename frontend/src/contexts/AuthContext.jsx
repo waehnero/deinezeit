@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import {
   authApi, groupsApi, getAccessToken, setAbmeldeHandler,
   sitzungWiederherstellen, tokenVerwerfen, warAngemeldet,

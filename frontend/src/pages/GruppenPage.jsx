@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import toast from 'react-hot-toast'
 import {
   ArrowLeft, Loader2, Lock, Plus, ShieldCheck, Trash2, Users, X,

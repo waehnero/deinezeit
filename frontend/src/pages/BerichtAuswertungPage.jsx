@@ -10,7 +10,7 @@
  * macht.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import PageHeader from '../components/PageHeader'
 import ZeitraumLeiste, { zeitraumBerechnen, tagesbeginn, tagesende } from '../components/ZeitraumLeiste'
 import { reportsApi } from '../services/api'

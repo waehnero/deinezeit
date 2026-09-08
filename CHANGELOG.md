@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1] – 2026-09-08 – Technik-Update im Hintergrund
+
+### Aktualisierungen
+- Die Bausteine der Oberfläche wurden auf den aktuellen Stand gebracht (Seitenwechsel, Texteditor, Build-Werkzeug). Es gibt keine bekannten Sicherheitslücken mehr in den verwendeten Paketen.
+- Texteditor: Fett, Kursiv, Unterstrichen, Ausrichtung und Listen funktionieren wie bisher.
+
+---
+
 ## [2.0.0] – 2026-09-04 – Release 2.0 – Software-Audit abgeschlossen
 
 ### Neu

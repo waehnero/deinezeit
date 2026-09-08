@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { invoiceApi } from '../services/api'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/PageHeader'

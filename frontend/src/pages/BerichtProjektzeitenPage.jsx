@@ -14,7 +14,7 @@
  * zeigt Seite 2 eine andere Gesamtsumme als Seite 1.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import PageHeader from '../components/PageHeader'
 import ZeitraumLeiste, { zeitraumBerechnen, tagesbeginn, tagesende } from '../components/ZeitraumLeiste'
 import { reportsApi, zeiterfassungApi, usersApi } from '../services/api'

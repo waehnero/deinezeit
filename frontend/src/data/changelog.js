@@ -4,6 +4,17 @@
  */
 export const changelog = [
   {
+    version: '2.0.1',
+    day: '08',
+    month: 'September',
+    year: '2026',
+    features: [],
+    updates: [
+      'Die Bausteine der Oberfläche wurden auf den aktuellen Stand gebracht (Seitenwechsel, Texteditor, Build-Werkzeug). Es gibt keine bekannten Sicherheitslücken mehr in den verwendeten Paketen.',
+      'Texteditor: Fett, Kursiv, Unterstrichen, Ausrichtung und Listen funktionieren wie bisher.',
+    ],
+  },
+  {
     version: '2.0.0',
     day: '04',
     month: 'September',

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { zeiterfassungApi } from '../services/api'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Plus, Trash2, GripVertical, Loader2, Settings2 } from 'lucide-react'

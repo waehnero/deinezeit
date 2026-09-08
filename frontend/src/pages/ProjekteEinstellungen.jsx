@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { projektplanApi } from '../services/api'
 import toast from 'react-hot-toast'
 import errMsg from '../utils/errMsg'

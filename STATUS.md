@@ -47,7 +47,7 @@ Release-Checkliste: [docs/RELEASE-2.0.0.md](docs/RELEASE-2.0.0.md).
 
 ### Nächste Schritte / To-dos
 
-- Nach 2.0.0 (ohne Release-Druck): npm-Hauptversionen (react-router 7, TipTap 3, vite 8), K-26
+- Nach 2.0.0 (ohne Release-Druck): ~~npm-Hauptversionen~~ (erledigt 08.09.2026: react-router 7, TipTap 3, vite 8, Node 22, `npm audit` 0), K-26 — Prüfbericht: [docs/PRUEFBERICHT-NPM-2026-09-08.md](docs/PRUEFBERICHT-NPM-2026-09-08.md)
   (invoice.py aufteilen, Skripte ordnen, React.lazy, aria-label/Formularfeld-IDs), OPS-006 Logging
 - Branch-Schutz: „Frontend: Tests (Vitest)" als Pflicht-Check aufnehmen
 

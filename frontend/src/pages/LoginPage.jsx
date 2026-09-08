@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router'
 import { authApi, setAccessToken, setupApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { version } from '../../package.json'
