@@ -210,3 +210,24 @@ PR öffnen; Pflicht-Checks: „Backend: Tests (pytest)" und „Frontend: Tests (
 
 Nächstes Bündel laut Plan: **K-26** (invoice.py aufteilen, Skripte ordnen, `React.lazy`
 je Seite gegen die 1,7-MB-Warnung aus 5.2, `aria-label`/N-03).
+
+## 9. Abnahme am Server (08.09.2026, nach Merge und Deploy)
+
+Durchgeführt über den eingebauten Browser auf https://dz.wwinterface.online (Anmeldung durch Oliver).
+
+| Prüfpunkt | Ergebnis |
+|---|---|
+| `/api/health` | `{"status":"ok","version":"2.0.1"}` ✅ |
+| Anmeldeseite | Fußzeile v2.0.1; Reiter „Updates" zeigt den Eintrag vom 08.09. mit beiden Texten ✅ |
+| Dashboard | lädt vollständig, Kachel „Version 2.0.1" ✅ |
+| Editor (Einstellungen → Parameter → E-Mail-Vorlagen → Rechnung) | bestehende Vorlage mit Fettdruck korrekt geladen (R1); Cursor im fetten Wort → Button „Fett" leuchtet (R2); Unterstrichen, Zentriert und Nummerierte Liste setzen das Format und leuchten auf ✅ — Änderungen nicht gespeichert |
+| `useParams` | Verkauf → RE-2026-002 öffnet „Rechnung bearbeiten" ✅ |
+| Zurück-Taste | zurück zur Verkaufsliste, Filter „Rechnungen" erhalten ✅ |
+| `useSearchParams` | `/invoices/new?type=angebot` → Formular startet als Angebot (AN-2026-002) ✅ |
+| `Navigate`-Weiterleitung | `/masterdata/projekte` → Zeitprojekte ✅ |
+| Abmelden | Weiterleitung zur Anmeldeseite ✅ |
+| Browser-Konsole | keine Einträge über den gesamten Rundgang (keine Fehler, kein „Refused to …") ✅ |
+
+Nebenbefund (nicht dieses Bündel, Wortlaut): Überschrift „Neue Angebot" beim neuen Beleg vom Typ Angebot – Artikel passt nicht zum Dokumenttyp. Vermerk für K-26/aria-Durchgang.
+
+**Ergebnis: Bündel npm abgenommen, keine Auffälligkeiten.**

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2] – 2026-09-08 – Aufräumen im Verkaufsmodul
+
+### Aktualisierungen
+- Der Programmcode des Verkaufsmoduls (Belege, Zahlungen, Mahnwesen, Buchhaltung, Versand) ist intern neu geordnet. Für dich ändert sich nichts — alle Funktionen und Adressen bleiben gleich.
+
+---
+
 ## [2.0.1] – 2026-09-08 – Technik-Update im Hintergrund
 
 ### Aktualisierungen
