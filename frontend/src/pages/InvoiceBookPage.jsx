@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { invoiceApi, accountingApi } from '../services/api'
 import toast from 'react-hot-toast'
 import { ArrowLeft, Download, RefreshCw, FileText, Mail, Filter } from 'lucide-react'

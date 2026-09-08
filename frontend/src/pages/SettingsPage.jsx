@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useSettings } from '../contexts/SettingsContext'
 import { getAccessToken, settingsApi, systemApi, invoiceApi } from '../services/api'
 import toast from 'react-hot-toast'

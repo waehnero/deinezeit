@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { Search, CornerDownLeft } from 'lucide-react'
 
 // ⌘K-Befehlspalette (Design-Verfassung, Regel 5 · Musthave 2026):

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import toast from 'react-hot-toast'
 import { Loader2, Rocket, Eye, EyeOff, ArrowRight, ArrowLeft, Check, Building2, ImagePlus } from 'lucide-react'
 import { setAccessToken, setupApi, settingsApi } from '../services/api'

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import {
   ArrowLeft, Plus, Loader2, CheckCircle2, Circle, Clock, User as UserIcon,
   Calendar, Flag, X, ChevronRight, ArrowUpRight, Trash2, Diamond, Tag as TagIcon, MoreVertical,

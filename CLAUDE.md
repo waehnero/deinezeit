@@ -34,13 +34,13 @@ der Service Worker ist bewusst abgeschaltet (`selfDestroying` in
 - E-Mail-Vorschau: extract-msg
 
 **Frontend** (`frontend/`)
-- **React 18** + **Vite 5**, React Router 6
+- **React 18** + **Vite 8** (Rolldown), React Router 7 (Paket `react-router`, Node 22 im Build)
 - State: **Zustand**; Formulare: react-hook-form
 - UI: **Tailwind CSS 3**, lucide-react Icons, react-hot-toast
 - i18n: i18next — **faktisch einsprachig (Deutsch)**: nur ~48 Schlüssel sind
   übersetzt, die Seiten sind fest deutsch; die Sprachwahl im Profil ist
   ausgeblendet (Audit UX-002)
-- Editor: TipTap; Drag&Drop: @dnd-kit (Kanban/Gantt); CSV: papaparse
+- Editor: TipTap 3 (Underline im StarterKit, Link abgeschaltet); Drag&Drop: @dnd-kit (Kanban/Gantt); CSV: papaparse
 - **PWA:** vite-plugin-pwa nur noch für das Manifest (Service Worker abgeschaltet, s. o.)
 
 **Infrastruktur**
