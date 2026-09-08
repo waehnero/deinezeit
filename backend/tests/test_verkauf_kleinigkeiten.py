@@ -123,7 +123,9 @@ def test_massenversand_haelt_erfolge_fest(auth_client, db_session, monkeypatch):
     Vorher hätte das gemeinsame Commit am Ende beide zurückgerollt — obwohl
     die erste E-Mail längst draußen war.
     """
-    from app.api import invoice as invoice_api
+    # Der Versand wohnt seit K-26 in app/api/invoice_versand.py — der Patch
+    # muss dort ansetzen, wo der Endpunkt die Funktion nachschlägt.
+    from app.api import invoice_versand as invoice_api
 
     kontakt = _make_kontakt(db_session)
     a = _create_invoice(auth_client, kontakt.id, title="Erster")

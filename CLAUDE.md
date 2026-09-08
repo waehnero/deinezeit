@@ -59,6 +59,9 @@ deinezeit/
 │   │   ├── api/               # Endpunkte: auth, users, masterdata, zeiterfassung,
 │   │   │                      #   reports, settings, datacenter, system, invoice,
 │   │   │                      #   accounting, projektplan, deps
+│   │   │                      # Verkauf ist aufgeteilt: invoice.py = Sammelrouter +
+│   │   │                      #   Re-Exporte, invoice_common.py = Hilfsfunktionen,
+│   │   │                      #   invoice_<fachgebiet>.py = Endpunkte (K-26)
 │   │   ├── core/              # config.py (Settings/Env), security.py, zeit.py, worker_sperre.py
 │   │   ├── db/                # DB-Session / Base
 │   │   ├── models/            # SQLAlchemy-Modelle (ein Modul je Domäne)
@@ -316,7 +319,11 @@ cd frontend && npm run test:watch
   (i18next ist eingerichtet, aber nicht durchgezogen — siehe Tech-Stack).
 - **Domänen-Schnitt:** pro Fachbereich je ein Modul in `api/`, `models/`,
   `schemas/`, `services/` (gleicher Name, z. B. `invoice.py`). Neue Features
-  diesem Muster folgend ergänzen.
+  diesem Muster folgend ergänzen. Wächst ein API-Modul über ~1.000 Zeilen,
+  nach dem Vorbild von Verkauf aufteilen: `<modul>.py` bleibt Sammelrouter,
+  Endpunkte wandern in `<modul>_<fachgebiet>.py`, gemeinsame Hilfen in
+  `<modul>_common.py`. Neue Verkaufs-Endpunkte gehören in den passenden
+  `invoice_*`-Teil, nicht in `invoice.py`.
 - **API-Präfix:** alle Router unter `/api` (siehe `main.py`).
 - **Migrationen:** durchnummeriert; nie nachträglich umnummerieren.
 - **Zeilenenden** (`.gitattributes`): `.sh` = LF, `.bat/.ps1/.cmd` = CRLF.

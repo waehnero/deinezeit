@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '2.0.2',
+    day: '08',
+    month: 'September',
+    year: '2026',
+    features: [],
+    updates: [
+      'Der Programmcode des Verkaufsmoduls (Belege, Zahlungen, Mahnwesen, Buchhaltung, Versand) ist intern neu geordnet. Für dich ändert sich nichts — alle Funktionen und Adressen bleiben gleich.',
+    ],
+  },
+  {
     version: '2.0.1',
     day: '08',
     month: 'September',
