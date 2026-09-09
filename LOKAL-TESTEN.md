@@ -50,7 +50,7 @@ Sobald Docker Desktop läuft:
    genügen auf dem eigenen Rechner beliebige Testwerte. Diese Datei bleibt
    auf Ihrem Computer und wird nicht weitergegeben.
 
-3. Doppelklicken Sie auf **`start-lokal.bat`**
+3. Doppelklicken Sie im Ordner **`scripts\windows`** auf **`start-lokal.bat`**
 
 4. Ein schwarzes Fenster öffnet sich — das ist normal.
    Beim **ersten Start** werden alle notwendigen Dateien
@@ -77,7 +77,7 @@ Beim ersten Start werden folgende Zugangsdaten automatisch angelegt:
 
 ## Programm beenden
 
-Wenn Sie fertig sind, doppelklicken Sie auf **`stopp-lokal.bat`**.
+Wenn Sie fertig sind, doppelklicken Sie im Ordner `scripts\windows` auf **`stopp-lokal.bat`**.
 
 Ihre eingegebenen Daten bleiben gespeichert und sind
 beim nächsten Start wieder da.
@@ -87,7 +87,7 @@ beim nächsten Start wieder da.
 ## Alles zurücksetzen
 
 Falls Sie komplett neu starten möchten (alle Testdaten löschen):
-Doppelklicken Sie auf **`reset-lokal.bat`**.
+Doppelklicken Sie im Ordner `scripts\windows` auf **`reset-lokal.bat`**.
 
 ---
 
@@ -96,11 +96,11 @@ Doppelklicken Sie auf **`reset-lokal.bat`**.
 **„Docker Desktop ist nicht gestartet" — was tun?**
 Öffnen Sie Docker Desktop über das Startmenü und warten Sie,
 bis das Symbol in der Taskleiste erscheint. Dann nochmal
-`start-lokal.bat` doppelklicken.
+`scripts\windows\start-lokal.bat` doppelklicken.
 
 **Wie oft muss ich Docker Desktop starten?**
 Docker Desktop startet normalerweise automatisch mit Windows.
-Sie müssen nur `start-lokal.bat` doppelklicken.
+Sie müssen nur `scripts\windows\start-lokal.bat` doppelklicken.
 
 **Beim zweiten Start geht es schnell?**
 Ja — nur beim ersten Start werden alle Dateien aufgebaut.

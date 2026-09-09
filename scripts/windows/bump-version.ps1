@@ -2,7 +2,7 @@
 # Aktualisiert alle Versions-Dateien auf einmal und committet.
 #
 # Verwendung:
-#   .\bump-version.ps1 -Version 1.3.0 -Titel "Neues Feature" -Features "Feature A","Feature B" -Updates "Fix X","Fix Y"
+#   .\scripts\windows\bump-version.ps1 -Version 1.3.0 -Titel "Neues Feature" -Features "Feature A","Feature B" -Updates "Fix X","Fix Y"
 #
 # Pflichtparameter: -Version, -Titel
 # Optional: -Features, -Updates (jeweils als String-Array)
@@ -14,7 +14,8 @@ param(
     [string[]]$Updates  = @()
 )
 
-$Root = $PSScriptRoot
+# Repo-Wurzel: dieses Skript liegt seit K-26 in scripts\windows\ (zwei Ebenen tiefer).
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 function Write-Step([string]$msg) {
     Write-Host "  → $msg" -ForegroundColor Cyan
@@ -126,7 +127,7 @@ $clMd = $clMd.Substring(0, $insertIdx) + $newMdEntry + $clMd.Substring($insertId
 # ── 7. Git commit & push ────────────────────────────────────────────────────
 Write-Host ""
 Write-Step "git add + commit + push"
-git -C $Root add "frontend/package.json" "backend/app/core/config.py" "docker-compose.yml" "docker-compose.local.yml" "frontend/src/data/changelog.js" "CHANGELOG.md" "bump-version.ps1"
+git -C $Root add "frontend/package.json" "backend/app/core/config.py" "docker-compose.yml" "docker-compose.local.yml" "frontend/src/data/changelog.js" "CHANGELOG.md" "scripts/windows/bump-version.ps1"
 
 $commitMsg = "chore: Version $Version - $Titel"
 git -C $Root commit -m $commitMsg

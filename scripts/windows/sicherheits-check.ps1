@@ -1,7 +1,11 @@
 # ============================================================
 # DeineZeit – Sicherheits- & Qualitäts-Check
-# Ausführen vor jedem Deployment: .\sicherheits-check.ps1
+# Ausführen vor jedem Deployment: .\scripts\windows\sicherheits-check.ps1
 # ============================================================
+
+# Repo-Wurzel: dieses Skript liegt seit K-26 in scripts\windows\ (zwei Ebenen tiefer);
+# alle Pfade unten sind relativ zur Wurzel.
+Set-Location (Join-Path $PSScriptRoot "..\..")
 
 $ErrorActionPreference = "Stop"
 $Passed  = 0

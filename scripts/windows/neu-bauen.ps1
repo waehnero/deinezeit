@@ -2,7 +2,8 @@ Write-Host ""
 Write-Host "  DeineZeit - Frontend & Backend neu bauen" -ForegroundColor Cyan
 Write-Host ""
 
-Set-Location $PSScriptRoot
+# Repo-Wurzel: dieses Skript liegt seit K-26 in scripts\windows\ (zwei Ebenen tiefer).
+Set-Location (Join-Path $PSScriptRoot "..\..")
 
 if (-not (Test-Path ".env.local")) {
     Write-Host "  FEHLER: .env.local nicht gefunden!" -ForegroundColor Red

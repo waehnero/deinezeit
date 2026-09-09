@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3] – 2026-09-09 – Ordnung im Werkzeugkasten
+
+### Aktualisierungen
+- Die Hilfsskripte für die lokale Entwicklung unter Windows liegen jetzt gesammelt im Ordner scripts/windows. Für den laufenden Betrieb und die Backups ändert sich nichts.
+
+---
+
 ## [2.0.2] – 2026-09-08 – Aufräumen im Verkaufsmodul
 
 ### Aktualisierungen

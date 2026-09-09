@@ -80,7 +80,8 @@ deinezeit/
 │   └── nginx.conf
 ├── nginx/                     # Reverse-Proxy-Konfig (conf.d/app.conf prod, local.conf lokal)
 ├── sql/                       # manuelle SQL-Hilfen (Einzelfälle)
-├── scripts/                   # auto_version.py, deploy.sh
+├── scripts/                   # auto_version.py, bump_version.py, deploy.sh, ssl-renew.sh
+│   └── windows/               # Entwickler-Skripte für Windows (start-lokal, neu-bauen, bump-version, …)
 ├── .github/workflows/         # ci.yml, deploy.yml, auto-version.yml
 ├── docker-compose.yml         # PRODUKTION (db, minio, backend, frontend, nginx, certbot)
 ├── docker-compose.local.yml   # LOKAL (http://localhost, MinIO-Console :9001)
@@ -126,9 +127,13 @@ docker compose -f docker-compose.local.yml down
 ./check.sh
 ```
 
-> Die `.bat`/`.ps1`-Skripte (`start-lokal.bat`, `neu-bauen.bat`,
-> `bump-version.ps1`, …) sind die **Windows-Pendants**. Am Mac stattdessen die
-> oben genannten `docker compose`-Befehle bzw. `.sh`-Skripte verwenden.
+> Die `.bat`/`.ps1`-Skripte für die lokale Entwicklung (`start-lokal.bat`,
+> `neu-bauen.bat`, `bump-version.ps1`, …) liegen seit K-26 in
+> **`scripts/windows/`** und sind die **Windows-Pendants**. Am Mac stattdessen
+> die oben genannten `docker compose`-Befehle bzw. `.sh`-Skripte verwenden.
+> Die Backup-Skripte (`backup*.ps1`, `wiederherstellen.*`, `backup.cfg`) bleiben
+> bewusst im Wurzelverzeichnis: Windows-Installationen und die Aufgabenplanung
+> verweisen mit absoluten Pfaden darauf.
 
 ### Datenbank / Migrationen
 
@@ -221,7 +226,7 @@ git config core.hooksPath .githooks
 > **Hinweis:** Die alte GitHub-Action `auto-version.yml` (Post-Push-Bump auf
 > `main`) ist **deaktiviert** — sie scheiterte am Branch-Schutz (direkter Push
 > auf `main` gesperrt). Nicht reaktivieren, solange kein Bot-Bypass existiert.
-> `bump-version.ps1` ist das Windows-Pendant zu `bump_version.py`.
+> `scripts/windows/bump-version.ps1` ist das Windows-Pendant zu `bump_version.py`.
 
 > Hinweis: GitHub Desktop u. ä. hinterlassen manchmal eine verwaiste
 > `.git/index.lock`. `check.sh` räumt sie auf, wenn kein git-Prozess läuft.

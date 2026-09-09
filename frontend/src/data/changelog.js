@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '2.0.3',
+    day: '09',
+    month: 'September',
+    year: '2026',
+    features: [],
+    updates: [
+      'Die Hilfsskripte für die lokale Entwicklung unter Windows liegen jetzt gesammelt im Ordner scripts/windows. Für den laufenden Betrieb und die Backups ändert sich nichts.',
+    ],
+  },
+  {
     version: '2.0.2',
     day: '08',
     month: 'September',

@@ -1,7 +1,11 @@
 # ============================================================
 # DeineZeit - Git Repository einrichten
-# Einmalig ausfuehren: .\git-einrichten.ps1
+# Einmalig ausfuehren: .\scripts\windows\git-einrichten.ps1
 # ============================================================
+
+# Repo-Wurzel: dieses Skript liegt seit K-26 in scripts\windows\ (zwei Ebenen tiefer);
+# alle Pfade unten sind relativ zur Wurzel.
+Set-Location (Join-Path $PSScriptRoot "..\..")
 
 Write-Host ""
 Write-Host "Git Repository einrichten..." -ForegroundColor Cyan
@@ -44,5 +48,5 @@ Write-Host "    git remote add origin https://github.com/waehnero/deinezeit.git"
 Write-Host "    git push -u origin main" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Sicherheits-Check vor dem Deployment:" -ForegroundColor White
-Write-Host "    .\sicherheits-check.ps1" -ForegroundColor Yellow
+Write-Host "    .\scripts\windows\sicherheits-check.ps1" -ForegroundColor Yellow
 Write-Host ""

@@ -1,6 +1,7 @@
 
 # Lokale Test-Konfiguration für Windows mit Docker Desktop
-# Verwendung: Doppelklick auf start-lokal.bat
+# Verwendung: Doppelklick auf scripts\windows\start-lokal.bat (Windows) oder
+#             docker compose -f docker-compose.local.yml up -d --build (Mac/Linux)
 # Erreichbar unter: http://localhost
 
 services:
@@ -62,7 +63,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: deinezeit-files
       MINIO_PUBLIC_URL: http://localhost
-      APP_VERSION: ${APP_VERSION:-2.0.2}
+      APP_VERSION: ${APP_VERSION:-2.0.3}
       # Ortszeit für Kalenderdaten, Berichte und Worker-Zeiten (Audit BUG-002)
       TZ: ${TZ:-Europe/Vienna}
       DEPLOY_MODE: local
