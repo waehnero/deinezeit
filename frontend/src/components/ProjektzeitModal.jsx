@@ -138,7 +138,7 @@ export default function ProjektzeitModal({ entry, initial = null, onClose, onSav
             {isEdit ? 'Zeiteintrag bearbeiten' : 'Projektzeit nachtragen'}
             {initial && <Sparkles size={16} className="text-primary-500" title="Per KI aus Sprachaufnahme vorbefüllt" />}
           </h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
+          <button aria-label="Schließen" onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
             <X size={20} />
           </button>
         </div>

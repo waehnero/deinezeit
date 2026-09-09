@@ -216,7 +216,7 @@ export default function GruppenPage() {
               <ShieldCheck size={18} className="text-neutral-400" />
               {auswahl.id ? `„${auswahl.name}“ bearbeiten` : 'Neue Gruppe'}
             </h2>
-            <button onClick={schliessen} className="text-neutral-400 hover:text-neutral-600">
+            <button aria-label="Schließen" onClick={schliessen} className="text-neutral-400 hover:text-neutral-600">
               <X size={18} />
             </button>
           </div>

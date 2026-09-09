@@ -103,7 +103,7 @@ function ShareDialog({ attachment, onClose }) {
       <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Share-Link</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
+          <button aria-label="Schließen" onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
             <X size={18} />
           </button>
         </div>
@@ -177,7 +177,7 @@ function ExtendDialog({ attachment, onClose, onExtended }) {
       <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Freigabe verlängern</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
+          <button aria-label="Schließen" onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
             <X size={18} />
           </button>
         </div>
@@ -354,7 +354,7 @@ function PreviewModal({ attachment, onClose }) {
       }}>
       <div className="flex items-center justify-between px-5 py-3 bg-black/60 text-white">
         <span className="text-sm font-medium truncate">{attachment.display_name || attachment.filename}</span>
-        <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition">
+        <button aria-label="Schließen" onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition">
           <X size={20} />
         </button>
       </div>
@@ -742,7 +742,7 @@ function ContactEditDialog({ attachment, onClose, onSaved }) {
       <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Kontakt der Datei</h3>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+          <button aria-label="Schließen" onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
             <X size={18} />
           </button>
         </div>

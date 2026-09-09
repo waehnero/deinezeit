@@ -83,6 +83,18 @@ function applyColorOverrides(settings) {
 }
 
 // MIME-Typ anhand der Dateiendung bestimmen (Favicon kann PNG, ICO, SVG oder JPG sein)
+/**
+ * Cache-Buster für Logo-Adressen. Das Backend hängt beim Hochladen bereits
+ * ?v=<Zeitstempel> an — dann bleibt die Adresse unverändert. Nur eine Adresse
+ * ohne Parameter (Altbestand) bekommt einen Zeitstempel. Vorher wurde bei
+ * jedem Render ein zweites ?v=Date.now() angehängt: doppelter Parameter in der
+ * Adresse und ein neuer Bild-Request pro Render (Audit K-26b).
+ */
+export function mitCacheBuster(url) {
+  if (!url) return url
+  return url.includes('?') ? url : `${url}?v=${Date.now()}`
+}
+
 const FAVICON_TYPES = {
   svg:  'image/svg+xml',
   png:  'image/png',
@@ -104,8 +116,8 @@ function applyFavicon(faviconUrl) {
   link.rel = 'icon'
   const ext = url.split('?')[0].split('.').pop().toLowerCase()
   if (FAVICON_TYPES[ext]) link.type = FAVICON_TYPES[ext]
-  // Cache-Buster damit der Browser das neue Favicon sofort lädt
-  link.href = `${url}?v=${Date.now()}`
+  // Cache-Buster, damit der Browser ein neues Favicon sofort lädt (siehe mitCacheBuster).
+  link.href = mitCacheBuster(url)
   document.head.appendChild(link)
 }
 

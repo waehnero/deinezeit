@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '2.0.4',
+    day: '09',
+    month: 'September',
+    year: '2026',
+    features: [],
+    updates: [
+      'Die Anwendung lädt beim Anmelden nur noch, was du gerade brauchst — jede Seite holt sich ihre Daten erst beim Aufruf. Der erste Start ist damit deutlich kleiner (rund 270 statt 1.770 KB).',
+      'Anmeldung, Profil, Benutzer- und Feldverwaltung: Eingabefelder sind für Passwort-Manager und Bildschirmleser sauber benannt; Schließen- und Symbol-Schaltflächen haben eine Beschriftung.',
+      'Beim Anlegen eines Angebots heißt die Überschrift jetzt „Neues Angebot“, beim Lieferschein „Neuer Lieferschein“.',
+    ],
+  },
+  {
     version: '2.0.3',
     day: '09',
     month: 'September',

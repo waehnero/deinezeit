@@ -151,7 +151,7 @@ function SortableWidget({
               >
                 <Pencil size={13} />
               </button>
-              <button
+              <button aria-label="Baustein entfernen"
                 onClick={onRemove}
                 title="Baustein entfernen"
                 className="p-0.5 rounded text-white/80 hover:text-white hover:bg-red-500 transition-colors"
@@ -972,7 +972,7 @@ function KatalogDialog({ offen, onClose, vorhandeneTypen, vorhandeneSlugs, types
             <p className="font-semibold text-neutral-900">Baustein hinzufügen</p>
             <p className="text-xs text-neutral-400">Wird unten an die Ansicht angehängt</p>
           </div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700">
+          <button aria-label="Schließen" onClick={onClose} className="text-neutral-400 hover:text-neutral-700">
             <X size={20} />
           </button>
         </div>
@@ -1047,14 +1047,14 @@ function LayoutLeiste({ config, editMode, onWechsel, onNeu, onKopie, onUmbenenne
         <>
           {config.layouts.length < MAX_LAYOUTS && (
             <>
-              <button
+              <button aria-label="Leere Ansicht anlegen"
                 onClick={onNeu}
                 title="Leere Ansicht anlegen"
                 className="p-1.5 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
               >
                 <Plus size={15} />
               </button>
-              <button
+              <button aria-label="Aktuelle Ansicht duplizieren"
                 onClick={onKopie}
                 title="Aktuelle Ansicht duplizieren"
                 className="p-1.5 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200"

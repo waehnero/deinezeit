@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import './i18n'
 import './index.css'
 import { initPrefs } from './utils/anzeige'
+import { lazySeite } from './utils/lazySeite'
 
 import { SettingsProvider } from './contexts/SettingsContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -13,35 +14,36 @@ import LoginPage from './pages/LoginPage'
 import SetupPage from './pages/SetupPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
-import DashboardPage from './pages/DashboardPage'
-import MasterDataOverview from './pages/MasterDataOverview'
-import MasterDataDetail from './pages/MasterDataDetail'
-import ProfilePage from './pages/ProfilePage'
-import UserManagementPage from './pages/UserManagementPage'
-import GruppenPage from './pages/GruppenPage'
-import ZeiterfassungPage from './pages/ZeiterfassungPage'
-import ZeiterfassungFelder from './pages/ZeiterfassungFelder'
-import ZeitprojektePage from './pages/ZeitprojektePage'
-import BerichtProjektzeitenPage from './pages/BerichtProjektzeitenPage'
-import BerichtAuswertungPage from './pages/BerichtAuswertungPage'
-import SettingsPage from './pages/SettingsPage'
-import DatacenterPage from './pages/DatacenterPage'
-import InvoicePage from './pages/InvoicePage'
-import InvoiceFormPage from './pages/InvoiceFormPage'
-import InvoiceBookPage from './pages/InvoiceBookPage'
-import OpenItemsPage from './pages/OpenItemsPage'
-import MonatsabschlussPage from './pages/MonatsabschlussPage'
-import MahnlaufPage from './pages/MahnlaufPage'
-import AuswertungenPage from './pages/AuswertungenPage'
-import BuchhaltungPage from './pages/BuchhaltungPage'
-import KontenplanPage from './pages/KontenplanPage'
-import ArtikelgruppenPage from './pages/ArtikelgruppenPage'
-import EingangsrechnungenPage from './pages/EingangsrechnungenPage'
-import ProjektplanPage from './pages/ProjektplanPage'
-import ProjektplanDetailPage from './pages/ProjektplanDetailPage'
-import ProjekteEinstellungen from './pages/ProjekteEinstellungen'
-import AufgabenPage from './pages/AufgabenPage'
-import PosteckePage from './pages/PosteckePage'
+// Seiten hinter der Anmeldung werden erst beim Aufruf geladen (K-26b, siehe utils/lazySeite.js).
+const DashboardPage              = lazySeite(() => import('./pages/DashboardPage'))
+const MasterDataOverview         = lazySeite(() => import('./pages/MasterDataOverview'))
+const MasterDataDetail           = lazySeite(() => import('./pages/MasterDataDetail'))
+const ProfilePage                = lazySeite(() => import('./pages/ProfilePage'))
+const UserManagementPage         = lazySeite(() => import('./pages/UserManagementPage'))
+const GruppenPage                = lazySeite(() => import('./pages/GruppenPage'))
+const ZeiterfassungPage          = lazySeite(() => import('./pages/ZeiterfassungPage'))
+const ZeiterfassungFelder        = lazySeite(() => import('./pages/ZeiterfassungFelder'))
+const ZeitprojektePage           = lazySeite(() => import('./pages/ZeitprojektePage'))
+const BerichtProjektzeitenPage   = lazySeite(() => import('./pages/BerichtProjektzeitenPage'))
+const BerichtAuswertungPage      = lazySeite(() => import('./pages/BerichtAuswertungPage'))
+const SettingsPage               = lazySeite(() => import('./pages/SettingsPage'))
+const DatacenterPage             = lazySeite(() => import('./pages/DatacenterPage'))
+const InvoicePage                = lazySeite(() => import('./pages/InvoicePage'))
+const InvoiceFormPage            = lazySeite(() => import('./pages/InvoiceFormPage'))
+const InvoiceBookPage            = lazySeite(() => import('./pages/InvoiceBookPage'))
+const OpenItemsPage              = lazySeite(() => import('./pages/OpenItemsPage'))
+const MonatsabschlussPage        = lazySeite(() => import('./pages/MonatsabschlussPage'))
+const MahnlaufPage               = lazySeite(() => import('./pages/MahnlaufPage'))
+const AuswertungenPage           = lazySeite(() => import('./pages/AuswertungenPage'))
+const BuchhaltungPage            = lazySeite(() => import('./pages/BuchhaltungPage'))
+const KontenplanPage             = lazySeite(() => import('./pages/KontenplanPage'))
+const ArtikelgruppenPage         = lazySeite(() => import('./pages/ArtikelgruppenPage'))
+const EingangsrechnungenPage     = lazySeite(() => import('./pages/EingangsrechnungenPage'))
+const ProjektplanPage            = lazySeite(() => import('./pages/ProjektplanPage'))
+const ProjektplanDetailPage      = lazySeite(() => import('./pages/ProjektplanDetailPage'))
+const ProjekteEinstellungen      = lazySeite(() => import('./pages/ProjekteEinstellungen'))
+const AufgabenPage               = lazySeite(() => import('./pages/AufgabenPage'))
+const PosteckePage               = lazySeite(() => import('./pages/PosteckePage'))
 import Layout, { homeRoute } from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -111,6 +113,8 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
+                    {/* Ladeanzeige, während die Datei einer Seite nachgeladen wird (K-26b) */}
+                    <Suspense fallback={<AuthSpinner />}>
                     <Routes>
                       <Route path="/dashboard"            element={<ModuleRoute module="dashboard"><DashboardPage /></ModuleRoute>} />
                       <Route path="/masterdata"           element={<ModuleRoute module="stammdaten"><MasterDataOverview /></ModuleRoute>} />
@@ -177,6 +181,7 @@ function App() {
                       <Route path="/settings"             element={<AdminRoute><SettingsPage /></AdminRoute>} />
                       <Route path="*"                     element={<HomeRedirect />} />
                     </Routes>
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }

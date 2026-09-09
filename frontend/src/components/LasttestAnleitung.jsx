@@ -37,7 +37,7 @@ function Befehl({ children, hinweis }) {
         <pre className="bg-neutral-900 text-neutral-100 text-xs px-3 py-2.5 pr-10 rounded-lg overflow-x-auto font-mono whitespace-pre">
 {text}
         </pre>
-        <button onClick={kopieren}
+        <button aria-label="Befehl kopieren" onClick={kopieren}
           className="absolute top-2 right-2 p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-700 transition"
           title="Befehl kopieren">
           {kopiert ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}

@@ -195,7 +195,7 @@ export default function MonatsabschlussPage() {
                   <Download size={14} /> Übergabepaket
                 </button>
                 {isAdmin && pruefung.status !== 'abgeschlossen' && (
-                  <button onClick={abschliessen} disabled={laeuft || !pruefung.abschluss_moeglich}
+                  <button aria-label={!pruefung.abschluss_moeglich ? 'Erst die blockierenden Punkte erledigen' : undefined} onClick={abschliessen} disabled={laeuft || !pruefung.abschluss_moeglich}
                     title={!pruefung.abschluss_moeglich ? 'Erst die blockierenden Punkte erledigen' : undefined}
                     className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
                     <Lock size={14} /> Monat abschließen

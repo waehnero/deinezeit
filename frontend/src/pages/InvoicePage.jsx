@@ -279,7 +279,7 @@ export default function InvoicePage() {
             <option value="">Alle Status</option>
             {Object.entries(STATUS_BADGE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
-          <button onClick={load} className="p-2 text-neutral-500 hover:text-neutral-800">
+          <button aria-label="Liste aktualisieren" onClick={load} className="p-2 text-neutral-500 hover:text-neutral-800">
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -976,7 +976,7 @@ function DatacenterPicker({ onSelect, onClose }) {
           <h3 className="font-semibold text-sm flex items-center gap-2">
             <HardDrive size={15} className="text-blue-500" /> Datacenter
           </h3>
-          <button onClick={onClose}><XIcon size={16} /></button>
+          <button aria-label="Schließen" onClick={onClose}><XIcon size={16} /></button>
         </div>
         <input
           className="border rounded-lg px-3 py-1.5 text-sm mb-3 outline-none focus:ring-2 focus:ring-blue-300"

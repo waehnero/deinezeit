@@ -114,7 +114,7 @@ function RuleDialog({ rule, statuses, taskTypes, onClose, onSave }) {
       <div className="bg-surface w-full md:max-w-lg rounded-2xl max-h-full lg:max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <h2 className="text-base font-medium text-gray-900">{rule.name ? 'Regel bearbeiten' : 'Neue Regel'}</h2>
-          <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
+          <button aria-label="Schließen" onClick={onClose}><X size={20} className="text-gray-400" /></button>
         </div>
 
         <div className="p-5 space-y-4">

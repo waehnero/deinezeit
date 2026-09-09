@@ -86,7 +86,7 @@ function ShareDialog({ attachment, onClose }) {
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
             <Share2 size={16} className="text-primary-500" /> Download-Link erstellen
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button aria-label="Schließen" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="p-4 space-y-4">
           <p className="text-sm text-gray-500">Datei: <span className="font-medium text-gray-800">{attachment.display_name}</span></p>
@@ -161,7 +161,7 @@ export function AddLinkDialog({ entityType, entityId, providers, onClose, onAdde
           <h3 className="font-semibold text-gray-900 flex items-center gap-2">
             <Link size={16} className="text-primary-500" /> Cloud-Link hinzufügen
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button aria-label="Schließen" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <form onSubmit={submit} className="p-4 space-y-3">
           <div>
@@ -176,14 +176,14 @@ export function AddLinkDialog({ entityType, entityId, providers, onClose, onAdde
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Anzeigename *</label>
-            <input required value={form.display_name} onChange={e => setForm(f => ({...f, display_name: e.target.value}))}
+            <label htmlFor="link-anzeigename" className="block text-sm font-medium text-gray-700 mb-1">Anzeigename *</label>
+            <input id="link-anzeigename" name="link-anzeigename" required value={form.display_name} onChange={e => setForm(f => ({...f, display_name: e.target.value}))}
               placeholder="z.B. Projektdokumentation"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">URL *</label>
-            <input type="url" required value={form.link_url} onChange={e => setForm(f => ({...f, link_url: e.target.value}))}
+            <label htmlFor="link-url" className="block text-sm font-medium text-gray-700 mb-1">URL *</label>
+            <input id="link-url" name="link-url" type="url" required value={form.link_url} onChange={e => setForm(f => ({...f, link_url: e.target.value}))}
               placeholder="https://..."
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400" />
           </div>
@@ -238,7 +238,7 @@ function PreviewModal({ attachment, onClose }) {
       <div className="bg-surface rounded-xl shadow-xl max-w-4xl w-full max-h-full overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-3 border-b border-gray-100">
           <span className="font-medium text-gray-800 text-sm">{attachment.display_name}</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          <button aria-label="Schließen" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
         <div className="overflow-auto" style={{ maxHeight: 'calc(100dvh - 140px)' }}>
           {istText ? (
@@ -496,7 +496,7 @@ export default function AttachmentExplorer({ entityType, entityId, onClose, full
               <HardDrive size={18} className="text-primary-500" />
               Anhänge & Dateien
             </h2>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button aria-label="Schließen" onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X size={20} />
             </button>
           </div>

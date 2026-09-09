@@ -284,7 +284,7 @@ function ProjectRow({ p, flat, statusLabel, statusColor, onOpen, menuOpen, onMen
         <span className="text-center text-gray-500">{p.task_count}</span>
         <span className="text-right text-gray-500">{p.progress_percent}%</span>
         <span className="relative flex justify-end">
-          <button ref={menuBtnDesktop} onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={16} /></button>
+          <button aria-label="Weitere Aktionen" ref={menuBtnDesktop} onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={16} /></button>
           {menuOpen && (<><div className="fixed inset-0 z-[65]" onClick={onCloseMenu} /><ProjectActionsMenu anchorRef={menuBtnDesktop} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} /></>)}
         </span>
       </div>
@@ -304,7 +304,7 @@ function ProjectRow({ p, flat, statusLabel, statusColor, onOpen, menuOpen, onMen
           </div>
         </button>
         <div className="relative shrink-0">
-          <button ref={menuBtnMobile} onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={18} /></button>
+          <button aria-label="Weitere Aktionen" ref={menuBtnMobile} onClick={onMenu} className="text-gray-400 hover:text-gray-700 p-1"><MoreVertical size={18} /></button>
           {menuOpen && (<><div className="fixed inset-0 z-[65]" onClick={onCloseMenu} /><ProjectActionsMenu anchorRef={menuBtnMobile} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} /></>)}
         </div>
       </div>

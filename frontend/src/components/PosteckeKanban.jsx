@@ -150,7 +150,7 @@ function PlanenDialog({ post, onBestaetigen, onAbbrechen }) {
       <div className="max-h-full overflow-y-auto bg-surface rounded-2xl p-4 w-full max-w-xs space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-neutral-900">Wann soll gepostet werden?</p>
-          <button onClick={onAbbrechen} className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-500">
+          <button aria-label="Schließen" onClick={onAbbrechen} className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-500">
             <X size={16} />
           </button>
         </div>

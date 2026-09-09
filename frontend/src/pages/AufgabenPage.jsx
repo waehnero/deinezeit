@@ -266,7 +266,7 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
               </p>
             )}
           </div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
+          <button aria-label="Schließen" onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
@@ -384,7 +384,7 @@ function TodoDialog({ todo, statuses, priorities, onClose, onSaved, onDeleted })
               </button>
             )}
             {!isNew && (
-              <button onClick={drucken} disabled={printing}
+              <button aria-label="Laufzettel drucken (A5-Infos + Notizraster + QR-Code)" onClick={drucken} disabled={printing}
                 title="Laufzettel drucken (A5-Infos + Notizraster + QR-Code)"
                 className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-primary-600 disabled:opacity-50">
                 {printing ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
@@ -474,7 +474,7 @@ function MailScanPopup({ onClose, onScanned }) {
           <h2 className="font-semibold text-neutral-900 flex items-center gap-2">
             <Mail size={17} className="text-primary-600" /> Mail-Import
           </h2>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
+          <button aria-label="Schließen" onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
         </div>
         <div className="px-5 py-4">
           {konten === null ? (

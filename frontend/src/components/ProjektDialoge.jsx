@@ -20,7 +20,7 @@ function Header({ title, onClose }) {
   return (
     <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
       <h2 className="text-base font-medium text-gray-900">{title}</h2>
-      <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
+      <button aria-label="Schließen" onClick={onClose}><X size={20} className="text-gray-400" /></button>
     </div>
   )
 }

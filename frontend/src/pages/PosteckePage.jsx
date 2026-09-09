@@ -749,7 +749,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
             <Megaphone size={16} className="text-primary-600" />
             {istNeu ? 'Neuer Post' : 'Post bearbeiten'}
           </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
+          <button aria-label="Schließen" onClick={onClose} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
             <X size={18} />
           </button>
         </div>
@@ -803,7 +803,7 @@ function PostEditor({ post, profile, onClose, onSaved }) {
                   videoId={aktuell.video.id}
                   hasPoster={aktuell.video.has_poster}
                   className="w-full min-h-[8rem] max-h-64" />
-                <button onClick={videoLoeschen}
+                <button aria-label="Video entfernen" onClick={videoLoeschen}
                   className="absolute top-1 right-1 p-1 rounded-full bg-neutral-900/60 text-white opacity-80 hover:opacity-100 z-10">
                   <X size={14} />
                 </button>

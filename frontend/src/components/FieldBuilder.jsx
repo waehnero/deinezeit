@@ -137,8 +137,8 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Feldname */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Feldbezeichnung *</label>
-            <input
+            <label htmlFor="feld-name" className="block text-xs font-medium text-gray-600 mb-1">Feldbezeichnung *</label>
+            <input id="feld-name" name="feld-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -151,10 +151,10 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
 
           {/* Feldtyp */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Feldtyp</label>
+            <label htmlFor="feld-typ" className="block text-xs font-medium text-gray-600 mb-1">Feldtyp</label>
             <div className="relative">
               <TypeIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <select
+              <select id="feld-typ" name="feld-typ"
                 value={fieldType}
                 onChange={(e) => setFieldType(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none bg-surface"
@@ -175,10 +175,10 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
         {/* Lookup: Verzeichnis auswählen */}
         {fieldType === 'lookup' && (
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="feld-lookup-quelle" className="block text-xs font-medium text-gray-600 mb-1">
               Auswahl aus *
             </label>
-            <select
+            <select id="feld-lookup-quelle" name="feld-lookup-quelle"
               value={lookupSource}
               onChange={(e) => setLookupSource(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface"
@@ -203,7 +203,7 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
             {availableTypes.length === 0 ? (
               <p className="text-xs text-gray-400 py-2">Keine anderen Stammdaten-Typen vorhanden</p>
             ) : (
-              <select
+              <select id="feld-verknuepfter-typ" name="feld-verknuepfter-typ"
                 value={linkedTypeSlug}
                 onChange={(e) => setLinkedTypeSlug(e.target.value)}
                 required
@@ -221,10 +221,10 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
         {/* Platzhalter */}
         {!['checkbox', 'date', 'relation'].includes(fieldType) && (
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="feld-platzhalter" className="block text-xs font-medium text-gray-600 mb-1">
               Platzhaltertext (optional)
             </label>
-            <input
+            <input id="feld-platzhalter" name="feld-platzhalter"
               type="text"
               value={placeholder}
               onChange={(e) => setPlaceholder(e.target.value)}
@@ -236,8 +236,8 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
 
         {/* Optionen */}
         <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
+          <label htmlFor="feld-pflicht" className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input id="feld-pflicht" name="feld-pflicht"
               type="checkbox"
               checked={isRequired}
               onChange={(e) => setIsRequired(e.target.checked)}
@@ -245,8 +245,8 @@ function AddFieldForm({ slug, onAdded, onCancel }) {
             />
             Pflichtfeld
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
+          <label htmlFor="feld-in-liste" className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input id="feld-in-liste" name="feld-in-liste"
               type="checkbox"
               checked={showInList}
               onChange={(e) => setShowInList(e.target.checked)}
@@ -421,7 +421,7 @@ function FieldRow({ field, slug, onUpdated, onDeleted }) {
                 den Aufruf ohnehin ab; die Schaltfläche gar nicht erst
                 anzubieten erspart den Weg über eine Fehlermeldung. */}
             {!field.is_system && (
-              <button
+              <button aria-label={confirmDelete ? 'Nochmal klicken zum Bestätigen' : 'Feld entfernen'}
                 onClick={handleDelete}
                 disabled={loading}
                 className={`p-1.5 rounded-lg transition ${

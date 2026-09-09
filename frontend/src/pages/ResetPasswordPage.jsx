@@ -130,11 +130,11 @@ export default function ResetPasswordPage() {
 
               <form onSubmit={absenden} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                  <label htmlFor="passwort" className="block text-sm font-medium text-neutral-700 mb-1.5">
                     Neues Passwort
                   </label>
                   <div className="relative">
-                    <input
+                    <input id="passwort" name="passwort"
                       type={zeigen ? 'text' : 'password'}
                       value={passwort}
                       onChange={(e) => setPasswort(e.target.value)}
@@ -157,10 +157,10 @@ export default function ResetPasswordPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                  <label htmlFor="passwort-wiederholung" className="block text-sm font-medium text-neutral-700 mb-1.5">
                     Passwort wiederholen
                   </label>
-                  <input
+                  <input id="passwort-wiederholung" name="passwort-wiederholung"
                     type={zeigen ? 'text' : 'password'}
                     value={wiederholung}
                     onChange={(e) => setWiederholung(e.target.value)}

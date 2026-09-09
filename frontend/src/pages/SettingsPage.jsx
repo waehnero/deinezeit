@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { useSettings } from '../contexts/SettingsContext'
+import { useSettings, mitCacheBuster } from '../contexts/SettingsContext'
 import { getAccessToken, settingsApi, systemApi, invoiceApi } from '../services/api'
 import toast from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
@@ -275,7 +275,7 @@ function TabAllgemein({ settings, onSaved }) {
             </div>
             <div className="h-16 border border-gray-200 rounded-xl bg-surface flex items-center justify-center p-2">
               {logoHeaderUrl
-                ? <img src={`${logoHeaderUrl}?v=${Date.now()}`} alt="Header" className="max-h-full max-w-full object-contain" />
+                ? <img src={mitCacheBuster(logoHeaderUrl)} alt="Header" className="max-h-full max-w-full object-contain" />
                 : <div className="text-xs text-gray-300 text-center">600 × 120 px<br/>für Berichte</div>
               }
             </div>
@@ -290,7 +290,7 @@ function TabAllgemein({ settings, onSaved }) {
             <div className="h-16 border border-gray-200 rounded-xl bg-gray-100 flex items-center gap-3 px-4">
               <div className="w-8 h-8 border border-gray-200 rounded bg-surface flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {logoFaviconUrl
-                  ? <img src={`${logoFaviconUrl}?v=${Date.now()}`} alt="Favicon" className="w-full h-full object-contain" />
+                  ? <img src={mitCacheBuster(logoFaviconUrl)} alt="Favicon" className="w-full h-full object-contain" />
                   : <Monitor size={14} className="text-gray-300" />
                 }
               </div>
@@ -347,7 +347,7 @@ function TabAllgemein({ settings, onSaved }) {
             {logoFaviconUrl ? (
               <div className="w-16 h-16 border border-gray-200 rounded-xl bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
                 <img
-                  src={`${logoFaviconUrl}?v=${Date.now()}`}
+                  src={mitCacheBuster(logoFaviconUrl)}
                   alt="Favicon"
                   className="w-8 h-8 object-contain"
                 />
@@ -1187,7 +1187,7 @@ function SecretInput({ value, onChange, placeholder = '••••••••'
           placeholder={placeholder}
           className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
-        <button type="button" onClick={() => setShow(s => !s)}
+        <button type="button" onClick={() => setShow(s => !s)} aria-label={show ? 'Wert verbergen' : 'Wert anzeigen'}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
           {show ? <EyeOff size={14}/> : <Eye size={14}/>}
         </button>
@@ -1955,7 +1955,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
                     onChange={() => setTaxRates(l => l.map((x, j) => ({ ...x, standard: j === i })))} />
                   Standard
                 </label>
-                <button type="button" title="Satz entfernen"
+                <button aria-label="Satz entfernen" type="button" title="Satz entfernen"
                   onClick={() => setTaxRates(l => l.filter((_, j) => j !== i))}
                   className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
               </div>
@@ -2006,7 +2006,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
                     onChange={e => setDunningLevels(l => l.map((x, j) => j === i ? { ...x, interest: e.target.checked } : x))} />
                   berechnen
                 </label>
-                <button type="button" title="Stufe entfernen"
+                <button aria-label="Stufe entfernen" type="button" title="Stufe entfernen"
                   onClick={() => setDunningLevels(l => l.filter((_, j) => j !== i)
                                                        .map((x, j) => ({ ...x, level: j + 1 })))}
                   className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={13} /></button>
@@ -2968,7 +2968,7 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
           <p className="text-sm text-gray-400 mt-0.5">Programm konfigurieren</p>
         </div>
-        <button onClick={handleReload} disabled={reloading} className="ml-auto p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition" title="Neu laden">
+        <button aria-label="Neu laden" onClick={handleReload} disabled={reloading} className="ml-auto p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition" title="Neu laden">
           <RefreshCw size={16} className={reloading ? 'animate-spin' : ''} />
         </button>
       </div>

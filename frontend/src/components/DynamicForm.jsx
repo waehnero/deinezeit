@@ -122,7 +122,7 @@ function InlineCreateModal({ entityType, onClose, onCreated }) {
               <p className="text-xs text-neutral-400">Wird direkt in {entityType.name} gespeichert und verknüpft</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition">
+          <button aria-label="Schließen" type="button" onClick={onClose} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition">
             <X size={18} />
           </button>
         </div>
@@ -260,7 +260,7 @@ function RelationField({ field, value, onChange, disabled }) {
           <GitMerge size={14} className="text-primary-500 flex-shrink-0" />
           <span className="text-sm text-primary-800 flex-1 font-medium">{selected.display_name}</span>
           {!disabled && (
-            <button
+            <button aria-label="Verknüpfung aufheben"
               type="button"
               onClick={handleClear}
               className="p-0.5 text-primary-400 hover:text-red-500 transition"
