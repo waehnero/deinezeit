@@ -69,8 +69,8 @@ function NewTypeModal({ onClose, onCreated }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bezeichnung *</label>
-            <input
+            <label htmlFor="typ-bezeichnung" className="block text-sm font-medium text-gray-700 mb-1">Bezeichnung *</label>
+            <input id="typ-bezeichnung" name="typ-bezeichnung"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -126,8 +126,8 @@ function NewTypeModal({ onClose, onCreated }) {
 
           {/* Beschreibung */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Beschreibung (optional)</label>
-            <input
+            <label htmlFor="typ-beschreibung" className="block text-sm font-medium text-gray-700 mb-1">Beschreibung (optional)</label>
+            <input id="typ-beschreibung" name="typ-beschreibung"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}

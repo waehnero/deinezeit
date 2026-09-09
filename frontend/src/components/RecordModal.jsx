@@ -96,7 +96,7 @@ export default function RecordModal({ entityType, record, onClose, onSaved,
               : isEdit ? 'Datensatz bearbeiten'
               : `Neuen ${entityType.name.replace(/en$/, '').replace(/s$/, '')} anlegen`}
           </h2>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
+          <button aria-label="Schließen" onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
             <X size={20} />
           </button>
         </div>

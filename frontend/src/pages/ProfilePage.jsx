@@ -173,13 +173,13 @@ export default function ProfilePage() {
           </h2>
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+              <label htmlFor="profil-name" className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input id="profil-name" name="profil-name" autoComplete="name" type="text" value={fullName} onChange={e => setFullName(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
-              <input type="email" value={user?.email} disabled
+              <label htmlFor="profil-email" className="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+              <input id="profil-email" name="profil-email" autoComplete="email" type="email" value={user?.email} disabled
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-500" />
             </div>
             {/* Sprachwahl ausgeblendet (Audit UX-002): Nur 48 Texte sind
@@ -225,11 +225,11 @@ export default function ProfilePage() {
           </h2>
           <form onSubmit={handleSavePassword} className="space-y-3">
             <div className="relative">
-              <input type={showPw ? 'text' : 'password'}
+              <input id="neues-passwort" name="neues-passwort" autoComplete="new-password" type={showPw ? 'text' : 'password'}
                 value={newPassword} onChange={e => setNewPassword(e.target.value)}
                 placeholder="Neues Passwort (min. 8 Zeichen)"
                 className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <button type="button" onClick={() => setShowPw(!showPw)}
+              <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? 'Passwort verbergen' : 'Passwort anzeigen'}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>

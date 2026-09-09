@@ -329,6 +329,11 @@ cd frontend && npm run test:watch
   Endpunkte wandern in `<modul>_<fachgebiet>.py`, gemeinsame Hilfen in
   `<modul>_common.py`. Neue Verkaufs-Endpunkte gehören in den passenden
   `invoice_*`-Teil, nicht in `invoice.py`.
+- **Seiten laden verzögert:** Jede Seite hinter der Anmeldung wird in
+  `frontend/src/main.jsx` mit `lazySeite(() => import('./pages/X'))` eingebunden
+  (K-26b) — eine neue Seite bitte genauso, nicht per statischem `import`.
+  `utils/lazySeite.js` fängt den Fall ab, dass nach einem Deploy eine alte
+  Browser-Sitzung eine nicht mehr vorhandene Datei anfordert (einmaliger Reload).
 - **API-Präfix:** alle Router unter `/api` (siehe `main.py`).
 - **Migrationen:** durchnummeriert; nie nachträglich umnummerieren.
 - **Zeilenenden** (`.gitattributes`): `.sh` = LF, `.bat/.ps1/.cmd` = CRLF.

@@ -73,7 +73,7 @@ export default function AttachmentQuickBar({ entityType, entityId, onEnsureEntit
   return (
     <>
       <div className={`flex items-center flex-wrap gap-2 ${className}`}>
-        <button type="button" onClick={openCloudLink} disabled={uploading} title="Cloud-Link"
+        <button aria-label="Cloud-Link" type="button" onClick={openCloudLink} disabled={uploading} title="Cloud-Link"
           className="flex items-center gap-1.5 px-2.5 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
           <Link size={14} /> <span className="hidden sm:inline">Cloud-Link</span>
         </button>

@@ -30,7 +30,7 @@ export default function PageHeader({ icon: Icon, title, subtitle, children }) {
       <div className="flex items-center gap-2 flex-wrap">
         {children}
         {/* Globale Suche (⌘K) — immer ganz rechts, auf jeder Seite gleich */}
-        <button onClick={openCommandPalette} title="Suchen & Befehle (⌘K)"
+        <button aria-label="Suchen & Befehle (⌘K)" onClick={openCommandPalette} title="Suchen & Befehle (⌘K)"
           className="flex items-center gap-2 px-2.5 py-2.5 rounded-xl border border-neutral-200 bg-surface text-neutral-400 hover:text-neutral-700 hover:bg-neutral-50 transition">
           <Search size={16} />
           <kbd className="hidden md:block text-[10px] border border-neutral-200 rounded px-1 py-0.5">⌘K</kbd>

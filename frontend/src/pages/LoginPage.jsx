@@ -218,8 +218,8 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="label">{t('auth.email')}</label>
-              <input
+              <label htmlFor="email" className="label">{t('auth.email')}</label>
+              <input id="email" name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -232,13 +232,13 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="label mb-0">{t('auth.password')}</label>
+                <label htmlFor="password" className="label mb-0">{t('auth.password')}</label>
                 <Link to="/forgot-password" className="text-xs text-primary-500 hover:text-primary-600 transition-colors">
                   Passwort vergessen?
                 </Link>
               </div>
               <div className="relative">
-                <input
+                <input id="password" name="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -250,6 +250,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -259,8 +260,8 @@ export default function LoginPage() {
 
             {showTotp && !recoveryModus && (
               <div>
-                <label className="label">{t('auth.totpCode')}</label>
-                <input
+                <label htmlFor="totp" className="label">{t('auth.totpCode')}</label>
+                <input id="totp" name="totp" inputMode="numeric"
                   type="text"
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -282,8 +283,8 @@ export default function LoginPage() {
 
             {showTotp && recoveryModus && (
               <div>
-                <label className="label">Einmal-Code</label>
-                <input
+                <label htmlFor="recovery-code" className="label">Einmal-Code</label>
+                <input id="recovery-code" name="recovery-code"
                   type="text"
                   value={recoveryCode}
                   onChange={(e) => setRecoveryCode(e.target.value.toUpperCase().slice(0, 12))}

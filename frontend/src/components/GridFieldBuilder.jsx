@@ -198,7 +198,7 @@ function SortableField({ field, slug, tabs, activeTab, onUpdated, onDeleted, onC
                     die Breite ändern bleibt möglich — nur das Entfernen nicht,
                     weil Belegpicker und Kontenkaskade darauf zugreifen. */}
                 {!field.is_system && (
-                  <button onClick={handleDelete} disabled={loading}
+                  <button aria-label={confirmDelete ? 'Nochmal klicken' : 'Löschen'} onClick={handleDelete} disabled={loading}
                     className={`p-1 rounded-lg transition ${
                       confirmDelete ? 'bg-red-100 text-red-500' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
                     }`} title={confirmDelete ? 'Nochmal klicken' : 'Löschen'}>
@@ -324,14 +324,14 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Bezeichnung *</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} autoFocus required
+            <label htmlFor="gfeld-name" className="block text-xs font-medium text-gray-600 mb-1">Bezeichnung *</label>
+            <input id="gfeld-name" name="gfeld-name" type="text" value={name} onChange={e => setName(e.target.value)} autoFocus required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="z.B. Geburtsdatum, Umsatz …" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Feldtyp</label>
-            <select value={fieldType} onChange={e => setFieldType(e.target.value)}
+            <label htmlFor="gfeld-typ" className="block text-xs font-medium text-gray-600 mb-1">Feldtyp</label>
+            <select id="gfeld-typ" name="gfeld-typ" value={fieldType} onChange={e => setFieldType(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
               {FIELD_TYPES.map(({ key, label }) => <option key={key} value={key}>{label}</option>)}
             </select>
@@ -340,11 +340,11 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
 
         {fieldType === 'relation' && (
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Verknüpft mit *</label>
+            <label htmlFor="gfeld-verknuepfter-typ" className="block text-xs font-medium text-gray-600 mb-1">Verknüpft mit *</label>
             {availableTypes.length === 0 ? (
               <p className="text-xs text-gray-400 py-2">Keine anderen Stammdaten-Typen vorhanden</p>
             ) : (
-              <select value={linkedTypeSlug} onChange={e => setLinkedTypeSlug(e.target.value)} required
+              <select id="gfeld-verknuepfter-typ" name="gfeld-verknuepfter-typ" value={linkedTypeSlug} onChange={e => setLinkedTypeSlug(e.target.value)} required
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
                 <option value="">— Typ auswählen —</option>
                 {availableTypes.map(t => <option key={t.slug} value={t.slug}>{t.name}</option>)}
@@ -371,8 +371,8 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
 
         {tabs.length > 0 && (
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Tab-Zugehörigkeit</label>
-            <select value={selectedTab || tabs[0]} onChange={e => setSelectedTab(e.target.value)}
+            <label htmlFor="gfeld-tab" className="block text-xs font-medium text-gray-600 mb-1">Tab-Zugehörigkeit</label>
+            <select id="gfeld-tab" name="gfeld-tab" value={selectedTab || tabs[0]} onChange={e => setSelectedTab(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-surface">
               {tabs.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -381,8 +381,8 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
 
         {fieldType === 'dropdown' && (
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Optionen (kommagetrennt)</label>
-            <input type="text" value={options} onChange={e => setOptions(e.target.value)}
+            <label htmlFor="gfeld-optionen" className="block text-xs font-medium text-gray-600 mb-1">Optionen (kommagetrennt)</label>
+            <input id="gfeld-optionen" name="gfeld-optionen" type="text" value={options} onChange={e => setOptions(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="Option A, Option B, Option C" />
           </div>
@@ -390,15 +390,15 @@ function AddFieldPanel({ slug, tabs, activeTab, onAdded }) {
 
         {!['checkbox', 'date', 'relation'].includes(fieldType) && (
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Platzhalter (optional)</label>
-            <input type="text" value={placeholder} onChange={e => setPlaceholder(e.target.value)}
+            <label htmlFor="gfeld-platzhalter" className="block text-xs font-medium text-gray-600 mb-1">Platzhalter (optional)</label>
+            <input id="gfeld-platzhalter" name="gfeld-platzhalter" type="text" value={placeholder} onChange={e => setPlaceholder(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="Hinweistext im Eingabefeld" />
           </div>
         )}
 
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input type="checkbox" checked={isRequired} onChange={e => setIsRequired(e.target.checked)}
+        <label htmlFor="gfeld-pflicht" className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input id="gfeld-pflicht" name="gfeld-pflicht" type="checkbox" checked={isRequired} onChange={e => setIsRequired(e.target.checked)}
             className="w-4 h-4 accent-primary-600" />
           Pflichtfeld
         </label>

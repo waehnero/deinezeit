@@ -74,7 +74,7 @@ export default function AuswertungenPage() {
               className="border border-neutral-200 rounded-lg px-3 py-2 text-sm">
               {jahre.map(j => <option key={j} value={j}>{j}</option>)}
             </select>
-            <button onClick={holen}
+            <button aria-label="Neu laden" onClick={holen}
               className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500" title="Neu laden">
               <RefreshCw size={16} className={laden ? 'animate-spin' : ''} />
             </button>

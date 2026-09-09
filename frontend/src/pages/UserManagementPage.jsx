@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }) {
       <div className="max-h-full overflow-y-auto bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
           <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
-          <button onClick={onClose} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition">
+          <button aria-label="Schließen" onClick={onClose} className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition">
             <X size={18} />
           </button>
         </div>
@@ -54,16 +54,16 @@ function NewUserModal({ onClose, onCreated }) {
     <Modal title="Neuen Benutzer anlegen" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="label">Name *</label>
-          <input className="input" type="text" value={form.full_name} onChange={e => set('full_name', e.target.value)} required autoFocus placeholder="Vor- und Nachname" />
+          <label htmlFor="neu-name" className="label">Name *</label>
+          <input id="neu-name" name="neu-name" autoComplete="off" className="input" type="text" value={form.full_name} onChange={e => set('full_name', e.target.value)} required autoFocus placeholder="Vor- und Nachname" />
         </div>
         <div>
-          <label className="label">E-Mail *</label>
-          <input className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} required placeholder="name@firma.at" />
+          <label htmlFor="neu-email" className="label">E-Mail *</label>
+          <input id="neu-email" name="neu-email" autoComplete="off" className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} required placeholder="name@firma.at" />
         </div>
         <div>
-          <label className="label">Passwort *</label>
-          <input className="input" type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={8} placeholder="Mindestens 8 Zeichen" />
+          <label htmlFor="neu-passwort" className="label">Passwort *</label>
+          <input id="neu-passwort" name="neu-passwort" autoComplete="new-password" className="input" type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={8} placeholder="Mindestens 8 Zeichen" />
         </div>
         <div>
           <label className="label">Rolle</label>
@@ -196,12 +196,12 @@ function EditUserModal({ user, onClose, onUpdated }) {
     <Modal title={`${user.full_name} bearbeiten`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="label">Name</label>
-          <input className="input" type="text" value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
+          <label htmlFor="bearbeiten-name" className="label">Name</label>
+          <input id="bearbeiten-name" name="bearbeiten-name" autoComplete="off" className="input" type="text" value={form.full_name} onChange={e => set('full_name', e.target.value)} required />
         </div>
         <div>
-          <label className="label">Neues Passwort <span className="text-neutral-400 font-normal">(leer lassen = unverändert)</span></label>
-          <input className="input" type="password" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Neues Passwort vergeben" minLength={8} />
+          <label htmlFor="bearbeiten-passwort" className="label">Neues Passwort <span className="text-neutral-400 font-normal">(leer lassen = unverändert)</span></label>
+          <input id="bearbeiten-passwort" name="bearbeiten-passwort" autoComplete="new-password" className="input" type="password" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Neues Passwort vergeben" minLength={8} />
         </div>
         <div>
           <label className="label">Rolle</label>
@@ -245,7 +245,7 @@ function EditUserModal({ user, onClose, onUpdated }) {
                 {gruppen.map((g) => (
                   <label key={g.id}
                          className="flex items-start gap-3 px-2 py-1.5 hover:bg-neutral-50 rounded-lg cursor-pointer">
-                    <input type="checkbox"
+                    <input type="checkbox" name={`gruppe-${g.id}`}
                            checked={form.group_ids.includes(g.id)}
                            onChange={() => toggleGruppe(g.id)}
                            className="w-4 h-4 mt-0.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500" />

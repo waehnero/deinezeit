@@ -277,7 +277,7 @@ export default function Layout({ children }) {
             </>
           )}
         </NavLink>
-        <button onClick={handleLogout}
+        <button aria-label={mini ? t('auth.logout') : undefined} onClick={handleLogout}
           title={mini ? t('auth.logout') : undefined}
           className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium text-sidebar-text hover:bg-red-50 hover:text-red-600 transition-all duration-150 group ${
             mini ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
@@ -298,7 +298,7 @@ export default function Layout({ children }) {
       }`}>
         <SidebarContent mini={collapsed} />
         {/* Ein-/Ausklappen */}
-        <button
+        <button aria-label={collapsed ? 'Menü ausklappen' : 'Menü einklappen'}
           onClick={toggleCollapsed}
           title={collapsed ? 'Menü ausklappen' : 'Menü einklappen'}
           className="absolute -right-3 top-20 z-10 w-6 h-6 bg-surface border border-neutral-200 rounded-full flex items-center justify-center text-neutral-400 hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
@@ -335,7 +335,7 @@ export default function Layout({ children }) {
             )}
             <span className="font-semibold text-neutral-900 text-sm">{companyName}</span>
           </button>
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-600">
+          <button onClick={() => setMobileOpen(!mobileOpen)} aria-label={mobileOpen ? 'Menü schließen' : 'Menü öffnen'} aria-expanded={mobileOpen} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-600">
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </header>

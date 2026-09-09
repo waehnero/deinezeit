@@ -78,6 +78,26 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Die einzige Datei über 500 kB ist exceljs (930 kB), die nur beim
+    // Excel-Import/-Export per import() nachgeladen wird. Die Warnung soll bei
+    // echten Ausreißern im Hauptbundle wieder anschlagen, nicht bei dieser.
+    chunkSizeWarningLimit: 1000,
+    rolldownOptions: {
+      output: {
+        // Seiten werden per React.lazy nachgeladen (K-26b). Ohne diese Gruppen
+        // legt Rolldown für jedes lucide-Icon, das mehrere Seiten teilen, eine
+        // eigene 200-Byte-Datei an — über 50 Stück, jede ein eigener Request.
+        // Deshalb: alle Icons in eine Datei, React-Kern in eine zweite.
+        codeSplitting: {
+          groups: [
+            { name: 'icons', test: /node_modules[\\/]lucide-react[\\/]/ },
+            { name: 'react', test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {

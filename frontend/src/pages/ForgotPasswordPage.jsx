@@ -121,10 +121,10 @@ export default function ForgotPasswordPage() {
 
               <form onSubmit={absenden} className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                  <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-1.5">
                     E-Mail-Adresse
                   </label>
-                  <input
+                  <input id="email" name="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}

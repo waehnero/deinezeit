@@ -104,6 +104,13 @@ const DOC_TYPE_LABELS = {
   auftragsbestaetigung: 'Auftragsbestätigung',
   gutschrift: 'Gutschrift', lieferschein: 'Lieferschein',
 }
+// Überschrift beim Anlegen — der Artikel hängt am Genus des Belegtyps
+// („Neues Angebot", „Neuer Lieferschein"), nicht einfach „Neue " + Label.
+const DOC_TYPE_NEU = {
+  rechnung: 'Neue Rechnung', angebot: 'Neues Angebot',
+  auftragsbestaetigung: 'Neue Auftragsbestätigung',
+  gutschrift: 'Neue Gutschrift', lieferschein: 'Neuer Lieferschein',
+}
 
 const EMPTY_POSITION = {
   pos_type: 'item', description: '', detail: '', quantity: '1', unit: 'Stk',
@@ -610,7 +617,7 @@ export default function InvoiceFormPage() {
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/invoices')} className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-500"><ArrowLeft size={18} /></button>
           <div>
-            <h1 className="text-xl font-semibold text-neutral-900">{isNew ? 'Neue ' + DOC_TYPE_LABELS[docType] : DOC_TYPE_LABELS[docType] + ' bearbeiten'}</h1>
+            <h1 className="text-xl font-semibold text-neutral-900">{isNew ? (DOC_TYPE_NEU[docType] || 'Neuer Beleg') : DOC_TYPE_LABELS[docType] + ' bearbeiten'}</h1>
             {number
               ? <p className="text-sm text-neutral-400 mt-0.5">Nummer: {number}</p>
               : nextNumber && (
@@ -649,7 +656,7 @@ export default function InvoiceFormPage() {
               </button>
             </>
           )}
-          <button onClick={handleSave} disabled={saving}
+          <button aria-label={gesperrt ? 'Speichert die interne Notiz' : undefined} onClick={handleSave} disabled={saving}
             title={gesperrt ? 'Speichert die interne Notiz' : undefined}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
             {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
@@ -1450,7 +1457,7 @@ function PositionImage({ pos, onChange }) {
         <span className="text-xs text-neutral-500">
           Bild · {label ? `${label[1]} (${label[2]})` : pos.image_size}
         </span>
-        <button type="button" title="Bild entfernen"
+        <button aria-label="Bild entfernen" type="button" title="Bild entfernen"
           onClick={() => { onChange('image_key', null); onChange('image_size', null); onChange('image_provider', null) }}
           className="p-1 text-neutral-400 hover:text-red-500"><XIcon size={13} /></button>
       </div>
@@ -1559,7 +1566,7 @@ function PositionRow({ pos, index, taxMode, taxRates = [], betrag,
           {['subtotal', 'discount'].includes(typ) && (
             <span className="text-sm font-medium text-neutral-800 w-28 text-right">{fmtEuro(betrag)}</span>
           )}
-          <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
+          <button aria-label="Position entfernen" onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
         </div>
         {typ === 'discount' && (
           <p className="text-xs text-neutral-500 mt-1.5 ml-26">
@@ -1617,7 +1624,7 @@ function PositionRow({ pos, index, taxMode, taxRates = [], betrag,
         </div>
         <div className="col-span-1 md:col-span-1 flex items-center justify-center gap-0.5">
           <MoveButtons istErste={istErste} istLetzte={istLetzte} onMove={onMove} />
-          <button onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
+          <button aria-label="Position entfernen" onClick={onRemove} className="p-1 text-neutral-400 hover:text-red-500"><Trash2 size={14} /></button>
         </div>
       </div>
       <div className="mt-2 flex gap-2">

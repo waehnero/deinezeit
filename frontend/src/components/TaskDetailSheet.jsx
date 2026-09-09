@@ -212,7 +212,7 @@ export default function TaskDetailSheet({ task, settings, fields, project, proje
         {/* Kopf */}
         <div className="sticky top-0 bg-surface border-b border-gray-100 px-5 py-3 flex items-center justify-between z-10">
           <span className="text-sm text-gray-500">Aufgabe bearbeiten</span>
-          <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
+          <button aria-label="Schließen" onClick={onClose}><X size={20} className="text-gray-400" /></button>
         </div>
 
         <div className="p-5 space-y-4">

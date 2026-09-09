@@ -47,7 +47,7 @@ Release-Checkliste: [docs/RELEASE-2.0.0.md](docs/RELEASE-2.0.0.md).
 
 ### Nächste Schritte / To-dos
 
-- Nach 2.0.0 (ohne Release-Druck): ~~npm-Hauptversionen~~ (erledigt 08.09.2026: react-router 7, TipTap 3, vite 8, Node 22, `npm audit` 0), K-26 — Prüfbericht: [docs/PRUEFBERICHT-NPM-2026-09-08.md](docs/PRUEFBERICHT-NPM-2026-09-08.md); K-26a gemergt 09.09.2026 (Verkauf aufgeteilt, v2.0.2), K-26a2 gebaut 09.09. (Windows-Skripte → scripts/windows, v2.0.3, Windows-Test offen) — Prüfbericht: [docs/PRUEFBERICHT-K26A-2026-09-08.md](docs/PRUEFBERICHT-K26A-2026-09-08.md)
+- Nach 2.0.0 (ohne Release-Druck): ~~npm-Hauptversionen~~ (erledigt 08.09.2026: react-router 7, TipTap 3, vite 8, Node 22, `npm audit` 0), K-26 — Prüfbericht: [docs/PRUEFBERICHT-NPM-2026-09-08.md](docs/PRUEFBERICHT-NPM-2026-09-08.md); K-26a gemergt 09.09.2026 (Verkauf aufgeteilt, v2.0.2), K-26a2 gemergt 09.09. (v2.0.3, Windows-Test offen), K-26b gebaut 09.09. (Frontend: Lazy-Loading, N-03, aria-label, v2.0.4) — Prüfbericht: [docs/PRUEFBERICHT-K26B-2026-09-09.md](docs/PRUEFBERICHT-K26B-2026-09-09.md) — Prüfbericht: [docs/PRUEFBERICHT-K26A-2026-09-08.md](docs/PRUEFBERICHT-K26A-2026-09-08.md)
   (invoice.py aufteilen, Skripte ordnen, React.lazy, aria-label/Formularfeld-IDs), OPS-006 Logging
 - Branch-Schutz: „Frontend: Tests (Vitest)" als Pflicht-Check aufnehmen
 

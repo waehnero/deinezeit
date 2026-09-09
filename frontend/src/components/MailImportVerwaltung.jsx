@@ -184,7 +184,7 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
           <h2 className="font-semibold text-neutral-900">
             {isNew ? (global ? 'Neues globales Mail-Konto' : 'Neues Mail-Konto') : 'Mail-Konto bearbeiten'}
           </h2>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
+          <button aria-label="Schließen" onClick={onClose} className="text-neutral-400 hover:text-neutral-700"><X size={18} /></button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
@@ -311,7 +311,7 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
               <input value={form.folder} onChange={e => set('folder', e.target.value)}
                 placeholder={istImap ? 'INBOX' : 'inbox'} className={inputCls} />
             </div>
-            <button onClick={ordnerTesten} disabled={testing || isNew}
+            <button aria-label={isNew ? 'Erst speichern, dann testen' : 'Verbindung testen und Ordner auflisten'} onClick={ordnerTesten} disabled={testing || isNew}
               title={isNew ? 'Erst speichern, dann testen' : 'Verbindung testen und Ordner auflisten'}
               className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-300 text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">
               {testing ? <Loader2 size={14} className="animate-spin" /> : <FolderSearch size={14} />}

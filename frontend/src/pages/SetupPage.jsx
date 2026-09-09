@@ -173,37 +173,37 @@ export default function SetupPage() {
 
               <form onSubmit={goToStep2} className="space-y-4">
                 <div>
-                  <label className="label">Name</label>
-                  <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)}
+                  <label htmlFor="admin-name" className="label">Name</label>
+                  <input id="admin-name" name="admin-name" className="input" value={fullName} onChange={(e) => setFullName(e.target.value)}
                     required placeholder="Vor- und Nachname" autoComplete="name" autoFocus />
                 </div>
                 <div>
-                  <label className="label">E-Mail</label>
-                  <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)}
+                  <label htmlFor="admin-email" className="label">E-Mail</label>
+                  <input id="admin-email" name="admin-email" type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)}
                     required placeholder="name@firma.at" autoComplete="username" />
                 </div>
                 <div>
-                  <label className="label">Passwort</label>
+                  <label htmlFor="admin-passwort" className="label">Passwort</label>
                   <div className="relative">
-                    <input type={showPassword ? 'text' : 'password'} className="input pr-10"
+                    <input id="admin-passwort" name="admin-passwort" type={showPassword ? 'text' : 'password'} className="input pr-10"
                       value={password} onChange={(e) => setPassword(e.target.value)}
                       required placeholder="mindestens 8 Zeichen" autoComplete="new-password" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="label">Passwort bestätigen</label>
-                  <input type={showPassword ? 'text' : 'password'} className="input"
+                  <label htmlFor="admin-passwort2" className="label">Passwort bestätigen</label>
+                  <input id="admin-passwort2" name="admin-passwort2" type={showPassword ? 'text' : 'password'} className="input"
                     value={password2} onChange={(e) => setPassword2(e.target.value)}
                     required placeholder="••••••••" autoComplete="new-password" />
                 </div>
                 {tokenRequired && (
                   <div>
-                    <label className="label">Einrichtungs-Token</label>
-                    <input className="input font-mono" value={setupToken}
+                    <label htmlFor="setup-token" className="label">Einrichtungs-Token</label>
+                    <input id="setup-token" name="setup-token" className="input font-mono" value={setupToken}
                       onChange={(e) => setSetupToken(e.target.value)}
                       required placeholder="aus der Datei .env (SETUP_TOKEN)" autoComplete="off" />
                     <p className="text-xs text-neutral-500 mt-1">

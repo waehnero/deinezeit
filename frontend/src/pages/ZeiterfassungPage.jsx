@@ -114,7 +114,7 @@ function RunningTimerCard({ entry, onStop, onStopAt, onPause, onSwitch, onDelete
                     className="flex-1 px-2 py-1 text-xs font-medium text-white bg-gray-700 hover:bg-gray-800 rounded-lg transition flex items-center justify-center gap-1">
                     <Square size={9} fill="white" /> Stopp um {endTime}
                   </button>
-                  <button type="button" title="Endzeit-Änderung verwerfen"
+                  <button aria-label="Endzeit-Änderung verwerfen" type="button" title="Endzeit-Änderung verwerfen"
                     onClick={() => { setEndDirty(false); setEndTime(nowTimeLocal()) }}
                     className="p-1 text-gray-400 hover:text-gray-600 rounded-lg transition">
                     <X size={13} />

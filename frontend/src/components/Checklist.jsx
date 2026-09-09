@@ -211,7 +211,7 @@ function AssignDialog({ item, onClose, onAssigned }) {
       <div className="bg-surface w-full md:max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-medium text-gray-900">Element zuweisen</h2>
-          <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
+          <button aria-label="Schließen" onClick={onClose}><X size={20} className="text-gray-400" /></button>
         </div>
         <p className="text-sm text-gray-500 mb-4 truncate">„{item.text}"</p>
 

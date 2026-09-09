@@ -32,7 +32,7 @@ export function CsvExportButton({ slug, entityName }) {
   }
 
   return (
-    <button
+    <button aria-label="Als CSV exportieren"
       onClick={handleExport}
       disabled={loading}
       className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition"
@@ -294,7 +294,7 @@ function ImportAssistent({ slug, entityType, onClose, onImported }) {
               <p className="text-xs text-gray-400 mt-0.5">{dateiname} · {zeilen.length} Zeilen</p>
             )}
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
+          <button aria-label="Schließen" onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
             <X size={20} />
           </button>
         </div>
@@ -649,7 +649,7 @@ function NeuesFeldDialog({ slug, spalte, beispiel, vorhandeneKeys, onClose, onAn
       <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h3 className="font-bold text-gray-900">Neues Feld für „{spalte}"</h3>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">
+          <button aria-label="Schließen" onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">
             <X size={18} />
           </button>
         </div>
