@@ -12,7 +12,8 @@ if /i not "%CONFIRM%"=="J" (
     exit /b 0
 )
 
-cd /d "%~dp0"
+rem Repo-Wurzel: dieses Skript liegt seit K-26 in scripts\windows\ (zwei Ebenen tiefer).
+cd /d "%~dp0..\.."
 echo.
 echo  Stoppe und lösche alle Container und Daten...
 docker compose -f docker-compose.local.yml down -v

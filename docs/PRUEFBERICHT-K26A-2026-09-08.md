@@ -146,6 +146,8 @@ Vorschlag: (a) belassen und in `INSTALLATION.md`/`LOKAL-TESTEN.md` eine kurze Ta
 `bump-version`, `git-einrichten`, `sicherheits-check`) mit Pfadkorrektur, Backup-Familie
 bleibt — dann bitte mit einem Windows-Test durch dich. **Meine Empfehlung: (a).**
 
+> **Entscheidung Oliver (09.09.2026): (b).** Umsetzung als Nachtrag K-26a2, siehe Abschnitt 10.
+
 ## 7. Abnahme durch Oliver (lokal)
 
 ```bash
@@ -171,3 +173,101 @@ Danach Commit und PR; Pflicht-Checks „Backend: Tests (pytest)" (enthält den R
 | Skripte in `scripts/windows/` ordnen | ⏸ Entscheidungsvorlage (Abschnitt 6) |
 | `React.lazy` je Seite, `aria-label`/N-03, Wortlaut „Neue Angebot" | → K-26b (Frontend) |
 | Optional OPS-006, SEC-015, CODE-001-Rest | offen, nach K-26b |
+
+## 9. Abnahme am Server (09.09.2026, nach Merge und Deploy)
+
+`./test.sh` lokal durch Oliver: **961 bestanden**. Rundgang über den eingebauten Browser auf
+https://dz.wwinterface.online (Anmeldung durch Oliver); die Server-Antworten wurden aus dem
+Netzwerkprotokoll des Browsers abgelesen.
+
+| Teil-Router | Aufgerufene Endpunkte (alle **200**) |
+|---|---|
+| `/api/health` | `{"status":"ok","version":"2.0.2"}` |
+| `invoice_belege` | `GET /invoices`, `?doc_type=rechnung`, `/next-number`, `/number-sequences?year=2026`, `GET /{id}`, `/{id}/audit`, `/{id}/preview` |
+| `invoice_einstellungen` | `/settings/all`, `/email-templates/rechnung` |
+| `invoice_buchhaltung` | `/open-items`, `/book/list`, `/uva`, `/auswertung/umsatz-jahr`, `/umsatz-kunden`, `/umsatz-artikel`, `/angebotsquote` |
+| `invoice_zahlungen` | `/{id}/payments`, `/{id}/skonto?paid_at=…` |
+| `invoice_mahnwesen` | `/dunning/run`, `/{id}/dunning` |
+| `invoice_erechnung` | `/{id}/erechnung/pruefen` |
+| `invoice_versand`, `invoice_anhaenge`, `invoice_status` | nur schreibende Aktionen (Versand, Storno, Umwandlung, Anhang) — am Produktivsystem bewusst nicht ausgelöst; Auflösung durch 4.4–4.6 und die Backend-Tests abgedeckt |
+
+Seiten: Verkauf (Liste, Reiter Rechnungen/Wiederkehrend, Zahlungen-Dialog), Beleg RE-2026-002
+(Vorschau, Änderungsprotokoll), Offene Posten, Mahnlauf, Verkaufsbuch, Auswertungen,
+Einstellungen → Parameter (Belegnummern, E-Mail-Vorlagen) — alle mit Inhalt, Konsole ohne Einträge.
+
+Nebenbefund (nicht dieses Bündel): Die Logo-Bilder werden mit doppeltem Cache-Parameter
+angefordert (`logo_header.png?v=1785821496?v=1788931966742`); ein Teil dieser Anfragen wird vom
+Browser mit `ERR_ABORTED` verworfen, weil das Layout sie beim Neu-Rendern erneut stellt.
+Funktional folgenlos (die Wiederholung liefert 200), aber unsauber — Vermerk für K-26b.
+
+**Ergebnis: K-26a abgenommen, keine Auffälligkeiten.**
+
+## 10. Nachtrag K-26a2: Entwickler-Skripte nach `scripts/windows/` (09.09.2026, Version 2.0.3)
+
+Umgesetzt nach Olivers Entscheidung für Variante (b). **Branch-Vorschlag:** `fix/audit-k26a2-windows-skripte`.
+
+### 10.1 Verschoben (12 Dateien, Inhalt bis auf die Pfadkorrektur unverändert)
+
+`start-lokal.bat/.ps1`, `stopp-lokal.bat/.ps1`, `reset-lokal.bat`, `neu-bauen.bat/.ps1`,
+`migriere-kontakte.bat/.ps1`, `bump-version.ps1`, `git-einrichten.ps1`, `sicherheits-check.ps1`
+→ `scripts/windows/`. Git erkennt das als Umbenennung (Inhalt > 90 % gleich), die Historie bleibt.
+
+**Nicht verschoben** (Begründung Abschnitt 6): `backup*.ps1/.bat`, `backup.cfg`,
+`backup-uri-handler.vbs`, `wiederherstellen.*`, sowie die Mac-Skripte `check.sh`, `test.sh`,
+`start-arbeit.sh`, `frontend-neu-bauen.sh`, `install.sh` (in CLAUDE.md als Einstiegspunkte
+an der Wurzel dokumentiert).
+
+### 10.2 Pfadkorrekturen je Skript
+
+Jedes Skript nahm bisher `$PSScriptRoot` bzw. `%~dp0` als Repo-Wurzel an. Jetzt:
+
+| Skript | Änderung |
+|---|---|
+| `start-lokal.ps1`, `neu-bauen.ps1`, `migriere-kontakte.ps1` | `Set-Location $PSScriptRoot` → `Set-Location (Join-Path $PSScriptRoot "..\..")` |
+| `stopp-lokal.ps1` | `$Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path`, `Set-Location $Root`; `.watcher-pid` wird unter `$Root` gesucht (dort legt `backup-watcher.ps1` sie ab) |
+| `reset-lokal.bat` | `cd /d "%~dp0"` → `cd /d "%~dp0..\.."` |
+| `bump-version.ps1` | `$Root = $PSScriptRoot` → `Resolve-Path (Join-Path $PSScriptRoot "..\..")`; `git add` des Skripts selbst auf `scripts/windows/bump-version.ps1`; Aufrufbeispiel im Kopf |
+| `git-einrichten.ps1`, `sicherheits-check.ps1` | hatten **kein** `Set-Location` und verließen sich auf das aktuelle Verzeichnis — jetzt explizit `Set-Location (Join-Path $PSScriptRoot "..\..")` nach dem Kopfkommentar; Aufrufhinweise auf `.\scripts\windows\…` |
+| `*.bat`-Starter | unverändert (`%~dp0<name>.ps1` zeigt weiter auf die Datei daneben) |
+
+Zeilenenden (CRLF) und die UTF-8-BOM von `bump-version.ps1` sind erhalten (`.gitattributes`
+gilt per Muster `*.ps1`/`*.bat`, unabhängig vom Ordner).
+
+### 10.3 Doku und Verweise
+
+| Datei | Änderung |
+|---|---|
+| `scripts/windows/README.md` (neu) | Tabelle „Welches Skript wofür" + Hinweis, warum die Backup-Familie an der Wurzel bleibt |
+| `LOKAL-TESTEN.md` | 5 Stellen: „im Ordner `scripts\windows`" bzw. voller Pfad |
+| `MIGRATION-0016-PROJEKTPLAN.md` | `scripts\windows\neu-bauen.bat` |
+| `docker-compose.local.yml` | Kopfkommentar (Windows-Pfad + Mac-Befehl) |
+| `CLAUDE.md` | Ordnerbaum (`scripts/windows/`), Hinweis zu Windows-Pendants und Backup-Familie, `bump-version.ps1`-Pfad |
+| Version 2.0.3 | `bump_version.py`, Lockfile-Wurzel nachgezogen; Changelog kundentauglich |
+
+Nicht angepasst: Einträge in `CHANGELOG.md`/`changelog.js` (Historie), `AUDIT-*.md`
+(Befundtext), `auto-version.yml` (deaktiviert, Kommentar).
+
+### 10.4 Prüfung
+
+| # | Prüfung | Ergebnis |
+|---|---|---|
+| 1 | Alle Verweise auf die 12 Dateinamen im Repo (`grep`, ohne node_modules/dist/.git/Changelog/Audit) | nur noch die Windows-Skripte untereinander (gleicher Ordner) und die angepassten Doku-Stellen ✅ |
+| 2 | Kein Skript außerhalb der 12 verweist auf einen alten Pfad | `backup*.ps1`, `wiederherstellen.ps1` nennen `start-lokal.bat` nur in Hinweistexten an den Benutzer — nicht als Aufruf ✅ (Texte bewusst nicht geändert; sie sagen „starte DeineZeit", der Ort steht in LOKAL-TESTEN.md) |
+| 3 | CI/Deploy | `ci.yml` und `deploy.yml` referenzieren keine der 12 Dateien; rsync-Ausnahmen betreffen nur `backup.cfg` ✅ |
+| 4 | Zeilenenden/BOM nach dem Bearbeiten | `file`: CRLF erhalten, BOM bei `bump-version.ps1` erhalten ✅ |
+| 5 | **PowerShell-Lauf** | ⚠️ **nicht möglich** — kein Windows/PowerShell in der Prüfumgebung. Abnahme unter Windows durch Oliver (10.5). |
+
+Nebenbefund `bump-version.ps1` (unverändert gelassen, historisch): Das Skript macht am Ende
+`git commit` + `git push` auf den aktuellen Branch und zieht `package-lock.json` nicht nach —
+beides passt nicht mehr zum heutigen Ablauf (pre-commit-Hook, geschütztes `main`). Kandidat
+zum Streichen oder Angleichen, aber nicht Teil dieses Bündels.
+
+### 10.5 Abnahme (Windows, durch Oliver)
+
+- [ ] `scripts\windows\start-lokal.bat` doppelklicken → Container starten, Browser öffnet http://localhost
+- [ ] `scripts\windows\stopp-lokal.bat` → Container stoppen, keine Fehlermeldung zu `.watcher-pid`
+- [ ] `scripts\windows\neu-bauen.bat` → Build läuft durch
+- [ ] optional `reset-lokal.bat` (löscht Testdaten!) und `sicherheits-check.ps1`
+
+Ohne Windows-Rechner: PR trotzdem mergbar (Backend/Frontend unberührt, CI grün erwartet);
+die Skripte dann beim nächsten Windows-Einsatz prüfen und Rückmeldung in diesen Bericht.

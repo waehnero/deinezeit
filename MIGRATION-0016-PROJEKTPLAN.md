@@ -13,7 +13,7 @@ nur die neuen Datenbank-Tabellen.
 Doppelklick auf:
 
 ```
-neu-bauen.bat
+scripts\windows\neu-bauen.bat
 ```
 
 Dieses Skript erledigt alles in einem Rutsch:

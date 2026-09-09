@@ -2,10 +2,12 @@ Write-Host ""
 Write-Host "  DeineZeit wird gestoppt..." -ForegroundColor Yellow
 Write-Host ""
 
-Set-Location $PSScriptRoot
+# Repo-Wurzel: dieses Skript liegt seit K-26 in scripts\windows\ (zwei Ebenen tiefer).
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+Set-Location $Root
 
 # Backup-Watcher stoppen
-$pidFile = Join-Path $PSScriptRoot ".watcher-pid"
+$pidFile = Join-Path $Root ".watcher-pid"
 if (Test-Path $pidFile) {
     $watcherPid = [int](Get-Content $pidFile -ErrorAction SilentlyContinue)
     if ($watcherPid -gt 0) {

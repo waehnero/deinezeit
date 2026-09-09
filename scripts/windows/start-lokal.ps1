@@ -25,8 +25,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host " OK" -ForegroundColor Green
 
-# In den Projektordner wechseln
-Set-Location $PSScriptRoot
+# In den Projektordner wechseln (Repo-Wurzel, zwei Ebenen ueber scripts\windows\)
+Set-Location (Join-Path $PSScriptRoot "..\..")
 
 # .env.local verwenden
 if (-not (Test-Path ".env.local")) {

@@ -3,7 +3,8 @@ Write-Host "  DeineZeit - Migration: Kunden + Lieferanten -> Kontakte" -Foregrou
 Write-Host "  Bitte stelle sicher, dass DeineZeit laeuft (start-lokal.bat)." -ForegroundColor Yellow
 Write-Host ""
 
-Set-Location $PSScriptRoot
+# Repo-Wurzel: dieses Skript liegt seit K-26 in scripts\windows\ (zwei Ebenen tiefer).
+Set-Location (Join-Path $PSScriptRoot "..\..")
 
 $container = "deinezeit_backend"
 
