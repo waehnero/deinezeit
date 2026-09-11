@@ -160,3 +160,38 @@ Deploy auf eine noch nicht besuchte Seite navigieren → genau ein Reload, keine
 | CODE-001 `except: pass`-Durchsicht | ✅ 35 gesichtet, 4 geändert, Rest begründet |
 | SEC-015 Doku-Hinweis | ✅ |
 | Doku K-26b/Frage 3 fährt mit | ✅ |
+
+## 9. Abnahme am Server (11.09.2026, dz.wwinterface.online, Version 2.0.5)
+
+Merge und Deploy #228 durch. Oliver hat sich im eingebauten Browser angemeldet; ich habe navigiert
+und DOM, Netzwerk und Konsole ausgelesen.
+
+| Prüfung | Ergebnis |
+|---|---|
+| Version | Dashboard zeigt **2.0.5**, `/api/health` liefert `2.0.5` ✅ |
+| `X-Request-ID` | jede API-Antwort trägt eine 32-stellige Hex-Kennung (z. B. `e37e0a69…`), also die von nginx erzeugte; zwei Aufrufe → zwei verschiedene Kennungen ✅ |
+| Seiten nachgeladen | `BuchhaltungPage`, `PosteckePage`, `SettingsPage`, `UserManagementPage` je beim Aufruf ✅ |
+| Konsole | keine Fehler aus der Anwendung (401 = Aufrufe vor dem Login bzw. meine Testaufrufe ohne Token; der eine 404 ist der R1-Fall unten) ✅ |
+| Serverlog (`rid=` / `[…]`) | am Server selbst nicht eingesehen — Oliver prüft bei Gelegenheit `docker compose logs nginx backend \| tail` |
+
+### 9.1 K-26b R1 live beobachtet — Reload-Schutz funktioniert
+
+Der Browser-Tab war **vor** dem Deploy geöffnet (Anmeldeseite mit dem 2.0.4-Bundle
+`index-AN7OGThw.js`), Oliver hat sich darin nach dem Deploy angemeldet. Klick auf **Buchhaltung**
+(noch nie besucht) ergab im Netzwerkprotokoll genau die vorhergesagte Kette:
+
+```
+GET /assets/BuchhaltungPage-Z27sADVv.js   → 404            (alter Hash, Datei weg)
+GET /buchhaltung                          → 200            (genau EIN location.reload())
+GET /assets/index-BaH437MR.js             → 200            (neues Bundle)
+POST /api/auth/refresh                    → 200            (Sitzung überlebt)
+GET /assets/BuchhaltungPage-BsLxZESz.js   → 200            (neuer Hash)
+```
+
+`performance.navigation.type = "reload"`, Merker `deinezeit.chunk-neu-geladen` danach gelöscht,
+Seite „Buchhaltung" sichtbar, Benutzer angemeldet. Oliver hat denselben Fall parallel in seinem
+eigenen Browser gesehen („passt"). **R1 damit abgeschlossen** — ohne `lazySeite` hätte dieser Klick
+die Fehlerseite gezeigt.
+
+**Bündel K-26c abgeschlossen. Aus dem Audit vom 02.–04.09.2026 ist damit nichts mehr offen;**
+als Nächstes steht nur noch das Tiefen-Audit ab ~25.09.2026 an.
