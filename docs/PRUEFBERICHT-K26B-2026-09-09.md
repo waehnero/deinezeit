@@ -203,3 +203,18 @@ und Konsole ausgelesen.
 
 **Offen für den Server:** R1 (Sitzung von vor dem Deploy → genau ein Reload), Logo-Adressen mit genau
 einem `?v=`, Passwort-Manager-Angebot beim Login in Olivers Browser.
+
+## 10. Abnahme am Server (10.09.2026, dz.wwinterface.online, Version 2.0.4)
+
+PR #94 gemergt, Deploy durch. Oliver hat sich im eingebauten Browser angemeldet; ich habe navigiert und DOM, Netzwerk und Konsole ausgelesen.
+
+| Prüfung | Ergebnis |
+|---|---|
+| Anmeldeseite | `index`, `rolldown-runtime`, `icons`, `react` — kein Seiten-Chunk ✅ |
+| Dashboard | `DashboardPage`, `PageHeader`, `VoiceEntryDialog`, dnd-kit nachgeladen; Version 2.0.4 im Fußbereich ✅ |
+| Einstellungen | `SettingsPage`, `MailImportVerwaltung`, `RichTextEditor`, `UserManagementPage` nachgeladen ✅ |
+| Logo-Adressen | Favicon-`<link>` und alle sechs `<img>` mit **genau einem** `?v=` (Backend-Wert); pro Logo-Datei genau **ein** Request, auch nach 4 s Wartezeit keine weiteren — der Request-pro-Render-Fehler ist weg ✅ |
+| Konsole | keine Fehler aus der Anwendung; die 401 sind zwei fehlgeschlagene Anmeldeversuche und zwei Testaufrufe von mir ohne Token ✅ |
+| R1 (Sitzung von vor dem Deploy) | für diesen Deploy nicht mehr prüfbar (Deploy war vor der Abnahme durch); beim nächsten Deploy nachholen ⏸ |
+
+**Bündel K-26b abgeschlossen.** Offen bleibt nur R1 als Beobachtungspunkt beim nächsten Deploy.
