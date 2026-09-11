@@ -171,13 +171,13 @@ def _post_mit_fehlerbehandlung(url: str, provider: str, **kwargs) -> httpx.Respo
         logger.error("%s HTTP %s von %s: %s", LOG_PRAEFIX_HTTP,
                      e.response.status_code, provider,
                      (e.response.text or "")[:MAX_LOG_FEHLERTEXT])
-        raise RuntimeError(_api_fehlertext(provider, e.response))
+        raise RuntimeError(_api_fehlertext(provider, e.response)) from e
     except httpx.HTTPError as e:
         logger.error("%s %s nicht erreichbar: %s: %s", LOG_PRAEFIX_HTTP,
                      provider, e.__class__.__name__, e)
         raise RuntimeError(
             f"KI-Provider {provider} nicht erreichbar ({e.__class__.__name__}) — "
-            "Internetzugang des Backends prüfen")
+            "Internetzugang des Backends prüfen") from e
 
 
 def _protokolliere_antwort(kontext: str, provider: str, model: str,

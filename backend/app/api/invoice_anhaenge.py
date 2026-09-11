@@ -82,7 +82,7 @@ def upload_contract(
         storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
     except Exception as exc:
         logger.exception("Fehler bei invoice: %s", exc)
-        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).") from exc
 
     rec = db.query(EntityRecord).filter(EntityRecord.id == inv.contact_id).first()
     contact_name = rec.display_name if rec else None

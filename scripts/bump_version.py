@@ -6,7 +6,7 @@ Feature-Branches aufgerufen (einmal pro Branch), kann aber auch manuell mit
 eigenem Titel laufen.
 
 Aktualisierte Dateien (Formate wie auto_version.py):
-  1. frontend/package.json
+  1. frontend/package.json (+ Wurzel von package-lock.json)
   2. backend/app/core/config.py
   3. docker-compose.yml
   4. docker-compose.local.yml

@@ -9,6 +9,7 @@ import os
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.netz import echte_ip
+from app.core.request_id import RequestIdMiddleware, RequestIdFilter
 from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard, groups
 from app.api import settings as settings_api
 from app.services import storage_service
@@ -20,12 +21,15 @@ from app.services import storage_service
 # Grund, warum im Serverlog zu Fehlern oft nur der nackte HTTP-Status stand.
 # Wir hängen daher genau EINEN Handler an den Teilbaum "app". Fremdbibliotheken
 # (httpx, sqlalchemy, ...) bleiben unberührt, es wird also nicht lauter als nötig.
+# Jede Zeile trägt die Anfragekennung [request_id] (core/request_id.py, OPS-006);
+# außerhalb einer Anfrage (Start, Hintergrundjobs) steht dort "-".
 _log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 _app_logger = logging.getLogger("app")
 if not _app_logger.handlers:
     _handler = logging.StreamHandler()
+    _handler.addFilter(RequestIdFilter())
     _handler.setFormatter(logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        "%(asctime)s %(levelname)s %(name)s [%(request_id)s]: %(message)s"))
     _app_logger.addHandler(_handler)
 _app_logger.setLevel(getattr(logging, _log_level, logging.INFO))
 # propagate bleibt bewusst an: der Root-Logger hat unter Uvicorn keine Handler,
@@ -75,7 +79,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+# Anfragekennung (OPS-006). Zuletzt hinzugefügt = äußerste Schicht: Die Kennung
+# steht damit schon fest, bevor CORS und Rate-Limit ihre Meldungen schreiben.
+app.add_middleware(RequestIdMiddleware)
 
 # ── Statische Dateien ─────────────────────────────────────────────────────────
 # Pfad per Env überschreibbar (Default = /app/static wie im Docker-Container).
@@ -103,6 +111,8 @@ app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Bewusst OHNE Modul-Sperre (Querbezüge, siehe core/modules.py):
 #   masterdata  → Lesen für alle (Auswahlfelder); Schreiben je Endpunkt gesperrt
 #   datacenter  → Anhänge je Datensatz für alle; nur Übersicht je Endpunkt gesperrt
+#                 (Fachentscheidung Oliver 11.09.2026: bleibt so, inkl. Beleg-PDF-Archiv
+#                 und Eingangsrechnungen — Audit-Frage 3, nicht erneut aufgreifen)
 #   reports     → gehört fachlich zur Zeiterfassung
 from app.api.deps import require_modul_rechte as _rm
 from fastapi import Depends as _Dep

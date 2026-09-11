@@ -43,9 +43,9 @@ def get_current_user(
     try:
         user_id = UUID(payload.get("sub", ""))
         session_id = UUID(payload.get("sid", ""))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail=_UNGUELTIG)
+                            detail=_UNGUELTIG) from e
 
     sitzung = auth_service.sitzung_laden(db, session_id)
     if not auth_service.sitzung_gueltig(sitzung) or sitzung.user_id != user_id:

@@ -148,7 +148,7 @@ def list_account_folders(
     try:
         return mail_ingest.list_folders(db, acc)
     except Exception as e:
-        raise HTTPException(400, f"Verbindung fehlgeschlagen: {e}")
+        raise HTTPException(400, f"Verbindung fehlgeschlagen: {e}") from e
 
 
 @router.post("/accounts/{account_id}/scan", response_model=ScanResult)
@@ -164,7 +164,7 @@ def scan_account_now(
     try:
         anzahl = mail_ingest.scan_account(db, acc)
     except Exception as e:
-        raise HTTPException(400, f"Scan fehlgeschlagen: {e}")
+        raise HTTPException(400, f"Scan fehlgeschlagen: {e}") from e
     return ScanResult(account_id=acc.id, neue_vorschlaege=anzahl)
 
 

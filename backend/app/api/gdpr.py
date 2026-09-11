@@ -131,9 +131,9 @@ def erase_record(
             note=body.note,
         )
     except GdprBlockedError as e:
-        raise HTTPException(409, {"message": "Löschung blockiert", "blockers": e.blockers})
+        raise HTTPException(409, {"message": "Löschung blockiert", "blockers": e.blockers}) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
     # Zahlen fürs Protokoll/PDF zusammenführen (Report zeigt Stand VOR Löschung)
     categories["attachments_deleted"] = files_deleted

@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '2.0.5',
+    day: '11',
+    month: 'September',
+    year: '2026',
+    features: [],
+    updates: [
+      'Jede Anfrage bekommt eine Kennung, die in allen Logzeilen des Servers und in der Antwort (X-Request-ID) steht. Damit lassen sich Fehlermeldungen einer bestimmten Aktion zuordnen — auch wenn mehrere Personen gleichzeitig arbeiten.',
+      'Fehlerketten im Serverlog sind vollständig (Ursache bleibt erhalten); scheiterndes Aufräumen alter Backups und fehlgeschlagenes Löschen im Cloud-Speicher werden protokolliert statt verschluckt.',
+      'Installationsanleitung: Hinweis, wie sich das Installationsskript vor dem Ausführen prüfen lässt.',
+    ],
+  },
+  {
     version: '2.0.4',
     day: '09',
     month: 'September',

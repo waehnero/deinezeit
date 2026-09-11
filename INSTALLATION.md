@@ -17,6 +17,17 @@ Das Skript fragt Sie dann interaktiv nach:
 
 Alles andere — Docker, Code-Download, SSL-Zertifikat, Datenbank, erster Benutzer — wird vollautomatisch eingerichtet.
 
+> **Hinweis zur Sicherheit:** `curl … | sudo bash` führt ein Skript aus dem Internet mit Root-Rechten aus, ohne dass Sie es vorher gesehen haben. Das ist bei Installationsskripten üblich, aber Vertrauenssache. Wenn Sie das Skript lieber vorher prüfen möchten:
+>
+> ```bash
+> git clone https://github.com/waehnero/deinezeit.git
+> cd deinezeit
+> less install.sh          # Skript lesen
+> sudo bash install.sh     # dann ausführen
+> ```
+>
+> Das Ergebnis ist dasselbe: Liegt das Skript im Projektordner, kopiert es diesen Stand nach `/opt/deinezeit` und lädt nichts erneut herunter. So lässt sich vor dem Ausführen auch ein bestimmter Stand wählen (`git checkout <Commit oder Tag>`), statt blind den aktuellen `main` zu nehmen.
+
 ---
 
 ## Voraussetzungen

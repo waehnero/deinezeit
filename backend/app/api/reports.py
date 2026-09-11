@@ -298,8 +298,8 @@ def report_zeiterfassung(
     try:
         dt_from = _zeitgrenze(date_from)
         dt_to   = _zeitgrenze(date_to, ende=True)
-    except ValueError:
-        raise HTTPException(400, "Ungültiges Datumsformat (YYYY-MM-DD erwartet)")
+    except ValueError as e:
+        raise HTTPException(400, "Ungültiges Datumsformat (YYYY-MM-DD erwartet)") from e
 
     # ── Einträge abfragen ─────────────────────────────────────────────────────
     # Gemeinsame Abfrage mit der Auswertung (``_entry_query``) — inklusive der
@@ -355,7 +355,7 @@ def report_zeiterfassung(
     except Exception as exc:
         logger.exception("WeasyPrint Fehler beim PDF-Generieren")
         logger.exception("Fehler bei reports: %s", exc)
-        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).") from exc
 
     # ── Dateiname ─────────────────────────────────────────────────────────────
     if filename:
@@ -484,8 +484,8 @@ def report_uebersicht(
     try:
         dt_from = _zeitgrenze(date_from)
         dt_to   = _zeitgrenze(date_to, ende=True)
-    except ValueError:
-        raise HTTPException(400, "Ungültiges Datumsformat (YYYY-MM-DD erwartet)")
+    except ValueError as e:
+        raise HTTPException(400, "Ungültiges Datumsformat (YYYY-MM-DD erwartet)") from e
 
     entries = _entry_query(db, current_user, dt_from, dt_to, contact_name,
                            project_name, user_id, billable).all()

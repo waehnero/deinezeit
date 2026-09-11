@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.5] – 2026-09-11 – Nachvollziehbare Logs
+
+### Aktualisierungen
+- Jede Anfrage bekommt eine Kennung, die in allen Logzeilen des Servers und in der Antwort (X-Request-ID) steht. Damit lassen sich Fehlermeldungen einer bestimmten Aktion zuordnen — auch wenn mehrere Personen gleichzeitig arbeiten.
+- Fehlerketten im Serverlog sind vollständig (Ursache bleibt erhalten); scheiterndes Aufräumen alter Backups und fehlgeschlagenes Löschen im Cloud-Speicher werden protokolliert statt verschluckt.
+- Installationsanleitung: Hinweis, wie sich das Installationsskript vor dem Ausführen prüfen lässt.
+
+---
+
 ## [2.0.4] – 2026-09-09 – Schneller starten
 
 ### Aktualisierungen

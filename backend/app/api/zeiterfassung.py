@@ -688,8 +688,8 @@ def get_budgets(
             continue
         try:
             ids.append(UUID(part))
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Ungültige Projekt-ID: {part}")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Ungültige Projekt-ID: {part}") from e
     if len(ids) > 200:
         raise HTTPException(status_code=400, detail="Maximal 200 Projekt-IDs pro Abfrage")
     return [_compute_budget(db, pid) for pid in ids]
@@ -802,7 +802,7 @@ def ki_nachtragen(
     try:
         antwort = call_ki(ki, prompt, max_tokens=800, kontext="zeiterfassung")
     except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
     daten = _parse_ki_json(antwort)
     warnings = [w for w in (daten.get("warnings") or []) if isinstance(w, str)]

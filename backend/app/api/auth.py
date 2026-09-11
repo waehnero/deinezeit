@@ -736,14 +736,14 @@ def webauthn_register_complete(request: Request,
             expected_origin=settings.FRONTEND_URL,
             require_user_verification=True,
         )
-    except Exception:                                          # noqa: BLE001
+    except Exception as e:                                          # noqa: BLE001
         # Der Ausnahmetext der Bibliothek nennt Innereien des Prüfvorgangs.
         # Nach außen genügt „hat nicht funktioniert"; die Ursache steht im Log.
         logger.warning("Passkey-Registrierung für %s fehlgeschlagen",
                        current_user.email, exc_info=True)
         raise HTTPException(status_code=400,
                             detail="Registrierung fehlgeschlagen. Bitte erneut "
-                                   "versuchen.")
+                                   "versuchen.") from e
 
     db.add(WebAuthnCredential(
         user_id=current_user.id,
@@ -830,8 +830,8 @@ def webauthn_login_complete(request: Request, response: Response,
     try:
         missing = (4 - len(cred_id_b64) % 4) % 4
         cred_id_hex = base64.urlsafe_b64decode(cred_id_b64 + "=" * missing).hex()
-    except Exception:                                          # noqa: BLE001
-        raise HTTPException(status_code=400, detail="Ungültige Credential-ID")
+    except Exception as e:                                          # noqa: BLE001
+        raise HTTPException(status_code=400, detail="Ungültige Credential-ID") from e
 
     db_cred = db.query(WebAuthnCredential).filter(
         WebAuthnCredential.user_id == user.id,
@@ -852,12 +852,12 @@ def webauthn_login_complete(request: Request, response: Response,
             credential_current_sign_count=int(db_cred.sign_count),
             require_user_verification=True,
         )
-    except Exception:                                          # noqa: BLE001
+    except Exception as e:                                          # noqa: BLE001
         logger.warning("Passkey-Anmeldung für %s fehlgeschlagen", email,
                        exc_info=True)
         auth_service.ereignis(db, EV.PASSKEY_FAIL, user=user, meta=meta,
                               detail="Prüfung fehlgeschlagen")
-        raise abgelehnt
+        raise abgelehnt from e
 
     db_cred.sign_count = str(verification.new_sign_count)
     db_cred.last_used_at = _jetzt()
