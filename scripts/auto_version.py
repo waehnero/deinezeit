@@ -175,6 +175,26 @@ def update_package_json(version: str):
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
     print(f"  ✓ {path}")
+    _update_package_lock(version)
+
+
+def _update_package_lock(version: str):
+    """Die Wurzel des Lockfiles (zwei Stellen: oben und unter packages[""])
+    trägt dieselbe Version wie package.json. Ohne diesen Schritt meldete
+    ``npm ci`` nach jedem Bump eine Abweichung, bis jemand von Hand nachzog."""
+    path = "frontend/package-lock.json"
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    data["version"] = version
+    root = data.get("packages", {}).get("")
+    if isinstance(root, dict):
+        root["version"] = version
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(f"  ✓ {path}")
 
 
 def update_config_py(version: str):

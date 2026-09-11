@@ -47,14 +47,14 @@ def verkleinern(rohdaten: bytes, groesse: str) -> tuple:
                                  f"Erlaubt: {', '.join(GROESSEN)}")
     try:
         from PIL import Image
-    except ImportError:                                   # pragma: no cover
-        raise HTTPException(500, "Bildverarbeitung steht nicht zur Verfügung")
+    except ImportError as e:                                   # pragma: no cover
+        raise HTTPException(500, "Bildverarbeitung steht nicht zur Verfügung") from e
 
     try:
         bild = Image.open(io.BytesIO(rohdaten))
         bild.load()
-    except Exception:
-        raise HTTPException(400, "Die Datei konnte nicht als Bild gelesen werden")
+    except Exception as e:
+        raise HTTPException(400, "Die Datei konnte nicht als Bild gelesen werden") from e
 
     ziel_breite = GROESSEN[groesse][1]
     if bild.width > ziel_breite:

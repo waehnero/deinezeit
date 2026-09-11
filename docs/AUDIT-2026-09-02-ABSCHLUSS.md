@@ -138,7 +138,7 @@ Die Korrekturarbeit — vor allem die neuen Tests — hat weitere Punkte zutage 
 3. **`SECRET_KEY` dient JWT und Feldverschlüsselung** (2FA-Secrets, Settings-Geheimnisse): ein Wechsel entwertet beides. Dokumentiert; ein separater Verschlüsselungsschlüssel wäre sauberer (Modernisierungsvorschlag).
 4. **`UVICORN_WORKERS` > 1** ist technisch freigegeben, aber im Betrieb noch nicht erprobt (Vorgabe bleibt 1). Beim Hochsetzen: Pool-Größe gilt je Prozess; Log auf genau eine Zeile „Worker-Sperre erhalten" prüfen.
 5. **certbot-Lebenszeichen:** Läuft die Schleife, ist die Datei frisch; steht der Container, altert sie. Nicht erkannt wird ein Container, der läuft, aber dessen `certbot renew` intern scheitert — das fängt die Restlaufzeit-Warnung (21/7 Tage) ab. Zwei Ebenen bleiben also.
-6. **Anhänge für alle angemeldeten Benutzer** (offene Frage 3 des Berichts): weiterhin bewusste Fachentscheidung; Beleg-PDF-Archiv und Eingangsrechnungen sind damit für jeden Mitarbeiter lesbar. Entscheidung Oliver.
+6. **Anhänge für alle angemeldeten Benutzer** (offene Frage 3 des Berichts): **entschieden 11.09.2026 (Oliver): ja, bleibt so.** Beleg-PDF-Archiv und Eingangsrechnungen sind bewusst für jeden angemeldeten Mitarbeiter lesbar; kein Änderungsbedarf, im Tiefen-Audit nicht erneut als Befund führen.
 7. **`backup.cfg` am Server** wird vom Backend nicht mehr erreicht (kein Mount); am Server las die Datei ohnehin nichts. Für lokale Windows-Installationen bleibt der Mount in `docker-compose.local.yml`.
 8. **Deploy per `ssh-keyscan` (TOFU)** statt gepinntem Host-Fingerprint — unverändert, niedrig.
 
@@ -165,7 +165,7 @@ Die Korrekturarbeit — vor allem die neuen Tests — hat weitere Punkte zutage 
 | Keine stillen Änderungen | ja — jeder Schritt mit Dateiliste, Begründung, Tests und Restrisiken berichtet; Oliver hat jeden PR selbst gemergt |
 | Produktivnachweis | Deploys A–G automatisch nach grüner CI; Server-Nachweise: Migration 0060/0062, verschlüsselte Settings, Mounts ohne Socket, Worker-Sperre im Log, MinIO-Tag |
 | Dokumentation aktuell | STATUS.md, CLAUDE.md, INSTALLATION/LOKAL-TESTEN, WIEDERHERSTELLUNG.md; Platzhalter im CHANGELOG (N-06) mit R-01 |
-| Offene Fragen des Berichts | 1 (Version): **2.0.0** entschieden · 2 (Server): nachgeholt · 3 (Anhänge): offen, Fachentscheidung · 4 (vite): läuft in CI und lokal · 5 (Tiefe): unverändert · 6 (Lasttest): stillgelegt, PERF-001 strukturell behoben · 7 (.env.local): gelöscht · 8 (Windows-Skripte): nur gelesen |
+| Offene Fragen des Berichts | 1 (Version): **2.0.0** entschieden · 2 (Server): nachgeholt · 3 (Anhänge): **entschieden 11.09.2026 – ja, bleibt für alle angemeldeten Benutzer** · 4 (vite): läuft in CI und lokal · 5 (Tiefe): unverändert · 6 (Lasttest): stillgelegt, PERF-001 strukturell behoben · 7 (.env.local): gelöscht · 8 (Windows-Skripte): nur gelesen |
 
 ---
 

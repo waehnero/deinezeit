@@ -114,7 +114,7 @@ def _graph_get_token(tenant_id: str, client_id: str, client_secret: str) -> str:
             desc = err.get("error_description", body)[:300]
         except Exception:
             code, desc = "unknown", body[:300]
-        raise ValueError(f"Token-Fehler ({code}): {desc}")
+        raise ValueError(f"Token-Fehler ({code}): {desc}") from e
 
     if "access_token" not in result:
         raise ValueError(f"Kein Access-Token erhalten: {result}")
@@ -198,7 +198,7 @@ def _send_graph(
             code = err.get("error", {}).get("code", str(e.code))
         except Exception:
             msg, code = body[:400], str(e.code)
-        raise ValueError(f"Graph API Fehler ({code}): {msg}")
+        raise ValueError(f"Graph API Fehler ({code}): {msg}") from e
 
 
 # ── Öffentliche Schnittstelle ─────────────────────────────────────────────────

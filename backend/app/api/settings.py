@@ -229,7 +229,7 @@ def upload_logo(
     try:
         orig_bytes, header_bytes, favicon_bytes = _generate_logo_variants(raw_bytes, ext)
     except Exception as e:
-        raise HTTPException(400, f"Bild konnte nicht verarbeitet werden: {str(e)}")
+        raise HTTPException(400, f"Bild konnte nicht verarbeitet werden: {str(e)}") from e
 
     # Alte Logos entfernen
     for old in os.listdir(LOGO_PATH):
@@ -318,7 +318,7 @@ def upload_favicon(
             raw_bytes = _pil_to_png_bytes(fav)
             ext = ".png"
         except Exception as e:
-            raise HTTPException(400, f"Favicon konnte nicht verarbeitet werden: {str(e)}")
+            raise HTTPException(400, f"Favicon konnte nicht verarbeitet werden: {str(e)}") from e
 
     # Alten Favicon entfernen
     for fname in os.listdir(LOGO_PATH):
@@ -437,7 +437,7 @@ def test_email(
         return {"ok": True, "message": f"Test-Mail via {method} an {body.to_email} gesendet"}
 
     except Exception as e:
-        raise HTTPException(400, f"E-Mail konnte nicht gesendet werden: {str(e)}")
+        raise HTTPException(400, f"E-Mail konnte nicht gesendet werden: {str(e)}") from e
 
 
 # ── Backup-Ping: durch Token gesichert ───────────────────────────────────────
@@ -487,7 +487,7 @@ def download_backup(
     try:
         zip_pfad, _manifest = create_backup_archive(db)
     except RuntimeError as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
     _save(db, "backup_last_at", datetime.now(timezone.utc).isoformat())
 
@@ -569,9 +569,9 @@ def run_backup_now(
     try:
         return run_onedrive_backup(db)
     except RuntimeError as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
     except Exception as e:
-        raise HTTPException(400, f"OneDrive-Backup fehlgeschlagen: {e}")
+        raise HTTPException(400, f"OneDrive-Backup fehlgeschlagen: {e}") from e
 
 
 # ── Storage-Provider ──────────────────────────────────────────────────────────

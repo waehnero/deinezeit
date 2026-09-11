@@ -240,7 +240,7 @@ def get_book_pdf(
         # Öffnen auf, und dann sah es nach einer kaputten Datei aus statt nach
         # einem Serverproblem.
         logger.exception("Fehler bei invoice: %s", e)
-        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).") from e
 
     return Response(
         content=pdf_bytes,
@@ -518,7 +518,7 @@ def get_uva_pdf(
         pdf = weasyprint.HTML(string=html).write_pdf()
     except Exception as e:
         logger.exception("Fehler bei invoice: %s", e)
-        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).") from e
 
     name = f"umsatzsteuer_{date_from or 'alle'}_{date_to or ''}".rstrip("_")
     return Response(content=pdf, media_type="application/pdf",

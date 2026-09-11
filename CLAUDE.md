@@ -335,6 +335,12 @@ cd frontend && npm run test:watch
   `utils/lazySeite.js` fängt den Fall ab, dass nach einem Deploy eine alte
   Browser-Sitzung eine nicht mehr vorhandene Datei anfordert (einmaliger Reload).
 - **API-Präfix:** alle Router unter `/api` (siehe `main.py`).
+- **Logging:** `logger = logging.getLogger(__name__)` je Modul (Teilbaum `app`,
+  ab INFO sichtbar). Jede Zeile trägt automatisch die Anfragekennung
+  `[request_id]` (`core/request_id.py`, K-26c); nginx schreibt dieselbe Kennung
+  als `rid=` ins Zugriffslog, die Antwort trägt sie als `X-Request-ID`. Fehler
+  in `except` weiterwerfen mit `raise … from e` (ruff B904 ist in CI Pflicht);
+  `except Exception: pass` nur für echtes Beiwerk, sonst `logger.warning(…, exc_info=True)`.
 - **Migrationen:** durchnummeriert; nie nachträglich umnummerieren.
 - **Zeilenenden** (`.gitattributes`): `.sh` = LF, `.bat/.ps1/.cmd` = CRLF.
 - **Doku:** nutzerorientierte Anleitungen sind bewusst einfach gehalten und

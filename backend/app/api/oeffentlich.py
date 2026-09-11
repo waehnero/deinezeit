@@ -36,8 +36,8 @@ def postecke_medium(token: str, db: Session = Depends(get_db)):
     art, media_id = geprueft
     try:
         mid = UUID(media_id)
-    except ValueError:
-        raise HTTPException(404, "Link ungültig")
+    except ValueError as e:
+        raise HTTPException(404, "Link ungültig") from e
 
     if art == "video":
         video = db.query(SocialPostVideo).filter(SocialPostVideo.id == mid).first()

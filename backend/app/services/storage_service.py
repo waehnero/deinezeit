@@ -5,6 +5,7 @@ Unterstützte Provider:
   minio   – lokaler MinIO Objektspeicher (Standard)
   webdav  – WebDAV-kompatibler Cloudspeicher (Nextcloud, SeaDrive, ...)
 """
+import logging
 import os
 import io
 import secrets
@@ -12,6 +13,8 @@ import time
 import threading
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from minio import Minio
 from minio.error import S3Error
@@ -201,7 +204,9 @@ class WebDavProvider(StorageProvider):
         try:
             requests.delete(self._url(storage_key), auth=self._auth(), timeout=15)
         except Exception:
-            pass
+            # Löschen darf den Aufrufer nicht scheitern lassen, aber eine
+            # verwaiste Datei soll im Log auffindbar sein.
+            logger.warning("WebDAV: Löschen von %s fehlgeschlagen", storage_key, exc_info=True)
 
     def test_connection(self) -> dict:
         import requests
@@ -354,7 +359,7 @@ class OneDriveProvider(StorageProvider):
         try:
             req.delete(self._item_url(storage_key), headers=self._headers(), timeout=15)
         except Exception:
-            pass
+            logger.warning("OneDrive: Löschen von %s fehlgeschlagen", storage_key, exc_info=True)
 
     def item_meta(self, storage_key: str) -> Optional[dict]:
         """Metadaten (u.a. 'webUrl', 'size') einer Datei; None wenn nicht vorhanden."""

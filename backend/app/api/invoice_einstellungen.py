@@ -183,7 +183,7 @@ def upload_position_image(
         storage_service.upload_file(schluessel, daten, mime, db=db, backend=backend)
     except Exception as exc:
         logger.exception("Fehler bei invoice: %s", exc)
-        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).") from exc
 
     return {"image_key": schluessel, "image_size": size, "image_provider": backend,
             "breite_mm": position_image.breite_mm(size), "bytes": len(daten)}
@@ -202,8 +202,8 @@ def get_position_image(
         raise HTTPException(400, "Ungültiger Bildschlüssel")
     try:
         daten, mime = storage_service.download_file(key, db=db, backend=provider)
-    except Exception:
-        raise HTTPException(404, "Bild nicht gefunden")
+    except Exception as e:
+        raise HTTPException(404, "Bild nicht gefunden") from e
     return Response(content=daten, media_type=mime or "image/jpeg",
                     headers={"Cache-Control": "private, max-age=3600"})
 

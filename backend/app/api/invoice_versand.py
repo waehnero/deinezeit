@@ -241,10 +241,10 @@ def send_invoice_email(
         # wurde ja gerade nicht, und der Grund liegt am Beleg.
         raise
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     except Exception as e:
         logger.exception("Fehler bei invoice: %s", e)
-        raise HTTPException(500, "Die E-Mail konnte nicht gesendet werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Die E-Mail konnte nicht gesendet werden (Ursache im Serverlog).") from e
 
     return {"ok": True, "to": to_email, "number": inv.number}
 

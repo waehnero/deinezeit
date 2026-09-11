@@ -21,6 +21,7 @@ SharePoint hochgeladen werden (Backup-Ziel ``onedrive``). Die tägliche
 Automatik läuft — wie der Wiederkehr-/Mail-Worker — in einem eigenen
 Daemon-Thread (in Tests deaktiviert).
 """
+import logging
 import os
 import json
 import subprocess
@@ -30,6 +31,8 @@ import time
 import zipfile
 from datetime import datetime, timezone, timedelta
 from app.core import zeit
+
+logger = logging.getLogger(__name__)
 
 
 # ── pg_dump ───────────────────────────────────────────────────────────────────
@@ -46,8 +49,8 @@ def _db_zugang() -> dict:
             "host": host_db[0].split(":")[0],
             "name": host_db[1].split("?")[0],
         }
-    except Exception:
-        raise RuntimeError("Datenbank-URL konnte nicht geparst werden")
+    except Exception as e:
+        raise RuntimeError("Datenbank-URL konnte nicht geparst werden") from e
 
 
 def _timeout_vorgabe(timeout) -> int:
@@ -74,10 +77,10 @@ def pg_dump_in_datei(pfad: str, timeout: int = None) -> None:
                 stdout=ziel, stderr=subprocess.PIPE, env=env,
                 timeout=_timeout_vorgabe(timeout),
             )
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"Backup-Timeout nach {_timeout_vorgabe(timeout)} Sekunden")
-    except FileNotFoundError:
-        raise RuntimeError("pg_dump nicht gefunden — bitte Container neu bauen")
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError(f"Backup-Timeout nach {_timeout_vorgabe(timeout)} Sekunden") from e
+    except FileNotFoundError as e:
+        raise RuntimeError("pg_dump nicht gefunden — bitte Container neu bauen") from e
     if result.returncode != 0:
         raise RuntimeError(f"pg_dump Fehler: {result.stderr.decode('utf-8', 'replace')[:200]}")
 
@@ -134,7 +137,7 @@ def create_backup_archive(db, timeout: int = None) -> tuple:
         try:
             objekte = minio.list_keys()
         except Exception as e:                                       # noqa: BLE001
-            raise RuntimeError(f"Dateispeicher (MinIO) nicht erreichbar: {e}")
+            raise RuntimeError(f"Dateispeicher (MinIO) nicht erreichbar: {e}") from e
 
         # Anhänge in fremden Speichern nur verzeichnen — sie liegen schon extern
         extern = [{"id": str(a.id), "storage_key": a.storage_key,
@@ -245,7 +248,9 @@ def _apply_retention(provider, keep_days: int) -> int:
                 provider.delete(name)
                 deleted += 1
     except Exception:
-        pass
+        # Aufräumen alter Backups ist Beiwerk – aber ein dauerhaft scheiterndes
+        # Aufräumen füllt den Speicher unbemerkt. Deshalb ins Log statt schlucken.
+        logger.warning("Aufräumen alter Backups fehlgeschlagen", exc_info=True)
     return deleted
 
 

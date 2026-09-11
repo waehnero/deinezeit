@@ -8,6 +8,7 @@ war gleichbedeutend mit root auf dem Server — ein einziger Fehler im Backend
 hätte den ganzen Server preisgegeben. Updates kommen seither ausschließlich
 über den CI-Deploy (GitHub Actions nach grüner Prüfung auf ``main``).
 """
+import logging
 import os
 import re
 import time
@@ -16,6 +17,8 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 from threading import Lock
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -178,7 +181,7 @@ async def get_changelog(_: User = Depends(get_current_user)):
             if resp.status_code == 200:
                 return {"content": resp.text}
     except Exception:
-        pass
+        logger.debug("Changelog von GitHub nicht erreichbar", exc_info=True)
     return {"content": "Changelog konnte nicht geladen werden."}
 
 

@@ -426,14 +426,14 @@ def create_record(
                 daten["artikelnummer"] = artikelstamm.naechste_artikelnummer(
                     db, gruppe, festschreiben=True)
             except ValueError as fehler:
-                raise HTTPException(status_code=409, detail=str(fehler))
+                raise HTTPException(status_code=409, detail=str(fehler)) from fehler
 
     try:
         return masterdata_service.create_record(db, et, daten, current_user.id)
     except ValueError as fehler:
         # Verletzte Eindeutigkeit — 409, nicht 400: Der Datensatz ist in Ordnung,
         # er kollidiert nur mit einem bestehenden.
-        raise HTTPException(status_code=409, detail=str(fehler))
+        raise HTTPException(status_code=409, detail=str(fehler)) from fehler
 
 
 @router.get("/types/{slug}/records/{record_id}", response_model=EntityRecordResponse)
@@ -466,7 +466,7 @@ def update_record(
     try:
         return masterdata_service.update_record(db, record, body.data, current_user.id)
     except ValueError as fehler:
-        raise HTTPException(status_code=409, detail=str(fehler))
+        raise HTTPException(status_code=409, detail=str(fehler)) from fehler
 
 
 @router.get("/types/{slug}/records/export/csv")
@@ -535,7 +535,7 @@ def import_records(
             fehlerhafte_ueberspringen=body.skip_invalid,
         )
     except ValueError as fehler:
-        raise HTTPException(status_code=400, detail=str(fehler))
+        raise HTTPException(status_code=400, detail=str(fehler)) from fehler
 
     return ImportReport(
         geprueft=bericht.geprueft,
@@ -942,7 +942,7 @@ def naechste_artikelnummer(
         return {"artikelnummer": artikelstamm.naechste_artikelnummer(db, g, festschreiben=False),
                 "gruppe": g.nr, "praefix": g.praefix}
     except ValueError as fehler:
-        raise HTTPException(status_code=409, detail=str(fehler))
+        raise HTTPException(status_code=409, detail=str(fehler)) from fehler
 
 
 @router.get("/artikel/{record_id}/vorgaben", response_model=ArtikelVorgaben)
@@ -1010,7 +1010,7 @@ def upload_masterdata_image(
         storage_service.upload_file(schluessel, daten, mime, db=db, backend=backend)
     except Exception as exc:
         logger.exception("Fehler bei masterdata: %s", exc)
-        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).") from exc
 
     return {"key": schluessel, "provider": backend, "size": size,
             "bytes": len(daten), "name": file.filename}
@@ -1032,7 +1032,7 @@ def get_masterdata_image(
         raise HTTPException(400, "Ungültiger Bildschlüssel")
     try:
         daten, mime = storage_service.download_file(key, db=db, backend=provider)
-    except Exception:
-        raise HTTPException(404, "Bild nicht gefunden")
+    except Exception as e:
+        raise HTTPException(404, "Bild nicht gefunden") from e
     return Response(content=daten, media_type=mime or "image/jpeg",
                     headers={"Cache-Control": "private, max-age=3600"})

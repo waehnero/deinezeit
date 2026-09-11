@@ -316,7 +316,7 @@ def veroeffentliche_post(
     try:
         social_publish.publiziere(db, p, profil)
     except RuntimeError as e:
-        raise HTTPException(502, str(e))
+        raise HTTPException(502, str(e)) from e
     db.commit()
     db.refresh(p)
     _sync_datacenter(db, p, current_user.id)
@@ -345,9 +345,9 @@ def generiere_post(
         vorschlag = postecke_service.generiere_vorschlag(
             db, p, profil, beschreibung=body.beschreibung)
     except RuntimeError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     except Exception as e:
-        raise HTTPException(502, f"KI-Aufruf fehlgeschlagen: {e}")
+        raise HTTPException(502, f"KI-Aufruf fehlgeschlagen: {e}") from e
 
     if body.beschreibung:
         p.beschreibung = body.beschreibung

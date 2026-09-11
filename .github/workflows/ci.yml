@@ -117,7 +117,7 @@ jobs:
       # nicht geprüft: bestehende Migrationen bleiben unangetastet.
       - name: "Statische Prüfung (ruff)"
         working-directory: backend
-        run: ruff check --select F,E9 --ignore F841 app/ alembic/env.py
+        run: ruff check --select F,E9,B904 --ignore F841 app/ alembic/env.py
 
       - name: "Tests ausführen"
         working-directory: backend

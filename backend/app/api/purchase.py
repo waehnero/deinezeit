@@ -544,7 +544,7 @@ def upload_file(
                                     db=db, backend=backend)
     except Exception as exc:
         logger.exception("Fehler bei purchase: %s", exc)
-        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).") from exc
 
     inv.file_key = schluessel
     inv.file_name = file.filename
@@ -574,8 +574,8 @@ def get_file(
         # Provider der Datei, nicht der gerade aktive — siehe upload_file.
         daten, mime = storage_service.download_file(inv.file_key, db=db,
                                                     backend=inv.file_provider)
-    except Exception:
-        raise HTTPException(404, "Das Original ist im Speicher nicht auffindbar")
+    except Exception as e:
+        raise HTTPException(404, "Das Original ist im Speicher nicht auffindbar") from e
     name = inv.file_name or f"{inv.internal_number or 'beleg'}.pdf"
     return Response(content=daten, media_type=mime or inv.file_mimetype or "application/pdf",
                     headers={"Content-Disposition": content_disposition("inline", name)})

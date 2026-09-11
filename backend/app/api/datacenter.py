@@ -113,8 +113,8 @@ def _entity_pruefen(entity_type: str, entity_id: str) -> uuid.UUID:
         raise HTTPException(400, "Ungültiger Datensatztyp")
     try:
         return uuid.UUID(str(entity_id))
-    except (ValueError, TypeError, AttributeError):
-        raise HTTPException(400, "Ungültige Datensatz-ID")
+    except (ValueError, TypeError, AttributeError) as e:
+        raise HTTPException(400, "Ungültige Datensatz-ID") from e
 
 # Max. Dateigröße: 100 MB
 MAX_FILE_SIZE = 100 * 1024 * 1024
@@ -799,7 +799,7 @@ def upload_file(
         storage_service.upload_file(storage_key, data, mimetype, db=db, backend=backend)
     except Exception as exc:
         logger.exception("Fehler bei datacenter: %s", exc)
-        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Die Datei konnte nicht gespeichert werden (Ursache im Serverlog).") from exc
 
     contact_id, contact_name = resolve_contact(db, entity_type, entity_id)
 

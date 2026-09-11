@@ -81,8 +81,8 @@ def _zahl(wert: str) -> float:
         text = text.replace(".", "").replace(",", ".")
     try:
         return float(text)
-    except ValueError:
-        raise Wertfehler("keine Zahl")
+    except ValueError as e:
+        raise Wertfehler("keine Zahl") from e
 
 
 def _datum(wert: str) -> str:

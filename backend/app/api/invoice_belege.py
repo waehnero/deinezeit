@@ -364,7 +364,7 @@ def download_invoice_pdf(
                                  erechnung_xml=xml)
     except Exception as e:
         logger.exception("Fehler bei invoice: %s", e)
-        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).")
+        raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).") from e
 
     filename = f"{(inv.number or 'beleg').replace('/', '-')}.pdf"
     return Response(
