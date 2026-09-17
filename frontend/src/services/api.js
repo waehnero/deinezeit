@@ -327,6 +327,19 @@ export const zeiterfassungApi = {
   // KI: Sprach-Nachtragen (Transkript auswerten → Vorschlag)
   kiNachtragen: (transcript) => api.post('/zeiterfassung/ki-nachtragen', { transcript }),
 
+  // Import aus Fremdsystemen (components/ZeitenImport.jsx)
+  importFelder: () => api.get('/zeiterfassung/import/felder'),
+  // rows: fertig zugeordnete Zeilen; optionen: { user_id, dry_run, skip_invalid }
+  importZeiten: (rows, optionen) => api.post('/zeiterfassung/import', { rows, ...optionen }),
+  // PDF → Tabelle über die KI. Kann dauern (bis knapp 3 Minuten), daher eigenes Zeitlimit.
+  importPdf: (datei) => {
+    const form = new FormData()
+    form.append('file', datei)
+    // Content-Type bewusst undefined: Browser setzt multipart-boundary selbst
+    return api.post('/zeiterfassung/import/pdf', form,
+      { headers: { 'Content-Type': undefined }, timeout: 180000 })
+  },
+
   // Stundenkonten / Projekt-Budgets
   listStundenkonten: (projectId) => api.get(`/zeiterfassung/projekte/${projectId}/stundenkonten`),
   createStundenkonto: (projectId, data) => api.post(`/zeiterfassung/projekte/${projectId}/stundenkonten`, data),
