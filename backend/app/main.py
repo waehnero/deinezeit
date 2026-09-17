@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.netz import echte_ip
 from app.core.request_id import RequestIdMiddleware, RequestIdFilter
-from app.api import auth, users, masterdata, zeiterfassung, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard, groups
+from app.api import auth, users, masterdata, zeiterfassung, zeiterfassung_import, reports, datacenter, system, invoice, accounting, projektplan, aufgaben, mailimport, gdpr, postecke, setup, oeffentlich, period, purchase, dashboard, groups
 from app.api import settings as settings_api
 from app.services import storage_service
 
@@ -125,6 +125,8 @@ app.include_router(users.router, prefix="/api")
 app.include_router(groups.router, prefix="/api")
 app.include_router(masterdata.router, prefix="/api")
 app.include_router(zeiterfassung.router, prefix="/api",
+                   dependencies=[_Dep(_rm("zeiterfassung"))])
+app.include_router(zeiterfassung_import.router, prefix="/api",
                    dependencies=[_Dep(_rm("zeiterfassung"))])
 app.include_router(reports.router, prefix="/api",
                    dependencies=[_Dep(_rm("zeiterfassung"))])

@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0] – 2026-09-18 – Zeiten aus anderen Programmen übernehmen
+
+### Neu
+- Zeiterfassung: Neuer Knopf „Import“. Projektzeiten aus anderen Programmen lassen sich aus CSV, Excel, JSON (z.B. Toggl, Clockify) und Kalenderdateien (.ics) übernehmen. Du ordnest die Spalten zu, siehst einen Prüfbericht mit Stundensumme und entscheidest dann erst über den Import.
+- Stundenzettel als PDF — auch gescannt — liest die KI in eine Tabelle. Vor dem Senden wirst du gefragt, weil die Datei dafür an den KI-Anbieter geht. Die gelesene Tabelle kannst du prüfen, als CSV herunterladen und korrigieren.
+
+### Aktualisierungen
+- Beim Import wird nichts erraten: Zeilen ohne Beginn und Ende, unklare Datumsangaben oder unbekannte Zeitprojekte werden mit Begründung aufgelistet. Eine Datei zweimal einzuspielen verdoppelt keine Stunden.
+- Administratoren können Zeiten für andere Personen importieren — über eine Spalte mit Name oder E-Mail oder für eine Person je Datei. Alle anderen importieren nur für sich selbst.
+
+---
+
 ## [2.0.5] – 2026-09-11 – Nachvollziehbare Logs
 
 ### Aktualisierungen

@@ -6,11 +6,12 @@ import { zeiterfassungApi, usersApi, datacenterApi } from '../services/api'
 import toast from 'react-hot-toast'
 import {
   Play, Square, Plus, Trash2, Search, ChevronLeft, ChevronRight,
-  Clock, Loader2, X, Settings2, Timer, Euro, FileText, Mic, Sparkles
+  Clock, Loader2, X, Settings2, Timer, Euro, FileText, Mic, Sparkles, Upload
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import AttachmentQuickBar from '../components/AttachmentQuickBar'
 import VoiceEntryDialog from '../components/VoiceEntryDialog'
+import ZeitenImport from '../components/ZeitenImport'
 import ZeitprojektSuche from '../components/ZeitprojektSuche'
 import TimeSuggestInput from '../components/TimeSuggestInput'
 import ProjektzeitModal from '../components/ProjektzeitModal'
@@ -447,6 +448,7 @@ export default function ZeiterfassungPage() {
   const [modalEntry, setModalEntry] = useState(undefined)
   const [modalInitial, setModalInitial] = useState(null)  // KI-Vorbefüllung fürs Nachtragen
   const [voiceOpen, setVoiceOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   // KI-Vorschlag aus der Sprachaufnahme → Nachtragen-Dialog vorbefüllt öffnen.
   // Datum/Uhrzeit werden normalisiert, damit die Eingabefelder (date/time)
@@ -720,6 +722,14 @@ export default function ZeiterfassungPage() {
             <span className="hidden sm:inline">Berichte</span>
           </button>
           {darfErfassen && (
+            <button onClick={() => setImportOpen(true)} title="Projektzeiten aus einer Datei importieren (CSV, Excel, JSON, Kalender, PDF)"
+              aria-label="Projektzeiten importieren"
+              className="flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+              <Upload size={16} />
+              <span className="hidden lg:inline">Import</span>
+            </button>
+          )}
+          {darfErfassen && (
             <button onClick={() => setModalEntry(null)} title="Projektzeit nachtragen"
               className="hidden sm:flex items-center gap-2 px-2.5 sm:px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
               <Plus size={16} />
@@ -880,6 +890,16 @@ export default function ZeiterfassungPage() {
 
       {voiceOpen && (
         <VoiceEntryDialog onClose={() => setVoiceOpen(false)} onResult={handleVoiceResult} />
+      )}
+
+      {importOpen && (
+        <ZeitenImport
+          onClose={() => setImportOpen(false)}
+          onImported={(anzahl) => {
+            setImportOpen(false)
+            toast.success(`${anzahl} Projektzeiten importiert`)
+            loadAll()
+          }} />
       )}
 
     </div>

@@ -215,7 +215,10 @@ def _protokolliere_antwort(kontext: str, provider: str, model: str,
 
 def call_ki(ki: dict, prompt: str,
             images: Optional[List[Tuple[bytes, str]]] = None,
-            max_tokens: int = 1500, kontext: str = "") -> str:
+            max_tokens: int = 1500, kontext: str = "",
+            dokumente: Optional[List[Tuple[bytes, str]]] = None,
+            timeout: int = 120,
+            meta: Optional[dict] = None) -> str:
     """
     Ruft den konfigurierten KI-Provider auf und liefert den Antworttext.
 
@@ -225,6 +228,15 @@ def call_ki(ki: dict, prompt: str,
              übergeben (beide Provider unterstützen Base64-Bilder)
     kontext  freies Kürzel für das Log (z.B. "postecke"), damit sich Aufrufe
              verschiedener Module im Serverlog auseinanderhalten lassen
+    dokumente  optionale Liste [(bytes, dateiname), ...] mit PDF-Dateien. Beide
+             Provider lesen PDFs selbst (Text UND Seitenbild, also auch
+             gescannte Seiten) — das Backend braucht dafür keine PDF-Bibliothek.
+    timeout  Sekunden bis zum Abbruch. Muss unter dem ``proxy_read_timeout``
+             von nginx (180 s) bleiben, sonst sieht der Benutzer ein 504 statt
+             unserer Fehlermeldung.
+    meta     optionales dict, das mit ``abgeschnitten`` (bool) gefüllt wird.
+             Der Aufrufer kann damit „Antwort am Token-Limit abgerissen" von
+             „Antwort unbrauchbar" unterscheiden, ohne das Log zu lesen.
     """
     if not ki.get("api_key_enc"):
         raise RuntimeError(
@@ -244,8 +256,19 @@ def call_ki(ki: dict, prompt: str,
                 "bitte das Foto als JPEG/PNG hochladen")
         bilder.append((data, mimetype))
 
+    pdfs: List[Tuple[bytes, str]] = list(dokumente or [])
+
     if provider == "anthropic":
         content = []
+        for data, _name in pdfs:
+            content.append({
+                "type": "document",
+                "source": {
+                    "type": "base64",
+                    "media_type": "application/pdf",
+                    "data": base64.b64encode(data).decode(),
+                },
+            })
         for data, mimetype in bilder:
             content.append({
                 "type": "image",
@@ -268,16 +291,27 @@ def call_ki(ki: dict, prompt: str,
                 "max_tokens": max_tokens,
                 "messages": [{"role": "user", "content": content}],
             },
-            timeout=120,
+            timeout=timeout,
         )
         daten = resp.json()
         text = "".join(b.get("text", "") for b in daten.get("content", []))
+        if meta is not None:
+            meta["abgeschnitten"] = daten.get("stop_reason") == "max_tokens"
         _protokolliere_antwort(kontext, provider, model, bilder, max_tokens,
                                daten, text)
         return text
 
     # openai
     content = []
+    for data, name in pdfs:
+        content.append({
+            "type": "file",
+            "file": {
+                "filename": name or "dokument.pdf",
+                "file_data": "data:application/pdf;base64,"
+                             + base64.b64encode(data).decode(),
+            },
+        })
     for data, mimetype in bilder:
         content.append({
             "type": "image_url",
@@ -292,10 +326,13 @@ def call_ki(ki: dict, prompt: str,
             "messages": [{"role": "user", "content": content}],
             "temperature": 0,
         },
-        timeout=120,
+        timeout=timeout,
     )
     daten = resp.json()
     text = daten["choices"][0]["message"]["content"]
+    if meta is not None:
+        meta["abgeschnitten"] = (
+            (daten.get("choices") or [{}])[0].get("finish_reason") == "length")
     _protokolliere_antwort(kontext, provider, model, bilder, max_tokens,
                            daten, text)
     return text
