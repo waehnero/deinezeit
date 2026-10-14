@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1] – 2026-10-14 – Schnellere Verbindung
+
+### Aktualisierungen
+- Die Anwendung nutzt jetzt HTTP/2: Der Browser lädt alle Teile einer Seite gleichzeitig über eine Verbindung. Seiten öffnen sich dadurch spürbar flotter, besonders am Handy im mobilen Netz.
+
+---
+
 ## [2.1.0] – 2026-09-18 – Zeiten aus anderen Programmen übernehmen
 
 ### Neu

@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '2.1.1',
+    day: '14',
+    month: 'Oktober',
+    year: '2026',
+    features: [],
+    updates: [
+      'Die Anwendung nutzt jetzt HTTP/2: Der Browser lädt alle Teile einer Seite gleichzeitig über eine Verbindung. Seiten öffnen sich dadurch spürbar flotter, besonders am Handy im mobilen Netz.',
+    ],
+  },
+  {
     version: '2.1.0',
     day: '18',
     month: 'September',
