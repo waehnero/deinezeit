@@ -163,3 +163,31 @@ Rückweg: Branch nicht mergen bzw. Revert — keine Migration, keine Datenänder
 - Zuordnungen je Quelle merken (Vorlage „Toggl", „Clockify").
 - Option „unbekannte Zeitprojekte beim Import anlegen".
 - Excel-Leser von Stammdaten- und Zeiten-Import zusammenlegen.
+
+## 9. Abnahme (nachgetragen 14.10.2026)
+
+**Lokal (Oliver, 18.09.2026):** `./test.sh` grün. Merge als PR #96 am 18.09.2026 00:39
+(Merge-Commit `ed3f5df`). CI „Qualitätsprüfung" #469 grün (9 min 56 s), „Deploy → Produktion"
+#230 grün (58 s, inkl. hartem Healthcheck).
+
+**Server (14.10.2026, Oliver per SSH, Ausgaben eingesehen):**
+
+| Prüfung | Ergebnis |
+|---|---|
+| `curl -s http://localhost/api/health` | `{"status":"ok","version":"2.1.0"}` ✅ |
+| `docker compose ps` | backend (healthy), db, frontend, nginx, minio, certbot — alle `Up 3 weeks`, kein Neustart-Loop ✅ |
+| Backend-Log, letzte 40 Zeilen, `error\|traceback` | keine Treffer ✅ |
+| PDF-Import am Server | am 21.09.2026 22:22 UTC tatsächlich genutzt: `[KI-AUFRUF] zeiten-import anthropic/claude-sonnet-4-5 \| max_tokens=10000 \| stop_reason=end_turn \| Tokens: 3047 rein / 828 raus \| Antwortlänge: 1670 Zeichen` ✅ — Antwort nicht abgeschnitten, Verbrauch weit unter dem Limit |
+
+Damit ist der in Abschnitt 5 offene Punkt „echter KI-Aufruf mit PDF" am Server bestätigt.
+Nicht aus dem Log ablesbar: ob die gelesene Tabelle inhaltlich stimmte — das sieht nur der
+Anwender im Vergleich mit dem PDF.
+
+**Nebenbefund (nicht Teil dieser Etappe):** `git log` in `/opt/deinezeit` zeigt `fe65af4`
+(Version 1.12.14), die Container laufen aber nachweislich aus diesem Ordner auf 2.1.0. Grund:
+Der Deploy überträgt die Dateien per `rsync --exclude='.git'` (deploy.yml), das `.git`-Verzeichnis
+ist ein Überbleibsel eines früheren manuellen Checkouts und sagt nichts über den Stand aus.
+Regel: am Server **kein** `git pull` (würde den rsync-Stand überschreiben); laufende Version
+über `/api/health` oder `frontend/package.json` prüfen. Außerdem laut Login-Banner:
+`*** System restart required ***`, 51 Updates (5 Sicherheit), Platte 82 % voll → eigenes
+Thema „Server-Wartung".
