@@ -11,7 +11,7 @@
 
 - **Version:** **2.0.0** (Release 04.09.2026, Abschluss des Audits) — Details in `frontend/package.json` / [CHANGELOG.md](CHANGELOG.md); der pre-commit-Hook hebt die Patch-Version je Branch an
 - **Branch-Modell:** Feature-Branch → PR → CI (pytest ist Pflicht) → Merge auf `main` → Deploy **nach grüner CI** (`deploy.yml`, `workflow_run`)
-- **DB-Migrationsstand:** bis `0062_update_zustand_entfernen`; Modelle und Migrationen sind deckungsgleich (`tests/test_migrationen.py` wacht darüber)
+- **DB-Migrationsstand:** bis `0063_mail_zentrale_zugangsdaten_binden`; Modelle und Migrationen sind deckungsgleich (`tests/test_migrationen.py` wacht darüber)
 - **Tests:** 961 pytest-Tests + 9 Vitest-Tests, Laufzeit in CI wenige Minuten
 - **Lokale Umgebung:** Docker Compose (`docker-compose.local.yml`) → http://localhost; lokale Werte in `.env.local` (nicht im Repo)
 
@@ -55,6 +55,13 @@ Release-Checkliste: [docs/RELEASE-2.0.0.md](docs/RELEASE-2.0.0.md).
 ---
 
 ## Logbuch
+
+### 2026-10-15 – Sicherheitsbefund Mail-Import: zentrale Zugangsdaten (2.1.2)
+- Befund „zentrale Mailzugangsdaten an frei wählbaren IMAP-Server" per Regressionstest bestätigt
+  und behoben: zentrale Zugangsdaten nur an globalen Konten mit vom Admin bestätigtem Ziel,
+  Freigabe zentraler Konten nach Gruppen, TLS mit Zertifikatsprüfung Pflicht, interne Adressen
+  gesperrt (Admin-Freigabe möglich), Graph-Mailbox gebunden. Migration 0063.
+- Prüfbericht + Admin-Schritte nach dem Einspielen: [docs/PRUEFBERICHT-MAIL-ZUGANGSDATEN-2026-10-15.md](docs/PRUEFBERICHT-MAIL-ZUGANGSDATEN-2026-10-15.md).
 
 ### 2026-09-02 … 09-03 – Software-Audit und Korrekturbündel A–F
 - Prüfbericht `docs/AUDIT-2026-09-02.md` (45 Befunde, Korrekturplan K-01…K-26).

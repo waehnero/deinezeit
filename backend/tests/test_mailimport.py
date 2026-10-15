@@ -59,8 +59,9 @@ def test_globales_konto_nur_admin(auth_client):
 def test_globales_konto_als_admin_fuer_alle_sichtbar(client, admin_user, test_user):
     _admin_client(client, admin_user)
     resp = client.post("/api/mail-import/accounts", json={
-        "name": "Office", "protocol": "imap", "imap_host": "x",
+        "name": "Office", "protocol": "imap", "imap_host": "imap.example.com",
         "imap_user": "x", "secret": "x", "is_global": True,
+        "freigabe_alle": True,
     })
     assert resp.status_code == 201
     assert resp.json()["owner_user_id"] is None
@@ -89,14 +90,22 @@ def test_konto_aendern_und_loeschen(auth_client):
 
 
 # ── Zentrale E-Mail-Zugangsdaten (Einstellungen -> System -> E-Mail) ─────────
-def test_konto_mit_zentralen_zugangsdaten_ohne_secret(auth_client):
+def test_persoenliches_konto_darf_keine_zentralen_zugangsdaten_nutzen(auth_client):
+    # Bis Oktober 2026 erlaubt — das war der Sicherheitsbefund (siehe
+    # test_mailimport_sicherheit.py). Zentrale Zugangsdaten gibt es nur an
+    # globalen, vom Admin eingerichteten Konten.
     resp = auth_client.post("/api/mail-import/accounts", json={
         "name": "Zentral", "protocol": "graph",
         "use_central_credentials": True, "folder": "inbox",
     })
-    assert resp.status_code == 201, resp.text
-    assert resp.json()["use_central_credentials"] is True
-    assert resp.json()["has_secret"] is False
+    assert resp.status_code == 403
+
+
+def _bestaetigt(db_session, acc):
+    from datetime import datetime, timezone
+    from app.services import mail_sicherheit
+    mail_sicherheit.bindung_setzen(db_session, acc, None, datetime.now(timezone.utc))
+    return acc
 
 
 def test_zentrale_imap_zugangsdaten_aufloesen(db_session, auth_client):
@@ -107,7 +116,8 @@ def test_zentrale_imap_zugangsdaten_aufloesen(db_session, auth_client):
     db_session.commit()
 
     acc = MailAccount(name="Z", protocol="imap", imap_host="imap.firma.at",
-                      use_central_credentials=True, folder="INBOX")
+                      imap_ssl=True, use_central_credentials=True, folder="INBOX")
+    _bestaetigt(db_session, acc)
     user, password = mail_ingest._imap_credentials(db_session, acc)
     assert user == "office@firma.at"
     assert password == "smtp-geheim"
@@ -116,7 +126,7 @@ def test_zentrale_imap_zugangsdaten_aufloesen(db_session, auth_client):
 def test_zentrale_graph_zugangsdaten_aufloesen(db_session):
     from app.models.settings import Setting
     from app.models.mailimport import MailAccount
-    for k, v in [("ms_tenant_id", "t-1"), ("ms_client_id", "c-1"),
+    for k, v in [("ms_tenant_id", "t-1.onmicrosoft.com"), ("ms_client_id", "c-1"),
                  ("ms_client_secret", "s-1"), ("smtp_from_email", "office@firma.at")]:
         db_session.add(Setting(key=k, value=v))
     db_session.commit()
@@ -124,8 +134,9 @@ def test_zentrale_graph_zugangsdaten_aufloesen(db_session):
     # Mailbox leer -> Absenderadresse aus der zentralen Konfiguration
     acc = MailAccount(name="Z", protocol="graph",
                       use_central_credentials=True, folder="inbox")
+    _bestaetigt(db_session, acc)
     tenant, client, secret, mailbox = mail_ingest._graph_credentials(db_session, acc)
-    assert (tenant, client, secret) == ("t-1", "c-1", "s-1")
+    assert (tenant, client, secret) == ("t-1.onmicrosoft.com", "c-1", "s-1")
     assert mailbox == "office@firma.at"
 
 

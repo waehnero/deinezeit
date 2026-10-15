@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.2] – 2026-10-15 – Sicherere Mail-Anbindung
+
+### Aktualisierungen
+- Mail-Import: Die zentralen E-Mail-Zugangsdaten der Firma können nur noch an Mail-Konten verwendet werden, die ein Administrator eingerichtet hat – und nur für den Server bzw. das Postfach, das er bestätigt hat. Persönliche Konten arbeiten mit eigenen Zugangsdaten.
+- Zentrale Mail-Konten gibt der Administrator gezielt frei: für alle oder nur für bestimmte Gruppen. Wer nicht freigegeben ist, sieht das Konto und seine Aufgabenvorschläge nicht.
+- Mailserver werden nur noch verschlüsselt (SSL/TLS oder STARTTLS) und mit geprüftem Zertifikat angesprochen. Interne Firmen-Mailserver und eine eigene Firmen-Zertifizierungsstelle lassen sich in den Einstellungen freigeben.
+- Betrifft ein bestehendes Konto die neue Regel, steht der Grund direkt beim Konto – samt Knopf „Ziel bestätigen“ für Administratoren.
+
+---
+
 ## [2.1.1] – 2026-10-14 – Schnellere Verbindung
 
 ### Aktualisierungen

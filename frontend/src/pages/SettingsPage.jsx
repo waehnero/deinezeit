@@ -5,7 +5,7 @@ import { getAccessToken, settingsApi, systemApi, invoiceApi } from '../services/
 import toast from 'react-hot-toast'
 import RichTextEditor from '../components/RichTextEditor'
 import UserManagementPage from './UserManagementPage'
-import MailKonten, { KiEinstellungen } from '../components/MailImportVerwaltung'
+import MailKonten, { KiEinstellungen, MailSicherheit } from '../components/MailImportVerwaltung'
 import DatenschutzEinstellungen from './DatenschutzEinstellungen'
 import LasttestAnleitung from '../components/LasttestAnleitung'
 import SystemSitzungen from '../components/SystemSitzungen'
@@ -2381,6 +2381,9 @@ function TabSystemWrapper({ settings, onSaved }) {
           <KiEinstellungen />
           <div className="border-t border-neutral-100 pt-6">
             <MailKonten global />
+          </div>
+          <div className="border-t border-neutral-100 pt-6">
+            <MailSicherheit />
           </div>
         </div>
       )}

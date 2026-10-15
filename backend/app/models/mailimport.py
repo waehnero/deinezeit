@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Index, Column, String, Boolean, DateTime, Integer, ForeignKey, Text, Date
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.db.base import Base
 
 MAIL_PROTOCOLS = ("imap", "graph")
@@ -67,6 +67,19 @@ class MailAccount(Base):
     #  ms_client_secret bzw. smtp_user/smtp_password). Dann sind die
     #  kontoeigenen Zugangsdaten/secret_enc nicht nötig.
     use_central_credentials = Column(Boolean, default=False, nullable=False)
+
+    # Seit Migration 0063 (Sicherheitsbefund zentrale Zugangsdaten):
+    # Zentrale Zugangsdaten nur an globalen Konten und nur an das vom Admin
+    # bestätigte Ziel (Server, Port, TLS-Art, Anmeldeidentität, Mailbox).
+    # Weicht der aktuelle Stand ab, wird nicht verbunden. Inhalt ohne
+    # Geheimnisse; siehe services/mail_sicherheit.py.
+    zentral_bindung = Column(JSONB, nullable=True)
+
+    # Wer ein globales Konto verwenden darf (Vorschläge sehen, scannen).
+    # Admins immer; sonst alle Benutzer oder die Mitglieder der genannten
+    # Rechtegruppen (permission_groups.id als Zeichenkette).
+    freigabe_alle = Column(Boolean, default=False, nullable=False, server_default="false")
+    freigabe_gruppen = Column(JSONB, default=list, nullable=False, server_default="[]")
 
     # Zu scannender Ordner (IMAP-Ordnername bzw. Graph-Ordnername/-ID)
     folder = Column(String(300), nullable=False, default="INBOX")

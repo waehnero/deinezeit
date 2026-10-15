@@ -67,7 +67,7 @@ deinezeit/
 │   │   ├── models/            # SQLAlchemy-Modelle (ein Modul je Domäne)
 │   │   ├── schemas/           # Pydantic-Schemas
 │   │   └── services/          # auth, email, invoice_pdf, masterdata, storage (MinIO)
-│   ├── alembic/versions/      # Migrationen 0001..0061 (durchnummeriert; Drift-Test tests/test_migrationen.py)
+│   ├── alembic/versions/      # Migrationen 0001..0063 (durchnummeriert; Drift-Test tests/test_migrationen.py)
 │   ├── Dockerfile
 │   └── entrypoint.sh          # führt `alembic upgrade head` aus, startet uvicorn
 ├── frontend/

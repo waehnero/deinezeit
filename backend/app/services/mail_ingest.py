@@ -19,12 +19,15 @@ import email
 import email.header
 import email.utils
 import json
+import logging
 import re
+import socket
 import threading
 import time
 import os
 from datetime import datetime, timezone, timedelta, date
 from typing import List
+from urllib.parse import quote
 
 import httpx
 from sqlalchemy.orm import Session
@@ -41,6 +44,10 @@ from app.services.ki import (  # noqa: F401
     load_ki_settings, save_ki_settings, call_ki,
 )
 from app.core import zeit
+from app.services import mail_sicherheit
+from app.services.mail_sicherheit import MailSicherheitsFehler
+
+logger = logging.getLogger(__name__)
 
 # Wie viele Nachrichten pro Scan maximal betrachtet werden (neueste zuerst)
 MAX_MESSAGES_PER_SCAN = 25
@@ -55,13 +62,18 @@ def _settings_dict(db: Session, keys: List[str]) -> dict:
 
 
 def _imap_credentials(db: Session, account: MailAccount) -> tuple:
-    """(user, password) — kontoeigen oder aus der zentralen SMTP-Konfiguration."""
+    """(user, password) — kontoeigen oder aus der zentralen SMTP-Konfiguration.
+
+    Zentrale Zugangsdaten gibt es nur für globale Konten mit vom Admin
+    bestätigtem Ziel (services/mail_sicherheit.py). Die Prüfung steht hier,
+    damit sie für Verbindungstest, manuellen und Hintergrund-Scan gleich gilt.
+    """
     if account.use_central_credentials:
+        mail_sicherheit.zentrale_nutzung_pruefen(db, account)
         s = _settings_dict(db, ["smtp_user", "smtp_password"])
         user, password = s.get("smtp_user", ""), s.get("smtp_password", "")
         if not user or not password:
-            raise RuntimeError(
-                "Zentrale E-Mail-Zugangsdaten fehlen (Einstellungen -> System -> E-Mail)")
+            raise RuntimeError(mail_sicherheit.SPERRE_UNVOLLSTAENDIG)
         return user, password
     if not account.secret_enc:
         raise RuntimeError("Für dieses Konto ist kein Passwort hinterlegt")
@@ -69,8 +81,14 @@ def _imap_credentials(db: Session, account: MailAccount) -> tuple:
 
 
 def _graph_credentials(db: Session, account: MailAccount) -> tuple:
-    """(tenant_id, client_id, client_secret, mailbox) — kontoeigen oder zentral."""
+    """(tenant_id, client_id, client_secret, mailbox) — kontoeigen oder zentral.
+
+    Mit den zentralen Anwendungsrechten darf nur die vom Admin bestätigte
+    Mailbox gelesen werden — eine frei gewählte Mailbox würde jedes Postfach
+    des Tenants öffnen (Applikationsberechtigung Mail.Read gilt tenantweit).
+    """
     if account.use_central_credentials:
+        mail_sicherheit.zentrale_nutzung_pruefen(db, account)
         s = _settings_dict(db, ["ms_tenant_id", "ms_client_id",
                                 "ms_client_secret", "smtp_from_email"])
         tenant, client, secret = s.get("ms_tenant_id"), s.get("ms_client_id"), s.get("ms_client_secret")
@@ -80,11 +98,21 @@ def _graph_credentials(db: Session, account: MailAccount) -> tuple:
         mailbox = account.graph_mailbox or s.get("smtp_from_email")
         if not mailbox:
             raise RuntimeError("Keine Mailbox angegeben (Konto oder Absenderadresse)")
-        return tenant, client, secret, mailbox
-    if not account.secret_enc:
-        raise RuntimeError("Für dieses Konto ist kein Client-Secret hinterlegt")
-    return (account.graph_tenant_id, account.graph_client_id,
+        # Gegenprobe zur Bindung: genau die bestätigte Mailbox
+        gebunden = (account.zentral_bindung or {}).get("mailbox")
+        if not gebunden or mailbox.strip().lower() != gebunden:
+            raise MailSicherheitsFehler(mail_sicherheit.SPERRE_GEAENDERT)
+    else:
+        if not account.secret_enc:
+            raise RuntimeError("Für dieses Konto ist kein Client-Secret hinterlegt")
+        tenant, client, secret, mailbox = (
+            account.graph_tenant_id, account.graph_client_id,
             decrypt_secret(account.secret_enc), account.graph_mailbox)
+    if not mail_sicherheit.tenant_gueltig(tenant):
+        raise MailSicherheitsFehler("Ungültige Tenant-ID")
+    if not mail_sicherheit.mailbox_gueltig(mailbox):
+        raise MailSicherheitsFehler("Ungültige Mailbox (E-Mail-Adresse oder Objekt-ID erwartet)")
+    return tenant, client, secret, mailbox
 
 
 # ── Hilfen: Mail-Inhalte ──────────────────────────────────────────────────────
@@ -144,15 +172,78 @@ def _mail_body_text(msg: email.message.Message) -> str:
 
 
 # ── 2a. IMAP ──────────────────────────────────────────────────────────────────
+def _imap_oeffnen(host: str, port: int, ziel_ip, tls_direkt: bool,
+                  ctx, timeout: int = 20) -> imaplib.IMAP4:
+    """
+    Baut die IMAP-Verbindung auf — immer verschlüsselt, Zertifikat und
+    Hostname werden geprüft (``ctx`` aus ``mail_sicherheit.tls_kontext``).
+
+    Verbunden wird mit den vorab geprüften Adressen ``ziel_ip`` (eine oder
+    eine Liste, der Reihe nach probiert); der Hostname
+    dient nur noch für SNI und die Zertifikatsprüfung. So kann ein zweiter
+    DNS-Abruf (DNS-Rebinding) die Verbindung nicht mehr ins interne Netz
+    umlenken.
+
+    Die Klasse entsteht beim Aufruf (nicht beim Import), damit Tests
+    ``imaplib`` durch eine Simulation ersetzen können.
+    """
+    basis = imaplib.IMAP4_SSL if tls_direkt else imaplib.IMAP4
+    adressen = [ziel_ip] if isinstance(ziel_ip, str) else list(ziel_ip)
+
+    class _GepruefteVerbindung(basis):
+        def _create_socket(self, timeout):
+            letzter = None
+            for ip in adressen:
+                try:
+                    sock = socket.create_connection((ip, self.port), timeout)
+                    break
+                except OSError as e:
+                    letzter = e
+            else:
+                raise letzter or OSError("keine Adresse erreichbar")
+            if not tls_direkt:
+                return sock
+            try:
+                return self.ssl_context.wrap_socket(sock, server_hostname=self.host)
+            except Exception:
+                sock.close()
+                raise
+
+    if tls_direkt:
+        return _GepruefteVerbindung(host, port, ssl_context=ctx, timeout=timeout)
+    conn = _GepruefteVerbindung(host, port, timeout=timeout)
+    try:
+        # STARTTLS ist Pflicht: unterstützt der Server es nicht oder scheitert
+        # die Zertifikatsprüfung, wird abgebrochen — VOR der Anmeldung.
+        conn.starttls(ssl_context=ctx)
+    except Exception as e:
+        try:
+            conn.shutdown()
+        except Exception:  # noqa: BLE001 — Aufräumen, Fehler kommt unten
+            pass
+        raise MailSicherheitsFehler(
+            f"STARTTLS fehlgeschlagen, Verbindung abgebrochen: {e}") from e
+    return conn
+
+
 def _imap_connect(db: Session, account: MailAccount) -> imaplib.IMAP4:
-    host = account.imap_host
-    port = account.imap_port or (993 if account.imap_ssl else 143)
-    if account.imap_ssl:
-        conn = imaplib.IMAP4_SSL(host, port, timeout=20)
-    else:
-        conn = imaplib.IMAP4(host, port, timeout=20)
+    # Reihenfolge ist Absicht: erst Berechtigung der Zugangsdaten, dann Ziel,
+    # dann Verschlüsselung — angemeldet wird ganz zum Schluss.
     user, password = _imap_credentials(db, account)
-    conn.login(user, password)
+    port = mail_sicherheit.imap_port(account)
+    adressen = mail_sicherheit.ziel_adressen(db, account.imap_host, port)
+    ctx = mail_sicherheit.tls_kontext(db)
+    host = account.imap_host.strip().strip("[]").rstrip(".")
+    conn = _imap_oeffnen(host, port, adressen, bool(account.imap_ssl), ctx)
+    try:
+        conn.login(user, password)
+    except Exception as e:
+        try:
+            conn.shutdown()
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError(mail_sicherheit.geheimnisse_entfernen(
+            f"IMAP-Anmeldung fehlgeschlagen: {e}", [password])) from e
     return conn
 
 
@@ -218,10 +309,17 @@ def imap_fetch_messages(db: Session, account: MailAccount,
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 
+def _url_teil(wert: str) -> str:
+    """Pfadsegment sicher kodieren — „/", „?" oder „#" in Mailbox, Ordner-
+    oder Nachrichten-ID dürfen den Graph-Aufruf nicht auf einen anderen
+    Endpunkt umbiegen."""
+    return quote(str(wert), safe="@=")
+
+
 def _graph_token(db: Session, account: MailAccount) -> tuple:
     """Liefert (access_token, mailbox)."""
     tenant, client, secret, mailbox = _graph_credentials(db, account)
-    url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+    url = f"https://login.microsoftonline.com/{quote(tenant, safe='')}/oauth2/v2.0/token"
     resp = httpx.post(url, data={
         "client_id": client,
         "client_secret": secret,
@@ -234,7 +332,7 @@ def _graph_token(db: Session, account: MailAccount) -> tuple:
 
 def graph_list_folders(db: Session, account: MailAccount) -> List[str]:
     token, mailbox = _graph_token(db, account)
-    url = f"{GRAPH_BASE}/users/{mailbox}/mailFolders?$top=100"
+    url = f"{GRAPH_BASE}/users/{_url_teil(mailbox)}/mailFolders?$top=100"
     resp = httpx.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=20)
     resp.raise_for_status()
     return [f["displayName"] for f in resp.json().get("value", [])]
@@ -245,7 +343,7 @@ def _graph_folder_id(mailbox: str, folder: str, token: str) -> str:
     known = {"inbox", "drafts", "sentitems", "deleteditems", "junkemail", "archive"}
     if folder.lower() in known:
         return folder.lower()
-    url = f"{GRAPH_BASE}/users/{mailbox}/mailFolders?$top=100"
+    url = f"{GRAPH_BASE}/users/{_url_teil(mailbox)}/mailFolders?$top=100"
     resp = httpx.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=20)
     resp.raise_for_status()
     for f in resp.json().get("value", []):
@@ -258,7 +356,7 @@ def graph_fetch_messages(db: Session, account: MailAccount,
                          limit: int = MAX_MESSAGES_PER_SCAN) -> List[dict]:
     token, mailbox = _graph_token(db, account)
     folder_id = _graph_folder_id(mailbox, account.folder, token)
-    url = (f"{GRAPH_BASE}/users/{mailbox}/mailFolders/{folder_id}/messages"
+    url = (f"{GRAPH_BASE}/users/{_url_teil(mailbox)}/mailFolders/{_url_teil(folder_id)}/messages"
            f"?$top={limit}&$orderby=receivedDateTime desc"
            f"&$select=id,subject,from,receivedDateTime,body,bodyPreview")
     resp = httpx.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=30)
@@ -295,7 +393,7 @@ def graph_set_flag(db: Session, account: MailAccount, message_id: str,
     """
     token, mailbox = _graph_token(db, account)
     resp = httpx.patch(
-        f"{GRAPH_BASE}/users/{mailbox}/messages/{message_id}",
+        f"{GRAPH_BASE}/users/{_url_teil(mailbox)}/messages/{_url_teil(message_id)}",
         headers={"Authorization": f"Bearer {token}",
                  "Content-Type": "application/json"},
         json={"flag": {"flagStatus": flag_status}},
@@ -452,7 +550,7 @@ def scan_account(db: Session, account: MailAccount) -> int:
                 try:
                     graph_set_flag(db, account, mail["message_id"], "flagged")
                 except Exception as e:
-                    flag_fehler = str(e)[:500]
+                    flag_fehler = fehlertext(db, account, e)[:500]
 
         account.last_scan_at = datetime.now(timezone.utc)
         # Flag-Fehler sichtbar am Konto vermerken (Scan selbst war erfolgreich)
@@ -462,14 +560,64 @@ def scan_account(db: Session, account: MailAccount) -> int:
         return anzahl
     except Exception as e:
         db.rollback()
-        account.last_error = str(e)[:2000]
+        account.last_error = fehlertext(db, account, e)[:2000]
         account.last_scan_at = datetime.now(timezone.utc)
         db.commit()
         raise
 
 
+def fehlertext(db: Session, account: MailAccount, fehler: Exception) -> str:
+    """Fehlermeldung für last_error/API/Log — ohne Passwörter und Secrets."""
+    geheimnisse = []
+    try:
+        if account.secret_enc:
+            geheimnisse.append(decrypt_secret(account.secret_enc))
+        s = _settings_dict(db, ["smtp_password", "ms_client_secret"])
+        geheimnisse += [s.get("smtp_password"), s.get("ms_client_secret")]
+    except Exception:  # noqa: BLE001 — Bereinigen darf nie selbst scheitern
+        pass
+    return mail_sicherheit.geheimnisse_entfernen(str(fehler), geheimnisse)
+
+
 # ── 5. Hintergrund-Scanner ────────────────────────────────────────────────────
 _scanner_started = False
+
+
+def auto_scan_durchlauf(db: Session, jetzt: datetime = None) -> int:
+    """
+    Ein Durchlauf des Hintergrund-Scanners: alle fälligen Auto-Scan-Konten
+    abarbeiten. Liefert die Zahl der tatsächlich gescannten Konten.
+    Eigene Funktion, damit die Tests dieselben Regeln prüfen können, die
+    im Hintergrund-Thread gelten.
+    """
+    jetzt = jetzt or datetime.now(timezone.utc)
+    konten = (db.query(MailAccount)
+              .filter(MailAccount.auto_scan.is_(True),
+                      MailAccount.is_active.is_(True)).all())
+    gescannt = 0
+    for konto in konten:
+        faellig = (konto.last_scan_at is None or
+                   konto.last_scan_at + timedelta(minutes=konto.scan_interval_minutes) <= jetzt)
+        if not faellig:
+            continue
+        # Dieselben Regeln wie beim manuellen Scan: ein gesperrtes Konto wird
+        # übersprungen und der Grund am Konto vermerkt (einmal, nicht bei
+        # jedem Durchlauf ins Log).
+        grund = mail_sicherheit.zentral_sperrgrund(db, konto)
+        if grund:
+            if konto.last_error != grund:
+                konto.last_error = grund
+                konto.last_scan_at = jetzt
+                db.commit()
+                logger.warning("Auto-Scan Mail-Konto %s übersprungen: %s", konto.id, grund)
+            continue
+        try:
+            scan_account(db, konto)
+            gescannt += 1
+        except Exception as e:
+            logger.warning("Auto-Scan Mail-Konto %s fehlgeschlagen: %s",
+                           konto.id, fehlertext(db, konto, e))
+    return gescannt
 
 
 def _scanner_loop():
@@ -479,23 +627,11 @@ def _scanner_loop():
         try:
             db = SessionLocal()
             try:
-                jetzt = datetime.now(timezone.utc)
-                konten = (db.query(MailAccount)
-                          .filter(MailAccount.auto_scan.is_(True),
-                                  MailAccount.is_active.is_(True)).all())
-                for konto in konten:
-                    faellig = (konto.last_scan_at is None or
-                               konto.last_scan_at + timedelta(minutes=konto.scan_interval_minutes) <= jetzt)
-                    if not faellig:
-                        continue
-                    try:
-                        scan_account(db, konto)
-                    except Exception as e:
-                        print(f"[WARN] Auto-Scan '{konto.name}' fehlgeschlagen: {e}")
+                auto_scan_durchlauf(db)
             finally:
                 db.close()
-        except Exception as e:
-            print(f"[WARN] Mail-Scanner-Schleife: {e}")
+        except Exception:
+            logger.warning("Mail-Scanner-Schleife fehlgeschlagen", exc_info=True)
 
 
 def start_background_scanner():
