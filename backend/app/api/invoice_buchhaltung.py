@@ -13,6 +13,8 @@ from datetime import date
 import logging
 import io
 
+from app.core.dokument_html import text
+from app.services.pdf_render import PdfRenderUeberlastet, render_pdf
 from app.db.base import get_db
 from app.api.deps import (get_current_user, require_modul_rechte)
 from app.models.user import User
@@ -190,14 +192,14 @@ def get_book_pdf(
         }
         rows_html += f"""
         <tr>
-          <td>{inv.number}</td>
+          <td>{text(inv.number)}</td>
           <td>{fmt_date(inv.date)}</td>
           <td>{fmt_date(inv.due_date)}</td>
-          <td>{inv.title or '—'}</td>
+          <td>{text(inv.title or '—')}</td>
           <td class="r">{fmt_eur(inv.subtotal or 0)}</td>
           <td class="r">{fmt_eur(inv.tax_total or 0)}</td>
           <td class="r"><b>{fmt_eur(inv.total or 0)}</b></td>
-          <td>{status_map.get(inv.status, inv.status)}</td>
+          <td>{text(status_map.get(inv.status, inv.status))}</td>
         </tr>"""
 
     html = f"""<!DOCTYPE html>
@@ -232,8 +234,9 @@ def get_book_pdf(
 </body></html>"""
 
     try:
-        import weasyprint
-        pdf_bytes = weasyprint.HTML(string=html).write_pdf()
+        pdf_bytes = render_pdf(html)
+    except PdfRenderUeberlastet as e:
+        raise HTTPException(503, str(e)) from e
     except Exception as e:
         # Kein HTML-Rückfall mehr: Der Browser lud die Datei als
         # „belegbuch.pdf" herunter und bekam HTML — der Fehler fiel erst beim
@@ -430,8 +433,8 @@ def get_uva_pdf(
 
     daten = get_uva(date_from=date_from, date_to=date_to, db=db, _=current_user)
     settings = {r.key: r.value for r in db.query(Setting).all()}
-    firma = settings.get("company_name", "") or "—"
-    land = tax_rates_service.SUPPORTED_COUNTRIES.get(daten.country, daten.country)
+    firma = text(settings.get("company_name", "") or "—")
+    land = text(tax_rates_service.SUPPORTED_COUNTRIES.get(daten.country, daten.country))
 
     def eur(n):
         return f"{float(n):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -444,16 +447,16 @@ def get_uva_pdf(
 
     zeilen_html = ""
     for z in daten.zeilen:
-        kz = z.kennzahl or '<span class="offen">nicht zugeordnet</span>'
+        kz = text(z.kennzahl) or '<span class="offen">nicht zugeordnet</span>'
         zeilen_html += f"""
         <tr>
           <td class="kz">{kz}</td>
-          <td>{z.bezeichnung}</td>
+          <td>{text(z.bezeichnung)}</td>
           <td class="r">{eur(z.bemessungsgrundlage)}</td>
           <td class="r">{eur(z.steuer)}</td>
         </tr>"""
 
-    hinweise_html = "".join(f"<li>{h}</li>" for h in daten.hinweise)
+    hinweise_html = "".join(f"<li>{text(h)}</li>" for h in daten.hinweise)
 
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
       @page {{ size: A4; margin: 2cm; }}
@@ -514,8 +517,9 @@ def get_uva_pdf(
     </body></html>"""
 
     try:
-        import weasyprint
-        pdf = weasyprint.HTML(string=html).write_pdf()
+        pdf = render_pdf(html)
+    except PdfRenderUeberlastet as e:
+        raise HTTPException(503, str(e)) from e
     except Exception as e:
         logger.exception("Fehler bei invoice: %s", e)
         raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).") from e

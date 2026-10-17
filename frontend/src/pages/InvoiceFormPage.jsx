@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { oeffneHtmlVorschau } from '../utils/htmlVorschau'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { getAccessToken, invoiceApi, masterdataApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -645,11 +646,9 @@ export default function InvoiceFormPage() {
                 try {
                   const token = getAccessToken()
                   const res = await fetch('/api/invoices/' + id + '/preview', { headers: { Authorization: 'Bearer ' + token } })
-                  const html = await res.text()
-                  const blob = new Blob([html], { type: 'text/html' })
-                  const url = URL.createObjectURL(blob)
-                  window.open(url, '_blank')
-                  setTimeout(() => URL.revokeObjectURL(url), 10000)
+                  if (!res.ok) throw new Error(res.status)
+                  // S02: abgeschottet in einem sandbox-iframe, nicht als Blob im App-Ursprung
+                  oeffneHtmlVorschau(await res.text(), 'Vorschau ' + (number || 'Beleg'))
                 } catch { toast.error('Vorschau-Fehler') }
               }} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-lg hover:bg-neutral-50">
                 <Eye size={14} /> Vorschau

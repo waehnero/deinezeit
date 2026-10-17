@@ -4,6 +4,18 @@
  */
 export const changelog = [
   {
+    version: '2.1.3',
+    day: '17',
+    month: 'Oktober',
+    year: '2026',
+    features: [],
+    updates: [
+      'Belege, Mahnungen, Berichte und Protokolle: Texte aus Eingabefeldern können das Dokument nicht mehr verändern. Erlaubte Formatierungen wie fett, kursiv, unterstrichen, Absätze und Aufzählungen bleiben erhalten; Bilder, Links und eingebettete Inhalte aus Textfeldern werden nicht mehr übernommen.',
+      'PDFs entstehen jetzt in einem abgeschotteten Vorgang: Er lädt nichts aus dem Internet oder von der Festplatte nach, hat feste Zeit- und Speichergrenzen und bricht hängende Dokumente zuverlässig ab. Logos und Positionsbilder erscheinen wie bisher.',
+      'Die HTML-Vorschau von Belegen und Projektzeitberichten öffnet sich in einem geschützten Rahmen ohne Skripte. Zum Drucken bitte das PDF verwenden.',
+    ],
+  },
+  {
     version: '2.1.2',
     day: '15',
     month: 'Oktober',

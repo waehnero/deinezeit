@@ -70,6 +70,20 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# S02: Fehler des abgeschotteten PDF-Renderprozesses einheitlich beantworten —
+# Überlastung als 503 (später erneut versuchen), sonst 500 mit Klartext. Die
+# Ursache steht im Serverlog (pdf_render), nicht in der Antwort.
+from fastapi.responses import JSONResponse as _JSONResponse  # noqa: E402
+from app.services.pdf_render import PdfRenderFehler, PdfRenderUeberlastet  # noqa: E402
+
+
+@app.exception_handler(PdfRenderFehler)
+async def _pdf_render_fehler(_request, exc: PdfRenderFehler):
+    status = 503 if isinstance(exc, PdfRenderUeberlastet) else 500
+    return _JSONResponse(status_code=status, content={"detail": str(exc)})
+
 app.add_middleware(SlowAPIMiddleware)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

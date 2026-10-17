@@ -13,6 +13,8 @@ from uuid import UUID
 from datetime import date
 import logging
 
+from app.core.dokument_html import vorschau_antwort
+from app.services.pdf_render import PdfRenderFehler
 from app.db.base import get_db
 from app.api.deps import (get_current_user, require_admin)
 from app.models.user import User
@@ -362,6 +364,8 @@ def download_invoice_pdf(
         pdf_bytes = generate_pdf(inv, inv.positions, settings_d, inv_settings_d,
                                  sender_contact, recipient_contact, db=db,
                                  erechnung_xml=xml)
+    except PdfRenderFehler:
+        raise           # → zentrale Behandlung in main.py (503 bei Überlastung)
     except Exception as e:
         logger.exception("Fehler bei invoice: %s", e)
         raise HTTPException(500, "Das PDF konnte nicht erzeugt werden (Ursache im Serverlog).") from e
@@ -388,7 +392,8 @@ def preview_invoice_html(
     settings_d, inv_settings_d, sender_contact, recipient_contact = _load_pdf_context(db, inv)
     html = generate_html_preview(inv, inv.positions, settings_d, inv_settings_d,
                                  sender_contact, recipient_contact, db=db)
-    return Response(content=html, media_type="text/html")
+    # S02: Vorschau mit eigener CSP (keine Skripte, keine Nachladungen) und sandbox
+    return vorschau_antwort(html)
 
 
 @router.put("/{invoice_id}", response_model=InvoiceResponse)

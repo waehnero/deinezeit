@@ -14,13 +14,11 @@ Kunden einheitlich aussieht.
 Bei einer Sammelmahnung (mehrere Belege desselben Kunden, gleiche ``batch_id``)
 stehen alle betroffenen Rechnungen auf einem Schreiben.
 """
-import io
 import json
-import re
 from decimal import Decimal
 
-from weasyprint import HTML as WeasyprintHTML
-
+from app.core.dokument_html import farbe, nur_text, rich_text, text
+from app.services.pdf_render import render_pdf
 from app.services.invoice_pdf import (BASE_CSS, _logo_b64, _addr_lines,
                                       _recipient_lines, _footer_html,
                                       _fmt_date_long, _fmt_amount, _fmt_date)
@@ -69,22 +67,22 @@ def baue_html(db, eintrag) -> tuple:
     stufen = {s["level"]: s for s in dunning_service.get_levels(db)}
     stufe = stufen.get(eintrag.level, {})
 
-    primary = settings.get("primary_color") or "#ef7d00"
-    waehrung = leitbeleg.currency or "EUR"
+    primary = farbe(settings.get("primary_color"), "#ef7d00")
+    waehrung = text(leitbeleg.currency or "EUR")
     logo_src = _logo_b64(settings)
     logo_html = (f'<img class="logo" src="{logo_src}" alt="Logo">' if logo_src else
                  f'<span style="font-size:14pt;font-weight:bold;">'
-                 f'{settings.get("company_name", "")}</span>')
+                 f'{text(settings.get("company_name", ""))}</span>')
 
     sender = _addr_lines(sender_contact, settings)
     empfaenger = _recipient_lines(recipient_contact)
-    plain_sender = [re.sub(r"<[^>]+>", "", z) for z in sender]
-    ruecksende = " – ".join([p for p in plain_sender[:3] if p])
+    plain_sender = [nur_text(z) for z in sender]
+    ruecksende = text(" – ".join([p for p in plain_sender[:3] if p]))
 
     sd = (sender_contact.data or {}) if sender_contact is not None else {}
     ort = sd.get("ort", "")
     datum = _fmt_date_long(eintrag.dunned_at)
-    ort_datum = f"{ort}, {datum}" if ort else datum
+    ort_datum = text(f"{ort}, {datum}" if ort else datum)
 
     bank = inv_settings.get("bank", {})
     if isinstance(bank, str):
@@ -111,7 +109,7 @@ def baue_html(db, eintrag) -> tuple:
                           + (f" ({detail})" if detail else ""))
         zeilen_html += f"""
         <tr class="item">
-          <td>{beleg.number or "—"}</td>
+          <td>{text(beleg.number or "—")}</td>
           <td>{_fmt_date(beleg.date)}</td>
           <td>{_fmt_date(beleg.due_date) if beleg.due_date else "—"}</td>
           <td class="num">{_fmt_amount(z.open_amount, waehrung)}</td>
@@ -121,8 +119,9 @@ def baue_html(db, eintrag) -> tuple:
             zeilen_html += (f'<tr class="detail"><td colspan="5">'
                             f'{" · ".join(zusatz)}</td></tr>')
 
-    titel = eintrag.label or f"Mahnung (Stufe {eintrag.level})"
-    einleitung = stufe.get("text") or ""
+    titel = text(eintrag.label or f"Mahnung (Stufe {eintrag.level})")
+    # Mahntext der Stufe: in den Einstellungen gepflegt → erlaubter Rich Text
+    einleitung = rich_text(stufe.get("text") or "")
     frist_satz = (f"Wir ersuchen Sie, den Gesamtbetrag von "
                   f"<b>{_fmt_amount(summe, waehrung)}</b> bis spätestens "
                   f"<b>{_fmt_date_long(eintrag.due_date)}</b> auf das unten "
@@ -206,6 +205,4 @@ table.summe tr.grand td {{ font-weight: 700; border-top: 1.5px solid #333;
 def generate_dunning_pdf(db, eintrag) -> tuple:
     """Gibt ``(pdf_bytes, dateiname)`` zurück."""
     html, dateiname = baue_html(db, eintrag)
-    puffer = io.BytesIO()
-    WeasyprintHTML(string=html, base_url="/").write_pdf(puffer)
-    return puffer.getvalue(), dateiname
+    return render_pdf(html), dateiname

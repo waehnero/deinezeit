@@ -326,8 +326,11 @@ async def paket_bauen(db: Session, jahr: int, monat: int, benutzer) -> tuple:
         name = f"belege/{_sicherer_name(beleg.number or str(beleg.id)[:8])}.pdf"
         try:
             s, i, absender, empfaenger = _load_pdf_context(db, beleg)
-            dateien[name] = generate_pdf(beleg, beleg.positions, s, i, absender,
-                                         empfaenger, db=db)
+            # Im Threadpool: Seit S02 entsteht jedes PDF in einem eigenen
+            # Renderprozess (~0,7 s). Direkt im async-Kontext würde das den
+            # ganzen Arbeitsprozess für die Dauer des Pakets anhalten.
+            dateien[name] = await run_in_threadpool(
+                generate_pdf, beleg, beleg.positions, s, i, absender, empfaenger, db=db)
         except Exception as e:
             dateien[name.replace(".pdf", "_FEHLER.txt")] = f"{e}\n".encode("utf-8")
 

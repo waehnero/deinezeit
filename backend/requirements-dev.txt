@@ -3,3 +3,6 @@
 
 pytest==8.2.2
 # httpx ist bereits in requirements.txt (0.27.0) – wird vom FastAPI-TestClient genutzt
+# PDF-Inhalte in Tests prüfen (Anhänge, Text) statt Zeichenfolgen im Rohtext zu
+# suchen — S02, siehe tests/test_pdf_render.py
+pypdf==6.21.1
