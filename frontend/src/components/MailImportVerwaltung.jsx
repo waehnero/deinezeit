@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   Mail, Plus, Trash2, Pencil, Loader2, X, FolderSearch, RefreshCw,
-  AlertCircle, Sparkles, Check,
+  AlertCircle, Sparkles, Check, ShieldCheck, ShieldAlert,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { mailImportApi } from '../services/api'
+import { mailImportApi, groupsApi } from '../services/api'
 
 /**
  * Verwaltung der Mail-Import-Konten (Aufgabenmodul, Etappe 3).
@@ -12,6 +12,12 @@ import { mailImportApi } from '../services/api'
  * <MailKonten />          – persönliche Konten (Profil-Seite)
  * <MailKonten global />   – globale Konten (App-Einstellungen, Admin)
  * <KiEinstellungen />     – KI-Provider/-Key (App-Einstellungen, Admin)
+ * <MailSicherheit />      – interne Mailserver + Firmen-CA (App-Einstellungen, Admin)
+ *
+ * Zentrale Zugangsdaten (Einstellungen → System → E-Mail) gibt es nur an
+ * globalen Konten, die der Admin einrichtet und für Gruppen freigibt. Der
+ * Server bindet sie an das bestätigte Ziel — die Oberfläche zeigt das nur an,
+ * maßgeblich ist immer die Prüfung im Backend.
  */
 
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary-400'
@@ -90,6 +96,86 @@ export function KiEinstellungen() {
   )
 }
 
+// ── Sicherheitsregeln für Mailverbindungen (Admin) ───────────────────────────
+export function MailSicherheit() {
+  const [ziele, setZiele] = useState('')
+  const [ca, setCa] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    mailImportApi.getSicherheit().then(r => {
+      setZiele((r.data.interne_ziele || []).join('\n'))
+      setCa(r.data.ca_zertifikate || '')
+    }).catch(() => {})
+  }, [])
+
+  const speichern = async () => {
+    setSaving(true)
+    try {
+      const { data } = await mailImportApi.updateSicherheit({
+        interne_ziele: ziele.split(/[\s,;]+/).map(z => z.trim()).filter(Boolean),
+        ca_zertifikate: ca,
+      })
+      setZiele((data.interne_ziele || []).join('\n'))
+      toast.success('Sicherheitsregeln gespeichert')
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ShieldCheck size={18} className="text-primary-600" />
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Sicherheit der Mailverbindungen</h3>
+      </div>
+      <p className="text-sm text-neutral-500">
+        Mailserver werden nur verschlüsselt und mit geprüftem Zertifikat angesprochen.
+        Server im internen Netz (z. B. 10.x, 192.168.x) sind gesperrt, bis du sie hier
+        ausdrücklich freigibst. Hat euer interner Server ein Zertifikat einer eigenen
+        Firmen-CA, hinterlege diese unten.
+      </p>
+      <div>
+        <label htmlFor="mail-interne-ziele" className={labelCls}>Freigegebene interne Mailserver (Hostname, IP oder Netz, je Zeile; ohne :Port gelten 143 und 993)</label>
+        <textarea id="mail-interne-ziele" rows={3} value={ziele} onChange={e => setZiele(e.target.value)}
+          placeholder={'exchange.firma.local\n10.0.5.0/24\nmail.firma.local:1993'} className={`${inputCls} font-mono`} />
+      </div>
+      <div>
+        <label htmlFor="mail-ca" className={labelCls}>Firmen-CA-Zertifikate (PEM, optional)</label>
+        <textarea id="mail-ca" rows={4} value={ca} onChange={e => setCa(e.target.value)}
+          placeholder="-----BEGIN CERTIFICATE-----" className={`${inputCls} font-mono text-xs`} />
+      </div>
+      <button onClick={speichern} disabled={saving}
+        className="px-4 py-2 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2">
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+        Speichern
+      </button>
+    </div>
+  )
+}
+
+// Hinweis, warum ein Konto die zentralen Zugangsdaten gerade nicht nutzen darf
+function SperrHinweis({ grund, onBestaetigen, bestaetigen }) {
+  if (!grund) return null
+  return (
+    <div className="flex items-start gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+      <ShieldAlert size={14} className="shrink-0 mt-0.5" />
+      <div className="flex-1">
+        {grund}
+        {onBestaetigen && (
+          <button onClick={onBestaetigen} disabled={bestaetigen}
+            className="mt-1.5 flex items-center gap-1 px-2 py-1 rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50">
+            {bestaetigen ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+            Ziel bestätigen
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Konto-Dialog (anlegen/bearbeiten) ─────────────────────────────────────────
 function KontoDialog({ konto, global, onClose, onSaved }) {
   const isNew = !konto?.id
@@ -105,6 +191,8 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
     graph_mailbox: konto?.graph_mailbox || '',
     folder: konto?.folder || 'INBOX',
     use_central_credentials: konto?.use_central_credentials ?? false,
+    freigabe_alle: konto?.freigabe_alle ?? false,
+    freigabe_gruppen: konto?.freigabe_gruppen || [],
     flag_erledigt: konto?.flag_erledigt ?? false,
     auto_scan: konto?.auto_scan ?? false,
     scan_interval_minutes: konto?.scan_interval_minutes || 15,
@@ -113,10 +201,26 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [folders, setFolders] = useState(null)
   const [testing, setTesting] = useState(false)
+  const [gruppen, setGruppen] = useState([])
+  const [sperrgrund, setSperrgrund] = useState(konto?.zentral_sperrgrund || null)
+  const [bestaetigen, setBestaetigen] = useState(false)
+
+  useEffect(() => {
+    if (global) groupsApi.list().then(r => setGruppen(r.data || [])).catch(() => {})
+  }, [global])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const istImap = form.protocol === 'imap'
-  const zentral = form.use_central_credentials
+  // Für persönliche Konten nie „zentral" — auch nicht für Altkonten, damit die
+  // Felder für die eigenen Zugangsdaten sichtbar werden.
+  const zentral = !!global && form.use_central_credentials
+  // Persönliche Konten dürfen keine zentralen Zugangsdaten nutzen. Ein altes
+  // Konto, das es noch tut, wird beim Speichern auf eigene Daten umgestellt.
+  const altZentral = !global && !!konto?.use_central_credentials
+  const gruppeUmschalten = (id) => set('freigabe_gruppen',
+    form.freigabe_gruppen.includes(id)
+      ? form.freigabe_gruppen.filter(g => g !== id)
+      : [...form.freigabe_gruppen, id])
 
   const speichern = async () => {
     if (!form.name.trim()) return toast.error('Bitte einen Namen eingeben')
@@ -125,7 +229,8 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
       if (istImap && !form.imap_user) return toast.error('IMAP-Benutzer angeben')
       if (!istImap && (!form.graph_tenant_id || !form.graph_client_id || !form.graph_mailbox))
         return toast.error('Tenant-ID, Client-ID und Mailbox angeben')
-      if (isNew && !form.secret) return toast.error(istImap ? 'Passwort angeben' : 'Client-Secret angeben')
+      if ((isNew || altZentral) && !form.secret)
+        return toast.error(istImap ? 'Passwort angeben' : 'Client-Secret angeben')
     }
 
     setSaving(true)
@@ -139,11 +244,15 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
       graph_client_id: form.graph_client_id || null,
       graph_mailbox: form.graph_mailbox || null,
       folder: form.folder || 'INBOX',
-      use_central_credentials: form.use_central_credentials,
+      use_central_credentials: global ? form.use_central_credentials : false,
       flag_erledigt: form.flag_erledigt,
       auto_scan: form.auto_scan,
       scan_interval_minutes: Number(form.scan_interval_minutes) || 15,
       secret: form.secret || null,
+    }
+    if (global) {
+      payload.freigabe_alle = form.freigabe_alle
+      payload.freigabe_gruppen = form.freigabe_gruppen
     }
     try {
       if (isNew) {
@@ -158,6 +267,19 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
       toast.error(err.response?.data?.detail || 'Fehler beim Speichern')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const zielBestaetigen = async () => {
+    setBestaetigen(true)
+    try {
+      const { data } = await mailImportApi.confirmCentral(konto.id)
+      setSperrgrund(data.zentral_sperrgrund)
+      toast.success('Ziel bestätigt')
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Bestätigung fehlgeschlagen')
+    } finally {
+      setBestaetigen(false)
     }
   }
 
@@ -204,20 +326,30 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Zugangsdaten aus Einstellungen -> System -> E-Mail übernehmen */}
-          <label className="flex items-start gap-2 text-sm text-neutral-700 cursor-pointer select-none bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2.5">
-            <input type="checkbox" checked={form.use_central_credentials}
-              onChange={e => set('use_central_credentials', e.target.checked)}
-              className="rounded border-gray-300 mt-0.5" />
-            <span>
-              Zentrale E-Mail-Zugangsdaten verwenden
-              <span className="block text-xs text-neutral-400">
-                {istImap
-                  ? 'Benutzer/Passwort aus Einstellungen → System → E-Mail (SMTP)'
-                  : 'Tenant-ID, Client-ID und Client-Secret aus Einstellungen → System → E-Mail (Microsoft Graph)'}
+          {/* Zentrale Zugangsdaten: nur an globalen Konten (Admin) */}
+          {global && (
+            <label className="flex items-start gap-2 text-sm text-neutral-700 cursor-pointer select-none bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2.5">
+              <input type="checkbox" checked={form.use_central_credentials}
+                onChange={e => set('use_central_credentials', e.target.checked)}
+                className="rounded border-gray-300 mt-0.5" />
+              <span>
+                Zentrale E-Mail-Zugangsdaten verwenden
+                <span className="block text-xs text-neutral-400">
+                  {istImap
+                    ? 'Benutzer/Passwort aus Einstellungen → System → E-Mail (SMTP). '
+                    : 'Tenant-ID, Client-ID und Client-Secret aus Einstellungen → System → E-Mail (Microsoft Graph). '}
+                  Mit dem Speichern bestätigst du, dass sie nur an
+                  {istImap ? ' diesen Server und Port' : ' diese Mailbox'} gehen dürfen.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
+          {altZentral && (
+            <SperrHinweis grund="Dieses Konto nutzt noch die zentralen Zugangsdaten. Das ist für persönliche Konten nicht mehr zulässig — bitte trage unten deine eigenen Zugangsdaten ein und speichere." />
+          )}
+          {global && !isNew && zentral && (
+            <SperrHinweis grund={sperrgrund} onBestaetigen={zielBestaetigen} bestaetigen={bestaetigen} />
+          )}
 
           {istImap ? (
             <>
@@ -249,10 +381,17 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
                   </div>
                 </div>
               )}
-              <label className="flex items-center gap-1.5 text-sm text-neutral-600 cursor-pointer select-none">
-                <input type="checkbox" checked={form.imap_ssl} onChange={e => set('imap_ssl', e.target.checked)}
-                  className="rounded border-gray-300" /> SSL/TLS (Port 993)
-              </label>
+              <div>
+                <label htmlFor="mail-tls" className={labelCls}>Verschlüsselung</label>
+                <select id="mail-tls" value={form.imap_ssl ? 'ssl' : 'starttls'}
+                  onChange={e => set('imap_ssl', e.target.value === 'ssl')} className={inputCls}>
+                  <option value="ssl">SSL/TLS (Port 993)</option>
+                  <option value="starttls">STARTTLS (Port 143)</option>
+                </select>
+                <p className="text-xs text-neutral-400 mt-1">
+                  Unverschlüsselte Verbindungen sind nicht möglich; das Zertifikat des Servers wird immer geprüft.
+                </p>
+              </div>
             </>
           ) : (
             <>
@@ -328,6 +467,30 @@ function KontoDialog({ konto, global, onClose, onSaved }) {
                   {f}
                 </button>
               ))}
+            </div>
+          )}
+
+          {global && (
+            <div className="border-t border-neutral-100 pt-3 space-y-2">
+              <p className="text-xs font-medium text-neutral-500">Wer darf dieses Konto verwenden?</p>
+              <label className="flex items-center gap-1.5 text-sm text-neutral-600 cursor-pointer select-none">
+                <input type="checkbox" checked={form.freigabe_alle}
+                  onChange={e => set('freigabe_alle', e.target.checked)}
+                  className="rounded border-gray-300" /> Alle Benutzer mit Zugriff auf „Aufgaben"
+              </label>
+              {!form.freigabe_alle && (
+                gruppen.length === 0
+                  ? <p className="text-xs text-neutral-400">Keine Gruppen vorhanden — ohne Freigabe nutzen nur Admins das Konto.</p>
+                  : <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {gruppen.map(g => (
+                        <label key={g.id} className="flex items-center gap-1.5 text-sm text-neutral-600 cursor-pointer select-none">
+                          <input type="checkbox" checked={form.freigabe_gruppen.includes(g.id)}
+                            onChange={() => gruppeUmschalten(g.id)}
+                            className="rounded border-gray-300" /> {g.name}
+                        </label>
+                      ))}
+                    </div>
+              )}
             </div>
           )}
 
@@ -446,7 +609,11 @@ export default function MailKonten({ global = false }) {
                   {k.use_central_credentials && ' · zentrale Zugangsdaten'}
                   {k.last_scan_at && ` · zuletzt: ${new Date(k.last_scan_at).toLocaleString('de-AT')}`}
                 </p>
-                {k.last_error && (
+                {k.zentral_sperrgrund ? (
+                  <p className="text-xs text-amber-700 flex items-center gap-1 mt-0.5">
+                    <ShieldAlert size={12} /> {k.zentral_sperrgrund}
+                  </p>
+                ) : k.last_error && (
                   <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5">
                     <AlertCircle size={12} /> {k.last_error.slice(0, 160)}
                   </p>

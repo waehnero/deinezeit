@@ -677,6 +677,11 @@ export const mailImportApi = {
   deleteAccount: (id)        => api.delete(`/mail-import/accounts/${id}`),
   listFolders:   (id)        => api.get(`/mail-import/accounts/${id}/folders`),
   scan:          (id)        => api.post(`/mail-import/accounts/${id}/scan`),
+  // Admin: Ziel der zentralen Zugangsdaten ausdrücklich bestätigen
+  confirmCentral: (id)       => api.post(`/mail-import/accounts/${id}/zentral-bestaetigen`),
+  // Admin: interne Mailserver freigeben, Firmen-CA hinterlegen
+  getSicherheit:    ()     => api.get('/mail-import/sicherheit'),
+  updateSicherheit: (data) => api.put('/mail-import/sicherheit', data),
   listSuggestions: (status = 'offen') => api.get('/mail-import/suggestions', { params: { status } }),
   acceptSuggestion:  (id, data) => api.post(`/mail-import/suggestions/${id}/accept`, data || {}),
   dismissSuggestion: (id)       => api.post(`/mail-import/suggestions/${id}/dismiss`),
