@@ -48,6 +48,9 @@ requests==2.34.2          # PYSEC-2026-1872, PYSEC-2026-2275
 weasyprint==69.0
 pydyf==0.12.1
 Jinja2==3.1.6             # PYSEC-2026-1471, -1472, -1475
+# HTML-Bereinigung für Rich Text in Dokumenten (S02) — parserbasiert
+# (Rust-Bibliothek ammonia), keine selbstgebauten Regex-Filter.
+nh3==0.3.7
 slowapi==0.1.9
 limits==3.6.0
 

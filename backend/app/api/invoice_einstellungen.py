@@ -145,7 +145,9 @@ def template_preview(
 
     html = generate_html_preview(demo_invoice, positions, settings, inv_settings,
                                  sender_contact, recipient, template_id=template_id)
-    return Response(content=html, media_type="text/html")
+    # S02: Vorschau mit eigener CSP (keine Skripte, keine Nachladungen) und sandbox
+    from app.core.dokument_html import vorschau_antwort
+    return vorschau_antwort(html)
 
 
 @router.post("/positions/image")
@@ -197,8 +199,10 @@ def get_position_image(
     _: User = Depends(get_current_user),
 ):
     """Liefert ein Positionsbild aus — für die Vorschau im Formular."""
-    from app.services import storage_service
-    if not key.startswith("belege/positionsbilder/"):
+    from app.services import position_image, storage_service
+    # S02: dieselbe Regel wie bei der PDF-Erzeugung — nur Positionsbilder,
+    # kein ``..``, keine Unterordner, kein unbekannter Speicher.
+    if not position_image.schluessel_gueltig(key) or not position_image.speicher_gueltig(provider):
         raise HTTPException(400, "Ungültiger Bildschlüssel")
     try:
         daten, mime = storage_service.download_file(key, db=db, backend=provider)

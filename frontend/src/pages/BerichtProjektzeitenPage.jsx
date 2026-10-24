@@ -14,6 +14,7 @@
  * zeigt Seite 2 eine andere Gesamtsumme als Seite 1.
  */
 import { useState, useEffect, useCallback } from 'react'
+import { oeffneHtmlVorschau } from '../utils/htmlVorschau'
 import { useSearchParams } from 'react-router'
 import PageHeader from '../components/PageHeader'
 import ZeitraumLeiste, { zeitraumBerechnen, tagesbeginn, tagesende } from '../components/ZeitraumLeiste'
@@ -233,9 +234,8 @@ export default function BerichtProjektzeitenPage() {
     setLadeVorschau(true)
     try {
       const res = await reportsApi.previewZeiterfassung(berichtParams())
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/html; charset=utf-8' }))
-      window.open(url, '_blank')
-      setTimeout(() => window.URL.revokeObjectURL(url), 10_000)
+      // S02: abgeschottet in einem sandbox-iframe, nicht als Blob im App-Ursprung
+      oeffneHtmlVorschau(res.data, 'Projektzeitbericht – Vorschau')
     } catch (err) {
       toast.error(err.response?.status === 404
         ? 'Keine Zeiteinträge für die gewählten Filter gefunden'

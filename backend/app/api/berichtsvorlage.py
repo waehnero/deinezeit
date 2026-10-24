@@ -24,6 +24,9 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Callable
 from app.core import zeit
+from app.core.dokument_html import css_zeichenkette
+from app.core.dokument_html import farbe as css_farbe
+from app.core.dokument_html import text
 
 
 # Fallback-Markenfarbe: dasselbe Orange wie in den Rechnungsvorlagen
@@ -63,7 +66,12 @@ def bericht_html(
     Die Formatier- und Rundungsfunktionen kommen von außen (aus reports.py),
     damit Bericht und Auswertung nachweislich dieselbe Rechnung verwenden.
     """
-    farbe      = settings.get("brand_color") or settings.get("primary_color") or STANDARD_FARBE
+    # S02: Feldinhalte maskiert (``text``), Farben nur als Hex-Wert. ``logo_html``
+    # und ``empfaenger_html`` liefert reports.py bereits maskiert.
+    farbe      = css_farbe(settings.get("brand_color") or settings.get("primary_color"),
+                           STANDARD_FARBE)
+    if len(farbe) != 7:          # _hell() rechnet mit #rrggbb
+        farbe = STANDARD_FARBE
     farbe_hell = _hell(farbe, 0.88)
     farbe_mittel = _hell(farbe, 0.55)
 
@@ -98,7 +106,7 @@ def bericht_html(
     detail_spalte  = "Benutzer" if group_by == "aufgabe" else "Zeitprojekt"
 
     # ── Kopfzeile: Zeitraum + Filter als Marken ──────────────────────────────
-    zeitraum = f"{filters.get('date_from', '')} – {filters.get('date_to', '')}"
+    zeitraum = text(f"{filters.get('date_from', '')} – {filters.get('date_to', '')}")
     marken = []
     for beschriftung, wert in (
         # Der Kontakt entfällt hier, wenn er schon als Empfängerblock oben
@@ -110,7 +118,7 @@ def bericht_html(
     ):
         if wert:
             marken.append(
-                f'<span class="marke"><span class="marke-k">{beschriftung}</span>{wert}</span>'
+                f'<span class="marke"><span class="marke-k">{beschriftung}</span>{text(wert)}</span>'
             )
     marken_html = "".join(marken) or '<span class="marke marke-leer">Keine weiteren Filter</span>'
 
@@ -118,7 +126,7 @@ def bericht_html(
     anteil = lambda m: round(m * 100 / summe_gesamt) if summe_gesamt else 0  # noqa: E731
     zusammenfassung_html = "".join(
         f"<tr>"
-        f"<td class='name'>{name}</td>"
+        f"<td class='name'>{text(name)}</td>"
         f"<td class='zahl'>{fmt_minutes(verr)}</td>"
         f"<td class='zahl grau'>{fmt_minutes(nicht)}</td>"
         f"<td class='zahl stark'>{fmt_minutes(gesamt)}</td>"
@@ -138,12 +146,12 @@ def bericht_html(
                 (getattr(e.user, "full_name", "") or "—") if group_by == "aufgabe"
                 else (e.project_name or "(ohne Zeitprojekt)")
             )
-            notiz = (e.note or "").replace("\n", "<br>") or "<span class='leer'>—</span>"
+            notiz = text(e.note or "").replace("\n", "<br>") or "<span class='leer'>—</span>"
             verr_marke = ('<span class="ja">verrechenbar</span>' if e.billable
                           else '<span class="nein">nicht verr.</span>')
             html += (
                 f"<tr>"
-                f"<td class='wer'>{zweitspalte}</td>"
+                f"<td class='wer'>{text(zweitspalte)}</td>"
                 f"<td class='notiz'>{notiz}</td>"
                 f"<td class='zeit'>{fmt_dt(e.started_at)}</td>"
                 f"<td class='zeit'>{fmt_dt(e.ended_at)}</td>"
@@ -160,7 +168,7 @@ def bericht_html(
         abschnitte_html += f"""
 <section class="gruppe">
   <div class="gruppe-kopf">
-    <h3>{name}</h3>
+    <h3>{text(name)}</h3>
     <span class="gruppe-summe">{fmt_minutes(gruppen_summe)}</span>
   </div>
   <table class="detail">
@@ -185,7 +193,9 @@ def bericht_html(
     )
 
     erstellt = zeit.jetzt().strftime("%d.%m.%Y %H:%M")
-    rundung_hinweis = filters.get("rounding_label", "")
+    rundung_hinweis = text(filters.get("rounding_label", ""))
+    ersteller_css = css_zeichenkette(current_user_name)
+    current_user_name = text(current_user_name)
 
     return f"""<!DOCTYPE html>
 <html lang="de">
@@ -196,7 +206,7 @@ def bericht_html(
   @page {{
     size: A4;
     margin: 16mm 14mm 18mm 14mm;
-    @bottom-left   {{ content: "{current_user_name}"; font-size: 7.5pt; color: #9aa0a6; font-family: Helvetica, Arial, sans-serif; }}
+    @bottom-left   {{ content: "{ersteller_css}"; font-size: 7.5pt; color: #9aa0a6; font-family: Helvetica, Arial, sans-serif; }}
     @bottom-center {{ content: "Seite " counter(page) " von " counter(pages); font-size: 7.5pt; color: #9aa0a6; font-family: Helvetica, Arial, sans-serif; }}
     @bottom-right  {{ content: "{erstellt}"; font-size: 7.5pt; color: #9aa0a6; font-family: Helvetica, Arial, sans-serif; }}
   }}

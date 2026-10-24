@@ -15,18 +15,24 @@ Alle Vorlagen:
   - Kleinunternehmer / Reverse-Charge-Hinweis
   - Druckoptimiert (A4, cm-Abstände)
 """
-import io
-import os
-import re
-import base64
 import json
+import re
 from decimal import Decimal
 from datetime import date
 from typing import Optional
 
-from weasyprint import HTML as WeasyprintHTML
+from app.core.dokument_html import (css_block, farbe, nur_text, rich_text,
+                                    static_bild_datenurl, text)
+from app.services.pdf_render import render_pdf
 
 STATIC_DIR = "/app/static"
+
+# ── S02: Feldinhalte im Dokument ─────────────────────────────────────────────
+# Gewöhnlicher Text (Namen, Adressen, Nummern, Einheiten, Bankdaten, Titel,
+# Referenz) geht durch ``text()``; Positionsbeschreibung, Zusatztext,
+# Einleitung, Schlusstext, Hinweistexte und Fußzeilen-Freitexte gelten als
+# erlaubter Rich Text und gehen durch ``rich_text()`` (enge Positivliste).
+# Farben nur über ``farbe()``, das frei gepflegte CSS über ``css_block()``.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -34,55 +40,46 @@ STATIC_DIR = "/app/static"
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _logo_b64(settings: dict) -> str:
+    """Logo als geprüfte ``data:``-URL (nur aus dem static-Verzeichnis)."""
     url = settings.get("logo_header_url") or settings.get("logo_url") or ""
-    if not url:
-        return ""
-    path = url.replace("/api/static", STATIC_DIR)
-    if not os.path.exists(path):
-        return ""
-    ext  = os.path.splitext(path)[1].lower().lstrip(".")
-    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-            "svg": "image/svg+xml", "webp": "image/webp"}.get(ext, "image/png")
-    with open(path, "rb") as f:
-        data = base64.b64encode(f.read()).decode()
-    return f"data:{mime};base64,{data}"
+    return static_bild_datenurl(url, STATIC_DIR)
 
 
 def _addr_lines(contact_record, settings: dict) -> list[str]:
-    """Gibt Adresszeilen der eigenen Firma zurück."""
+    """Gibt Adresszeilen der eigenen Firma zurück (bereits maskiertes HTML)."""
     lines = []
     name = settings.get("company_name", "")
     if contact_record:
         d = contact_record.data or {}
         name = contact_record.display_name or name
-        lines.append(f"<strong>{name}</strong>")
-        if d.get("adresse"):   lines.append(d["adresse"])
+        lines.append(f"<strong>{text(name)}</strong>")
+        if d.get("adresse"):   lines.append(text(d["adresse"]))
         plz  = d.get("plz", "")
         ort  = d.get("ort", "")
-        if plz or ort:         lines.append(f"{plz} {ort}".strip())
-        if d.get("land"):      lines.append(d["land"])
-        if d.get("uid"):       lines.append(f"UID: {d['uid']}")
-        if d.get("email"):     lines.append(d["email"])
-        if d.get("telefon"):   lines.append(d["telefon"])
-        if d.get("webseite"):  lines.append(d["webseite"])
+        if plz or ort:         lines.append(text(f"{plz} {ort}".strip()))
+        if d.get("land"):      lines.append(text(d["land"]))
+        if d.get("uid"):       lines.append(text(f"UID: {d['uid']}"))
+        if d.get("email"):     lines.append(text(d["email"]))
+        if d.get("telefon"):   lines.append(text(d["telefon"]))
+        if d.get("webseite"):  lines.append(text(d["webseite"]))
     elif name:
-        lines.append(f"<strong>{name}</strong>")
+        lines.append(f"<strong>{text(name)}</strong>")
     return lines
 
 
 def _recipient_lines(contact_record) -> list[str]:
-    """Gibt Empfängeradresse zurück."""
+    """Gibt Empfängeradresse zurück (bereits maskiertes HTML)."""
     if not contact_record:
         return []
     d = contact_record.data or {}
     lines = []
-    lines.append(f"<strong>{contact_record.display_name or ''}</strong>")
-    if d.get("ansprechperson"): lines.append(d["ansprechperson"])
-    if d.get("adresse"):        lines.append(d["adresse"])
+    lines.append(f"<strong>{text(contact_record.display_name or '')}</strong>")
+    if d.get("ansprechperson"): lines.append(text(d["ansprechperson"]))
+    if d.get("adresse"):        lines.append(text(d["adresse"]))
     plz = d.get("plz", ""); ort = d.get("ort", "")
-    if plz or ort:              lines.append(f"{plz} {ort}".strip())
-    if d.get("land"):           lines.append(d["land"])
-    if d.get("uid"):            lines.append(f"UID: {d['uid']}")
+    if plz or ort:              lines.append(text(f"{plz} {ort}".strip()))
+    if d.get("land"):           lines.append(text(d["land"]))
+    if d.get("uid"):            lines.append(text(f"UID: {d['uid']}"))
     return lines
 
 
@@ -117,7 +114,7 @@ def _footer_html(sender_contact, bank_settings: dict) -> str:
         seg.append(f"IBAN {iban}")
         if bic:
             seg.append(f"BIC {bic}")
-        lines.append(", ".join(seg))
+        lines.append(text(", ".join(seg)))
 
     legal = []
     uid = _first(lambda k: "uid" in k)
@@ -127,15 +124,15 @@ def _footer_html(sender_contact, bank_settings: dict) -> str:
     if firmenbuch:
         legal.append(f"Firmenbuch-Nr.: {firmenbuch}")
     if legal:
-        lines.append(", ".join(legal))
+        lines.append(text(", ".join(legal)))
 
     # Gerichts-Angaben: Feldname wird als Label mit ausgegeben ("handelsgericht" → "Handelsgericht Salzburg")
     gericht = [f"{k.replace('_', ' ').title()} {v}" for k, v in items if "gericht" in k]
     if gericht:
-        lines.append(", ".join(gericht))
+        lines.append(text(", ".join(gericht)))
 
-    # Freie Fußzeilen-Texte (z.B. Eigentumsvorbehalt)
-    lines += [v for k, v in items if "fusszeile" in k or "fussnote" in k or "footer" in k]
+    # Freie Fußzeilen-Texte (z.B. Eigentumsvorbehalt) — erlaubter Rich Text
+    lines += [rich_text(v) for k, v in items if "fusszeile" in k or "fussnote" in k or "footer" in k]
 
     if not lines:
         return ""
@@ -295,7 +292,7 @@ def _bild_zeile(p, spalten: int, db=None) -> str:
     quelle = als_datenurl(db, schluessel, getattr(p, "image_provider", None))
     if not quelle:
         return ""      # fehlendes Bild darf keinen Beleg verhindern
-    mm = breite_mm(getattr(p, "image_size", None) or "mittel")
+    mm = int(breite_mm(getattr(p, "image_size", None) or "mittel"))
     return (f'<tr class="pos-bild"><td colspan="{spalten}">'
             f'<img src="{quelle}" style="width:{mm}mm;max-width:100%;'
             f'display:block;margin:3px 0;" /></td></tr>')
@@ -307,20 +304,20 @@ def _positions_html(positions, tax_mode: str, db=None) -> str:
         _t = getattr(p, "pos_type", "item") or "item"
         if _t == "heading":
             rows += (f'<tr class="pos-head"><td colspan="5">'
-                     f'<b>{p.description}</b></td></tr>')
+                     f'<b>{rich_text(p.description)}</b></td></tr>')
             continue
         if _t == "text":
-            rows += f'<tr class="pos-text"><td colspan="5">{p.description}</td></tr>'
+            rows += f'<tr class="pos-text"><td colspan="5">{rich_text(p.description)}</td></tr>'
             continue
         if _t == "subtotal":
             rows += (f'<tr class="pos-sub"><td colspan="4">'
-                     f'{p.description or "Zwischensumme"}</td>'
+                     f'{rich_text(p.description or "Zwischensumme")}</td>'
                      f'<td class="pos-num"><b>{_fmt_amount(p.line_total, "")}</b></td></tr>')
             continue
         if _t == "discount":
             hinweis = f" ({float(p.discount_pct):.0f} %)" if p.discount_pct else ""
             rows += (f'<tr class="pos-disc"><td colspan="4">'
-                     f'{p.description or "Rabatt"}{hinweis}</td>'
+                     f'{rich_text(p.description or "Rabatt")}{hinweis}</td>'
                      f'<td class="pos-num">{_fmt_amount(p.line_total, "")}</td></tr>')
             continue
         # Abzug einer bereits gestellten Anzahlung: wie der Rabatt über die
@@ -328,7 +325,7 @@ def _positions_html(positions, tax_mode: str, db=None) -> str:
         # Betrag ist die Aussage.
         if _t == "advance_deduction":
             rows += (f'<tr class="pos-disc"><td colspan="4">'
-                     f'{p.description or "Abzüglich Anzahlung"}</td>'
+                     f'{rich_text(p.description or "Abzüglich Anzahlung")}</td>'
                      f'<td class="pos-num">{_fmt_amount(p.line_total, "")}</td></tr>')
             continue
         qty   = float(p.quantity or 0)
@@ -343,14 +340,14 @@ def _positions_html(positions, tax_mode: str, db=None) -> str:
         bild_row = _bild_zeile(p, 5, db)
         detail_row = ""
         if p.detail:
-            detail_row = f'<tr class="pos-detail"><td colspan="5"><span>{p.detail}</span></td></tr>'
+            detail_row = f'<tr class="pos-detail"><td colspan="5"><span>{rich_text(p.detail)}</span></td></tr>'
 
         disc_str = f'<br><small>- {float(disc):.0f}% Rabatt</small>' if disc else ""
         rows += f"""
         <tr class="pos-row">
-          <td class="pos-desc">{p.description}{disc_str}</td>
+          <td class="pos-desc">{rich_text(p.description)}{disc_str}</td>
           <td class="pos-num">{qty:g}</td>
-          <td class="pos-num">{p.unit or ''}</td>
+          <td class="pos-num">{text(p.unit or '')}</td>
           <td class="pos-num">{_fmt_euro(price)}</td>
           {'<td class="pos-num">' + tax_cell + '</td>' if tax_mode != 'kleinunternehmer' else ''}
           <td class="pos-num pos-total">{_fmt_euro(total)}</td>
@@ -449,13 +446,11 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     """Gibt vollständiges HTML-Dokument zurück."""
 
     # Custom-CSS aus Einstellungen anhängen
-    custom_css = inv_settings.get("custom_template_css", "") or ""
-    if isinstance(custom_css, str) and custom_css.startswith('"'):
-        custom_css = custom_css.strip('"')
+    custom_css = css_block(inv_settings.get("custom_template_css", "") or "")
 
     logo_src   = _logo_b64(settings)
     logo_html  = f'<img class="logo" src="{logo_src}" alt="Logo">' if logo_src else \
-                 f'<span style="font-size:14pt;font-weight:bold;">{settings.get("company_name","")}</span>'
+                 f'<span style="font-size:14pt;font-weight:bold;">{text(settings.get("company_name",""))}</span>'
 
     sender     = _addr_lines(sender_contact, settings)
     recipient  = _recipient_lines(recipient_contact)
@@ -479,18 +474,22 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     if tax_mode == "kleinunternehmer":
         txt = inv_settings.get("kleinunternehmer_text", "Gemäß § 6 Abs. 1 Z 27 UStG wird keine Umsatzsteuer berechnet.")
         if isinstance(txt, str) and txt.startswith('"'): txt = txt.strip('"')
-        tax_notes = f'<div class="tax-note">{txt}</div>'
+        tax_notes = f'<div class="tax-note">{rich_text(txt)}</div>'
     elif any(b["label"].startswith("Reverse") for b in breakdown):
         txt = inv_settings.get("reverse_charge_text", "Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge)")
         if isinstance(txt, str) and txt.startswith('"'): txt = txt.strip('"')
-        tax_notes = f'<div class="tax-note">{txt}</div>'
+        tax_notes = f'<div class="tax-note">{rich_text(txt)}</div>'
 
     # Summen
     totals_html = _totals_html(invoice, breakdown, tax_mode)
 
     # Intro/Outro
-    intro = f'<p style="margin-bottom:0.3cm;">{invoice.intro_text}</p>' if invoice.intro_text else ""
-    outro = f'<p class="footer-text">{invoice.outro_text}</p>' if invoice.outro_text else ""
+    # Als <div>: Rich Text kann eigene <p>/<ul> mitbringen, die in einem <p>
+    # ungültig verschachtelt wären.
+    intro = (f'<div style="margin-bottom:0.3cm;">{rich_text(invoice.intro_text)}</div>'
+             if invoice.intro_text else "")
+    outro = (f'<div class="footer-text">{rich_text(invoice.outro_text)}</div>'
+             if invoice.outro_text else "")
 
     # Positionen-Header
     tax_th = '<th class="pos-num">MwSt.</th>' if tax_mode != "kleinunternehmer" else ""
@@ -522,8 +521,8 @@ def _build_html(invoice, positions, settings: dict, inv_settings: dict,
     if invoice.reference:  meta_rows.append(("Referenz",      invoice.reference))
 
     meta_html = "".join(
-        f'<tr><td style="color:#777;padding-right:1cm;">{k}</td>'
-        f'<td style="font-weight:500;">{v}</td></tr>'
+        f'<tr><td style="color:#777;padding-right:1cm;">{text(k)}</td>'
+        f'<td style="font-weight:500;">{text(v)}</td></tr>'
         for k, v in meta_rows
     )
 
@@ -582,15 +581,15 @@ def _t1(**kw) -> str:
     positions = kw["positions"]
     breakdown = kw["breakdown"]
     tax_mode  = kw["tax_mode"]
-    primary   = settings.get("primary_color") or "#ef7d00"
-    currency  = getattr(invoice, "currency", "EUR") or "EUR"
+    primary   = farbe(settings.get("primary_color"), "#ef7d00")
+    currency  = text(getattr(invoice, "currency", "EUR") or "EUR")
 
     sd = (kw.get("sender_contact").data or {}) if kw.get("sender_contact") is not None else {}
     rc = kw.get("recipient_contact")
 
     # Rücksendezeile: Name – Straße – PLZ Ort (aus den Absenderzeilen, ohne HTML)
-    plain_sender = [re.sub(r"<[^>]+>", "", l) for l in kw["sender"]]
-    ruecksende   = " – ".join([p for p in plain_sender[:3] if p])
+    plain_sender = [nur_text(l) for l in kw["sender"]]
+    ruecksende   = text(" – ".join([p for p in plain_sender[:3] if p]))
 
     recip_html = "<br>".join(kw["recipient"])
     sender_html = "<br>".join(kw["sender"])
@@ -598,11 +597,11 @@ def _t1(**kw) -> str:
     # Ort, Datum (Langform)
     ort       = sd.get("ort", "")
     datum     = _fmt_date_long(invoice.date)
-    ort_datum = f"{ort}, {datum}" if ort else datum
+    ort_datum = text(f"{ort}, {datum}" if ort else datum)
 
     # Titel: "Rechnung – <Belegtitel>"
     label_cap = kw["doc_label"].capitalize()
-    title     = f"{label_cap} – {invoice.title}" if getattr(invoice, "title", None) else label_cap
+    title     = text(f"{label_cap} – {invoice.title}" if getattr(invoice, "title", None) else label_cap)
 
     # Meta-Block mit fetten Labels
     nr_labels = {"rechnung": "Rechnungs-Nr.:", "angebot": "Angebots-Nr.:",
@@ -626,7 +625,7 @@ def _t1(**kw) -> str:
     if _skonto:
         meta_rows.append((_skonto[0] + ":", _skonto[1]))
     meta_html = "".join(
-        f'<tr><td class="m-label">{k}</td><td class="m-value">{v}</td></tr>'
+        f'<tr><td class="m-label">{text(k)}</td><td class="m-value">{text(v)}</td></tr>'
         for k, v in meta_rows
     )
 
@@ -639,29 +638,29 @@ def _t1(**kw) -> str:
     for p in positions:
         _t = getattr(p, "pos_type", "item") or "item"
         if _t == "heading":
-            rows += f'<tr class="grp"><td colspan="{ncols}"><b>{p.description}</b></td></tr>'
+            rows += f'<tr class="grp"><td colspan="{ncols}"><b>{rich_text(p.description)}</b></td></tr>'
             continue
         if _t == "text":
-            rows += f'<tr class="detail"><td colspan="{ncols}">{p.description}</td></tr>'
+            rows += f'<tr class="detail"><td colspan="{ncols}">{rich_text(p.description)}</td></tr>'
             continue
         if _t == "subtotal":
             rows += (f'<tr class="item"><td colspan="{ncols - 1}"><b>'
-                     f'{p.description or "Zwischensumme"}</b></td>'
+                     f'{rich_text(p.description or "Zwischensumme")}</b></td>'
                      f'<td class="num total"><b>{_fmt_amount(p.line_total, currency)}</b></td></tr>')
             continue
         if _t == "discount":
             hinweis = f" ({float(p.discount_pct):.0f} %)" if p.discount_pct else ""
             rows += (f'<tr class="item"><td colspan="{ncols - 1}">'
-                     f'{p.description or "Rabatt"}{hinweis}</td>'
+                     f'{rich_text(p.description or "Rabatt")}{hinweis}</td>'
                      f'<td class="num total">{_fmt_amount(p.line_total, currency)}</td></tr>')
             continue
         if _t == "advance_deduction":
             rows += (f'<tr class="item"><td colspan="{ncols - 1}">'
-                     f'{p.description or "Abzüglich Anzahlung"}</td>'
+                     f'{rich_text(p.description or "Abzüglich Anzahlung")}</td>'
                      f'<td class="num total">{_fmt_amount(p.line_total, currency)}</td></tr>')
             continue
         qty    = float(p.quantity or 0)
-        anzahl = f"{qty:g} {p.unit or ''}".strip()
+        anzahl = text(f"{qty:g} {p.unit or ''}".strip())
         disc   = f'<br><small class="disc">- {float(p.discount_pct):.0f}% Rabatt</small>' if p.discount_pct else ""
         tax_td = ""
         if show_tax:
@@ -669,14 +668,14 @@ def _t1(**kw) -> str:
             tax_td = f'<td class="num">{"RC" if r is None else f"{int(r) if r == int(r) else r} %"}</td>'
         rows += f"""
         <tr class="item">
-          <td>{p.description}{disc}</td>
+          <td>{rich_text(p.description)}{disc}</td>
           <td class="num">{anzahl}</td>
           <td class="num">{_fmt_amount(p.unit_price, currency)}</td>
           {tax_td}
           <td class="num total">{_fmt_amount(p.line_total, currency)}</td>
         </tr>"""
         if getattr(p, "detail", None):
-            rows += f'<tr class="detail"><td colspan="{ncols}">{p.detail}</td></tr>'
+            rows += f'<tr class="detail"><td colspan="{ncols}">{rich_text(p.detail)}</td></tr>'
         rows += _bild_zeile(p, ncols, kw.get("db"))
 
     tax_th = '<th class="num">MWST.</th>' if show_tax else ""
@@ -808,7 +807,7 @@ def _t2(**kw) -> str:
   <div class="logo">{kw["logo_html"]}</div>
   <div class="sender-mini">{sender_html}</div>
 </div>
-<div class="doc-label">{kw["doc_label"]}</div>
+<div class="doc-label">{text(kw["doc_label"])}</div>
 <div class="cols">
   <div style="font-size:9pt;">{recip_html}</div>
   <table class="meta-table"><tbody>{kw["meta_html"]}</tbody></table>
@@ -841,7 +840,7 @@ body {{ font-size: 8.5pt; }}
 </head><body>
 {"<div class='watermark'>" + kw['watermark'] + "</div>" if kw['watermark'] else ""}
 <div class="top">
-  <div>{kw["logo_html"]}<br><div class="doc-label">{kw["doc_label"]}</div></div>
+  <div>{kw["logo_html"]}<br><div class="doc-label">{text(kw["doc_label"])}</div></div>
   <div style="font-size:7.5pt;text-align:right;">{sender_html}</div>
 </div>
 <div class="two-col">
@@ -881,7 +880,7 @@ table.positions th, table.positions td {{ font-family: 'Helvetica Neue', Helveti
   <div>{kw["logo_html"]}</div>
   <div style="font-size:8pt;text-align:right;">{sender_html}</div>
 </div>
-<div class="doc-title">{kw["doc_label"]}</div>
+<div class="doc-title">{text(kw["doc_label"])}</div>
 <div class="address-cols">
   <div style="font-size:9pt;">{recip_html}</div>
   <table class="meta-table"><tbody>{kw["meta_html"]}</tbody></table>
@@ -901,7 +900,7 @@ table.positions th, table.positions td {{ font-family: 'Helvetica Neue', Helveti
 def _t5(**kw) -> str:
     sender_html  = "<br>".join(kw["sender"])
     recip_html   = "<br>".join(kw["recipient"])
-    primary      = kw["settings"].get("primary_color", "#2563eb") or "#2563eb"
+    primary      = farbe(kw["settings"].get("primary_color"), "#2563eb")
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
 {BASE_CSS}
@@ -933,7 +932,7 @@ table.totals .grand-total td {{ color: var(--primary); }}
   <div style="text-align:right;font-size:8pt;">{sender_html}</div>
 </div>
 <div style="margin-top:0.5cm;"></div>
-<div class="doc-label">{kw["doc_label"]}</div>
+<div class="doc-label">{text(kw["doc_label"])}</div>
 <div class="two-col">
   <div style="font-size:9pt;">{recip_html}</div>
   <table class="meta-table"><tbody>{kw["meta_html"]}</tbody></table>
@@ -978,23 +977,18 @@ def generate_pdf(invoice, positions, settings: dict, inv_settings: dict,
         template_id=template_id,
         db=db,
     )
-    buf = io.BytesIO()
-    dokument = WeasyprintHTML(string=html, base_url="/")
+    # S02: abgeschotteter Renderprozess mit Ressourcenfilter und Grenzen —
+    # kein base_url mehr (früher "/": relative Pfade wurden zu file://).
     if erechnung_xml:
-        from app.services.erechnung import pdf_anhang, facturx
+        from app.services.erechnung import facturx
         titel = f"{DOC_TYPE_LABELS.get(invoice.doc_type, 'Beleg')} {invoice.number or ''}".strip()
-        dokument.write_pdf(
-            buf,
-            pdf_variant="pdf/a-3b",
-            finisher=pdf_anhang.finisher(
-                erechnung_xml, facturx.dateiname(),
-                titel=titel,
-                autor=settings.get("company_name", "") or "",
-            ),
-        )
-    else:
-        dokument.write_pdf(buf)
-    return buf.getvalue()
+        return render_pdf(html, pdf_variant="pdf/a-3b", erechnung={
+            "xml": erechnung_xml,
+            "dateiname": facturx.dateiname(),
+            "titel": titel,
+            "autor": settings.get("company_name", "") or "",
+        })
+    return render_pdf(html)
 
 
 def generate_html_preview(invoice, positions, settings: dict, inv_settings: dict,

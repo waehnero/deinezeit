@@ -2103,7 +2103,7 @@ function TabRechnung({ embedded = false }) { // eslint-disable-line
               </div>
               <div className="flex-1 overflow-hidden rounded-b-2xl relative">
                 {previewLoading && <div className="absolute inset-0 flex items-center justify-center bg-surface z-10"><Loader2 size={28} className="animate-spin text-neutral-400" /></div>}
-                <iframe srcdoc={previewHtml} className="w-full h-full border-0" sandbox="allow-same-origin" />
+                <iframe srcdoc={previewHtml} className="w-full h-full border-0" sandbox="" referrerPolicy="no-referrer" title="Vorlagenvorschau" />
               </div>
             </div>
           </div>

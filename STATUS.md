@@ -56,6 +56,12 @@ Release-Checkliste: [docs/RELEASE-2.0.0.md](docs/RELEASE-2.0.0.md).
 
 ## Logbuch
 
+### 2026-10-17 – Sicherheitsbefund S02: PDF-Renderer (2.1.3)
+- Befund bestätigt: Mit `base_url="/"` bettete WeasyPrint über `<link rel="attachment">` aus einem Feldinhalt eine lokale (Marker-)Datei als PDF-Anhang ein; Standardabruf erlaubte zudem http/ftp/file.
+- Alle PDFs laufen jetzt über `services/pdf_render.render_pdf()`: eigener Prozess ohne Zugangsdaten, als `nobody`, mit Zeit-/CPU-/Speicher-/Größen-/Parallelitätsgrenzen; nur `data:`-Bilder; Audit-Hook gegen Datei-, Netz- und Prozesszugriffe.
+- Feldinhalte über `core/dokument_html.py` (Text maskiert, Rich Text per nh3-Positivliste, Farben/CSS geprüft); Logo- und Positionsbild-Referenzen eng begrenzt; Vorschauen mit eigener CSP und im `iframe sandbox`.
+- Belege, Bericht, Aufgabe, DSGVO pixelgleich zum Altstand; Prüfbericht: [docs/PRUEFBERICHT-S02-PDF-RENDERER-2026-10-17.md](docs/PRUEFBERICHT-S02-PDF-RENDERER-2026-10-17.md).
+
 ### 2026-10-15 – Sicherheitsbefund Mail-Import: zentrale Zugangsdaten (2.1.2)
 - Befund „zentrale Mailzugangsdaten an frei wählbaren IMAP-Server" per Regressionstest bestätigt
   und behoben: zentrale Zugangsdaten nur an globalen Konten mit vom Admin bestätigtem Ziel,

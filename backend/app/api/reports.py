@@ -2,8 +2,6 @@
 Berichte & PDF-Export
 """
 import io
-import base64
-import os
 import math
 import logging
 from datetime import datetime, timezone
@@ -11,9 +9,8 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from weasyprint import HTML as WeasyprintHTML
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +23,8 @@ from app.models.masterdata import EntityRecord, FieldDefinition
 from app.api.berichtsvorlage import bericht_html
 from app.core import zeit
 from app.core.http import content_disposition
+from app.core.dokument_html import static_bild_datenurl, text, vorschau_antwort
+from app.services.pdf_render import PdfRenderFehler, PdfRenderUeberlastet, render_pdf
 
 router = APIRouter(prefix="/reports", tags=["Berichte"])
 
@@ -93,18 +92,9 @@ def _load_settings(db: Session) -> dict:
 
 def _logo_base64(settings: dict) -> str:
     """Lädt das Header-Logo als base64 für den PDF-Einbau."""
+    # S02: nur geprüfte Bilddateien aus dem static-Verzeichnis
     logo_url = settings.get("logo_header_url") or settings.get("logo_url") or ""
-    if not logo_url:
-        return ""
-    path = logo_url.replace("/api/static", STATIC_DIR)
-    if not os.path.exists(path):
-        return ""
-    ext  = os.path.splitext(path)[1].lower().lstrip(".")
-    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-            "svg": "image/svg+xml", "webp": "image/webp"}.get(ext, "image/png")
-    with open(path, "rb") as f:
-        data = base64.b64encode(f.read()).decode()
-    return f"data:{mime};base64,{data}"
+    return static_bild_datenurl(logo_url, STATIC_DIR)
 
 
 def _adresse_aus_record(db: Session, record, vorgabe_name: str = "") -> dict:
@@ -229,7 +219,7 @@ def _build_html(
     if logo_src:
         logo_html = f'<img src="{logo_src}" class="logo" alt="Logo">'
     elif settings.get("company_name"):
-        logo_html = f'<span class="logo-text">{settings["company_name"]}</span>'
+        logo_html = f'<span class="logo-text">{text(settings["company_name"])}</span>'
     else:
         logo_html = ""
 
@@ -244,13 +234,13 @@ def _build_html(
     empfaenger_html = ""
     if len(kontakte) == 1:
         adresse = _kunde_adresse(db, next(iter(kontakte)))
-        zeilen = [f'<div class="empf-name">{adresse["name"]}</div>']
+        zeilen = [f'<div class="empf-name">{text(adresse["name"])}</div>']
         if adresse["street"]:
-            zeilen.append(f'<div>{adresse["street"]}</div>')
+            zeilen.append(f'<div>{text(adresse["street"])}</div>')
         if adresse["zip_city"]:
-            zeilen.append(f'<div>{adresse["zip_city"]}</div>')
+            zeilen.append(f'<div>{text(adresse["zip_city"])}</div>')
         if adresse["country"]:
-            zeilen.append(f'<div>{adresse["country"]}</div>')
+            zeilen.append(f'<div>{text(adresse["country"])}</div>')
         empfaenger_html = "\n".join(zeilen)
 
     # Rundung gehört in den Kopf des Berichts: Wer die Stunden nachrechnet,
@@ -347,11 +337,16 @@ def report_zeiterfassung(
 
     # ── HTML-Vorschau ─────────────────────────────────────────────────────────
     if format == "html":
-        return HTMLResponse(content=html_content)
+        return vorschau_antwort(html_content)
 
     # ── PDF generieren ────────────────────────────────────────────────────────
     try:
-        pdf_bytes = WeasyprintHTML(string=html_content).write_pdf()
+        pdf_bytes = render_pdf(html_content)
+    except PdfRenderUeberlastet as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except PdfRenderFehler as exc:
+        logger.warning("Projektzeitbericht: %s", exc)
+        raise HTTPException(500, str(exc)) from exc
     except Exception as exc:
         logger.exception("WeasyPrint Fehler beim PDF-Generieren")
         logger.exception("Fehler bei reports: %s", exc)

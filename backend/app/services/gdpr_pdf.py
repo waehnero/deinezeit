@@ -13,7 +13,8 @@ Zwei Varianten aus demselben Löschvorgang:
 from datetime import datetime
 from typing import Optional
 
-from weasyprint import HTML as WeasyprintHTML
+from app.core.dokument_html import text
+from app.services.pdf_render import render_pdf
 
 CATEGORY_LABELS = {
     "time_entries":         "Zeiteinträge",
@@ -61,7 +62,7 @@ def build_erasure_pdf(*, variant: str, report: dict, log_id: str,
     rows = ""
     for key, label in CATEGORY_LABELS.items():
         if key in cats:
-            rows += f"<tr><td>{label}</td><td class='r'>{cats[key]}</td></tr>"
+            rows += f"<tr><td>{text(label)}</td><td class='r'>{text(cats[key])}</td></tr>"
 
     # Betroffenen-Block nur in der persönlichen Variante
     person_html = ""
@@ -70,13 +71,13 @@ def build_erasure_pdf(*, variant: str, report: dict, log_id: str,
         detail_lines = []
         for k in ("ansprechperson", "adresse", "plz", "ort", "land", "email", "telefon", "uid"):
             if d.get(k):
-                detail_lines.append(str(d[k]))
+                detail_lines.append(text(d[k]))
         details = "<br>".join(detail_lines)
         person_html = f"""
         <h2>Betroffene Person / Organisation</h2>
-        <p><strong>{rec.get('display_name') or '—'}</strong><br>{details}</p>"""
+        <p><strong>{text(rec.get('display_name') or '—')}</strong><br>{details}</p>"""
 
-    company_html = "<br>".join(company_lines or [company_name])
+    company_html = "<br>".join(text(z) for z in (company_lines or [company_name]))
 
     retention_html = ""
     if retention.get("deletable_after"):
@@ -84,19 +85,19 @@ def build_erasure_pdf(*, variant: str, report: dict, log_id: str,
         <p>Aufbewahrungspflichtige Belegdaten (Name und Anschrift auf Rechnungen
         und Gutschriften) bleiben gemäß § 132 BAO bzw. § 147 AO als eingefrorener
         Beleg-Bestandteil erhalten (Aufbewahrungsfrist:
-        {retention.get('years', 7)} Jahre) und werden nach Fristablauf
-        (<strong>{_fmt_date(retention['deletable_after'])}</strong>) endgültig gelöscht.
+        {text(retention.get('years', 7))} Jahre) und werden nach Fristablauf
+        (<strong>{text(_fmt_date(retention['deletable_after']))}</strong>) endgültig gelöscht.
         Eine Verwendung für andere Zwecke ist ausgeschlossen
         (Art. 18 DSGVO — Einschränkung der Verarbeitung).</p>"""
 
     files_html = FILES_ACTION_LABELS.get(files_action, "")
-    note_html = f"<p>Anmerkung: {note}</p>" if (note and personal) else ""
+    note_html = f"<p>Anmerkung: {text(note)}</p>" if (note and personal) else ""
 
     title = ("Löschbescheinigung gemäß Art. 17 DSGVO" if personal
              else "Löschprotokoll (anonymisiert) — Art. 17 DSGVO")
 
     subject_html = "" if personal else f"""
-    <p>Betroffener Datensatz (anonymisiert): <code>{rec.get('id', '—')}</code><br>
+    <p>Betroffener Datensatz (anonymisiert): <code>{text(rec.get('id', '—'))}</code><br>
     Dieses Protokoll enthält bewusst keine personenbezogenen Daten
     (Rechenschaftspflicht, Art. 5 Abs. 2 DSGVO).</p>"""
 
@@ -121,9 +122,9 @@ def build_erasure_pdf(*, variant: str, report: dict, log_id: str,
 </style></head><body>
   <div class="sender">{company_html}</div>
   <h1>{title}</h1>
-  <p class="meta">Vorgangs-ID: <code>{log_id}</code> &nbsp;|&nbsp;
+  <p class="meta">Vorgangs-ID: <code>{text(log_id)}</code> &nbsp;|&nbsp;
      Durchgeführt am {executed_at.strftime('%d.%m.%Y um %H:%M Uhr (UTC)')}
-     {('durch ' + executed_by) if executed_by else ''}</p>
+     {text('durch ' + executed_by) if executed_by else ''}</p>
 
   {person_html}
   {subject_html}
@@ -141,9 +142,9 @@ def build_erasure_pdf(*, variant: str, report: dict, log_id: str,
   {note_html}
 
   <div class="footer">
-    Erstellt mit DeineZeit — {company_name}. Dieses Dokument wurde maschinell
+    Erstellt mit DeineZeit — {text(company_name)}. Dieses Dokument wurde maschinell
     erstellt und ist ohne Unterschrift gültig.
   </div>
 </body></html>"""
 
-    return WeasyprintHTML(string=html).write_pdf()
+    return render_pdf(html)

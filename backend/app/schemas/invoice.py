@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Any
 from uuid import UUID
 from datetime import date, datetime
@@ -28,9 +28,31 @@ class InvoicePositionBase(BaseModel):
     time_entry_id: Optional[UUID] = None
 
 class InvoicePositionCreate(InvoicePositionBase):
-    pass
+    # Nur beim Schreiben geprüft — gespeicherte Altbestände müssen sich
+    # weiterhin lesen lassen (die PDF-Erzeugung prüft dieselbe Regel selbst).
+    # S02: Die Bildreferenz vergibt der Server beim Hochladen; der Client
+    # schickt sie nur zurück. Fremde Speicherorte werden nicht angenommen.
+    @field_validator("image_key")
+    @classmethod
+    def _bildreferenz_pruefen(cls, wert):
+        if wert in (None, ""):
+            return None
+        from app.services.position_image import schluessel_gueltig
+        if not schluessel_gueltig(wert):
+            raise ValueError("Ungültige Bildreferenz")
+        return wert
 
-class InvoicePositionUpdate(InvoicePositionBase):
+    @field_validator("image_provider")
+    @classmethod
+    def _bildspeicher_pruefen(cls, wert):
+        if wert in (None, ""):
+            return None
+        from app.services.position_image import speicher_gueltig
+        if not speicher_gueltig(wert):
+            raise ValueError("Unbekannter Bildspeicher")
+        return wert
+
+class InvoicePositionUpdate(InvoicePositionCreate):
     pass
 
 class InvoicePositionResponse(InvoicePositionBase):

@@ -16,7 +16,8 @@ import base64
 import io
 
 import qrcode
-from weasyprint import HTML as WeasyprintHTML
+from app.core.dokument_html import farbe
+from app.services.pdf_render import render_pdf
 from app.core import zeit
 
 
@@ -68,9 +69,9 @@ def generate_todo_pdf(todo: dict, qr_payload: str, statuses: list, priorities: l
         return fallback
 
     status_label = _label(statuses, todo.get("status"))
-    status_color = _color(statuses, todo.get("status"))
+    status_color = farbe(_color(statuses, todo.get("status")), "#6b7280")
     prio_label = _label(priorities, todo.get("priority"))
-    prio_color = _color(priorities, todo.get("priority"))
+    prio_color = farbe(_color(priorities, todo.get("priority")), "#6b7280")
 
     faellig = _datum(todo.get("due_date"))
     if todo.get("due_time"):
@@ -182,4 +183,4 @@ def generate_todo_pdf(todo: dict, qr_payload: str, statuses: list, priorities: l
 
 </body></html>"""
 
-    return WeasyprintHTML(string=html).write_pdf()
+    return render_pdf(html)
