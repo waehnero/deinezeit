@@ -342,6 +342,11 @@ cd frontend && npm run test:watch
   in `except` weiterwerfen mit `raise … from e` (ruff B904 ist in CI Pflicht);
   `except Exception: pass` nur für echtes Beiwerk, sonst `logger.warning(…, exc_info=True)`.
 - **Migrationen:** durchnummeriert; nie nachträglich umnummerieren.
+- **nginx-Version ist fest** (`nginx:1.31.9-alpine`, seit 19.11.2026): in
+  `docker-compose.yml`, `docker-compose.local.yml` und `frontend/Dockerfile`
+  immer dieselbe Nummer, nie das lose `nginx:alpine` (wird am Server nie
+  erneuert). Beim Anheben auch `min` im CI-Schritt „nginx-Version fest und
+  nicht verwundbar?" nachziehen.
 - **Zeilenenden** (`.gitattributes`): `.sh` = LF, `.bat/.ps1/.cmd` = CRLF.
 - **Doku:** nutzerorientierte Anleitungen sind bewusst einfach gehalten und
   überwiegend für Windows-Endnutzer geschrieben — beim Erweitern Ton beibehalten.

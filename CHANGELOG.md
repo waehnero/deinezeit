@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4] – 2026-11-19 – Sicherheitsupdate Webserver
+
+### Aktualisierungen
+- Der Webserver wurde auf die aktuelle, abgesicherte Version angehoben.
+
+---
+
 ## [2.1.3] – 2026-10-17 – Sicherere PDF-Erzeugung
 
 ### Aktualisierungen

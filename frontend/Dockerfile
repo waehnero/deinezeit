@@ -19,7 +19,9 @@ RUN echo "build $GIT_SHA"
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+# Feste nginx-Version (NGINX2Root, 19.11.2026) — gleich halten mit
+# docker-compose.yml und docker-compose.local.yml, die CI prüft das.
+FROM nginx:1.31.9-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

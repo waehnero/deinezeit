@@ -56,6 +56,12 @@ Release-Checkliste: [docs/RELEASE-2.0.0.md](docs/RELEASE-2.0.0.md).
 
 ## Logbuch
 
+### 2026-11-19 – NGINX2Root: nginx fest auf 1.31.9
+- Anlass: fünf nginx-Lücken vom 18.11.2026 (CERT.at/F5). Der Server erfüllt mit `http2 on` + Weiterleitung die Voraussetzungen der zwei schwersten (CVE-2026-123007, CVE-2026-123633); lokal ist keine erreichbar.
+- Ursache der Anfälligkeit: `nginx:alpine` ist ein loses Etikett, das der Deploy nie neu holt. Jetzt an drei Stellen fest `nginx:1.31.9-alpine` (beide Compose-Dateien, `frontend/Dockerfile`); CI-Schritt „nginx-Version fest und nicht verwundbar?" wacht über Gleichstand und Mindestversion.
+- Am Server zusätzlich: Kernel-Modul `sctp` sperren (ungepatchter Kernel-Fehler, mit dem die Forscher aus dem Container ausbrachen).
+- Prüfbericht: [docs/PRUEFBERICHT-NGINX2ROOT-2026-11-19.md](docs/PRUEFBERICHT-NGINX2ROOT-2026-11-19.md).
+
 ### 2026-10-17 – Sicherheitsbefund S02: PDF-Renderer (2.1.3)
 - Befund bestätigt: Mit `base_url="/"` bettete WeasyPrint über `<link rel="attachment">` aus einem Feldinhalt eine lokale (Marker-)Datei als PDF-Anhang ein; Standardabruf erlaubte zudem http/ftp/file.
 - Alle PDFs laufen jetzt über `services/pdf_render.render_pdf()`: eigener Prozess ohne Zugangsdaten, als `nobody`, mit Zeit-/CPU-/Speicher-/Größen-/Parallelitätsgrenzen; nur `data:`-Bilder; Audit-Hook gegen Datei-, Netz- und Prozesszugriffe.
