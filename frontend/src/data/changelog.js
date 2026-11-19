@@ -4,6 +4,16 @@
  */
 export const changelog = [
   {
+    version: '2.1.4',
+    day: '19',
+    month: 'November',
+    year: '2026',
+    features: [],
+    updates: [
+      'Der Webserver wurde auf die aktuelle, abgesicherte Version angehoben.',
+    ],
+  },
+  {
     version: '2.1.3',
     day: '17',
     month: 'Oktober',

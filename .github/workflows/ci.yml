@@ -241,3 +241,33 @@ jobs:
               exit 1
             fi
           done
+
+      # NGINX2Root (18.11.2026): fünf Lücken in nginx bis 1.30.6 / 1.31.8, zwei
+      # davon über HTTP/2 ohne Anmeldung erreichbar. Das lose Etikett
+      # `nginx:alpine` wurde am Server nie erneuert. Dieser Schritt hält fest:
+      # überall dieselbe feste Version, und nie wieder unter der bereinigten.
+      - name: "nginx-Version fest und nicht verwundbar?"
+        run: |
+          min="1.31.9"
+          dateien="docker-compose.yml docker-compose.local.yml frontend/Dockerfile"
+          tags="$(grep -hEo '(image:|FROM)[[:space:]]+nginx:[^[:space:]]+' $dateien | sed -E 's/.*nginx://')"
+          anzahl="$(printf '%s\n' "$tags" | grep -c . || true)"
+          if [ "$anzahl" -ne 3 ]; then
+            echo "  ✗ Erwartet 3 nginx-Images, gefunden: $anzahl"
+            exit 1
+          fi
+          if [ "$(printf '%s\n' "$tags" | sort -u | wc -l)" -ne 1 ]; then
+            echo "  ✗ nginx-Versionen laufen auseinander:"; printf '%s\n' "$tags"
+            exit 1
+          fi
+          tag="$(printf '%s\n' "$tags" | head -n1)"
+          version="$(printf '%s' "$tag" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          if [ -z "$version" ]; then
+            echo "  ✗ nginx ohne feste Versionsnummer: nginx:$tag"
+            exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "$min" "$version" | sort -V | head -n1)" != "$min" ]; then
+            echo "  ✗ nginx $version liegt unter der Mindestversion $min (NGINX2Root)"
+            exit 1
+          fi
+          echo "  ✓ nginx:$tag (mindestens $min)"
